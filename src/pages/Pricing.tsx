@@ -1,0 +1,298 @@
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
+import { Check, Crown, Zap, Users, MessageCircle, History, ArrowLeft, Sparkles } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useSubscription } from '@/hooks/useSubscription';
+import { useToast } from '@/hooks/use-toast';
+import { Plan, BillingCycle, BILLING_CYCLE_LABELS, BILLING_CYCLE_DISCOUNTS } from '@/lib/subscription-types';
+
+export default function Pricing() {
+  const navigate = useNavigate();
+  const { toast } = useToast();
+  const { plans, currentPlan, loading, createCheckout, accountType } = useSubscription();
+  const [accountTab, setAccountTab] = useState<'personal' | 'professional'>(accountType);
+  const [billingCycle, setBillingCycle] = useState<BillingCycle>('monthly');
+  const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null);
+
+  const filteredPlans = plans.filter(p => p.type === accountTab);
+
+  const getPrice = (plan: Plan, cycle: BillingCycle): number => {
+    switch (cycle) {
+      case 'quarterly': return plan.price_quarterly;
+      case 'semiannual': return plan.price_semiannual;
+      case 'annual': return plan.price_annual;
+      default: return plan.price_monthly;
+    }
+  };
+
+  const getMonthlyEquivalent = (plan: Plan, cycle: BillingCycle): number => {
+    const total = getPrice(plan, cycle);
+    switch (cycle) {
+      case 'quarterly': return total / 3;
+      case 'semiannual': return total / 6;
+      case 'annual': return total / 12;
+      default: return total;
+    }
+  };
+
+  const handleSubscribe = async (plan: Plan) => {
+    if (plan.name === 'free') {
+      toast({ title: 'Você já está no plano gratuito!' });
+      return;
+    }
+
+    setCheckoutLoading(plan.id);
+    try {
+      await createCheckout(plan.id, billingCycle);
+      toast({ title: 'Redirecionando para o checkout...' });
+    } catch (error) {
+      toast({
+        title: 'Erro ao criar checkout',
+        description: 'Tente novamente mais tarde.',
+        variant: 'destructive',
+      });
+    } finally {
+      setCheckoutLoading(null);
+    }
+  };
+
+  const getPlanIcon = (name: string) => {
+    switch (name) {
+      case 'free': return <Zap className="h-6 w-6" />;
+      case 'basic': return <Sparkles className="h-6 w-6" />;
+      case 'pro': return <Crown className="h-6 w-6" />;
+      default: return <Zap className="h-6 w-6" />;
+    }
+  };
+
+  const getPlanFeatures = (plan: Plan): string[] => {
+    const features: string[] = [];
+    
+    features.push(`${plan.diet_limit} dietas por mês`);
+    features.push(`${plan.substitution_limit} substituições`);
+    
+    if (plan.adjustment_limit > 0) {
+      features.push(`${plan.adjustment_limit} ajustes automáticos`);
+    }
+    
+    if (plan.has_chat) {
+      features.push(`${plan.chat_messages_per_day} mensagens de chat/dia`);
+    }
+    
+    if (plan.patients_limit > 0) {
+      features.push(`${plan.patients_limit} pacientes`);
+    }
+    
+    if (plan.history_days === 9999) {
+      features.push('Histórico ilimitado');
+    } else {
+      features.push(`${plan.history_days} dias de histórico`);
+    }
+    
+    return features;
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-background">
+      {/* Header */}
+      <header className="border-b bg-card/50 backdrop-blur-sm sticky top-0 z-50">
+        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
+          <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <h1 className="text-xl font-bold">Planos e Preços</h1>
+          <div className="w-10" />
+        </div>
+      </header>
+
+      <main className="container mx-auto px-4 py-8">
+        {/* Hero */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="text-center mb-12"
+        >
+          <h2 className="text-4xl font-bold mb-4">
+            Escolha o plano ideal para você
+          </h2>
+          <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
+            Desbloqueie todo o potencial da sua jornada nutricional com nossos planos personalizados.
+          </p>
+        </motion.div>
+
+        {/* Account Type Tabs */}
+        <Tabs value={accountTab} onValueChange={(v) => setAccountTab(v as 'personal' | 'professional')} className="mb-8">
+          <TabsList className="grid w-full max-w-md mx-auto grid-cols-2">
+            <TabsTrigger value="personal" className="flex items-center gap-2">
+              <Zap className="h-4 w-4" />
+              Uso Pessoal
+            </TabsTrigger>
+            <TabsTrigger value="professional" className="flex items-center gap-2">
+              <Users className="h-4 w-4" />
+              Profissional
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
+
+        {/* Billing Cycle */}
+        <div className="flex justify-center mb-8">
+          <div className="inline-flex bg-muted rounded-lg p-1 gap-1">
+            {(['monthly', 'quarterly', 'semiannual', 'annual'] as BillingCycle[]).map((cycle) => (
+              <button
+                key={cycle}
+                onClick={() => setBillingCycle(cycle)}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors relative ${
+                  billingCycle === cycle
+                    ? 'bg-primary text-primary-foreground'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                {BILLING_CYCLE_LABELS[cycle]}
+                {BILLING_CYCLE_DISCOUNTS[cycle] > 0 && (
+                  <Badge 
+                    variant="secondary" 
+                    className="absolute -top-2 -right-2 text-xs px-1 py-0"
+                  >
+                    -{BILLING_CYCLE_DISCOUNTS[cycle]}%
+                  </Badge>
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Plans Grid */}
+        <div className={`grid gap-6 max-w-5xl mx-auto ${
+          filteredPlans.length === 2 ? 'md:grid-cols-2' : 'md:grid-cols-3'
+        }`}>
+          {filteredPlans.map((plan, index) => {
+            const isCurrentPlan = currentPlan?.id === plan.id;
+            const isPro = plan.name === 'pro';
+            const price = getPrice(plan, billingCycle);
+            const monthlyEquiv = getMonthlyEquivalent(plan, billingCycle);
+            
+            return (
+              <motion.div
+                key={plan.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.1 }}
+              >
+                <Card className={`relative h-full flex flex-col ${
+                  isPro ? 'border-primary shadow-lg shadow-primary/20' : ''
+                } ${isCurrentPlan ? 'ring-2 ring-primary' : ''}`}>
+                  {isPro && (
+                    <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                      <Badge className="bg-primary text-primary-foreground">
+                        Mais Popular
+                      </Badge>
+                    </div>
+                  )}
+                  
+                  {isCurrentPlan && (
+                    <div className="absolute -top-3 right-4">
+                      <Badge variant="outline" className="bg-background">
+                        Seu Plano
+                      </Badge>
+                    </div>
+                  )}
+
+                  <CardHeader className="text-center pb-2">
+                    <div className={`w-12 h-12 rounded-full mx-auto mb-3 flex items-center justify-center ${
+                      isPro ? 'bg-primary text-primary-foreground' : 'bg-muted'
+                    }`}>
+                      {getPlanIcon(plan.name)}
+                    </div>
+                    <CardTitle className="text-2xl capitalize">{plan.name}</CardTitle>
+                    <CardDescription>
+                      {plan.name === 'free' && 'Comece gratuitamente'}
+                      {plan.name === 'basic' && 'Para uso regular'}
+                      {plan.name === 'pro' && 'Recursos completos'}
+                    </CardDescription>
+                  </CardHeader>
+
+                  <CardContent className="flex-1">
+                    <div className="text-center mb-6">
+                      <div className="flex items-baseline justify-center gap-1">
+                        <span className="text-4xl font-bold">
+                          R$ {price.toFixed(2).replace('.', ',')}
+                        </span>
+                        {billingCycle !== 'monthly' && (
+                          <span className="text-muted-foreground">/{BILLING_CYCLE_LABELS[billingCycle].toLowerCase()}</span>
+                        )}
+                      </div>
+                      {billingCycle !== 'monthly' && price > 0 && (
+                        <p className="text-sm text-muted-foreground mt-1">
+                          ≈ R$ {monthlyEquiv.toFixed(2).replace('.', ',')}/mês
+                        </p>
+                      )}
+                    </div>
+
+                    <ul className="space-y-3">
+                      {getPlanFeatures(plan).map((feature, i) => (
+                        <li key={i} className="flex items-center gap-3">
+                          <Check className="h-4 w-4 text-primary flex-shrink-0" />
+                          <span className="text-sm">{feature}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </CardContent>
+
+                  <CardFooter>
+                    <Button
+                      className="w-full"
+                      variant={isPro ? 'default' : 'outline'}
+                      disabled={isCurrentPlan || checkoutLoading === plan.id}
+                      onClick={() => handleSubscribe(plan)}
+                    >
+                      {checkoutLoading === plan.id ? (
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current" />
+                      ) : isCurrentPlan ? (
+                        'Plano Atual'
+                      ) : plan.name === 'free' ? (
+                        'Plano Gratuito'
+                      ) : (
+                        'Assinar Agora'
+                      )}
+                    </Button>
+                  </CardFooter>
+                </Card>
+              </motion.div>
+            );
+          })}
+        </div>
+
+        {/* FAQ or Features Section */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.5 }}
+          className="mt-16 text-center"
+        >
+          <h3 className="text-2xl font-bold mb-4">Dúvidas?</h3>
+          <p className="text-muted-foreground mb-6">
+            Todos os planos incluem suporte e atualizações. Cancele quando quiser.
+          </p>
+          <div className="flex justify-center gap-4">
+            <Button variant="outline" onClick={() => navigate('/chat')}>
+              <MessageCircle className="h-4 w-4 mr-2" />
+              Falar com Suporte
+            </Button>
+          </div>
+        </motion.div>
+      </main>
+    </div>
+  );
+}

@@ -18,6 +18,8 @@ import Progress from "./pages/Progress";
 import Students from "./pages/Students";
 import BecomeProfessional from "./pages/BecomeProfessional";
 import StudentView from "./pages/StudentView";
+import Pricing from "./pages/Pricing";
+import Subscription from "./pages/Subscription";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -43,6 +45,8 @@ const App = () => (
             <Route path="/students" element={<ProtectedRoute><Students /></ProtectedRoute>} />
             <Route path="/become-professional" element={<ProtectedRoute><BecomeProfessional /></ProtectedRoute>} />
             <Route path="/student/:studentId" element={<ProtectedRoute><StudentView /></ProtectedRoute>} />
+            <Route path="/pricing" element={<Pricing />} />
+            <Route path="/subscription" element={<ProtectedRoute><Subscription /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
