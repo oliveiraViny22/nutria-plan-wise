@@ -139,19 +139,27 @@ export default function MealDetail() {
     const originalQty = getTotalGrams(originalFood, selectedMealFood.quantity);
     const originalNutrients = calcNutrients(originalFood, originalQty);
     
-    // Calculate quantity of new food to match calories of original
+    // Calculate quantity of new food to EXACTLY match calories of original
     const newBaseGrams = parseServingGrams(food.serving_size);
-    const caloriesPerGram = food.calories / newBaseGrams;
-    const targetGrams = caloriesPerGram > 0 ? Math.round(originalNutrients.calories / caloriesPerGram) : newBaseGrams;
+    const caloriesPerBaseGram = food.calories / newBaseGrams;
     
-    // Clamp to reasonable range and round to nearest 5g
-    const adjustedQty = Math.min(500, Math.max(10, Math.round(targetGrams / 5) * 5));
+    // Calculate exact grams needed to match original calories
+    let targetGrams = caloriesPerBaseGram > 0 
+      ? originalNutrients.calories / caloriesPerBaseGram 
+      : newBaseGrams;
+    
+    // Round to nearest gram for precision
+    targetGrams = Math.round(targetGrams);
+    
+    // Clamp to reasonable range (10g - 500g)
+    const adjustedQty = Math.min(500, Math.max(10, targetGrams));
     
     setSelectedNewFood(food);
     setAdjustedQuantity(adjustedQty);
     setLoadingImpact(true);
 
     try {
+      // Calculate nutrients with the adjusted quantity
       const newNutrients = calcNutrients(food, adjustedQty);
       
       const response = await supabase.functions.invoke('explain-substitution', {
@@ -175,7 +183,7 @@ export default function MealDetail() {
       setImpactExplanation(response.data.explanation);
     } catch (error: any) {
       console.error('Error getting explanation:', error);
-      setImpactExplanation('Não foi possível gerar a explicação neste momento.');
+      setImpactExplanation('A quantidade foi ajustada para manter as mesmas calorias do alimento original.');
     } finally {
       setLoadingImpact(false);
     }
@@ -200,43 +208,86 @@ export default function MealDetail() {
 
       if (updateError) throw updateError;
 
-      // Calculate differences
-      const calorieDiff = newNutrients.calories - oldNutrients.calories;
+      // Calculate differences in macros only (calories should stay ~same due to quantity adjustment)
       const proteinDiff = newNutrients.protein - oldNutrients.protein;
       const carbsDiff = newNutrients.carbs - oldNutrients.carbs;
       const fatDiff = newNutrients.fat - oldNutrients.fat;
 
-      // Update meal totals
+      // Recalculate meal totals from scratch to ensure accuracy
+      const { data: updatedMealFoods } = await supabase
+        .from('meal_foods')
+        .select(`*, food:foods(*)`)
+        .eq('meal_id', meal.id);
+
+      let mealCalories = 0;
+      let mealProtein = 0;
+      let mealCarbs = 0;
+      let mealFat = 0;
+
+      if (updatedMealFoods) {
+        for (const mf of updatedMealFoods) {
+          const food = mf.food as Food;
+          const qty = getTotalGrams(food, mf.quantity);
+          const nutrients = calcNutrients(food, qty);
+          mealCalories += nutrients.calories;
+          mealProtein += nutrients.protein;
+          mealCarbs += nutrients.carbs;
+          mealFat += nutrients.fat;
+        }
+      }
+
+      // Update meal with recalculated totals
       const { error: mealError } = await supabase
         .from('meals')
         .update({
-          total_calories: meal.total_calories + calorieDiff,
-          total_protein: meal.total_protein + proteinDiff,
-          total_carbs: meal.total_carbs + carbsDiff,
-          total_fat: meal.total_fat + fatDiff,
+          total_calories: mealCalories,
+          total_protein: mealProtein,
+          total_carbs: mealCarbs,
+          total_fat: mealFat,
         })
         .eq('id', meal.id);
 
       if (mealError) throw mealError;
 
-      // Update diet plan totals
-      const { data: planData } = await supabase
-        .from('diet_plans')
+      // Recalculate diet plan totals from all meals
+      const { data: allMeals } = await supabase
+        .from('meals')
         .select('*')
-        .eq('id', meal.diet_plan_id)
-        .single();
+        .eq('diet_plan_id', meal.diet_plan_id);
 
-      if (planData) {
-        await supabase
-          .from('diet_plans')
-          .update({
-            total_calories: planData.total_calories + calorieDiff,
-            total_protein: planData.total_protein + proteinDiff,
-            total_carbs: planData.total_carbs + carbsDiff,
-            total_fat: planData.total_fat + fatDiff,
-          })
-          .eq('id', planData.id);
+      let planCalories = 0;
+      let planProtein = 0;
+      let planCarbs = 0;
+      let planFat = 0;
+
+      if (allMeals) {
+        // For meals other than current one, use their stored values
+        // For current meal, use our freshly calculated values
+        for (const m of allMeals) {
+          if (m.id === meal.id) {
+            planCalories += mealCalories;
+            planProtein += mealProtein;
+            planCarbs += mealCarbs;
+            planFat += mealFat;
+          } else {
+            planCalories += m.total_calories || 0;
+            planProtein += m.total_protein || 0;
+            planCarbs += m.total_carbs || 0;
+            planFat += m.total_fat || 0;
+          }
+        }
       }
+
+      // Update diet plan with accurate totals
+      await supabase
+        .from('diet_plans')
+        .update({
+          total_calories: planCalories,
+          total_protein: planProtein,
+          total_carbs: planCarbs,
+          total_fat: planFat,
+        })
+        .eq('id', meal.diet_plan_id);
 
       toast.success('Alimento substituído com sucesso!');
       setShowSubstituteModal(false);
