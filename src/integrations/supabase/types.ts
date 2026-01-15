@@ -228,6 +228,75 @@ export type Database = {
           },
         ]
       }
+      plans: {
+        Row: {
+          adjustment_limit: number
+          chat_messages_per_day: number
+          created_at: string | null
+          diet_limit: number
+          has_chat: boolean
+          history_days: number
+          id: string
+          is_active: boolean
+          name: string
+          patients_limit: number
+          price_annual: number | null
+          price_monthly: number | null
+          price_quarterly: number | null
+          price_semiannual: number | null
+          stripe_price_annual: string | null
+          stripe_price_monthly: string | null
+          stripe_price_quarterly: string | null
+          stripe_price_semiannual: string | null
+          substitution_limit: number
+          type: Database["public"]["Enums"]["plan_type"]
+        }
+        Insert: {
+          adjustment_limit?: number
+          chat_messages_per_day?: number
+          created_at?: string | null
+          diet_limit?: number
+          has_chat?: boolean
+          history_days?: number
+          id?: string
+          is_active?: boolean
+          name: string
+          patients_limit?: number
+          price_annual?: number | null
+          price_monthly?: number | null
+          price_quarterly?: number | null
+          price_semiannual?: number | null
+          stripe_price_annual?: string | null
+          stripe_price_monthly?: string | null
+          stripe_price_quarterly?: string | null
+          stripe_price_semiannual?: string | null
+          substitution_limit?: number
+          type: Database["public"]["Enums"]["plan_type"]
+        }
+        Update: {
+          adjustment_limit?: number
+          chat_messages_per_day?: number
+          created_at?: string | null
+          diet_limit?: number
+          has_chat?: boolean
+          history_days?: number
+          id?: string
+          is_active?: boolean
+          name?: string
+          patients_limit?: number
+          price_annual?: number | null
+          price_monthly?: number | null
+          price_quarterly?: number | null
+          price_semiannual?: number | null
+          stripe_price_annual?: string | null
+          stripe_price_monthly?: string | null
+          stripe_price_quarterly?: string | null
+          stripe_price_semiannual?: string | null
+          substitution_limit?: number
+          type?: Database["public"]["Enums"]["plan_type"]
+        }
+        Relationships: []
+      }
       professional_licenses: {
         Row: {
           created_at: string | null
@@ -360,6 +429,62 @@ export type Database = {
         }
         Relationships: []
       }
+      subscriptions: {
+        Row: {
+          billing_cycle: Database["public"]["Enums"]["billing_cycle"] | null
+          cancel_at_period_end: boolean | null
+          created_at: string | null
+          current_period_end: string | null
+          current_period_start: string | null
+          id: string
+          plan_id: string
+          provider: string | null
+          provider_customer_id: string | null
+          provider_subscription_id: string | null
+          status: Database["public"]["Enums"]["subscription_status"]
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          billing_cycle?: Database["public"]["Enums"]["billing_cycle"] | null
+          cancel_at_period_end?: boolean | null
+          created_at?: string | null
+          current_period_end?: string | null
+          current_period_start?: string | null
+          id?: string
+          plan_id: string
+          provider?: string | null
+          provider_customer_id?: string | null
+          provider_subscription_id?: string | null
+          status?: Database["public"]["Enums"]["subscription_status"]
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          billing_cycle?: Database["public"]["Enums"]["billing_cycle"] | null
+          cancel_at_period_end?: boolean | null
+          created_at?: string | null
+          current_period_end?: string | null
+          current_period_start?: string | null
+          id?: string
+          plan_id?: string
+          provider?: string | null
+          provider_customer_id?: string | null
+          provider_subscription_id?: string | null
+          status?: Database["public"]["Enums"]["subscription_status"]
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subscriptions_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           created_at: string | null
@@ -377,6 +502,48 @@ export type Database = {
           created_at?: string | null
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_usage: {
+        Row: {
+          adjustments_used: number
+          chat_messages_today: number
+          created_at: string | null
+          diets_used: number
+          id: string
+          last_chat_reset: string
+          period_end: string
+          period_start: string
+          substitutions_used: number
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          adjustments_used?: number
+          chat_messages_today?: number
+          created_at?: string | null
+          diets_used?: number
+          id?: string
+          last_chat_reset?: string
+          period_end?: string
+          period_start?: string
+          substitutions_used?: number
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          adjustments_used?: number
+          chat_messages_today?: number
+          created_at?: string | null
+          diets_used?: number
+          id?: string
+          last_chat_reset?: string
+          period_end?: string
+          period_start?: string
+          substitutions_used?: number
+          updated_at?: string | null
           user_id?: string
         }
         Relationships: []
@@ -413,7 +580,27 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      can_use_feature: {
+        Args: { _feature: string; _user_id: string }
+        Returns: boolean
+      }
       get_student_count: { Args: { _professional_id: string }; Returns: number }
+      get_user_plan: {
+        Args: { _user_id: string }
+        Returns: {
+          adjustment_limit: number
+          chat_messages_per_day: number
+          diet_limit: number
+          has_chat: boolean
+          history_days: number
+          patients_limit: number
+          plan_id: string
+          plan_name: string
+          plan_type: Database["public"]["Enums"]["plan_type"]
+          subscription_status: Database["public"]["Enums"]["subscription_status"]
+          substitution_limit: number
+        }[]
+      }
       has_active_license: { Args: { _user_id: string }; Returns: boolean }
       has_role: {
         Args: {
@@ -422,9 +609,22 @@ export type Database = {
         }
         Returns: boolean
       }
+      increment_usage: {
+        Args: { _feature: string; _user_id: string }
+        Returns: boolean
+      }
+      reset_monthly_usage: { Args: { _user_id: string }; Returns: undefined }
     }
     Enums: {
       app_role: "admin" | "professional" | "student"
+      billing_cycle: "monthly" | "quarterly" | "semiannual" | "annual"
+      plan_type: "personal" | "professional"
+      subscription_status:
+        | "trial"
+        | "active"
+        | "past_due"
+        | "canceled"
+        | "expired"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -553,6 +753,15 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "professional", "student"],
+      billing_cycle: ["monthly", "quarterly", "semiannual", "annual"],
+      plan_type: ["personal", "professional"],
+      subscription_status: [
+        "trial",
+        "active",
+        "past_due",
+        "canceled",
+        "expired",
+      ],
     },
   },
 } as const
