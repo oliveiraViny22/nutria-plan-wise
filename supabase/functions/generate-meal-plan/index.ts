@@ -82,6 +82,23 @@ serve(async (req) => {
     const { data: { user } } = await supabase.auth.getUser(token);
     if (!user) throw new Error("Unauthorized");
 
+    // Validate usage limit before generating meal plan
+    const { data: canUse } = await supabase.rpc('can_use_feature', {
+      _user_id: user.id,
+      _feature: 'diet',
+    });
+
+    if (!canUse) {
+      const { data: planInfo } = await supabase.rpc('get_user_plan', { _user_id: user.id });
+      return new Response(JSON.stringify({
+        error: `Você atingiu o limite de ${planInfo?.[0]?.diet_limit || 0} dietas do seu plano.`,
+        upgradeRequired: true,
+      }), {
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     // Fetch all foods from database
     const { data: allFoods, error: foodsError } = await supabase.from("foods").select("*");
     if (foodsError) throw new Error("Failed to load foods");
@@ -257,6 +274,12 @@ Lembre-se: quantity em gramas/ml, total EXATO de ${targetCalories} calorias, sem
       console.error("Failed to create diet plan:", planError);
       throw new Error(`Failed to create diet plan: ${planError?.message || "unknown"}`);
     }
+
+    // Increment usage after successful plan creation
+    await supabase.rpc('increment_usage', {
+      _user_id: user.id,
+      _feature: 'diet',
+    });
 
     // Save meals
     for (const meal of adjustedMeals) {
