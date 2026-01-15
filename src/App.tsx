@@ -13,6 +13,8 @@ import Onboarding from "./pages/Onboarding";
 import Dashboard from "./pages/Dashboard";
 import MealDetail from "./pages/MealDetail";
 import Chat from "./pages/Chat";
+import Profile from "./pages/Profile";
+import Progress from "./pages/Progress";
 import Students from "./pages/Students";
 import BecomeProfessional from "./pages/BecomeProfessional";
 import StudentView from "./pages/StudentView";
@@ -36,6 +38,8 @@ const App = () => (
             <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
             <Route path="/meal/:mealId" element={<ProtectedRoute><MealDetail /></ProtectedRoute>} />
             <Route path="/chat" element={<ProtectedRoute><Chat /></ProtectedRoute>} />
+            <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+            <Route path="/progress" element={<ProtectedRoute><Progress /></ProtectedRoute>} />
             <Route path="/students" element={<ProtectedRoute><Students /></ProtectedRoute>} />
             <Route path="/become-professional" element={<ProtectedRoute><BecomeProfessional /></ProtectedRoute>} />
             <Route path="/student/:studentId" element={<ProtectedRoute><StudentView /></ProtectedRoute>} />

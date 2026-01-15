@@ -10,18 +10,24 @@ import {
   Flame,
   RefreshCw,
   Loader2,
+  User,
+  TrendingUp,
+  Users,
+  Crown,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Logo } from '@/components/Logo';
 import { CalorieRing } from '@/components/CalorieRing';
 import { MacroChart } from '@/components/MacroChart';
 import { useAuth } from '@/contexts/AuthContext';
+import { useUserRole } from '@/hooks/useUserRole';
 import { supabase } from '@/integrations/supabase/client';
 import { DietPlan, Meal, GOALS, MEAL_NAMES } from '@/lib/types';
 import { toast } from 'sonner';
 
 export default function Dashboard() {
   const { profile, signOut } = useAuth();
+  const { isProfessional, hasActiveLicense } = useUserRole();
   const navigate = useNavigate();
   const [currentPlan, setCurrentPlan] = useState<DietPlan | null>(null);
   const [meals, setMeals] = useState<Meal[]>([]);
@@ -110,7 +116,30 @@ export default function Dashboard() {
       <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-md border-b border-border">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <Logo />
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1">
+            {isProfessional && hasActiveLicense ? (
+              <Link to="/students">
+                <Button variant="ghost" size="icon">
+                  <Users className="w-5 h-5" />
+                </Button>
+              </Link>
+            ) : (
+              <Link to="/become-professional">
+                <Button variant="ghost" size="icon">
+                  <Crown className="w-5 h-5" />
+                </Button>
+              </Link>
+            )}
+            <Link to="/progress">
+              <Button variant="ghost" size="icon">
+                <TrendingUp className="w-5 h-5" />
+              </Button>
+            </Link>
+            <Link to="/profile">
+              <Button variant="ghost" size="icon">
+                <User className="w-5 h-5" />
+              </Button>
+            </Link>
             <Link to="/chat">
               <Button variant="ghost" size="icon">
                 <MessageCircle className="w-5 h-5" />
