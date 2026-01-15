@@ -19,6 +19,7 @@ import { Button } from '@/components/ui/button';
 import { Logo } from '@/components/Logo';
 import { CalorieRing } from '@/components/CalorieRing';
 import { MacroChart } from '@/components/MacroChart';
+import { MacroRebalancer } from '@/components/MacroRebalancer';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserRole } from '@/hooks/useUserRole';
 import { supabase } from '@/integrations/supabase/client';
@@ -205,11 +206,12 @@ export default function Dashboard() {
           </div>
         </motion.section>
 
-        {/* Generate Plan Button */}
+        {/* Action Buttons */}
         <motion.section
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
+          className="space-y-3"
         >
           <Button
             variant="hero"
@@ -235,6 +237,26 @@ export default function Dashboard() {
               </>
             )}
           </Button>
+
+          {/* Macro Rebalancer */}
+          {currentPlan && (
+            <MacroRebalancer
+              planId={currentPlan.id}
+              targets={{
+                protein: profile?.protein_target || 150,
+                carbs: profile?.carbs_target || 250,
+                fat: profile?.fat_target || 65,
+                calories: profile?.daily_calories || 2000,
+              }}
+              currentMacros={{
+                protein: currentProtein,
+                carbs: currentCarbs,
+                fat: currentFat,
+                calories: currentCalories,
+              }}
+              onComplete={fetchCurrentPlan}
+            />
+          )}
         </motion.section>
 
         {/* Meals Section */}
