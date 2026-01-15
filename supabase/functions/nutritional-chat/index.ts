@@ -42,7 +42,8 @@ IMPORTANTE: Você oferece educação nutricional, não aconselhamento médico. S
 
     const data = await response.json();
     return new Response(JSON.stringify({ message: data.choices[0].message.content }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
-  } catch (e) {
-    return new Response(JSON.stringify({ error: e.message }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+  } catch (e: unknown) {
+    const message = e instanceof Error ? e.message : "Unknown error";
+    return new Response(JSON.stringify({ error: message }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
 });
