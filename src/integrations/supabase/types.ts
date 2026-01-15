@@ -187,6 +187,47 @@ export type Database = {
           },
         ]
       }
+      plan_history: {
+        Row: {
+          action: string
+          created_at: string | null
+          description: string
+          diet_plan_id: string | null
+          id: string
+          new_values: Json | null
+          previous_values: Json | null
+          user_id: string
+        }
+        Insert: {
+          action: string
+          created_at?: string | null
+          description: string
+          diet_plan_id?: string | null
+          id?: string
+          new_values?: Json | null
+          previous_values?: Json | null
+          user_id: string
+        }
+        Update: {
+          action?: string
+          created_at?: string | null
+          description?: string
+          diet_plan_id?: string | null
+          id?: string
+          new_values?: Json | null
+          previous_values?: Json | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "plan_history_diet_plan_id_fkey"
+            columns: ["diet_plan_id"]
+            isOneToOne: false
+            referencedRelation: "diet_plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       professional_licenses: {
         Row: {
           created_at: string | null
@@ -259,6 +300,7 @@ export type Database = {
           goal: string | null
           height: number | null
           id: string
+          meals_per_day: number | null
           name: string | null
           onboarding_completed: boolean | null
           preferences: string[] | null
@@ -281,6 +323,7 @@ export type Database = {
           goal?: string | null
           height?: number | null
           id?: string
+          meals_per_day?: number | null
           name?: string | null
           onboarding_completed?: boolean | null
           preferences?: string[] | null
@@ -303,6 +346,7 @@ export type Database = {
           goal?: string | null
           height?: number | null
           id?: string
+          meals_per_day?: number | null
           name?: string | null
           onboarding_completed?: boolean | null
           preferences?: string[] | null
@@ -334,6 +378,33 @@ export type Database = {
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
           user_id?: string
+        }
+        Relationships: []
+      }
+      weight_logs: {
+        Row: {
+          created_at: string | null
+          id: string
+          logged_at: string
+          notes: string | null
+          user_id: string
+          weight: number
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          logged_at?: string
+          notes?: string | null
+          user_id: string
+          weight: number
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          logged_at?: string
+          notes?: string | null
+          user_id?: string
+          weight?: number
         }
         Relationships: []
       }

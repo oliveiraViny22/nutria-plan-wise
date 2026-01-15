@@ -1,0 +1,527 @@
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
+import { 
+  ArrowLeft, 
+  User, 
+  Save, 
+  Loader2,
+  Target,
+  Activity,
+  Utensils,
+  Scale,
+  Flame,
+  TrendingUp
+} from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Logo } from '@/components/Logo';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
+import {
+  ACTIVITY_LEVELS,
+  GOALS,
+  FOOD_PREFERENCES,
+  FOOD_RESTRICTIONS,
+} from '@/lib/types';
+
+export default function Profile() {
+  const navigate = useNavigate();
+  const { user, profile, refreshProfile } = useAuth();
+  const [loading, setLoading] = useState(false);
+  const [hasChanges, setHasChanges] = useState(false);
+
+  const [formData, setFormData] = useState({
+    name: '',
+    age: '',
+    sex: '' as 'male' | 'female' | 'other' | '',
+    height: '',
+    weight: '',
+    goal: '' as 'lose_weight' | 'maintain' | 'gain_muscle' | '',
+    activity_level: '' as 'sedentary' | 'light' | 'moderate' | 'active' | 'very_active' | '',
+    meals_per_day: 4,
+    preferences: [] as string[],
+    restrictions: [] as string[],
+  });
+
+  useEffect(() => {
+    if (profile) {
+      setFormData({
+        name: profile.name || '',
+        age: profile.age?.toString() || '',
+        sex: profile.sex || '',
+        height: profile.height?.toString() || '',
+        weight: profile.weight?.toString() || '',
+        goal: profile.goal || '',
+        activity_level: profile.activity_level || '',
+        meals_per_day: (profile as any).meals_per_day || 4,
+        preferences: profile.preferences || [],
+        restrictions: profile.restrictions || [],
+      });
+    }
+  }, [profile]);
+
+  const calculateTargets = () => {
+    const { age, sex, height, weight, goal, activity_level } = formData;
+    
+    if (!age || !sex || !height || !weight || !activity_level) {
+      return null;
+    }
+
+    const bmr = sex === 'male'
+      ? 10 * Number(weight) + 6.25 * Number(height) - 5 * Number(age) + 5
+      : 10 * Number(weight) + 6.25 * Number(height) - 5 * Number(age) - 161;
+
+    const activityMultiplier = ACTIVITY_LEVELS[activity_level as keyof typeof ACTIVITY_LEVELS]?.multiplier || 1.55;
+    const tdee = bmr * activityMultiplier;
+    
+    const calorieAdjustment = goal ? GOALS[goal as keyof typeof GOALS]?.calorieAdjustment || 0 : 0;
+    const calories = Math.round(tdee + calorieAdjustment);
+
+    let proteinRatio = 0.3;
+    let carbsRatio = 0.4;
+    let fatRatio = 0.3;
+
+    if (goal === 'gain_muscle') {
+      proteinRatio = 0.35;
+      carbsRatio = 0.45;
+      fatRatio = 0.2;
+    } else if (goal === 'lose_weight') {
+      proteinRatio = 0.35;
+      carbsRatio = 0.35;
+      fatRatio = 0.3;
+    }
+
+    return {
+      calories,
+      protein: Math.round((calories * proteinRatio) / 4),
+      carbs: Math.round((calories * carbsRatio) / 4),
+      fat: Math.round((calories * fatRatio) / 9),
+    };
+  };
+
+  const handleChange = (key: string, value: any) => {
+    setFormData(prev => ({ ...prev, [key]: value }));
+    setHasChanges(true);
+  };
+
+  const togglePreference = (pref: string) => {
+    handleChange('preferences', 
+      formData.preferences.includes(pref)
+        ? formData.preferences.filter((p) => p !== pref)
+        : [...formData.preferences, pref]
+    );
+  };
+
+  const toggleRestriction = (rest: string) => {
+    handleChange('restrictions',
+      formData.restrictions.includes(rest)
+        ? formData.restrictions.filter((r) => r !== rest)
+        : [...formData.restrictions, rest]
+    );
+  };
+
+  const handleSave = async () => {
+    if (!user) return;
+    setLoading(true);
+
+    try {
+      const targets = calculateTargets();
+      const previousGoal = profile?.goal;
+      const goalChanged = previousGoal !== formData.goal;
+      
+      const updateData: any = {
+        name: formData.name.trim(),
+        age: Number(formData.age),
+        sex: formData.sex || null,
+        height: Number(formData.height),
+        weight: Number(formData.weight),
+        goal: formData.goal || null,
+        activity_level: formData.activity_level || null,
+        meals_per_day: formData.meals_per_day,
+        preferences: formData.preferences,
+        restrictions: formData.restrictions,
+      };
+
+      // Recalculate targets if goal or activity changed
+      if (targets) {
+        updateData.daily_calories = targets.calories;
+        updateData.protein_target = targets.protein;
+        updateData.carbs_target = targets.carbs;
+        updateData.fat_target = targets.fat;
+      }
+
+      const { error } = await supabase
+        .from('profiles')
+        .update(updateData)
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+
+      // Log weight change
+      if (formData.weight && Number(formData.weight) !== profile?.weight) {
+        await supabase.from('weight_logs').upsert({
+          user_id: user.id,
+          weight: Number(formData.weight),
+          logged_at: new Date().toISOString().split('T')[0],
+        }, { onConflict: 'user_id,logged_at' });
+      }
+
+      // Log goal change in history
+      if (goalChanged && formData.goal) {
+        await supabase.from('plan_history').insert({
+          user_id: user.id,
+          action: 'goal_changed',
+          description: `Objetivo alterado para ${GOALS[formData.goal as keyof typeof GOALS]?.label}`,
+          previous_values: { goal: previousGoal },
+          new_values: { goal: formData.goal, ...targets },
+        });
+      }
+
+      await refreshProfile();
+      setHasChanges(false);
+      toast.success('Perfil atualizado com sucesso!');
+
+      // Suggest regenerating plan if goal changed
+      if (goalChanged) {
+        toast.info('Objetivo alterado! Recomendamos gerar um novo plano alimentar.', {
+          duration: 5000,
+          action: {
+            label: 'Ir para Dashboard',
+            onClick: () => navigate('/dashboard'),
+          },
+        });
+      }
+    } catch (error: any) {
+      toast.error(error.message || 'Erro ao salvar perfil');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const targets = calculateTargets();
+
+  return (
+    <div className="min-h-screen bg-background">
+      {/* Header */}
+      <header className="sticky top-0 z-50 glass border-b">
+        <div className="container mx-auto px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard')}>
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <Logo size="sm" />
+          </div>
+          <h1 className="text-lg font-semibold">Meu Perfil</h1>
+          <Button 
+            size="sm" 
+            onClick={handleSave} 
+            disabled={loading || !hasChanges}
+          >
+            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+            Salvar
+          </Button>
+        </div>
+      </header>
+
+      <main className="container mx-auto px-4 py-6 pb-24">
+        <Tabs defaultValue="personal" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="personal">
+              <User className="h-4 w-4 mr-2" />
+              Pessoal
+            </TabsTrigger>
+            <TabsTrigger value="goals">
+              <Target className="h-4 w-4 mr-2" />
+              Objetivo
+            </TabsTrigger>
+            <TabsTrigger value="diet">
+              <Utensils className="h-4 w-4 mr-2" />
+              Dieta
+            </TabsTrigger>
+          </TabsList>
+
+          {/* Personal Data Tab */}
+          <TabsContent value="personal">
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+            >
+              <Card>
+                <CardHeader>
+                  <CardTitle>Dados Pessoais</CardTitle>
+                  <CardDescription>Informações básicas do seu perfil</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="space-y-2">
+                    <Label htmlFor="name">Nome</Label>
+                    <Input
+                      id="name"
+                      value={formData.name}
+                      onChange={(e) => handleChange('name', e.target.value)}
+                      placeholder="Seu nome"
+                      maxLength={100}
+                    />
+                  </div>
+
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="age">Idade</Label>
+                      <Input
+                        id="age"
+                        type="number"
+                        min="10"
+                        max="120"
+                        value={formData.age}
+                        onChange={(e) => handleChange('age', e.target.value)}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Sexo</Label>
+                      <div className="grid grid-cols-3 gap-2">
+                        {(['male', 'female', 'other'] as const).map((sex) => (
+                          <button
+                            key={sex}
+                            type="button"
+                            onClick={() => handleChange('sex', sex)}
+                            className={`h-10 rounded-lg border text-sm transition-colors ${
+                              formData.sex === sex
+                                ? 'border-primary bg-primary/10 text-primary'
+                                : 'border-border hover:border-primary/50'
+                            }`}
+                          >
+                            {sex === 'male' ? 'M' : sex === 'female' ? 'F' : 'Outro'}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="height">Altura (cm)</Label>
+                      <Input
+                        id="height"
+                        type="number"
+                        min="100"
+                        max="250"
+                        value={formData.height}
+                        onChange={(e) => handleChange('height', e.target.value)}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="weight">Peso (kg)</Label>
+                      <Input
+                        id="weight"
+                        type="number"
+                        min="20"
+                        max="400"
+                        step="0.1"
+                        value={formData.weight}
+                        onChange={(e) => handleChange('weight', e.target.value)}
+                      />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+          </TabsContent>
+
+          {/* Goals Tab */}
+          <TabsContent value="goals">
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="space-y-6"
+            >
+              <Card>
+                <CardHeader>
+                  <CardTitle>Objetivo Principal</CardTitle>
+                  <CardDescription>Alterar o objetivo recalcula suas metas</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid gap-3">
+                    {(Object.entries(GOALS) as [keyof typeof GOALS, typeof GOALS[keyof typeof GOALS]][]).map(
+                      ([key, value]) => (
+                        <button
+                          key={key}
+                          type="button"
+                          onClick={() => handleChange('goal', key)}
+                          className={`p-4 rounded-xl border text-left transition-all ${
+                            formData.goal === key
+                              ? 'border-primary bg-primary/10'
+                              : 'border-border hover:border-primary/50'
+                          }`}
+                        >
+                          <span className="font-medium">{value.label}</span>
+                        </button>
+                      )
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Activity className="h-5 w-5" />
+                    Nível de Atividade
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid gap-3">
+                    {(Object.entries(ACTIVITY_LEVELS) as [keyof typeof ACTIVITY_LEVELS, typeof ACTIVITY_LEVELS[keyof typeof ACTIVITY_LEVELS]][]).map(
+                      ([key, value]) => (
+                        <button
+                          key={key}
+                          type="button"
+                          onClick={() => handleChange('activity_level', key)}
+                          className={`p-4 rounded-xl border text-left transition-all ${
+                            formData.activity_level === key
+                              ? 'border-primary bg-primary/10'
+                              : 'border-border hover:border-primary/50'
+                          }`}
+                        >
+                          <span className="font-medium block">{value.label}</span>
+                          <span className="text-sm text-muted-foreground">{value.description}</span>
+                        </button>
+                      )
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Calculated Targets Preview */}
+              {targets && (
+                <Card className="border-primary/20 bg-primary/5">
+                  <CardHeader>
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <TrendingUp className="h-5 w-5 text-primary" />
+                      Metas Calculadas
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
+                      <div>
+                        <Flame className="h-5 w-5 mx-auto text-primary mb-1" />
+                        <p className="text-lg font-bold">{targets.calories}</p>
+                        <p className="text-xs text-muted-foreground">kcal/dia</p>
+                      </div>
+                      <div>
+                        <span className="text-protein text-lg">●</span>
+                        <p className="text-lg font-bold">{targets.protein}g</p>
+                        <p className="text-xs text-muted-foreground">Proteína</p>
+                      </div>
+                      <div>
+                        <span className="text-carbs text-lg">●</span>
+                        <p className="text-lg font-bold">{targets.carbs}g</p>
+                        <p className="text-xs text-muted-foreground">Carboidratos</p>
+                      </div>
+                      <div>
+                        <span className="text-fat text-lg">●</span>
+                        <p className="text-lg font-bold">{targets.fat}g</p>
+                        <p className="text-xs text-muted-foreground">Gordura</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </motion.div>
+          </TabsContent>
+
+          {/* Diet Preferences Tab */}
+          <TabsContent value="diet">
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="space-y-6"
+            >
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Utensils className="h-5 w-5" />
+                    Refeições por Dia
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-5 gap-2">
+                    {[2, 3, 4, 5, 6].map((num) => (
+                      <button
+                        key={num}
+                        type="button"
+                        onClick={() => handleChange('meals_per_day', num)}
+                        className={`h-12 rounded-lg border font-medium transition-colors ${
+                          formData.meals_per_day === num
+                            ? 'border-primary bg-primary text-primary-foreground'
+                            : 'border-border hover:border-primary/50'
+                        }`}
+                      >
+                        {num}
+                      </button>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Preferências Alimentares</CardTitle>
+                  <CardDescription>Selecione seus estilos de alimentação</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex flex-wrap gap-2">
+                    {FOOD_PREFERENCES.map((pref) => (
+                      <button
+                        key={pref}
+                        type="button"
+                        onClick={() => togglePreference(pref)}
+                        className={`px-4 py-2 rounded-full border transition-all ${
+                          formData.preferences.includes(pref)
+                            ? 'border-primary bg-primary text-primary-foreground'
+                            : 'border-border hover:border-primary/50'
+                        }`}
+                      >
+                        {pref}
+                      </button>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Restrições Alimentares</CardTitle>
+                  <CardDescription>Alimentos que você não pode consumir</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex flex-wrap gap-2">
+                    {FOOD_RESTRICTIONS.map((rest) => (
+                      <button
+                        key={rest}
+                        type="button"
+                        onClick={() => toggleRestriction(rest)}
+                        className={`px-4 py-2 rounded-full border transition-all ${
+                          formData.restrictions.includes(rest)
+                            ? 'border-destructive bg-destructive text-destructive-foreground'
+                            : 'border-border hover:border-destructive/50'
+                        }`}
+                      >
+                        {rest}
+                      </button>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+          </TabsContent>
+        </Tabs>
+      </main>
+    </div>
+  );
+}

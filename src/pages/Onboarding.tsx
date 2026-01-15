@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, ArrowRight, Check, Loader2 } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, Loader2, Utensils } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Slider } from '@/components/ui/slider';
 import { Logo } from '@/components/Logo';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -19,7 +20,16 @@ import {
 const steps = [
   { id: 1, title: 'Dados Pessoais', description: 'Informações básicas' },
   { id: 2, title: 'Objetivo', description: 'Sua meta principal' },
-  { id: 3, title: 'Preferências', description: 'Alimentação e restrições' },
+  { id: 3, title: 'Refeições', description: 'Quantas refeições por dia' },
+  { id: 4, title: 'Preferências', description: 'Alimentação e restrições' },
+];
+
+const MEALS_OPTIONS = [
+  { value: 2, label: '2 refeições', description: 'Jejum intermitente' },
+  { value: 3, label: '3 refeições', description: 'Tradicional' },
+  { value: 4, label: '4 refeições', description: 'Com lanche da tarde' },
+  { value: 5, label: '5 refeições', description: 'Com lanches' },
+  { value: 6, label: '6 refeições', description: 'Atletas e hipertrofia' },
 ];
 
 export default function Onboarding() {
@@ -36,6 +46,7 @@ export default function Onboarding() {
     weight: '',
     goal: '' as 'lose_weight' | 'maintain' | 'gain_muscle' | '',
     activity_level: '' as 'sedentary' | 'light' | 'moderate' | 'active' | 'very_active' | '',
+    meals_per_day: 4,
     preferences: [] as string[],
     restrictions: [] as string[],
   });
@@ -82,7 +93,7 @@ export default function Onboarding() {
   };
 
   const handleNext = async () => {
-    if (currentStep < 3) {
+    if (currentStep < steps.length) {
       setCurrentStep(currentStep + 1);
     } else {
       await handleComplete();
@@ -104,6 +115,7 @@ export default function Onboarding() {
           weight: Number(formData.weight),
           goal: formData.goal || null,
           activity_level: formData.activity_level || null,
+          meals_per_day: formData.meals_per_day,
           preferences: formData.preferences,
           restrictions: formData.restrictions,
           daily_calories: targets.calories,
@@ -116,8 +128,39 @@ export default function Onboarding() {
 
       if (error) throw error;
 
+      // Log initial weight
+      await supabase.from('weight_logs').upsert({
+        user_id: user?.id,
+        weight: Number(formData.weight),
+        logged_at: new Date().toISOString().split('T')[0],
+        notes: 'Peso inicial do cadastro',
+      }, { onConflict: 'user_id,logged_at' });
+
+      // Generate initial meal plan
+      toast.info('Gerando seu primeiro plano alimentar...');
+      
+      const planResponse = await supabase.functions.invoke('generate-meal-plan', {
+        body: {
+          profile: {
+            daily_calories: targets.calories,
+            protein_target: targets.protein,
+            carbs_target: targets.carbs,
+            fat_target: targets.fat,
+            preferences: formData.preferences,
+            restrictions: formData.restrictions,
+            goal: formData.goal,
+            meals_per_day: formData.meals_per_day,
+          },
+        },
+      });
+
+      if (planResponse.error) {
+        console.error('Error generating initial plan:', planResponse.error);
+        // Don't block onboarding if plan generation fails
+      }
+
       await refreshProfile();
-      toast.success('Perfil configurado com sucesso!');
+      toast.success('Perfil configurado e plano gerado com sucesso!');
       navigate('/dashboard');
     } catch (error: any) {
       toast.error(error.message || 'Erro ao salvar perfil');
@@ -151,6 +194,9 @@ export default function Onboarding() {
     if (currentStep === 2) {
       return formData.goal && formData.activity_level;
     }
+    if (currentStep === 3) {
+      return formData.meals_per_day >= 2 && formData.meals_per_day <= 6;
+    }
     return true;
   };
 
@@ -182,7 +228,7 @@ export default function Onboarding() {
                 </div>
                 {index < steps.length - 1 && (
                   <div
-                    className={`h-1 w-16 sm:w-24 mx-2 rounded-full transition-colors ${
+                    className={`h-1 w-8 sm:w-16 mx-1 sm:mx-2 rounded-full transition-colors ${
                       currentStep > step.id ? 'bg-primary' : 'bg-muted'
                     }`}
                   />
@@ -220,6 +266,8 @@ export default function Onboarding() {
                       id="age"
                       type="number"
                       placeholder="25"
+                      min="10"
+                      max="120"
                       value={formData.age}
                       onChange={(e) =>
                         setFormData({ ...formData, age: e.target.value })
@@ -254,6 +302,8 @@ export default function Onboarding() {
                       id="height"
                       type="number"
                       placeholder="175"
+                      min="100"
+                      max="250"
                       value={formData.height}
                       onChange={(e) =>
                         setFormData({ ...formData, height: e.target.value })
@@ -268,6 +318,9 @@ export default function Onboarding() {
                       id="weight"
                       type="number"
                       placeholder="70"
+                      min="20"
+                      max="400"
+                      step="0.1"
                       value={formData.weight}
                       onChange={(e) =>
                         setFormData({ ...formData, weight: e.target.value })
@@ -355,6 +408,52 @@ export default function Onboarding() {
                 className="card-elevated rounded-2xl p-6 sm:p-8"
               >
                 <div className="space-y-6">
+                  <div className="text-center mb-6">
+                    <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
+                      <Utensils className="w-8 h-8 text-primary" />
+                    </div>
+                    <h3 className="text-lg font-semibold">Quantas refeições por dia?</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Isso nos ajuda a distribuir melhor suas calorias
+                    </p>
+                  </div>
+
+                  <div className="grid gap-3">
+                    {MEALS_OPTIONS.map((option) => (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() =>
+                          setFormData({ ...formData, meals_per_day: option.value })
+                        }
+                        className={`p-4 rounded-xl border text-left transition-all ${
+                          formData.meals_per_day === option.value
+                            ? 'border-primary bg-primary/10'
+                            : 'border-border hover:border-primary/50'
+                        }`}
+                      >
+                        <span className="font-medium text-foreground block">
+                          {option.label}
+                        </span>
+                        <span className="text-sm text-muted-foreground">
+                          {option.description}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
+            {currentStep === 4 && (
+              <motion.div
+                key="step4"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                className="card-elevated rounded-2xl p-6 sm:p-8"
+              >
+                <div className="space-y-6">
                   <div className="space-y-3">
                     <Label>Preferências alimentares (opcional)</Label>
                     <div className="flex flex-wrap gap-2">
@@ -421,9 +520,9 @@ export default function Onboarding() {
             {loading ? (
               <>
                 <Loader2 className="w-4 h-4 animate-spin" />
-                Salvando...
+                Gerando plano...
               </>
-            ) : currentStep === 3 ? (
+            ) : currentStep === steps.length ? (
               <>
                 Concluir
                 <Check className="w-4 h-4 ml-2" />
