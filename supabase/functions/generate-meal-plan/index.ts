@@ -15,6 +15,7 @@ interface Food {
   fat: number;
   serving_size: string;
   category: string;
+  processing_level: string;
 }
 
 interface MealFood {
@@ -26,6 +27,22 @@ interface MealPlan {
   name: string;
   foods: MealFood[];
 }
+
+// Valid food categories (new taxonomy)
+const VALID_CATEGORIES = [
+  'frutas',
+  'hortaliças_folhosas',
+  'legumes',
+  'cereais_tubérculos',
+  'leguminosas',
+  'proteínas_animais',
+  'laticínios',
+  'óleos_oleaginosas',
+  'suplementos',
+];
+
+// Processing levels allowed for meal plan generation
+const ALLOWED_PROCESSING_LEVELS = ['in_natura', 'minimamente_processado'];
 
 // Parse serving_size to extract base grams (e.g., "100g" -> 100, "1 unidade (50g)" -> 50)
 function parseServingGrams(servingSize: string): number {
@@ -65,14 +82,32 @@ serve(async (req) => {
     const { data: { user } } = await supabase.auth.getUser(token);
     if (!user) throw new Error("Unauthorized");
 
-    const { data: foods, error: foodsError } = await supabase.from("foods").select("*");
+    // Fetch all foods from database
+    const { data: allFoods, error: foodsError } = await supabase.from("foods").select("*");
     if (foodsError) throw new Error("Failed to load foods");
-    if (!foods || foods.length === 0) throw new Error("No foods available");
+    if (!allFoods || allFoods.length === 0) throw new Error("No foods available");
+
+    // Filter foods for meal plan generation:
+    // - Exclude supplements (category = 'suplementos')
+    // - Only include in_natura and minimamente_processado
+    const foods = allFoods.filter((f: Food) => {
+      // Exclude supplements
+      if (f.category === 'suplementos') return false;
+      // Only allow natural and minimally processed foods
+      const level = f.processing_level || 'in_natura';
+      if (!ALLOWED_PROCESSING_LEVELS.includes(level)) return false;
+      return true;
+    });
+
+    if (foods.length === 0) throw new Error("No suitable foods available for meal plan");
 
     const targetCalories = profile.daily_calories || 2000;
     const targetProtein = profile.protein_target || 150;
     const targetCarbs = profile.carbs_target || 250;
     const targetFat = profile.fat_target || 70;
+
+    // Build category list for AI prompt
+    const categoryList = VALID_CATEGORIES.filter(c => c !== 'suplementos').join(', ');
 
     // AI prompt asking for quantities in grams
     const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -89,21 +124,29 @@ Preferências: ${profile.preferences?.join(", ") || "nenhuma"}.
 Restrições: ${profile.restrictions?.join(", ") || "nenhuma"}. 
 Objetivo: ${profile.goal}.
 
+CATEGORIAS VÁLIDAS: ${categoryList}
+TAXONOMIA NUTRICIONAL:
+- cereais_tubérculos: inclui cereais (arroz, milho, trigo, aveia, quinoa) E tubérculos/raízes (batata, mandioca, inhame, cará)
+- proteínas_animais: carnes, peixes, ovos
+- leguminosas: feijões, lentilhas, grão-de-bico, ervilhas, favas
+- óleos_oleaginosas: azeite, óleo de coco, castanhas, nozes, amendoim
+
 REGRAS IMPORTANTES:
 1. As quantidades devem ser em GRAMAS ou ML (não porções).
 2. O total de calorias do plano DEVE ser EXATAMENTE ${targetCalories} calorias (margem de ±10 kcal).
 3. Distribua as calorias: café da manhã 25%, almoço 35%, jantar 30%, lanche 10%.
-4. Use quantidades realistas (ex: 150g de arroz, 200ml de leite, 120g de frango).` 
+4. Use quantidades realistas (ex: 150g de arroz, 200ml de leite, 120g de frango).
+5. NÃO use suplementos - apenas alimentos naturais ou minimamente processados.` 
           },
           { 
             role: "user", 
-            content: `Alimentos disponíveis (id, nome, calorias por porção base, tamanho porção):
-${foods.slice(0, 40).map((f: Food) => `- ${f.id}: ${f.name}, ${f.calories}kcal/${f.serving_size}, categoria: ${f.category}`).join("\n")}
+            content: `Alimentos disponíveis (id, nome, calorias por porção base, tamanho porção, categoria):
+${foods.slice(0, 50).map((f: Food) => `- ${f.id}: ${f.name}, ${f.calories}kcal/${f.serving_size}, categoria: ${f.category}`).join("\n")}
 
 Retorne APENAS JSON válido:
 { "meals": [{ "name": "breakfast|lunch|dinner|snack", "foods": [{ "food_id": "uuid", "quantity": 150 }] }] }
 
-Lembre-se: quantity em gramas/ml, total EXATO de ${targetCalories} calorias!` 
+Lembre-se: quantity em gramas/ml, total EXATO de ${targetCalories} calorias, sem suplementos!` 
           }
         ],
       }),
@@ -116,9 +159,13 @@ Lembre-se: quantity em gramas/ml, total EXATO de ${targetCalories} calorias!`
       const content = aiData.choices[0].message.content.replace(/```json|```/g, "").trim();
       mealPlan = JSON.parse(content);
     } catch {
-      // Fallback simple plan - proportional to calorie targets
-      const breakfastFoods = foods.filter((f: Food) => ["cereais", "frutas", "laticinios"].includes(f.category));
-      const mainFoods = foods.filter((f: Food) => ["proteinas", "carboidratos", "vegetais", "leguminosas"].includes(f.category));
+      // Fallback simple plan using new taxonomy categories
+      const breakfastFoods = foods.filter((f: Food) => 
+        ["cereais_tubérculos", "frutas", "laticínios"].includes(f.category)
+      );
+      const mainFoods = foods.filter((f: Food) => 
+        ["proteínas_animais", "cereais_tubérculos", "hortaliças_folhosas", "leguminosas"].includes(f.category)
+      );
       
       mealPlan = {
         meals: [

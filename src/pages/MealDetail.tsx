@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { MacroChart } from '@/components/MacroChart';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { Meal, MealFood, Food, MEAL_NAMES } from '@/lib/types';
+import { Meal, MealFood, Food, MEAL_NAMES, SUBSTITUTABLE_PROCESSING_LEVELS, ProcessingLevel } from '@/lib/types';
 import { toast } from 'sonner';
 import {
   Dialog,
@@ -112,16 +112,36 @@ export default function MealDetail() {
     }
   };
 
-  // Filter foods by same category for substitution
+  // Check if a food can be used in automatic substitutions
+  const canBeSubstituted = (food: Food): boolean => {
+    // Supplements cannot be auto-substituted
+    if (food.category === 'suplementos') return false;
+    // Only in_natura and minimamente_processado can be substituted
+    const processingLevel = (food as any).processing_level as ProcessingLevel | undefined;
+    if (processingLevel && !SUBSTITUTABLE_PROCESSING_LEVELS.includes(processingLevel)) {
+      return false;
+    }
+    return true;
+  };
+
+  // Filter foods by same category for substitution (respecting processing level rules)
   const filteredFoodsForSubstitution = useMemo(() => {
     if (!selectedMealFood?.food) return [];
     const currentFood = selectedMealFood.food as Food;
     const currentCategory = currentFood.category;
     
-    return allFoods.filter((f) => 
-      f.id !== currentFood.id && 
-      f.category === currentCategory
-    );
+    // If current food cannot be substituted, return empty
+    if (!canBeSubstituted(currentFood)) return [];
+    
+    return allFoods.filter((f) => {
+      // Must be different food
+      if (f.id === currentFood.id) return false;
+      // Must be same category
+      if (f.category !== currentCategory) return false;
+      // Must be substitutable (not supplement, not processed/ultraprocessed)
+      if (!canBeSubstituted(f)) return false;
+      return true;
+    });
   }, [selectedMealFood, allFoods]);
 
   const openSubstituteModal = (mealFood: MealFood) => {
@@ -491,11 +511,16 @@ export default function MealDetail() {
             {selectedMealFood?.food && (
               <div className="p-3 bg-primary/10 rounded-lg">
                 <p className="text-xs text-primary font-medium">
-                  📌 Mostrando apenas alimentos da categoria: {(selectedMealFood.food as Food).category}
+                  📌 Categoria: {(selectedMealFood.food as Food).category}
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  A quantidade será ajustada automaticamente para manter as calorias similares.
+                  Substituições permitidas apenas entre alimentos naturais ou minimamente processados da mesma categoria.
                 </p>
+                {(selectedMealFood.food as Food).category === 'suplementos' && (
+                  <p className="text-xs text-destructive mt-1">
+                    ⚠️ Suplementos não podem ser substituídos automaticamente.
+                  </p>
+                )}
               </div>
             )}
 

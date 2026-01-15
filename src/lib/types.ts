@@ -20,6 +20,38 @@ export interface Profile {
   updated_at: string;
 }
 
+// Valid food categories (new taxonomy)
+export const FOOD_CATEGORIES = [
+  'frutas',
+  'hortaliças_folhosas',
+  'legumes',
+  'cereais_tubérculos',
+  'leguminosas',
+  'proteínas_animais',
+  'laticínios',
+  'óleos_oleaginosas',
+  'suplementos',
+] as const;
+
+export type FoodCategory = typeof FOOD_CATEGORIES[number];
+
+// Processing levels for food classification
+export const PROCESSING_LEVELS = [
+  'in_natura',
+  'minimamente_processado',
+  'processado',
+  'ultraprocessado',
+  'suplemento',
+] as const;
+
+export type ProcessingLevel = typeof PROCESSING_LEVELS[number];
+
+// Processing levels allowed for automatic substitutions
+export const SUBSTITUTABLE_PROCESSING_LEVELS: ProcessingLevel[] = [
+  'in_natura',
+  'minimamente_processado',
+];
+
 export interface Food {
   id: string;
   name: string;
@@ -28,7 +60,8 @@ export interface Food {
   carbs: number;
   fat: number;
   serving_size: string;
-  category: string | null;
+  category: FoodCategory | null;
+  processing_level: ProcessingLevel;
   created_at: string;
 }
 
