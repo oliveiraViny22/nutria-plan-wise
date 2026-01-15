@@ -57,33 +57,25 @@ serve(async (req) => {
     }
     logStep("Plan fetched", { planName: plan.name, planType: plan.type });
 
-    // Get price based on billing cycle
-    const priceColumn = `stripe_price_${billingCycle}` as keyof typeof plan;
-    let stripePriceId = plan[priceColumn] as string | null;
-    
-    // Price mapping based on plan
-    const priceMap: Record<string, Record<string, string>> = {
-      'personal_basic': {
-        monthly: 'price_1SpzYWIT6G6s8uYgkO9CWKht',
-      },
-      'personal_pro': {
-        monthly: 'price_1SpzZbIT6G6s8uYgse2Ruaqb',
-      },
-      'professional_basic': {
-        monthly: 'price_1SpzaDIT6G6s8uYgWG0syr3p',
-      },
-      'professional_pro': {
-        monthly: 'price_1SpzasIT6G6s8uYgq0OKlfc5',
-      },
+    // Get price based on billing cycle from database
+    const priceColumnMap: Record<string, string> = {
+      monthly: 'stripe_price_monthly',
+      quarterly: 'stripe_price_quarterly',
+      semiannual: 'stripe_price_semiannual',
+      annual: 'stripe_price_annual',
     };
-
-    const planKey = `${plan.type}_${plan.name}`;
-    stripePriceId = priceMap[planKey]?.[billingCycle] || stripePriceId;
-
-    if (!stripePriceId) {
-      throw new Error(`No price found for ${billingCycle} billing cycle`);
+    
+    const priceColumn = priceColumnMap[billingCycle];
+    if (!priceColumn) {
+      throw new Error(`Invalid billing cycle: ${billingCycle}`);
     }
-    logStep("Price ID determined", { stripePriceId });
+    
+    const stripePriceId = plan[priceColumn] as string | null;
+    
+    if (!stripePriceId) {
+      throw new Error(`No Stripe price configured for ${plan.name} with ${billingCycle} billing cycle. Please contact support.`);
+    }
+    logStep("Price ID determined from database", { stripePriceId, billingCycle });
 
     const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", { 
       apiVersion: "2025-08-27.basil" 

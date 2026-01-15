@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
   UtensilsCrossed,
@@ -14,14 +14,18 @@ import {
   TrendingUp,
   Users,
   Crown,
+  CreditCard,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Logo } from '@/components/Logo';
 import { CalorieRing } from '@/components/CalorieRing';
 import { MacroChart } from '@/components/MacroChart';
 import { MacroRebalancer } from '@/components/MacroRebalancer';
+import { UsageLimits } from '@/components/UsageLimits';
+import { UpgradeDialog } from '@/components/UpgradeDialog';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserRole } from '@/hooks/useUserRole';
+import { useSubscription } from '@/hooks/useSubscription';
 import { supabase } from '@/integrations/supabase/client';
 import { DietPlan, Meal, GOALS, MEAL_NAMES } from '@/lib/types';
 import { toast } from 'sonner';
@@ -29,11 +33,27 @@ import { toast } from 'sonner';
 export default function Dashboard() {
   const { profile, signOut } = useAuth();
   const { isProfessional, hasActiveLicense } = useUserRole();
+  const { refresh: refreshSubscription, currentPlan: subscriptionPlan } = useSubscription();
   const navigate = useNavigate();
-  const [currentPlan, setCurrentPlan] = useState<DietPlan | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [currentDietPlan, setCurrentDietPlan] = useState<DietPlan | null>(null);
   const [meals, setMeals] = useState<Meal[]>([]);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
+  const [showUpgradeDialog, setShowUpgradeDialog] = useState(false);
+  const [upgradeFeature, setUpgradeFeature] = useState<string>('diet');
+  const [upgradeLimit, setUpgradeLimit] = useState<number>(0);
+
+  // Handle checkout success
+  useEffect(() => {
+    const checkoutStatus = searchParams.get('checkout');
+    if (checkoutStatus === 'success') {
+      toast.success('Assinatura ativada com sucesso! 🎉');
+      refreshSubscription();
+      // Clear the query param
+      setSearchParams({});
+    }
+  }, [searchParams, setSearchParams, refreshSubscription]);
 
   useEffect(() => {
     fetchCurrentPlan();
@@ -50,7 +70,7 @@ export default function Dashboard() {
       if (error) throw error;
 
       if (plans && plans.length > 0) {
-        setCurrentPlan(plans[0] as DietPlan);
+        setCurrentDietPlan(plans[0] as DietPlan);
         await fetchMeals(plans[0].id);
       }
     } catch (error: any) {
@@ -106,10 +126,10 @@ export default function Dashboard() {
     navigate('/login');
   };
 
-  const currentCalories = currentPlan?.total_calories || 0;
-  const currentProtein = currentPlan?.total_protein || 0;
-  const currentCarbs = currentPlan?.total_carbs || 0;
-  const currentFat = currentPlan?.total_fat || 0;
+  const currentCalories = currentDietPlan?.total_calories || 0;
+  const currentProtein = currentDietPlan?.total_protein || 0;
+  const currentCarbs = currentDietPlan?.total_carbs || 0;
+  const currentFat = currentDietPlan?.total_fat || 0;
 
   return (
     <div className="min-h-screen bg-background">
@@ -131,6 +151,11 @@ export default function Dashboard() {
                 </Button>
               </Link>
             )}
+            <Link to="/subscription">
+              <Button variant="ghost" size="icon">
+                <CreditCard className="w-5 h-5" />
+              </Button>
+            </Link>
             <Link to="/progress">
               <Button variant="ghost" size="icon">
                 <TrendingUp className="w-5 h-5" />
@@ -225,7 +250,7 @@ export default function Dashboard() {
                 <Loader2 className="w-5 h-5 animate-spin" />
                 Gerando plano...
               </>
-            ) : currentPlan ? (
+            ) : currentDietPlan ? (
               <>
                 <RefreshCw className="w-5 h-5" />
                 Gerar novo plano
@@ -239,9 +264,9 @@ export default function Dashboard() {
           </Button>
 
           {/* Macro Rebalancer */}
-          {currentPlan && (
+          {currentDietPlan && (
             <MacroRebalancer
-              planId={currentPlan.id}
+              planId={currentDietPlan.id}
               targets={{
                 protein: profile?.protein_target || 150,
                 carbs: profile?.carbs_target || 250,
@@ -264,7 +289,7 @@ export default function Dashboard() {
           <div className="flex items-center justify-center py-12">
             <Loader2 className="w-8 h-8 animate-spin text-primary" />
           </div>
-        ) : currentPlan ? (
+        ) : currentDietPlan ? (
           <motion.section
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -320,6 +345,15 @@ export default function Dashboard() {
           </motion.section>
         )}
 
+        {/* Usage Limits */}
+        <motion.section
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4 }}
+        >
+          <UsageLimits />
+        </motion.section>
+
         {/* Disclaimer */}
         <motion.section
           initial={{ opacity: 0 }}
@@ -332,6 +366,15 @@ export default function Dashboard() {
           personalizada.
         </motion.section>
       </main>
+
+      {/* Upgrade Dialog */}
+      <UpgradeDialog
+        open={showUpgradeDialog}
+        onOpenChange={setShowUpgradeDialog}
+        feature={upgradeFeature}
+        currentPlan={subscriptionPlan?.name}
+        limit={upgradeLimit}
+      />
     </div>
   );
 }
