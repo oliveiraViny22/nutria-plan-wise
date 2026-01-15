@@ -1,17 +1,13 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ArrowLeft,
   RefreshCw,
   Loader2,
-  AlertTriangle,
-  ChevronDown,
-  ChevronUp,
   Sparkles,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Logo } from '@/components/Logo';
 import { MacroChart } from '@/components/MacroChart';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -23,6 +19,41 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+
+// Parse serving_size to extract base grams (e.g., "100g" -> 100, "1 unidade (50g)" -> 50)
+function parseServingGrams(servingSize: string): number {
+  const match = servingSize.match(/(\d+)\s*(g|ml)/i);
+  if (match) return parseInt(match[1], 10);
+  const parenMatch = servingSize.match(/\((\d+)(g|ml)\)/i);
+  if (parenMatch) return parseInt(parenMatch[1], 10);
+  return 100;
+}
+
+// Get unit from serving size (g or ml)
+function getUnit(servingSize: string): string {
+  if (servingSize.toLowerCase().includes('ml')) return 'ml';
+  return 'g';
+}
+
+// Calculate total grams for display
+function getTotalGrams(food: Food, quantity: number): number {
+  const baseGrams = parseServingGrams(food.serving_size);
+  // If quantity is stored as grams (>10), use directly; otherwise treat as multiplier
+  if (quantity >= 10) return Math.round(quantity);
+  return Math.round(baseGrams * quantity);
+}
+
+// Calculate nutrients for a given quantity
+function calcNutrients(food: Food, gramsQty: number) {
+  const baseGrams = parseServingGrams(food.serving_size);
+  const multiplier = gramsQty / baseGrams;
+  return {
+    calories: Math.round(food.calories * multiplier),
+    protein: Math.round(food.protein * multiplier),
+    carbs: Math.round(food.carbs * multiplier),
+    fat: Math.round(food.fat * multiplier),
+  };
+}
 
 export default function MealDetail() {
   const { mealId } = useParams();
@@ -36,6 +67,7 @@ export default function MealDetail() {
   const [showSubstituteModal, setShowSubstituteModal] = useState(false);
   const [selectedMealFood, setSelectedMealFood] = useState<MealFood | null>(null);
   const [selectedNewFood, setSelectedNewFood] = useState<Food | null>(null);
+  const [adjustedQuantity, setAdjustedQuantity] = useState<number>(0);
   const [impactExplanation, setImpactExplanation] = useState<string | null>(null);
   const [showImpact, setShowImpact] = useState(false);
   const [loadingImpact, setLoadingImpact] = useState(false);
@@ -60,10 +92,7 @@ export default function MealDetail() {
 
       const { data: mealFoodsData, error: mealFoodsError } = await supabase
         .from('meal_foods')
-        .select(`
-          *,
-          food:foods(*)
-        `)
+        .select(`*, food:foods(*)`)
         .eq('meal_id', mealId);
 
       if (mealFoodsError) throw mealFoodsError;
@@ -83,22 +112,60 @@ export default function MealDetail() {
     }
   };
 
+  // Filter foods by same category for substitution
+  const filteredFoodsForSubstitution = useMemo(() => {
+    if (!selectedMealFood?.food) return [];
+    const currentFood = selectedMealFood.food as Food;
+    const currentCategory = currentFood.category;
+    
+    return allFoods.filter((f) => 
+      f.id !== currentFood.id && 
+      f.category === currentCategory
+    );
+  }, [selectedMealFood, allFoods]);
+
   const openSubstituteModal = (mealFood: MealFood) => {
     setSelectedMealFood(mealFood);
     setSelectedNewFood(null);
+    setAdjustedQuantity(0);
     setImpactExplanation(null);
     setShowSubstituteModal(true);
   };
 
   const handleSelectNewFood = async (food: Food) => {
+    if (!selectedMealFood?.food) return;
+    
+    const originalFood = selectedMealFood.food as Food;
+    const originalQty = getTotalGrams(originalFood, selectedMealFood.quantity);
+    const originalNutrients = calcNutrients(originalFood, originalQty);
+    
+    // Calculate quantity of new food to match calories of original
+    const newBaseGrams = parseServingGrams(food.serving_size);
+    const caloriesPerGram = food.calories / newBaseGrams;
+    const targetGrams = caloriesPerGram > 0 ? Math.round(originalNutrients.calories / caloriesPerGram) : newBaseGrams;
+    
+    // Clamp to reasonable range and round to nearest 5g
+    const adjustedQty = Math.min(500, Math.max(10, Math.round(targetGrams / 5) * 5));
+    
     setSelectedNewFood(food);
+    setAdjustedQuantity(adjustedQty);
     setLoadingImpact(true);
 
     try {
+      const newNutrients = calcNutrients(food, adjustedQty);
+      
       const response = await supabase.functions.invoke('explain-substitution', {
         body: {
-          originalFood: selectedMealFood?.food,
-          newFood: food,
+          originalFood: { 
+            ...originalFood, 
+            quantity: originalQty,
+            adjustedCalories: originalNutrients.calories 
+          },
+          newFood: { 
+            ...food, 
+            quantity: adjustedQty,
+            adjustedCalories: newNutrients.calories 
+          },
           userGoal: profile?.goal,
           dailyCalories: profile?.daily_calories,
         },
@@ -120,23 +187,26 @@ export default function MealDetail() {
     setSubstituting(true);
 
     try {
-      // Update meal_food with new food
+      const oldFood = selectedMealFood.food as Food;
+      const oldQty = getTotalGrams(oldFood, selectedMealFood.quantity);
+      const oldNutrients = calcNutrients(oldFood, oldQty);
+      const newNutrients = calcNutrients(selectedNewFood, adjustedQuantity);
+
+      // Update meal_food with new food and adjusted quantity
       const { error: updateError } = await supabase
         .from('meal_foods')
-        .update({ food_id: selectedNewFood.id })
+        .update({ food_id: selectedNewFood.id, quantity: adjustedQuantity })
         .eq('id', selectedMealFood.id);
 
       if (updateError) throw updateError;
 
-      // Recalculate meal totals
-      const oldFood = selectedMealFood.food as Food;
-      const quantity = selectedMealFood.quantity;
+      // Calculate differences
+      const calorieDiff = newNutrients.calories - oldNutrients.calories;
+      const proteinDiff = newNutrients.protein - oldNutrients.protein;
+      const carbsDiff = newNutrients.carbs - oldNutrients.carbs;
+      const fatDiff = newNutrients.fat - oldNutrients.fat;
 
-      const calorieDiff = (selectedNewFood.calories - oldFood.calories) * quantity;
-      const proteinDiff = (selectedNewFood.protein - oldFood.protein) * quantity;
-      const carbsDiff = (selectedNewFood.carbs - oldFood.carbs) * quantity;
-      const fatDiff = (selectedNewFood.fat - oldFood.fat) * quantity;
-
+      // Update meal totals
       const { error: mealError } = await supabase
         .from('meals')
         .update({
@@ -275,51 +345,58 @@ export default function MealDetail() {
           className="space-y-3"
         >
           <h2 className="font-semibold text-foreground">Alimentos</h2>
-          {mealFoods.map((mealFood, index) => (
-            <motion.div
-              key={mealFood.id}
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.2 + index * 0.1 }}
-              className="card-elevated rounded-xl p-4"
-            >
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <h3 className="font-medium text-foreground">
-                    {(mealFood.food as Food)?.name}
-                  </h3>
-                  <p className="text-sm text-muted-foreground">
-                    {(mealFood.food as Food)?.serving_size} × {mealFood.quantity}
-                  </p>
-                  <div className="flex gap-3 mt-2 text-xs">
-                    <span className="text-protein font-medium">
-                      P: {Math.round((mealFood.food as Food)?.protein * mealFood.quantity)}g
-                    </span>
-                    <span className="text-carbs font-medium">
-                      C: {Math.round((mealFood.food as Food)?.carbs * mealFood.quantity)}g
-                    </span>
-                    <span className="text-fat font-medium">
-                      G: {Math.round((mealFood.food as Food)?.fat * mealFood.quantity)}g
-                    </span>
+          {mealFoods.map((mealFood, index) => {
+            const food = mealFood.food as Food;
+            const totalGrams = getTotalGrams(food, mealFood.quantity);
+            const unit = getUnit(food.serving_size);
+            const nutrients = calcNutrients(food, totalGrams);
+            
+            return (
+              <motion.div
+                key={mealFood.id}
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.2 + index * 0.1 }}
+                className="card-elevated rounded-xl p-4"
+              >
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <h3 className="font-medium text-foreground">
+                      {food?.name}
+                    </h3>
+                    <p className="text-sm text-muted-foreground">
+                      {totalGrams}{unit}
+                    </p>
+                    <div className="flex gap-3 mt-2 text-xs">
+                      <span className="text-protein font-medium">
+                        P: {nutrients.protein}g
+                      </span>
+                      <span className="text-carbs font-medium">
+                        C: {nutrients.carbs}g
+                      </span>
+                      <span className="text-fat font-medium">
+                        G: {nutrients.fat}g
+                      </span>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-semibold text-foreground">
+                      {nutrients.calories} kcal
+                    </p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="mt-2"
+                      onClick={() => openSubstituteModal(mealFood)}
+                    >
+                      <RefreshCw className="w-3 h-3 mr-1" />
+                      Substituir
+                    </Button>
                   </div>
                 </div>
-                <div className="text-right">
-                  <p className="font-semibold text-foreground">
-                    {Math.round((mealFood.food as Food)?.calories * mealFood.quantity)} kcal
-                  </p>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="mt-2"
-                    onClick={() => openSubstituteModal(mealFood)}
-                  >
-                    <RefreshCw className="w-3 h-3 mr-1" />
-                    Substituir
-                  </Button>
-                </div>
-              </div>
-            </motion.div>
-          ))}
+              </motion.div>
+            );
+          })}
         </motion.section>
       </main>
 
@@ -339,23 +416,50 @@ export default function MealDetail() {
               <p className="font-medium text-foreground">
                 {(selectedMealFood?.food as Food)?.name}
               </p>
-              <div className="flex gap-3 mt-1 text-xs text-muted-foreground">
-                <span>{(selectedMealFood?.food as Food)?.calories} kcal</span>
-                <span>P: {(selectedMealFood?.food as Food)?.protein}g</span>
-                <span>C: {(selectedMealFood?.food as Food)?.carbs}g</span>
-                <span>G: {(selectedMealFood?.food as Food)?.fat}g</span>
-              </div>
+              {selectedMealFood?.food && (
+                <div className="flex gap-3 mt-1 text-xs text-muted-foreground">
+                  {(() => {
+                    const food = selectedMealFood.food as Food;
+                    const qty = getTotalGrams(food, selectedMealFood.quantity);
+                    const nutrients = calcNutrients(food, qty);
+                    return (
+                      <>
+                        <span>{qty}{getUnit(food.serving_size)}</span>
+                        <span>{nutrients.calories} kcal</span>
+                        <span>P: {nutrients.protein}g</span>
+                        <span>C: {nutrients.carbs}g</span>
+                        <span>G: {nutrients.fat}g</span>
+                      </>
+                    );
+                  })()}
+                </div>
+              )}
             </div>
+
+            {/* Category Info */}
+            {selectedMealFood?.food && (
+              <div className="p-3 bg-primary/10 rounded-lg">
+                <p className="text-xs text-primary font-medium">
+                  📌 Mostrando apenas alimentos da categoria: {(selectedMealFood.food as Food).category}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  A quantidade será ajustada automaticamente para manter as calorias similares.
+                </p>
+              </div>
+            )}
 
             {/* New Food Selection */}
             <div className="space-y-2">
               <p className="text-sm font-medium text-foreground">
-                Escolha o novo alimento
+                Escolha o novo alimento ({filteredFoodsForSubstitution.length} opções)
               </p>
-              <div className="max-h-48 overflow-y-auto space-y-1 border rounded-lg p-2">
-                {allFoods
-                  .filter((f) => f.id !== (selectedMealFood?.food as Food)?.id)
-                  .map((food) => (
+              {filteredFoodsForSubstitution.length === 0 ? (
+                <p className="text-sm text-muted-foreground p-4 text-center">
+                  Não há outros alimentos disponíveis nesta categoria.
+                </p>
+              ) : (
+                <div className="max-h-48 overflow-y-auto space-y-1 border rounded-lg p-2">
+                  {filteredFoodsForSubstitution.map((food) => (
                     <button
                       key={food.id}
                       onClick={() => handleSelectNewFood(food)}
@@ -369,14 +473,15 @@ export default function MealDetail() {
                         {food.name}
                       </p>
                       <div className="flex gap-2 text-xs text-muted-foreground">
-                        <span>{food.calories} kcal</span>
+                        <span>{food.calories} kcal/{food.serving_size}</span>
                         <span>P: {food.protein}g</span>
                         <span>C: {food.carbs}g</span>
                         <span>G: {food.fat}g</span>
                       </div>
                     </button>
                   ))}
-              </div>
+                </div>
+              )}
             </div>
 
             {/* Impact Explanation */}
@@ -406,19 +511,41 @@ export default function MealDetail() {
             )}
 
             {/* Comparison */}
-            {selectedNewFood && (
+            {selectedNewFood && selectedMealFood?.food && (
               <div className="grid grid-cols-2 gap-4">
                 <div className="p-3 bg-muted rounded-lg text-center">
                   <p className="text-xs text-muted-foreground mb-1">Antes</p>
-                  <p className="text-lg font-bold text-foreground">
-                    {(selectedMealFood?.food as Food)?.calories} kcal
-                  </p>
+                  {(() => {
+                    const food = selectedMealFood.food as Food;
+                    const qty = getTotalGrams(food, selectedMealFood.quantity);
+                    const nutrients = calcNutrients(food, qty);
+                    return (
+                      <>
+                        <p className="text-lg font-bold text-foreground">
+                          {nutrients.calories} kcal
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {qty}{getUnit(food.serving_size)}
+                        </p>
+                      </>
+                    );
+                  })()}
                 </div>
                 <div className="p-3 bg-primary/10 rounded-lg text-center">
                   <p className="text-xs text-muted-foreground mb-1">Depois</p>
-                  <p className="text-lg font-bold text-primary">
-                    {selectedNewFood.calories} kcal
-                  </p>
+                  {(() => {
+                    const nutrients = calcNutrients(selectedNewFood, adjustedQuantity);
+                    return (
+                      <>
+                        <p className="text-lg font-bold text-primary">
+                          {nutrients.calories} kcal
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {adjustedQuantity}{getUnit(selectedNewFood.serving_size)}
+                        </p>
+                      </>
+                    );
+                  })()}
                 </div>
               </div>
             )}
