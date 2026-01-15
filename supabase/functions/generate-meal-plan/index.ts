@@ -76,19 +76,31 @@ serve(async (req) => {
     });
 
     // Save diet plan
-    const { data: plan } = await supabase.from("diet_plans").insert({
+    const { data: plan, error: planError } = await supabase.from("diet_plans").insert({
       user_id: user.id, total_calories: totalCal, total_protein: totalP, total_carbs: totalC, total_fat: totalF
     }).select().single();
 
+    if (planError || !plan) {
+      console.error("Failed to create diet plan:", planError);
+      throw new Error("Failed to create diet plan");
+    }
+
     // Save meals
     for (const meal of mealsData) {
-      const { data: savedMeal } = await supabase.from("meals").insert({
+      const { data: savedMeal, error: mealError } = await supabase.from("meals").insert({
         diet_plan_id: plan.id, name: meal.name, total_calories: meal.total_calories,
         total_protein: meal.total_protein, total_carbs: meal.total_carbs, total_fat: meal.total_fat
       }).select().single();
       
+      if (mealError || !savedMeal) {
+        console.error("Failed to create meal:", mealError);
+        continue;
+      }
+
       for (const food of meal.foods || []) {
-        await supabase.from("meal_foods").insert({ meal_id: savedMeal.id, food_id: food.food_id, quantity: food.quantity });
+        if (food.food_id) {
+          await supabase.from("meal_foods").insert({ meal_id: savedMeal.id, food_id: food.food_id, quantity: food.quantity || 1 });
+        }
       }
     }
 
