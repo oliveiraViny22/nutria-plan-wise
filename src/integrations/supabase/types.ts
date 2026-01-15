@@ -187,6 +187,66 @@ export type Database = {
           },
         ]
       }
+      professional_licenses: {
+        Row: {
+          created_at: string | null
+          expires_at: string
+          id: string
+          license_type: string
+          max_students: number | null
+          starts_at: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          expires_at: string
+          id?: string
+          license_type?: string
+          max_students?: number | null
+          starts_at?: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          expires_at?: string
+          id?: string
+          license_type?: string
+          max_students?: number | null
+          starts_at?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      professional_students: {
+        Row: {
+          created_at: string | null
+          id: string
+          professional_id: string
+          status: string
+          student_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          professional_id: string
+          status?: string
+          student_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          professional_id?: string
+          status?: string
+          student_id?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           activity_level: string | null
@@ -202,6 +262,7 @@ export type Database = {
           name: string | null
           onboarding_completed: boolean | null
           preferences: string[] | null
+          professional_id: string | null
           protein_target: number | null
           restrictions: string[] | null
           sex: string | null
@@ -223,6 +284,7 @@ export type Database = {
           name?: string | null
           onboarding_completed?: boolean | null
           preferences?: string[] | null
+          professional_id?: string | null
           protein_target?: number | null
           restrictions?: string[] | null
           sex?: string | null
@@ -244,6 +306,7 @@ export type Database = {
           name?: string | null
           onboarding_completed?: boolean | null
           preferences?: string[] | null
+          professional_id?: string | null
           protein_target?: number | null
           restrictions?: string[] | null
           sex?: string | null
@@ -253,15 +316,44 @@ export type Database = {
         }
         Relationships: []
       }
+      user_roles: {
+        Row: {
+          created_at: string | null
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_student_count: { Args: { _professional_id: string }; Returns: number }
+      has_active_license: { Args: { _user_id: string }; Returns: boolean }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "professional" | "student"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -388,6 +480,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "professional", "student"],
+    },
   },
 } as const
