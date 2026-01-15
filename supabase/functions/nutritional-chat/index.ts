@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -11,6 +12,35 @@ serve(async (req) => {
   try {
     const { message, profile, chatHistory } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    
+    const authHeader = req.headers.get("Authorization");
+    const supabase = createClient(supabaseUrl, supabaseKey);
+    
+    const token = authHeader?.replace("Bearer ", "");
+    const { data: { user } } = await supabase.auth.getUser(token);
+    if (!user) throw new Error("Unauthorized");
+
+    // Validate chat usage limit
+    const { data: canUse } = await supabase.rpc('can_use_feature', {
+      _user_id: user.id,
+      _feature: 'chat',
+    });
+
+    if (!canUse) {
+      const { data: planInfo } = await supabase.rpc('get_user_plan', { _user_id: user.id });
+      const errorMsg = planInfo?.[0]?.has_chat 
+        ? `Você atingiu o limite de ${planInfo?.[0]?.chat_messages_per_day || 0} mensagens diárias.`
+        : 'O chat não está disponível no seu plano atual.';
+      return new Response(JSON.stringify({
+        error: errorMsg,
+        upgradeRequired: true,
+      }), {
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     const systemPrompt = `Você é um assistente nutricional educacional. Responda perguntas sobre alimentação saudável de forma clara e acessível. 
 Contexto do usuário:
@@ -41,6 +71,13 @@ IMPORTANTE: Você oferece educação nutricional, não aconselhamento médico. S
     }
 
     const data = await response.json();
+
+    // Increment chat usage after successful response
+    await supabase.rpc('increment_usage', {
+      _user_id: user.id,
+      _feature: 'chat',
+    });
+
     return new Response(JSON.stringify({ message: data.choices[0].message.content }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (e: unknown) {
     const message = e instanceof Error ? e.message : "Unknown error";
