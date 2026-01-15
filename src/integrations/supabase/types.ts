@@ -77,6 +77,7 @@ export type Database = {
           fat: number
           id: string
           name: string
+          processing_level: string | null
           protein: number
           serving_size: string | null
         }
@@ -88,6 +89,7 @@ export type Database = {
           fat: number
           id?: string
           name: string
+          processing_level?: string | null
           protein: number
           serving_size?: string | null
         }
@@ -99,6 +101,7 @@ export type Database = {
           fat?: number
           id?: string
           name?: string
+          processing_level?: string | null
           protein?: number
           serving_size?: string | null
         }
