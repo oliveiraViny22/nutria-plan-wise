@@ -192,7 +192,7 @@ serve(async (req) => {
               const { data: freePlan } = await supabaseAdmin
                 .from('plans')
                 .select('id')
-                .eq('name', 'free')
+                .eq('name', 'gratuito')
                 .eq('type', 'personal')
                 .single();
 
@@ -204,6 +204,7 @@ serve(async (req) => {
                     plan_id: freePlan.id,
                     provider: null,
                     provider_subscription_id: null,
+                    stripe_price_id: null,
                   })
                   .eq('user_id', profile.user_id);
               }

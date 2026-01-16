@@ -9,16 +9,16 @@ interface BlockedActionCTAProps {
 }
 
 export function BlockedActionCTA({ action, onRequestClick }: BlockedActionCTAProps) {
-  const { accountType, isLinkedToProfessional, canSendRequests } = useAccountPermissions();
+  const { user_type, is_linked_to_professional, can_send_requests } = useAccountPermissions();
   
-  if (accountType === 'aluno' && isLinkedToProfessional) {
+  if (user_type === 'aluno' && is_linked_to_professional) {
     return (
       <div className="bg-muted/50 border border-border rounded-xl p-4 text-center">
         <Lock className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
         <p className="text-sm text-muted-foreground mb-3">
           Você não pode {action}. Seu plano é gerenciado pelo seu nutricionista.
         </p>
-        {canSendRequests && onRequestClick && (
+        {can_send_requests && onRequestClick && (
           <Button variant="outline" size="sm" onClick={onRequestClick}>
             <Send className="w-4 h-4 mr-2" />
             Enviar solicitação

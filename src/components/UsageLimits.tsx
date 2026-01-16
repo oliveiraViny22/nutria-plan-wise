@@ -130,7 +130,7 @@ export function UsageLimits() {
             className="w-full"
             onClick={() => navigate('/pricing')}
           >
-            {currentPlan.name === 'free' ? 'Fazer Upgrade' : 'Gerenciar Plano'}
+            {currentPlan.name === 'gratuito' ? 'Fazer Upgrade' : 'Gerenciar Plano'}
           </Button>
         </div>
       </CardContent>
