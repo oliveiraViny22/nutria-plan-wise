@@ -3,6 +3,7 @@
 // Allowed origins for CORS - add your production domains here
 const ALLOWED_ORIGINS = [
   'https://id-preview--0d4648d3-1fe4-49fc-9711-596d3211140b.lovable.app',
+  'https://0d4648d3-1fe4-49fc-9711-596d3211140b.lovableproject.com',
   'http://localhost:5173',
   'http://localhost:3000',
   'https://lovable.app',
