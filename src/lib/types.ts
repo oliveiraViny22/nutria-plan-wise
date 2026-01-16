@@ -15,6 +15,8 @@ export interface Profile {
   protein_target: number | null;
   carbs_target: number | null;
   fat_target: number | null;
+  meals_per_day: number | null;
+  professional_id: string | null;
   onboarding_completed: boolean;
   created_at: string;
   updated_at: string;
