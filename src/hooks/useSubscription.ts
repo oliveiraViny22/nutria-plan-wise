@@ -12,27 +12,60 @@ export function useSubscription() {
 
   const fetchSubscription = useCallback(async () => {
     // Wait for auth to finish loading before determining user state
-    if (authLoading) {
-      return;
-    }
-    
+    if (authLoading) return;
+
     if (!user) {
       setSubscriptionInfo(null);
+      setError(null);
       setLoading(false);
       return;
     }
 
+    const ensureFreshSession = async () => {
+      const { data, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError) throw sessionError;
+
+      const session = data.session;
+      const expiresAtMs = (session?.expires_at ?? 0) * 1000;
+
+      // Refresh if expiring soon (or already expired)
+      if (!expiresAtMs || expiresAtMs - Date.now() < 30_000) {
+        const { error: refreshError } = await supabase.auth.refreshSession();
+        if (refreshError) throw refreshError;
+      }
+    };
+
+    const invokeCheck = async () => {
+      const { data, error } = await supabase.functions.invoke('check-subscription');
+      if (error) throw error;
+      return data as SubscriptionInfo;
+    };
+
     try {
       setLoading(true);
-      const { data, error } = await supabase.functions.invoke('check-subscription');
-      
-      if (error) throw error;
-      
+      await ensureFreshSession();
+
+      const data = await invokeCheck();
       setSubscriptionInfo(data);
       setError(null);
-    } catch (err) {
+    } catch (err: any) {
+      // One retry on 401 (often caused by an expired access token)
+      const status = err?.context?.status;
+      if (status === 401) {
+        try {
+          await supabase.auth.refreshSession();
+          const data = await invokeCheck();
+          setSubscriptionInfo(data);
+          setError(null);
+          return;
+        } catch {
+          // fallthrough to generic error handler
+        }
+      }
+
       console.error('Error fetching subscription:', err);
       setError(err instanceof Error ? err.message : 'Failed to fetch subscription');
+      setSubscriptionInfo(null);
     } finally {
       setLoading(false);
     }
