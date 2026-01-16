@@ -19,7 +19,7 @@ import { MacroChart } from '@/components/MacroChart';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserRole } from '@/hooks/useUserRole';
-import { Profile, Meal, DietPlan, MEAL_NAMES, GOALS } from '@/lib/types';
+import { Profile, Meal, DietPlan, MEAL_NAMES, GOALS, MealType } from '@/lib/types';
 import { toast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
