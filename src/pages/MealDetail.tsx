@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ArrowLeft,
@@ -12,6 +12,7 @@ import { MacroChart } from '@/components/MacroChart';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLinkedStudent } from '@/hooks/useLinkedStudent';
+import { useUserRole } from '@/hooks/useUserRole';
 import { Meal, MealFood, Food, MEAL_NAMES, SUBSTITUTABLE_PROCESSING_LEVELS, ProcessingLevel, MealType } from '@/lib/types';
 import { toast } from 'sonner';
 import {
@@ -58,9 +59,19 @@ function calcNutrients(food: Food, gramsQty: number) {
 
 export default function MealDetail() {
   const { mealId } = useParams();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { profile } = useAuth();
+  const { profile, user } = useAuth();
   const { isLinkedStudent } = useLinkedStudent();
+  const { isProfessional } = useUserRole();
+  
+  // Check if this is a professional viewing a student's meal
+  const studentIdFromQuery = searchParams.get('studentId');
+  const isProfessionalViewingStudent = isProfessional && !!studentIdFromQuery;
+  
+  // Only restrict editing for linked students (not for professionals or regular users)
+  const canEdit = !isLinkedStudent || isProfessionalViewingStudent;
+  
   const [meal, setMeal] = useState<Meal | null>(null);
   const [mealFoods, setMealFoods] = useState<MealFood[]>([]);
   const [allFoods, setAllFoods] = useState<Food[]>([]);
@@ -456,8 +467,8 @@ export default function MealDetail() {
                     <p className="font-semibold text-foreground">
                       {nutrients.calories} kcal
                     </p>
-                    {/* Hide substitute button for linked students */}
-                    {!isLinkedStudent && (
+                    {/* Show substitute button for users who can edit */}
+                    {canEdit && (
                       <Button
                         variant="outline"
                         size="sm"
