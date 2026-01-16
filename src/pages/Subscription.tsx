@@ -1,18 +1,20 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { CreditCard, AlertTriangle, Check, ExternalLink, ArrowLeft } from 'lucide-react';
+import { CreditCard, AlertTriangle, Check, ExternalLink, ArrowLeft, Users, BarChart3, UserPlus } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useSubscription } from '@/hooks/useSubscription';
 import { useToast } from '@/hooks/use-toast';
+import { useUserRole } from '@/hooks/useUserRole';
 import { BILLING_CYCLE_LABELS } from '@/lib/subscription-types';
 
 export default function Subscription() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { subscriptionInfo, currentPlan, usage, loading, openCustomerPortal, refresh } = useSubscription();
+  const { isProfessional } = useUserRole();
   const [portalLoading, setPortalLoading] = useState(false);
 
   const handleManageSubscription = async () => {
@@ -236,6 +238,88 @@ export default function Subscription() {
                     included
                   />
                 </ul>
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
+
+        {/* Professional Quick Actions */}
+        {isProfessional && currentPlan?.type === 'professional' && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+          >
+            <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-primary/10">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Users className="h-5 w-5 text-primary" />
+                  Gestão Profissional
+                </CardTitle>
+                <CardDescription>
+                  Acesse as ferramentas exclusivas para profissionais
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <Button 
+                  className="w-full justify-start" 
+                  variant="outline"
+                  onClick={() => navigate('/students')}
+                >
+                  <Users className="h-4 w-4 mr-3" />
+                  Gerenciar Alunos
+                  <span className="ml-auto text-muted-foreground text-sm">
+                    Adicionar, remover e visualizar alunos
+                  </span>
+                </Button>
+                <Button 
+                  className="w-full justify-start" 
+                  variant="outline"
+                  onClick={() => navigate('/students')}
+                >
+                  <BarChart3 className="h-4 w-4 mr-3" />
+                  Ver Dietas dos Alunos
+                  <span className="ml-auto text-muted-foreground text-sm">
+                    Acompanhar planos alimentares
+                  </span>
+                </Button>
+                <Button 
+                  className="w-full justify-start" 
+                  variant="outline"
+                  onClick={() => navigate('/students')}
+                >
+                  <UserPlus className="h-4 w-4 mr-3" />
+                  Adicionar Novo Aluno
+                  <span className="ml-auto text-muted-foreground text-sm">
+                    Vincular aluno pelo email
+                  </span>
+                </Button>
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
+
+        {/* Become Professional CTA */}
+        {!isProfessional && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+          >
+            <Card className="border-dashed">
+              <CardContent className="pt-6">
+                <div className="text-center space-y-3">
+                  <Users className="h-10 w-10 mx-auto text-muted-foreground" />
+                  <div>
+                    <h3 className="font-semibold">É um profissional de saúde?</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Gerencie alunos, crie dietas personalizadas e acompanhe a evolução
+                    </p>
+                  </div>
+                  <Button onClick={() => navigate('/become-professional')}>
+                    Conhecer Plano Profissional
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           </motion.div>
