@@ -17,16 +17,22 @@ serve(async (req) => {
   try {
     logStep("Function started");
 
-    const supabaseClient = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_ANON_KEY") ?? ""
-    );
+    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
+    const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 
-    const supabaseAdmin = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
-      { auth: { persistSession: false } }
-    );
+    if (!supabaseUrl || !supabaseAnonKey || !supabaseServiceRoleKey) {
+      logStep("Missing required env", {
+        hasUrl: Boolean(supabaseUrl),
+        hasAnon: Boolean(supabaseAnonKey),
+        hasServiceRole: Boolean(supabaseServiceRoleKey),
+      });
+      return createErrorResponse(CLIENT_ERRORS.SERVER_ERROR, 500, corsHeaders);
+    }
+
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey, {
+      auth: { persistSession: false },
+    });
 
     const authHeader = req.headers.get("Authorization");
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
@@ -38,15 +44,29 @@ serve(async (req) => {
       return createErrorResponse(CLIENT_ERRORS.AUTH_REQUIRED, 401, corsHeaders);
     }
 
-    // Validate JWT using signing keys compatible method
-    const { data: claimsData, error: claimsError } = await supabaseClient.auth.getClaims(token);
+    // Auth client bound to this request's JWT (signing-keys compatible)
+    const supabaseAuth = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } },
+      auth: { persistSession: false },
+    });
 
-    if (claimsError || !claimsData?.claims?.sub) {
-      logStep("Auth failed", { error: claimsError?.message });
+    // Validate JWT using signing keys compatible method
+    const { data: claimsData, error: claimsError } = await supabaseAuth.auth.getClaims(token);
+
+    // Fallback for older GoTrue behavior / edge-runtime quirks
+    const userId =
+      (!claimsError && claimsData?.claims?.sub)
+        ? claimsData.claims.sub
+        : (await supabaseAuth.auth.getUser()).data.user?.id;
+
+    if (!userId) {
+      logStep("Auth failed", {
+        claimsError: claimsError?.message,
+      });
       return createErrorResponse(CLIENT_ERRORS.AUTH_FAILED, 401, corsHeaders);
     }
 
-    const user = { id: claimsData.claims.sub };
+    const user = { id: userId };
     logStep("User authenticated", { userId: user.id });
 
     // Get user's subscription with plan details
