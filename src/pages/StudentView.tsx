@@ -8,7 +8,13 @@ import {
   Flame,
   Calendar,
   Utensils,
-  TrendingUp
+  TrendingUp,
+  RefreshCw,
+  Loader2,
+  Send,
+  Lock,
+  Unlock,
+  Sparkles,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -16,6 +22,7 @@ import { Badge } from '@/components/ui/badge';
 import { Logo } from '@/components/Logo';
 import { CalorieRing } from '@/components/CalorieRing';
 import { MacroChart } from '@/components/MacroChart';
+import { MacroRebalancer } from '@/components/MacroRebalancer';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserRole } from '@/hooks/useUserRole';
@@ -52,6 +59,8 @@ export default function StudentView() {
   const [dietPlan, setDietPlan] = useState<DietPlan | null>(null);
   const [meals, setMeals] = useState<MealWithFoods[]>([]);
   const [loading, setLoading] = useState(true);
+  const [generating, setGenerating] = useState(false);
+  const [releasing, setReleasing] = useState(false);
 
   useEffect(() => {
     if (!studentId || !user) return;
@@ -142,6 +151,89 @@ export default function StudentView() {
 
     fetchStudentData();
   }, [studentId, user, navigate]);
+
+  // Generate meal plan for student
+  const generateMealPlan = async () => {
+    if (!studentProfile || !studentId) return;
+    
+    setGenerating(true);
+    try {
+      const response = await supabase.functions.invoke('generate-meal-plan', {
+        body: {
+          profile: {
+            daily_calories: studentProfile.daily_calories,
+            protein_target: studentProfile.protein_target,
+            carbs_target: studentProfile.carbs_target,
+            fat_target: studentProfile.fat_target,
+            preferences: studentProfile.preferences,
+            restrictions: studentProfile.restrictions,
+            goal: studentProfile.goal,
+            meals_per_day: studentProfile.meals_per_day || 4,
+          },
+          studentId: studentId,
+        },
+      });
+
+      if (response.error) throw response.error;
+
+      toast({
+        title: 'Sucesso!',
+        description: 'Plano alimentar gerado com sucesso.',
+      });
+      
+      // Refresh the page data
+      window.location.reload();
+    } catch (error: any) {
+      console.error('Error generating plan:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Erro',
+        description: 'Erro ao gerar plano alimentar',
+      });
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  // Release/unrelease plan to student
+  const togglePlanRelease = async () => {
+    if (!dietPlan) return;
+    
+    setReleasing(true);
+    try {
+      const newReleaseStatus = !dietPlan.released_to_student;
+      
+      const { error } = await supabase
+        .from('diet_plans')
+        .update({ released_to_student: newReleaseStatus })
+        .eq('id', dietPlan.id);
+
+      if (error) throw error;
+
+      setDietPlan({ ...dietPlan, released_to_student: newReleaseStatus });
+      
+      toast({
+        title: newReleaseStatus ? 'Plano liberado!' : 'Plano ocultado',
+        description: newReleaseStatus 
+          ? 'O aluno agora pode visualizar o plano alimentar.'
+          : 'O plano foi ocultado do aluno.',
+      });
+    } catch (error: any) {
+      console.error('Error toggling plan release:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Erro',
+        description: 'Erro ao alterar status do plano',
+      });
+    } finally {
+      setReleasing(false);
+    }
+  };
+
+  // Refetch after macro rebalancer completes
+  const handleMacroRebalanceComplete = () => {
+    window.location.reload();
+  };
 
   if (!isProfessional) {
     return (
@@ -241,6 +333,107 @@ export default function StudentView() {
               </div>
             </CardContent>
           </Card>
+        </motion.div>
+
+        {/* Action Buttons for Professional */}
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.05 }}
+          className="space-y-3"
+        >
+          {/* Generate/Regenerate Plan */}
+          <Button
+            variant="hero"
+            size="lg"
+            className="w-full"
+            onClick={generateMealPlan}
+            disabled={generating}
+          >
+            {generating ? (
+              <>
+                <Loader2 className="w-5 h-5 animate-spin" />
+                Gerando plano...
+              </>
+            ) : dietPlan ? (
+              <>
+                <RefreshCw className="w-5 h-5" />
+                Gerar novo plano
+              </>
+            ) : (
+              <>
+                <Utensils className="w-5 h-5" />
+                Criar plano alimentar
+              </>
+            )}
+          </Button>
+
+          {/* Macro Rebalancer */}
+          {dietPlan && (
+            <MacroRebalancer
+              planId={dietPlan.id}
+              targets={{
+                protein: studentProfile.protein_target || 150,
+                carbs: studentProfile.carbs_target || 250,
+                fat: studentProfile.fat_target || 65,
+                calories: studentProfile.daily_calories || 2000,
+              }}
+              currentMacros={{
+                protein: dietPlan.total_protein,
+                carbs: dietPlan.total_carbs,
+                fat: dietPlan.total_fat,
+                calories: dietPlan.total_calories,
+              }}
+              onComplete={handleMacroRebalanceComplete}
+            />
+          )}
+
+          {/* Release/Unrelease Plan Button */}
+          {dietPlan && (
+            <Button
+              variant={dietPlan.released_to_student ? "outline" : "default"}
+              size="lg"
+              className="w-full"
+              onClick={togglePlanRelease}
+              disabled={releasing}
+            >
+              {releasing ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  Processando...
+                </>
+              ) : dietPlan.released_to_student ? (
+                <>
+                  <Lock className="w-5 h-5" />
+                  Ocultar plano do aluno
+                </>
+              ) : (
+                <>
+                  <Send className="w-5 h-5" />
+                  Liberar plano para o aluno
+                </>
+              )}
+            </Button>
+          )}
+
+          {/* Status Badge */}
+          {dietPlan && (
+            <div className="flex justify-center">
+              <Badge variant={dietPlan.released_to_student ? "default" : "secondary"} className="gap-1">
+                {dietPlan.released_to_student ? (
+                  <>
+                    <Unlock className="h-3 w-3" />
+                    Plano visível para o aluno
+                  </>
+                ) : (
+                  <>
+                    <Lock className="h-3 w-3" />
+                    Plano oculto do aluno
+                  </>
+                )}
+              </Badge>
+            </div>
+          )}
         </motion.div>
 
         {/* Stats */}

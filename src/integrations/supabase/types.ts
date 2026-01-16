@@ -42,6 +42,7 @@ export type Database = {
         Row: {
           created_at: string | null
           id: string
+          released_to_student: boolean
           total_calories: number
           total_carbs: number
           total_fat: number
@@ -51,6 +52,7 @@ export type Database = {
         Insert: {
           created_at?: string | null
           id?: string
+          released_to_student?: boolean
           total_calories: number
           total_carbs: number
           total_fat: number
@@ -60,6 +62,7 @@ export type Database = {
         Update: {
           created_at?: string | null
           id?: string
+          released_to_student?: boolean
           total_calories?: number
           total_carbs?: number
           total_fat?: number

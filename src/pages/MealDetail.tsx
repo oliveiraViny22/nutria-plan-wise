@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { MacroChart } from '@/components/MacroChart';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useLinkedStudent } from '@/hooks/useLinkedStudent';
 import { Meal, MealFood, Food, MEAL_NAMES, SUBSTITUTABLE_PROCESSING_LEVELS, ProcessingLevel, MealType } from '@/lib/types';
 import { toast } from 'sonner';
 import {
@@ -59,6 +60,7 @@ export default function MealDetail() {
   const { mealId } = useParams();
   const navigate = useNavigate();
   const { profile } = useAuth();
+  const { isLinkedStudent } = useLinkedStudent();
   const [meal, setMeal] = useState<Meal | null>(null);
   const [mealFoods, setMealFoods] = useState<MealFood[]>([]);
   const [allFoods, setAllFoods] = useState<Food[]>([]);
@@ -454,15 +456,18 @@ export default function MealDetail() {
                     <p className="font-semibold text-foreground">
                       {nutrients.calories} kcal
                     </p>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="mt-2"
-                      onClick={() => openSubstituteModal(mealFood)}
-                    >
-                      <RefreshCw className="w-3 h-3 mr-1" />
-                      Substituir
-                    </Button>
+                    {/* Hide substitute button for linked students */}
+                    {!isLinkedStudent && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="mt-2"
+                        onClick={() => openSubstituteModal(mealFood)}
+                      >
+                        <RefreshCw className="w-3 h-3 mr-1" />
+                        Substituir
+                      </Button>
+                    )}
                   </div>
                 </div>
               </motion.div>
