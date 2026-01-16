@@ -13,12 +13,21 @@ import { Plan, BillingCycle, BILLING_CYCLE_LABELS, BILLING_CYCLE_DISCOUNTS } fro
 export default function Pricing() {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { plans, currentPlan, loading, createCheckout, accountType } = useSubscription();
+  const { plans, currentPlan, loading, createCheckout, accountType, isLinkedToProfessional } = useSubscription();
   const [accountTab, setAccountTab] = useState<'personal' | 'professional'>(accountType);
   const [billingCycle, setBillingCycle] = useState<BillingCycle>('monthly');
   const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null);
 
-  const filteredPlans = plans.filter(p => p.type === accountTab);
+  // Filter plans based on tab and Premium visibility rules
+  const filteredPlans = plans.filter(p => {
+    // Filter by account type tab
+    if (p.type !== accountTab) return false;
+    
+    // Premium is only visible to users linked to a professional
+    if (p.name === 'premium' && !isLinkedToProfessional) return false;
+    
+    return true;
+  });
 
   const getPrice = (plan: Plan, cycle: BillingCycle): number => {
     switch (cycle) {

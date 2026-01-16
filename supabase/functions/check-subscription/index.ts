@@ -98,6 +98,16 @@ serve(async (req) => {
     const user = { id: userId };
     logStep("User authenticated", { userId: user.id });
 
+    // Check if user is linked to a professional (student)
+    const { data: profileData } = await supabaseAdmin
+      .from('profiles')
+      .select('professional_id')
+      .eq('user_id', user.id)
+      .maybeSingle();
+    
+    const isLinkedToProfessional = Boolean(profileData?.professional_id);
+    logStep("Checked professional link", { isLinkedToProfessional });
+
     // Get user's subscription with plan details
     const { data: subscription, error: subError } = await supabaseAdmin
       .from('subscriptions')
@@ -127,6 +137,7 @@ serve(async (req) => {
         plan: null,
         usage: null,
         accountType: isProfessional ? 'professional' : 'personal',
+        isLinkedToProfessional,
       }, corsHeaders);
     }
 
@@ -247,6 +258,7 @@ serve(async (req) => {
         chat_messages_today: 0,
       },
       accountType: planType,
+      isLinkedToProfessional,
     }, corsHeaders);
   } catch (error) {
     logStep("ERROR", { message: getErrorForLogging(error) });

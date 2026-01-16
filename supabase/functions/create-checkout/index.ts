@@ -109,6 +109,32 @@ serve(async (req) => {
     const resolvedPlanId = plan.id;
     logStep("Plan fetched", { planName: plan.name, planType: plan.type, planId: resolvedPlanId });
 
+    // Validate Premium plan restriction: only for students linked to a professional
+    if (plan.name === 'premium') {
+      const { data: profileData, error: profileError } = await supabaseAdmin
+        .from('profiles')
+        .select('professional_id')
+        .eq('user_id', user.id)
+        .maybeSingle();
+      
+      if (profileError) {
+        logStep("Error checking profile", { error: profileError.message });
+        return createErrorResponse(CLIENT_ERRORS.SERVER_ERROR, 500, corsHeaders);
+      }
+
+      if (!profileData?.professional_id) {
+        logStep("Premium plan not available - user is not linked to a professional");
+        return createErrorResponse(
+          'O plano Premium é exclusivo para alunos vinculados a um profissional.',
+          403,
+          corsHeaders,
+          { premiumRestricted: true }
+        );
+      }
+      
+      logStep("Premium plan validation passed - user is linked to professional");
+    }
+
     // Prevent re-contracting the exact same active subscription
     const { data: existingSubscription, error: existingSubError } = await supabaseAdmin
       .from('subscriptions')
