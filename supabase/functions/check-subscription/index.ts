@@ -81,6 +81,83 @@ serve(async (req) => {
       status: subscription.status 
     });
 
+    const planType = subscription.plan?.type || 'personal';
+    const isSubscribed = subscription.status === 'active' || subscription.status === 'trial';
+    const shouldSyncProfessional =
+      planType === 'professional' && ['active', 'trial', 'past_due'].includes(subscription.status);
+
+    // Keep entitlements (role + license) in sync for professional accounts
+    if (shouldSyncProfessional) {
+      try {
+        // Ensure professional role exists
+        const { error: roleUpsertError } = await supabaseAdmin
+          .from('user_roles')
+          .upsert({ user_id: user.id, role: 'professional' }, { onConflict: 'user_id,role' });
+
+        if (roleUpsertError) {
+          logStep('Failed to upsert professional role', { error: roleUpsertError.message });
+        } else {
+          logStep('Professional role ensured');
+        }
+
+        // Ensure professional license exists/updated
+        const licenseType = subscription.billing_cycle === 'annual' ? 'annual' : 'monthly';
+        const startsAt = subscription.current_period_start || new Date().toISOString().split('T')[0];
+        const expiresAt = subscription.current_period_end || new Date().toISOString().split('T')[0];
+        const maxStudents = subscription.plan?.patients_limit ?? 0;
+
+        const { data: existingLicense, error: existingLicenseError } = await supabaseAdmin
+          .from('professional_licenses')
+          .select('id')
+          .eq('user_id', user.id)
+          .order('expires_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (existingLicenseError) {
+          logStep('Failed to check existing license', { error: existingLicenseError.message });
+        }
+
+        if (existingLicense?.id) {
+          const { error: licenseUpdateError } = await supabaseAdmin
+            .from('professional_licenses')
+            .update({
+              license_type: licenseType,
+              starts_at: startsAt,
+              expires_at: expiresAt,
+              max_students: maxStudents,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', existingLicense.id);
+
+          if (licenseUpdateError) {
+            logStep('Failed to update license', { error: licenseUpdateError.message });
+          } else {
+            logStep('Professional license updated', { expiresAt, maxStudents });
+          }
+        } else {
+          const { error: licenseInsertError } = await supabaseAdmin
+            .from('professional_licenses')
+            .insert({
+              user_id: user.id,
+              license_type: licenseType,
+              starts_at: startsAt,
+              expires_at: expiresAt,
+              max_students: maxStudents,
+              updated_at: new Date().toISOString(),
+            });
+
+          if (licenseInsertError) {
+            logStep('Failed to insert license', { error: licenseInsertError.message });
+          } else {
+            logStep('Professional license created', { expiresAt, maxStudents });
+          }
+        }
+      } catch (syncError) {
+        logStep('Entitlement sync error', { message: getErrorForLogging(syncError) });
+      }
+    }
+
     // Get usage data
     const { data: usage } = await supabaseAdmin
       .from('user_usage')
@@ -100,7 +177,7 @@ serve(async (req) => {
     }
 
     return createSuccessResponse({
-      subscribed: subscription.status === 'active' || subscription.status === 'trial',
+      subscribed: isSubscribed,
       subscription: {
         id: subscription.id,
         status: subscription.status,
@@ -115,7 +192,7 @@ serve(async (req) => {
         adjustments_used: 0,
         chat_messages_today: 0,
       },
-      accountType: subscription.plan?.type || 'personal',
+      accountType: planType,
     }, corsHeaders);
   } catch (error) {
     logStep("ERROR", { message: getErrorForLogging(error) });

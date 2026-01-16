@@ -109,6 +109,44 @@ serve(async (req) => {
     const resolvedPlanId = plan.id;
     logStep("Plan fetched", { planName: plan.name, planType: plan.type, planId: resolvedPlanId });
 
+    // Prevent re-contracting the exact same active subscription
+    const { data: existingSubscription, error: existingSubError } = await supabaseAdmin
+      .from('subscriptions')
+      .select('id, status, plan_id, plan:plans(type)')
+      .eq('user_id', user.id)
+      .in('status', ['active', 'trial'])
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (existingSubError) {
+      logStep('Failed to check existing subscription', { error: existingSubError.message });
+    }
+
+    if (existingSubscription) {
+      const existingPlanType = (existingSubscription as any).plan?.type as string | undefined;
+      const isSamePlan = existingSubscription.plan_id === resolvedPlanId;
+      const isSameType = existingPlanType === plan.type;
+
+      // If request was made by plan_type (e.g. BecomeProfessional), block when already subscribed to that type
+      if (isSamePlan || (hasPlanType && isSameType)) {
+        logStep('Active subscription already exists', {
+          existingSubscriptionId: existingSubscription.id,
+          existingPlanId: existingSubscription.plan_id,
+          existingPlanType,
+          requestedPlanId: resolvedPlanId,
+          requestedPlanType: plan.type,
+        });
+
+        return createErrorResponse(
+          'Você já possui uma assinatura ativa. Use o gerenciamento de assinatura para alterar/renovar.',
+          409,
+          corsHeaders,
+          { alreadySubscribed: true }
+        );
+      }
+    }
+
     // Get price based on billing cycle from database
     const priceColumnMap: Record<string, string> = {
       monthly: 'stripe_price_monthly',

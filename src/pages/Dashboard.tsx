@@ -34,7 +34,12 @@ import { toast } from 'sonner';
 export default function Dashboard() {
   const { profile, signOut } = useAuth();
   const { isProfessional, hasActiveLicense } = useUserRole();
-  const { refresh: refreshSubscription, currentPlan: subscriptionPlan } = useSubscription();
+  const {
+    refresh: refreshSubscription,
+    currentPlan: subscriptionPlan,
+    accountType,
+    isSubscribed,
+  } = useSubscription();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [currentDietPlan, setCurrentDietPlan] = useState<DietPlan | null>(null);
@@ -140,7 +145,7 @@ export default function Dashboard() {
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <Logo />
           <div className="flex items-center gap-1">
-            {isProfessional && hasActiveLicense && (
+            {(isSubscribed && accountType === 'professional') || (isProfessional && hasActiveLicense) ? (
               <>
                 <Link to="/professional">
                   <Button variant="ghost" size="icon" title="Painel Profissional">
@@ -153,8 +158,7 @@ export default function Dashboard() {
                   </Button>
                 </Link>
               </>
-            )}
-            {!isProfessional && (
+            ) : (
               <Link to="/become-professional">
                 <Button variant="ghost" size="icon" title="Seja Profissional">
                   <Crown className="w-5 h-5" />

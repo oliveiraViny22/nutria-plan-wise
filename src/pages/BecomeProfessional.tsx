@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Logo } from '@/components/Logo';
 import { useAuth } from '@/contexts/AuthContext';
+import { useSubscription } from '@/hooks/useSubscription';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 
@@ -72,10 +73,21 @@ const BENEFITS = [
 export default function BecomeProfessional() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { accountType, isSubscribed, openCustomerPortal } = useSubscription();
+  const isProfessionalActive = isSubscribed && accountType === 'professional';
+
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
   const [isActivating, setIsActivating] = useState(false);
 
   const handleActivateLicense = async () => {
+    if (isProfessionalActive) {
+      toast({
+        title: 'Assinatura já ativa',
+        description: 'Sua assinatura profissional já está ativa. Você pode acessar o painel ou gerenciar sua assinatura.',
+      });
+      return;
+    }
+
     if (!user || !selectedPlan) return;
 
     setIsActivating(true);
@@ -186,12 +198,18 @@ export default function BecomeProfessional() {
             {PLANS.map((plan) => (
               <Card 
                 key={plan.id}
-                className={`relative cursor-pointer transition-all ${
-                  selectedPlan === plan.id 
-                    ? 'ring-2 ring-primary border-primary' 
-                    : 'hover:border-primary/50'
+                className={`relative transition-all ${
+                  isProfessionalActive
+                    ? 'opacity-60'
+                    : 'cursor-pointer ' +
+                      (selectedPlan === plan.id 
+                        ? 'ring-2 ring-primary border-primary' 
+                        : 'hover:border-primary/50')
                 } ${plan.popular ? 'md:-mt-4 md:mb-4' : ''}`}
-                onClick={() => setSelectedPlan(plan.id)}
+                onClick={() => {
+                  if (isProfessionalActive) return;
+                  setSelectedPlan(plan.id);
+                }}
               >
                 {plan.popular && (
                   <div className="absolute -top-3 left-1/2 -translate-x-1/2">
@@ -237,24 +255,59 @@ export default function BecomeProfessional() {
           transition={{ delay: 0.4 }}
           className="text-center"
         >
-          <Button 
-            size="lg" 
-            className="min-w-[200px]"
-            disabled={!selectedPlan || isActivating}
-            onClick={handleActivateLicense}
-          >
-            {isActivating ? (
-              'Ativando...'
-            ) : (
-              <>
-                <Calendar className="h-4 w-4 mr-2" />
-                Ativar Licença
-              </>
-            )}
-          </Button>
-          <p className="text-sm text-muted-foreground mt-4">
-            * Em ambiente de demonstração, a licença é ativada instantaneamente.
-          </p>
+          {isProfessionalActive ? (
+            <Card className="card-elevated max-w-xl mx-auto text-left">
+              <CardContent className="pt-6 space-y-4">
+                <h3 className="text-lg font-semibold">Sua assinatura profissional está ativa</h3>
+                <p className="text-sm text-muted-foreground">
+                  Acesse agora o Painel Profissional para gerenciar alunos e acompanhar dietas.
+                </p>
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <Button size="lg" onClick={() => navigate('/professional')}>
+                    Ir para o Painel
+                  </Button>
+                  <Button
+                    size="lg"
+                    variant="outline"
+                    onClick={async () => {
+                      try {
+                        await openCustomerPortal();
+                      } catch {
+                        toast({
+                          variant: 'destructive',
+                          title: 'Erro',
+                          description: 'Não foi possível abrir o gerenciamento da assinatura.',
+                        });
+                      }
+                    }}
+                  >
+                    Gerenciar assinatura
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <>
+              <Button 
+                size="lg" 
+                className="min-w-[200px]"
+                disabled={!selectedPlan || isActivating}
+                onClick={handleActivateLicense}
+              >
+                {isActivating ? (
+                  'Ativando...'
+                ) : (
+                  <>
+                    <Calendar className="h-4 w-4 mr-2" />
+                    Ativar Licença
+                  </>
+                )}
+              </Button>
+              <p className="text-sm text-muted-foreground mt-4">
+                * Complete o pagamento para ativar sua licença profissional.
+              </p>
+            </>
+          )}
         </motion.div>
       </main>
     </div>

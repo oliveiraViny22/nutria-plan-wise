@@ -43,14 +43,20 @@ export function useUserRole(): UserRoleData {
           setRoles((rolesData || []).map(r => r.role as AppRole));
         }
 
-        // Check for active license if user is professional
-        const { data: licenseData } = await supabase
+        // Check for active license
+        const { data: licenseData, error: licenseError } = await supabase
           .from('professional_licenses')
           .select('expires_at')
           .eq('user_id', user.id)
-          .single();
+          .order('expires_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
 
-        if (licenseData) {
+        if (licenseError) {
+          console.error('Error fetching professional license:', licenseError);
+        }
+
+        if (licenseData?.expires_at) {
           const isActive = new Date(licenseData.expires_at) > new Date();
           setHasActiveLicense(isActive);
         } else {

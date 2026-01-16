@@ -88,13 +88,15 @@ export function useProfessionalStudents() {
       .from('professional_licenses')
       .select('*')
       .eq('user_id', user.id)
-      .single();
+      .order('expires_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
 
-    if (error && error.code !== 'PGRST116') {
+    if (error) {
       console.error('Error fetching license:', error);
     }
 
-    setLicense(data as ProfessionalLicense | null);
+    setLicense((data as ProfessionalLicense | null) ?? null);
   }, [user]);
 
   useEffect(() => {
