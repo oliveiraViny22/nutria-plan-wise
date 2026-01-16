@@ -263,13 +263,12 @@ export default function Subscription() {
               <CardContent className="space-y-3">
                 <Button 
                   className="w-full justify-start" 
-                  variant="outline"
-                  onClick={() => navigate('/students')}
+                  onClick={() => navigate('/professional')}
                 >
-                  <Users className="h-4 w-4 mr-3" />
-                  Gerenciar Alunos
+                  <BarChart3 className="h-4 w-4 mr-3" />
+                  Painel Profissional
                   <span className="ml-auto text-muted-foreground text-sm">
-                    Adicionar, remover e visualizar alunos
+                    Visão geral e métricas
                   </span>
                 </Button>
                 <Button 
@@ -277,10 +276,10 @@ export default function Subscription() {
                   variant="outline"
                   onClick={() => navigate('/students')}
                 >
-                  <BarChart3 className="h-4 w-4 mr-3" />
-                  Ver Dietas dos Alunos
+                  <Users className="h-4 w-4 mr-3" />
+                  Gerenciar Alunos
                   <span className="ml-auto text-muted-foreground text-sm">
-                    Acompanhar planos alimentares
+                    Adicionar, remover e visualizar
                   </span>
                 </Button>
                 <Button 
@@ -291,7 +290,7 @@ export default function Subscription() {
                   <UserPlus className="h-4 w-4 mr-3" />
                   Adicionar Novo Aluno
                   <span className="ml-auto text-muted-foreground text-sm">
-                    Vincular aluno pelo email
+                    Vincular pelo email
                   </span>
                 </Button>
               </CardContent>
