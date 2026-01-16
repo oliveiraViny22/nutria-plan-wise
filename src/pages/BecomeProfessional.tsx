@@ -16,7 +16,6 @@ import { Logo } from '@/components/Logo';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
-import { addMonths, addYears } from 'date-fns';
 
 const PLANS = [
   {
@@ -84,46 +83,31 @@ export default function BecomeProfessional() {
       const plan = PLANS.find(p => p.id === selectedPlan);
       if (!plan) throw new Error('Plano não encontrado');
 
-      const now = new Date();
-      const expiresAt = selectedPlan === 'annual' 
-        ? addYears(now, 1) 
-        : addMonths(now, 1);
-
-      // Create professional license
-      const { error: licenseError } = await supabase
-        .from('professional_licenses')
-        .upsert({
-          user_id: user.id,
-          license_type: selectedPlan,
-          starts_at: now.toISOString(),
-          expires_at: expiresAt.toISOString(),
-          max_students: plan.maxStudents,
-        }, { onConflict: 'user_id' });
-
-      if (licenseError) throw licenseError;
-
-      // Add professional role
-      const { error: roleError } = await supabase
-        .from('user_roles')
-        .upsert({
-          user_id: user.id,
-          role: 'professional',
-        }, { onConflict: 'user_id,role' });
-
-      if (roleError) throw roleError;
-
-      toast({
-        title: 'Licença ativada!',
-        description: 'Você agora é um profissional. Comece a adicionar seus alunos!',
+      // Redirect to Stripe checkout for payment - license/role activation 
+      // is handled securely via stripe-webhook after successful payment
+      const { data, error } = await supabase.functions.invoke('create-checkout', {
+        body: {
+          plan_type: 'professional',
+          billing_cycle: selectedPlan === 'annual' ? 'annual' : 'monthly',
+        },
       });
 
-      navigate('/students');
+      if (error) throw error;
+      if (!data?.url) throw new Error('Checkout URL not received');
+
+      // Open Stripe checkout in new tab
+      window.open(data.url, '_blank');
+
+      toast({
+        title: 'Redirecionando para pagamento',
+        description: 'Complete o pagamento para ativar sua licença profissional.',
+      });
     } catch (error) {
-      console.error('Error activating license:', error);
+      console.error('Error initiating checkout:', error);
       toast({
         variant: 'destructive',
         title: 'Erro',
-        description: 'Não foi possível ativar a licença. Tente novamente.',
+        description: 'Não foi possível iniciar o pagamento. Tente novamente.',
       });
     } finally {
       setIsActivating(false);
