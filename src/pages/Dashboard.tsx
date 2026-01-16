@@ -15,6 +15,7 @@ import {
   Users,
   Crown,
   CreditCard,
+  LayoutDashboard,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Logo } from '@/components/Logo';
@@ -139,15 +140,23 @@ export default function Dashboard() {
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <Logo />
           <div className="flex items-center gap-1">
-            {isProfessional && hasActiveLicense ? (
-              <Link to="/students">
-                <Button variant="ghost" size="icon">
-                  <Users className="w-5 h-5" />
-                </Button>
-              </Link>
-            ) : (
+            {isProfessional && hasActiveLicense && (
+              <>
+                <Link to="/professional">
+                  <Button variant="ghost" size="icon" title="Painel Profissional">
+                    <LayoutDashboard className="w-5 h-5" />
+                  </Button>
+                </Link>
+                <Link to="/students">
+                  <Button variant="ghost" size="icon" title="Gerenciar Alunos">
+                    <Users className="w-5 h-5" />
+                  </Button>
+                </Link>
+              </>
+            )}
+            {!isProfessional && (
               <Link to="/become-professional">
-                <Button variant="ghost" size="icon">
+                <Button variant="ghost" size="icon" title="Seja Profissional">
                   <Crown className="w-5 h-5" />
                 </Button>
               </Link>
