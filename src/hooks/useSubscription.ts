@@ -4,13 +4,18 @@ import { useAuth } from '@/contexts/AuthContext';
 import { SubscriptionInfo, Plan } from '@/lib/subscription-types';
 
 export function useSubscription() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [subscriptionInfo, setSubscriptionInfo] = useState<SubscriptionInfo | null>(null);
   const [plans, setPlans] = useState<Plan[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const fetchSubscription = useCallback(async () => {
+    // Wait for auth to finish loading before determining user state
+    if (authLoading) {
+      return;
+    }
+    
     if (!user) {
       setSubscriptionInfo(null);
       setLoading(false);
@@ -18,6 +23,7 @@ export function useSubscription() {
     }
 
     try {
+      setLoading(true);
       const { data, error } = await supabase.functions.invoke('check-subscription');
       
       if (error) throw error;
@@ -30,7 +36,7 @@ export function useSubscription() {
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, [user, authLoading]);
 
   const fetchPlans = useCallback(async () => {
     try {
@@ -49,10 +55,17 @@ export function useSubscription() {
     }
   }, []);
 
+  // Fetch plans immediately (public data)
   useEffect(() => {
-    fetchSubscription();
     fetchPlans();
-  }, [fetchSubscription, fetchPlans]);
+  }, [fetchPlans]);
+
+  // Fetch subscription only after auth is determined
+  useEffect(() => {
+    if (!authLoading) {
+      fetchSubscription();
+    }
+  }, [authLoading, fetchSubscription]);
 
   // Refresh every 60 seconds
   useEffect(() => {
