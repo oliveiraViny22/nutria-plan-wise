@@ -4,6 +4,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { getCorsHeaders, CLIENT_ERRORS, validate, getErrorForLogging, createErrorResponse, createSuccessResponse } from "../_shared/security.ts";
 
 const VALID_BILLING_CYCLES = ['monthly', 'quarterly', 'semiannual', 'annual'] as const;
+const VALID_PLAN_TYPES = ['personal', 'professional'] as const;
 
 const logStep = (step: string, details?: unknown) => {
   const detailsStr = details ? ` - ${JSON.stringify(details)}` : '';
@@ -32,21 +33,32 @@ serve(async (req) => {
       return createErrorResponse(CLIENT_ERRORS.INVALID_REQUEST, 400, corsHeaders);
     }
     
-    const { planId, billingCycle } = body as { planId: unknown; billingCycle: unknown };
+    const { planId, billingCycle, billing_cycle, plan_type } = body as { 
+      planId: unknown; 
+      billingCycle: unknown;
+      billing_cycle: unknown;
+      plan_type: unknown;
+    };
     
-    // Validate planId is a valid UUID
-    if (!validate.isUUID(planId)) {
-      logStep("Invalid planId", { planId });
-      return createErrorResponse(CLIENT_ERRORS.INVALID_REQUEST, 400, corsHeaders);
-    }
+    // Support both camelCase and snake_case for billing cycle
+    const effectiveBillingCycle = billingCycle || billing_cycle;
     
     // Validate billingCycle is a valid enum
-    if (!validate.isEnum(billingCycle, [...VALID_BILLING_CYCLES])) {
-      logStep("Invalid billingCycle", { billingCycle });
+    if (!validate.isEnum(effectiveBillingCycle, [...VALID_BILLING_CYCLES])) {
+      logStep("Invalid billingCycle", { billingCycle: effectiveBillingCycle });
       return createErrorResponse(CLIENT_ERRORS.INVALID_REQUEST, 400, corsHeaders);
     }
     
-    logStep("Request validated", { planId, billingCycle });
+    // Either planId (UUID) or plan_type must be provided
+    const hasPlanId = validate.isUUID(planId);
+    const hasPlanType = validate.isEnum(plan_type, [...VALID_PLAN_TYPES]);
+    
+    if (!hasPlanId && !hasPlanType) {
+      logStep("Invalid planId or plan_type", { planId, plan_type });
+      return createErrorResponse(CLIENT_ERRORS.INVALID_REQUEST, 400, corsHeaders);
+    }
+    
+    logStep("Request validated", { planId, plan_type, billingCycle: effectiveBillingCycle });
 
     const supabaseClient = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
@@ -76,17 +88,26 @@ serve(async (req) => {
       { auth: { persistSession: false } }
     );
 
-    const { data: plan, error: planError } = await supabaseAdmin
-      .from('plans')
-      .select('*')
-      .eq('id', planId)
-      .single();
+    // Fetch plan by ID or by type
+    let planQuery = supabaseAdmin.from('plans').select('*');
+    
+    if (hasPlanId) {
+      planQuery = planQuery.eq('id', planId);
+    } else {
+      // Look up by plan type - get the first active plan of this type
+      planQuery = planQuery.eq('type', plan_type).eq('is_active', true);
+    }
+    
+    const { data: planData, error: planError } = await planQuery.limit(1).single();
 
-    if (planError || !plan) {
-      logStep("Plan not found", { planId, error: planError?.message });
+    if (planError || !planData) {
+      logStep("Plan not found", { planId, plan_type, error: planError?.message });
       return createErrorResponse(CLIENT_ERRORS.NOT_FOUND, 404, corsHeaders);
     }
-    logStep("Plan fetched", { planName: plan.name, planType: plan.type });
+    
+    const plan = planData;
+    const resolvedPlanId = plan.id;
+    logStep("Plan fetched", { planName: plan.name, planType: plan.type, planId: resolvedPlanId });
 
     // Get price based on billing cycle from database
     const priceColumnMap: Record<string, string> = {
@@ -96,14 +117,14 @@ serve(async (req) => {
       annual: 'stripe_price_annual',
     };
     
-    const priceColumn = priceColumnMap[billingCycle];
+    const priceColumn = priceColumnMap[effectiveBillingCycle];
     const stripePriceId = plan[priceColumn] as string | null;
     
     if (!stripePriceId) {
-      logStep("No Stripe price configured", { planName: plan.name, billingCycle });
+      logStep("No Stripe price configured", { planName: plan.name, billingCycle: effectiveBillingCycle });
       return createErrorResponse(CLIENT_ERRORS.NOT_FOUND, 404, corsHeaders);
     }
-    logStep("Price ID determined from database", { stripePriceId, billingCycle });
+    logStep("Price ID determined from database", { stripePriceId, billingCycle: effectiveBillingCycle });
 
     const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", { 
       apiVersion: "2025-08-27.basil" 
@@ -134,8 +155,8 @@ serve(async (req) => {
       cancel_url: `${origin}/pricing?checkout=canceled`,
       metadata: {
         user_id: user.id,
-        plan_id: planId,
-        billing_cycle: billingCycle,
+        plan_id: resolvedPlanId,
+        billing_cycle: effectiveBillingCycle,
       },
     });
 
