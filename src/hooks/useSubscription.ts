@@ -108,10 +108,11 @@ export function useSubscription() {
     return () => clearInterval(interval);
   }, [user, fetchSubscription]);
 
-  const createCheckout = async (planId: string, billingCycle: string) => {
+  const createCheckout = async (planId: string, _billingCycle?: string) => {
     try {
+      // Always use monthly - ignore billing cycle parameter
       const { data, error } = await supabase.functions.invoke('create-checkout', {
-        body: { planId, billingCycle },
+        body: { planId },
       });
 
       if (error) throw error;

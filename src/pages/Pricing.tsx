@@ -1,21 +1,20 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Check, Crown, Zap, Users, MessageCircle, History, ArrowLeft, Sparkles } from 'lucide-react';
+import { Check, Crown, Zap, Users, MessageCircle, ArrowLeft, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useSubscription } from '@/hooks/useSubscription';
 import { useToast } from '@/hooks/use-toast';
-import { Plan, BillingCycle, BILLING_CYCLE_LABELS, BILLING_CYCLE_DISCOUNTS } from '@/lib/subscription-types';
+import { Plan } from '@/lib/subscription-types';
 
 export default function Pricing() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { plans, currentPlan, loading, createCheckout, accountType, isLinkedToProfessional } = useSubscription();
   const [accountTab, setAccountTab] = useState<'personal' | 'professional'>(accountType);
-  const [billingCycle, setBillingCycle] = useState<BillingCycle>('monthly');
   const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null);
 
   // Filter plans based on tab and Premium visibility rules
@@ -29,25 +28,6 @@ export default function Pricing() {
     return true;
   });
 
-  const getPrice = (plan: Plan, cycle: BillingCycle): number => {
-    switch (cycle) {
-      case 'quarterly': return plan.price_quarterly;
-      case 'semiannual': return plan.price_semiannual;
-      case 'annual': return plan.price_annual;
-      default: return plan.price_monthly;
-    }
-  };
-
-  const getMonthlyEquivalent = (plan: Plan, cycle: BillingCycle): number => {
-    const total = getPrice(plan, cycle);
-    switch (cycle) {
-      case 'quarterly': return total / 3;
-      case 'semiannual': return total / 6;
-      case 'annual': return total / 12;
-      default: return total;
-    }
-  };
-
   const handleSubscribe = async (plan: Plan) => {
     if (plan.name === 'gratuito') {
       toast({ title: 'Você já está no plano gratuito!' });
@@ -56,7 +36,8 @@ export default function Pricing() {
 
     setCheckoutLoading(plan.id);
     try {
-      await createCheckout(plan.id, billingCycle);
+      // Always use monthly billing
+      await createCheckout(plan.id, 'monthly');
       toast({ title: 'Redirecionando para o checkout...' });
     } catch (error) {
       toast({
@@ -156,33 +137,6 @@ export default function Pricing() {
           </TabsList>
         </Tabs>
 
-        {/* Billing Cycle */}
-        <div className="flex justify-center mb-8">
-          <div className="inline-flex bg-muted rounded-lg p-1 gap-1">
-            {(['monthly', 'quarterly', 'semiannual', 'annual'] as BillingCycle[]).map((cycle) => (
-              <button
-                key={cycle}
-                onClick={() => setBillingCycle(cycle)}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors relative ${
-                  billingCycle === cycle
-                    ? 'bg-primary text-primary-foreground'
-                    : 'text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                {BILLING_CYCLE_LABELS[cycle]}
-                {BILLING_CYCLE_DISCOUNTS[cycle] > 0 && (
-                  <Badge 
-                    variant="secondary" 
-                    className="absolute -top-2 -right-2 text-xs px-1 py-0"
-                  >
-                    -{BILLING_CYCLE_DISCOUNTS[cycle]}%
-                  </Badge>
-                )}
-              </button>
-            ))}
-          </div>
-        </div>
-
         {/* Plans Grid */}
         <div className={`grid gap-6 max-w-5xl mx-auto ${
           filteredPlans.length === 2 ? 'md:grid-cols-2' : 'md:grid-cols-3'
@@ -190,8 +144,7 @@ export default function Pricing() {
           {filteredPlans.map((plan, index) => {
             const isCurrentPlan = currentPlan?.id === plan.id;
             const isHighlight = plan.name === 'plano_pessoal_pago' || plan.name === 'profissional';
-            const price = getPrice(plan, billingCycle);
-            const monthlyEquiv = getMonthlyEquivalent(plan, billingCycle);
+            const price = plan.price_monthly;
             
             return (
               <motion.div
@@ -241,15 +194,8 @@ export default function Pricing() {
                         <span className="text-4xl font-bold">
                           R$ {price.toFixed(2).replace('.', ',')}
                         </span>
-                        {billingCycle !== 'monthly' && (
-                          <span className="text-muted-foreground">/{BILLING_CYCLE_LABELS[billingCycle].toLowerCase()}</span>
-                        )}
+                        <span className="text-muted-foreground">/mês</span>
                       </div>
-                      {billingCycle !== 'monthly' && price > 0 && (
-                        <p className="text-sm text-muted-foreground mt-1">
-                          ≈ R$ {monthlyEquiv.toFixed(2).replace('.', ',')}/mês
-                        </p>
-                      )}
                     </div>
 
                     <ul className="space-y-3">
