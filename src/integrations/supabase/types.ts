@@ -242,6 +242,7 @@ export type Database = {
           adjustment_limit: number
           chat_messages_per_day: number
           created_at: string | null
+          description: string | null
           diet_limit: number
           has_chat: boolean
           history_days: number
@@ -257,6 +258,7 @@ export type Database = {
           stripe_price_monthly: string | null
           stripe_price_quarterly: string | null
           stripe_price_semiannual: string | null
+          stripe_product_id: string | null
           substitution_limit: number
           type: Database["public"]["Enums"]["plan_type"]
         }
@@ -264,6 +266,7 @@ export type Database = {
           adjustment_limit?: number
           chat_messages_per_day?: number
           created_at?: string | null
+          description?: string | null
           diet_limit?: number
           has_chat?: boolean
           history_days?: number
@@ -279,6 +282,7 @@ export type Database = {
           stripe_price_monthly?: string | null
           stripe_price_quarterly?: string | null
           stripe_price_semiannual?: string | null
+          stripe_product_id?: string | null
           substitution_limit?: number
           type: Database["public"]["Enums"]["plan_type"]
         }
@@ -286,6 +290,7 @@ export type Database = {
           adjustment_limit?: number
           chat_messages_per_day?: number
           created_at?: string | null
+          description?: string | null
           diet_limit?: number
           has_chat?: boolean
           history_days?: number
@@ -301,6 +306,7 @@ export type Database = {
           stripe_price_monthly?: string | null
           stripe_price_quarterly?: string | null
           stripe_price_semiannual?: string | null
+          stripe_product_id?: string | null
           substitution_limit?: number
           type?: Database["public"]["Enums"]["plan_type"]
         }
@@ -389,6 +395,7 @@ export type Database = {
           sex: string | null
           updated_at: string | null
           user_id: string
+          user_type: Database["public"]["Enums"]["user_type"] | null
           weight: number | null
         }
         Insert: {
@@ -413,6 +420,7 @@ export type Database = {
           sex?: string | null
           updated_at?: string | null
           user_id: string
+          user_type?: Database["public"]["Enums"]["user_type"] | null
           weight?: number | null
         }
         Update: {
@@ -437,6 +445,7 @@ export type Database = {
           sex?: string | null
           updated_at?: string | null
           user_id?: string
+          user_type?: Database["public"]["Enums"]["user_type"] | null
           weight?: number | null
         }
         Relationships: []
@@ -496,6 +505,7 @@ export type Database = {
           provider_customer_id: string | null
           provider_subscription_id: string | null
           status: Database["public"]["Enums"]["subscription_status"]
+          stripe_price_id: string | null
           updated_at: string | null
           user_id: string
         }
@@ -511,6 +521,7 @@ export type Database = {
           provider_customer_id?: string | null
           provider_subscription_id?: string | null
           status?: Database["public"]["Enums"]["subscription_status"]
+          stripe_price_id?: string | null
           updated_at?: string | null
           user_id: string
         }
@@ -526,6 +537,7 @@ export type Database = {
           provider_customer_id?: string | null
           provider_subscription_id?: string | null
           status?: Database["public"]["Enums"]["subscription_status"]
+          stripe_price_id?: string | null
           updated_at?: string | null
           user_id?: string
         }
@@ -640,7 +652,33 @@ export type Database = {
         Args: { _feature: string; _user_id: string }
         Returns: boolean
       }
+      check_feature_limit: {
+        Args: { _feature: string; _user_id: string }
+        Returns: {
+          allowed: boolean
+          current_usage: number
+          max_limit: number
+          upgrade_required: boolean
+        }[]
+      }
       get_student_count: { Args: { _professional_id: string }; Returns: number }
+      get_user_permissions: {
+        Args: { _user_id: string }
+        Returns: {
+          can_adjust: boolean
+          can_create_plan: boolean
+          can_edit_plan: boolean
+          can_manage_students: boolean
+          can_send_requests: boolean
+          can_substitute: boolean
+          can_use_ai: boolean
+          can_use_simulations: boolean
+          can_view_plan: boolean
+          is_linked_to_professional: boolean
+          plan_name: string
+          user_type: Database["public"]["Enums"]["user_type"]
+        }[]
+      }
       get_user_plan: {
         Args: { _user_id: string }
         Returns: {
@@ -676,12 +714,18 @@ export type Database = {
       app_role: "admin" | "professional" | "student"
       billing_cycle: "monthly" | "quarterly" | "semiannual" | "annual"
       plan_type: "personal" | "professional"
+      plan_type_commercial:
+        | "gratuito"
+        | "plano_pessoal_pago"
+        | "premium"
+        | "profissional"
       subscription_status:
         | "trial"
         | "active"
         | "past_due"
         | "canceled"
         | "expired"
+      user_type: "aluno" | "usuario" | "profissional"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -813,6 +857,12 @@ export const Constants = {
       app_role: ["admin", "professional", "student"],
       billing_cycle: ["monthly", "quarterly", "semiannual", "annual"],
       plan_type: ["personal", "professional"],
+      plan_type_commercial: [
+        "gratuito",
+        "plano_pessoal_pago",
+        "premium",
+        "profissional",
+      ],
       subscription_status: [
         "trial",
         "active",
@@ -820,6 +870,7 @@ export const Constants = {
         "canceled",
         "expired",
       ],
+      user_type: ["aluno", "usuario", "profissional"],
     },
   },
 } as const

@@ -1,7 +1,10 @@
+import { CommercialPlan } from './types';
+
 export interface Plan {
   id: string;
-  name: string;
+  name: CommercialPlan;
   type: 'personal' | 'professional';
+  description: string | null;
   diet_limit: number;
   substitution_limit: number;
   adjustment_limit: number;
@@ -13,6 +16,7 @@ export interface Plan {
   price_quarterly: number;
   price_semiannual: number;
   price_annual: number;
+  stripe_product_id?: string;
   stripe_price_monthly?: string;
   stripe_price_quarterly?: string;
   stripe_price_semiannual?: string;
@@ -30,6 +34,7 @@ export interface Subscription {
   provider?: string;
   provider_subscription_id?: string;
   provider_customer_id?: string;
+  stripe_price_id?: string;
   current_period_start?: string;
   current_period_end?: string;
   cancel_at_period_end?: boolean;
@@ -84,4 +89,20 @@ export const BILLING_CYCLE_DISCOUNTS: Record<BillingCycle, number> = {
   quarterly: 15,
   semiannual: 25,
   annual: 35,
+};
+
+// Mapeamento de planos comerciais para exibição
+export const PLAN_DISPLAY_NAMES: Record<CommercialPlan, string> = {
+  gratuito: 'Gratuito',
+  plano_pessoal_pago: 'Pessoal',
+  premium: 'Premium',
+  profissional: 'Profissional',
+};
+
+// Descrições dos planos
+export const PLAN_DESCRIPTIONS: Record<CommercialPlan, string> = {
+  gratuito: 'Visualização apenas',
+  plano_pessoal_pago: 'Autonomia total',
+  premium: 'Simulações com IA',
+  profissional: 'Gerenciamento de alunos',
 };

@@ -1,4 +1,14 @@
-// Tipos de conta do sistema
+// =====================================================
+// TIPOS DE USUÁRIO (imutável) - armazenado em profiles.user_type
+// =====================================================
+export type UserType = 'aluno' | 'usuario' | 'profissional';
+
+// =====================================================
+// PLANOS COMERCIAIS (mutável) - armazenado em subscriptions via plan_id
+// =====================================================
+export type CommercialPlan = 'gratuito' | 'plano_pessoal_pago' | 'premium' | 'profissional';
+
+// Legacy - manter para compatibilidade
 export type AccountType = 'aluno' | 'plano_pessoal' | 'premium' | 'profissional';
 
 // Status permitidos para planos alimentares
@@ -27,10 +37,27 @@ export interface Profile {
   fat_target: number | null;
   meals_per_day: number | null;
   professional_id: string | null;
-  account_type: AccountType;
+  account_type: AccountType; // Legacy
+  user_type: UserType; // Novo campo imutável
   onboarding_completed: boolean;
   created_at: string;
   updated_at: string;
+}
+
+// Informações de permissões do usuário
+export interface UserPermissions {
+  user_type: UserType;
+  plan_name: CommercialPlan;
+  can_create_plan: boolean;
+  can_edit_plan: boolean;
+  can_view_plan: boolean;
+  can_substitute: boolean;
+  can_adjust: boolean;
+  can_use_ai: boolean;
+  can_use_simulations: boolean;
+  can_manage_students: boolean;
+  can_send_requests: boolean;
+  is_linked_to_professional: boolean;
 }
 
 export interface StudentRequest {

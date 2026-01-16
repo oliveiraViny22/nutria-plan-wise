@@ -130,7 +130,7 @@ export default function Subscription() {
               )}
 
               <div className="flex gap-3 pt-2">
-                {currentPlan?.name !== 'free' && subscriptionInfo?.subscription && (
+                {currentPlan?.name !== 'gratuito' && subscriptionInfo?.subscription && (
                   <Button 
                     variant="outline" 
                     onClick={handleManageSubscription}
@@ -145,7 +145,7 @@ export default function Subscription() {
                   </Button>
                 )}
                 <Button onClick={() => navigate('/pricing')}>
-                  {currentPlan?.name === 'free' ? 'Fazer Upgrade' : 'Alterar Plano'}
+                  {currentPlan?.name === 'gratuito' ? 'Fazer Upgrade' : 'Alterar Plano'}
                 </Button>
               </div>
             </CardContent>

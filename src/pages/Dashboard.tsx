@@ -112,8 +112,8 @@ export default function Dashboard() {
 
   const generateMealPlan = async () => {
     // Verificar permissões antes de gerar
-    if (!permissions.canCreatePlan) {
-      if (permissions.accountType === 'aluno' && permissions.isLinkedToProfessional) {
+    if (!permissions.can_create_plan) {
+      if (permissions.user_type === 'aluno' && permissions.is_linked_to_professional) {
         toast.error('Seu plano é gerenciado pelo seu nutricionista. Envie uma solicitação se precisar de mudanças.');
         setShowRequestDialog(true);
         return;
@@ -287,7 +287,7 @@ export default function Dashboard() {
         </motion.section>
 
         {/* Action Buttons - com verificação de permissões */}
-        {permissions.canCreatePlan && !isLinkedStudent && (
+        {permissions.can_create_plan && !isLinkedStudent && (
           <motion.section
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -320,7 +320,7 @@ export default function Dashboard() {
             </Button>
 
             {/* Macro Rebalancer - apenas se pode editar */}
-            {currentDietPlan && permissions.canAdjustMacros && (
+            {currentDietPlan && permissions.can_adjust && (
               <MacroRebalancer
                 planId={currentDietPlan.id}
                 targets={{

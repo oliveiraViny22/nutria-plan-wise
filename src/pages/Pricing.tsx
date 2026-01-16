@@ -40,7 +40,7 @@ export default function Pricing() {
   };
 
   const handleSubscribe = async (plan: Plan) => {
-    if (plan.name === 'free') {
+    if (plan.name === 'gratuito') {
       toast({ title: 'Você já está no plano gratuito!' });
       return;
     }
@@ -62,9 +62,10 @@ export default function Pricing() {
 
   const getPlanIcon = (name: string) => {
     switch (name) {
-      case 'free': return <Zap className="h-6 w-6" />;
-      case 'basic': return <Sparkles className="h-6 w-6" />;
-      case 'pro': return <Crown className="h-6 w-6" />;
+      case 'gratuito': return <Zap className="h-6 w-6" />;
+      case 'plano_pessoal_pago': return <Sparkles className="h-6 w-6" />;
+      case 'premium': return <Crown className="h-6 w-6" />;
+      case 'profissional': return <Users className="h-6 w-6" />;
       default: return <Zap className="h-6 w-6" />;
     }
   };
@@ -179,7 +180,7 @@ export default function Pricing() {
         }`}>
           {filteredPlans.map((plan, index) => {
             const isCurrentPlan = currentPlan?.id === plan.id;
-            const isPro = plan.name === 'pro';
+            const isHighlight = plan.name === 'plano_pessoal_pago' || plan.name === 'profissional';
             const price = getPrice(plan, billingCycle);
             const monthlyEquiv = getMonthlyEquivalent(plan, billingCycle);
             
@@ -191,12 +192,12 @@ export default function Pricing() {
                 transition={{ delay: index * 0.1 }}
               >
                 <Card className={`relative h-full flex flex-col ${
-                  isPro ? 'border-primary shadow-lg shadow-primary/20' : ''
+                  isHighlight ? 'border-primary shadow-lg shadow-primary/20' : ''
                 } ${isCurrentPlan ? 'ring-2 ring-primary' : ''}`}>
-                  {isPro && (
+                  {isHighlight && (
                     <div className="absolute -top-3 left-1/2 -translate-x-1/2">
                       <Badge className="bg-primary text-primary-foreground">
-                        Mais Popular
+                        {plan.name === 'profissional' ? 'Profissional' : 'Mais Popular'}
                       </Badge>
                     </div>
                   )}
@@ -211,15 +212,17 @@ export default function Pricing() {
 
                   <CardHeader className="text-center pb-2">
                     <div className={`w-12 h-12 rounded-full mx-auto mb-3 flex items-center justify-center ${
-                      isPro ? 'bg-primary text-primary-foreground' : 'bg-muted'
+                      isHighlight ? 'bg-primary text-primary-foreground' : 'bg-muted'
                     }`}>
                       {getPlanIcon(plan.name)}
                     </div>
-                    <CardTitle className="text-2xl capitalize">{plan.name}</CardTitle>
+                    <CardTitle className="text-2xl capitalize">
+                      {plan.name === 'plano_pessoal_pago' ? 'Pessoal' : 
+                       plan.name === 'profissional' ? 'Profissional' :
+                       plan.name === 'premium' ? 'Premium' : 'Gratuito'}
+                    </CardTitle>
                     <CardDescription>
-                      {plan.name === 'free' && 'Comece gratuitamente'}
-                      {plan.name === 'basic' && 'Para uso regular'}
-                      {plan.name === 'pro' && 'Recursos completos'}
+                      {plan.description || 'Plano de nutrição'}
                     </CardDescription>
                   </CardHeader>
 
@@ -253,7 +256,7 @@ export default function Pricing() {
                   <CardFooter>
                     <Button
                       className="w-full"
-                      variant={isPro ? 'default' : 'outline'}
+                      variant={isHighlight ? 'default' : 'outline'}
                       disabled={isCurrentPlan || checkoutLoading === plan.id}
                       onClick={() => handleSubscribe(plan)}
                     >
@@ -261,7 +264,7 @@ export default function Pricing() {
                         <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current" />
                       ) : isCurrentPlan ? (
                         'Plano Atual'
-                      ) : plan.name === 'free' ? (
+                      ) : plan.name === 'gratuito' ? (
                         'Plano Gratuito'
                       ) : (
                         'Assinar Agora'
