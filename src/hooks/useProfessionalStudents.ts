@@ -112,7 +112,7 @@ export function useProfessionalStudents() {
       return false;
     }
 
-    // Check license limits
+    // Check license limits (client-side pre-check, server will validate too)
     if (studentCount >= license.max_students) {
       toast({
         variant: 'destructive',
@@ -123,45 +123,52 @@ export function useProfessionalStudents() {
     }
 
     try {
-      // Find user by email
-      const { data: profileData, error: profileError } = await supabase
-        .from('profiles')
-        .select('user_id')
-        .eq('email', studentEmail.toLowerCase())
-        .single();
-
-      if (profileError || !profileData) {
+      // Use secure edge function to lookup student by email
+      // This avoids RLS issues and performs proper authorization server-side
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token;
+      
+      if (!token) {
         toast({
           variant: 'destructive',
-          title: 'Aluno não encontrado',
-          description: 'Não encontramos um usuário com esse email. Ele precisa se cadastrar primeiro.',
+          title: 'Erro',
+          description: 'Sessão expirada. Por favor, faça login novamente.',
         });
         return false;
       }
 
-      // Check if already linked
-      const { data: existingLink } = await supabase
-        .from('professional_students')
-        .select('id')
-        .eq('professional_id', user.id)
-        .eq('student_id', profileData.user_id)
-        .single();
+      const lookupResponse = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/lookup-student`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify({ email: studentEmail.toLowerCase().trim() }),
+        }
+      );
 
-      if (existingLink) {
+      const lookupData = await lookupResponse.json();
+
+      if (!lookupResponse.ok) {
         toast({
           variant: 'destructive',
-          title: 'Aluno já vinculado',
-          description: 'Este aluno já está na sua lista.',
+          title: lookupData.alreadyLinked ? 'Aluno já vinculado' : 
+                 lookupData.limitReached ? 'Limite atingido' : 'Erro',
+          description: lookupData.error || 'Não foi possível buscar o aluno.',
         });
         return false;
       }
+
+      const studentId = lookupData.student_id;
 
       // Add student link
       const { error: insertError } = await supabase
         .from('professional_students')
         .insert({
           professional_id: user.id,
-          student_id: profileData.user_id,
+          student_id: studentId,
           status: 'active',
         });
 
@@ -173,7 +180,7 @@ export function useProfessionalStudents() {
       await supabase
         .from('user_roles')
         .upsert({
-          user_id: profileData.user_id,
+          user_id: studentId,
           role: 'student',
         }, { onConflict: 'user_id,role' });
 
@@ -181,7 +188,7 @@ export function useProfessionalStudents() {
       await supabase
         .from('profiles')
         .update({ professional_id: user.id })
-        .eq('user_id', profileData.user_id);
+        .eq('user_id', studentId);
 
       toast({
         title: 'Aluno adicionado',

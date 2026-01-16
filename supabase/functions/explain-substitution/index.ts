@@ -1,16 +1,74 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
+import { getCorsHeaders, CLIENT_ERRORS, validate, getErrorForLogging, createErrorResponse, createSuccessResponse } from "../_shared/security.ts";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+const logStep = (step: string, details?: unknown) => {
+  const detailsStr = details ? ` - ${JSON.stringify(details)}` : '';
+  console.log(`[EXPLAIN-SUBSTITUTION] ${step}${detailsStr}`);
 };
 
+// Validate food object structure
+function isValidFood(food: unknown): food is { name: string; calories: number; protein: number; carbs: number; fat: number } {
+  if (!validate.isObject(food)) return false;
+  const f = food as Record<string, unknown>;
+  return (
+    validate.isNonEmptyString(f.name) &&
+    validate.maxLength(f.name, 100) &&
+    validate.isNumber(f.calories) &&
+    validate.isNumber(f.protein) &&
+    validate.isNumber(f.carbs) &&
+    validate.isNumber(f.fat)
+  );
+}
+
 serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  const corsHeaders = getCorsHeaders(req);
+  
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
+  }
 
   try {
-    const { originalFood, newFood, userGoal, dailyCalories } = await req.json();
+    logStep("Function started");
+    
+    // Parse and validate input
+    let body: unknown;
+    try {
+      body = await req.json();
+    } catch {
+      return createErrorResponse(CLIENT_ERRORS.INVALID_REQUEST, 400, corsHeaders);
+    }
+    
+    if (!validate.isObject(body)) {
+      return createErrorResponse(CLIENT_ERRORS.INVALID_REQUEST, 400, corsHeaders);
+    }
+    
+    const { originalFood, newFood, userGoal, dailyCalories } = body as {
+      originalFood: unknown;
+      newFood: unknown;
+      userGoal: unknown;
+      dailyCalories: unknown;
+    };
+    
+    // Validate food objects
+    if (!isValidFood(originalFood)) {
+      logStep("Invalid originalFood", { originalFood });
+      return createErrorResponse(CLIENT_ERRORS.INVALID_REQUEST, 400, corsHeaders);
+    }
+    
+    if (!isValidFood(newFood)) {
+      logStep("Invalid newFood", { newFood });
+      return createErrorResponse(CLIENT_ERRORS.INVALID_REQUEST, 400, corsHeaders);
+    }
+    
+    // Validate userGoal
+    const validGoals = ['lose_weight', 'gain_muscle', 'maintain'];
+    const safeUserGoal = validate.isEnum(userGoal, validGoals) ? userGoal : 'maintain';
+    
+    // Validate dailyCalories
+    const safeDailyCalories = validate.isInRange(dailyCalories, 500, 10000) ? dailyCalories : 2000;
+    
+    logStep("Request validated", { originalFood: originalFood.name, newFood: newFood.name });
     
     // Validate usage limits
     const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
@@ -21,23 +79,19 @@ serve(async (req) => {
     const authHeader = req.headers.get("Authorization");
     
     if (!authHeader) {
-      return new Response(JSON.stringify({ error: "Authorization required" }), { 
-        status: 401, 
-        headers: { ...corsHeaders, "Content-Type": "application/json" } 
-      });
+      return createErrorResponse(CLIENT_ERRORS.AUTH_REQUIRED, 401, corsHeaders);
     }
     
     const token = authHeader.replace("Bearer ", "");
     const { data: userData, error: userError } = await supabaseClient.auth.getUser(token);
     
     if (userError || !userData.user) {
-      return new Response(JSON.stringify({ error: "Invalid token" }), { 
-        status: 401, 
-        headers: { ...corsHeaders, "Content-Type": "application/json" } 
-      });
+      logStep("Auth failed", { error: userError?.message });
+      return createErrorResponse(CLIENT_ERRORS.AUTH_FAILED, 401, corsHeaders);
     }
     
     const userId = userData.user.id;
+    logStep("User authenticated", { userId });
     
     // Check usage limits
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, { auth: { persistSession: false } });
@@ -47,19 +101,15 @@ serve(async (req) => {
     });
     
     if (canUseError || !canUse) {
-      // Get plan info for better error message
-      const { data: planInfo } = await supabaseAdmin.rpc('get_user_plan', { _user_id: userId });
-      return new Response(JSON.stringify({ 
-        error: "Limite de substituições atingido",
-        allowed: false,
-        upgradeRequired: true,
-        planName: planInfo?.[0]?.plan_name || 'Gratuito',
-        limit: planInfo?.[0]?.substitution_limit || 0
-      }), { 
-        status: 403, 
-        headers: { ...corsHeaders, "Content-Type": "application/json" } 
-      });
+      logStep("Usage limit reached");
+      return createErrorResponse(
+        CLIENT_ERRORS.USAGE_LIMIT,
+        403,
+        corsHeaders,
+        { allowed: false, upgradeRequired: true }
+      );
     }
+    
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -69,15 +119,20 @@ serve(async (req) => {
         model: "google/gemini-3-flash-preview",
         messages: [
           { role: "system", content: "Você é um nutricionista educador. Explique de forma clara e simples o impacto nutricional de substituições alimentares. Seja objetivo, use linguagem acessível e limite a 3 frases." },
-          { role: "user", content: `O usuário está trocando "${originalFood?.name}" (${originalFood?.calories}kcal, P:${originalFood?.protein}g, C:${originalFood?.carbs}g, G:${originalFood?.fat}g) por "${newFood?.name}" (${newFood?.calories}kcal, P:${newFood?.protein}g, C:${newFood?.carbs}g, G:${newFood?.fat}g). Objetivo: ${userGoal === 'lose_weight' ? 'perder peso' : userGoal === 'gain_muscle' ? 'ganhar massa' : 'manter peso'}. Meta diária: ${dailyCalories}kcal. Explique o impacto dessa troca.` }
+          { role: "user", content: `O usuário está trocando "${originalFood.name}" (${originalFood.calories}kcal, P:${originalFood.protein}g, C:${originalFood.carbs}g, G:${originalFood.fat}g) por "${newFood.name}" (${newFood.calories}kcal, P:${newFood.protein}g, C:${newFood.carbs}g, G:${newFood.fat}g). Objetivo: ${safeUserGoal === 'lose_weight' ? 'perder peso' : safeUserGoal === 'gain_muscle' ? 'ganhar massa' : 'manter peso'}. Meta diária: ${safeDailyCalories}kcal. Explique o impacto dessa troca.` }
         ],
       }),
     });
 
     if (!response.ok) {
-      if (response.status === 429) return new Response(JSON.stringify({ error: "Rate limit exceeded" }), { status: 429, headers: corsHeaders });
-      if (response.status === 402) return new Response(JSON.stringify({ error: "Payment required" }), { status: 402, headers: corsHeaders });
-      throw new Error("AI error");
+      if (response.status === 429) {
+        return createErrorResponse(CLIENT_ERRORS.RATE_LIMIT, 429, corsHeaders);
+      }
+      if (response.status === 402) {
+        return createErrorResponse(CLIENT_ERRORS.PAYMENT_REQUIRED, 402, corsHeaders);
+      }
+      logStep("AI API error", { status: response.status });
+      return createErrorResponse(CLIENT_ERRORS.SERVER_ERROR, 500, corsHeaders);
     }
 
     const data = await response.json();
@@ -88,9 +143,9 @@ serve(async (req) => {
       _feature: 'substitution'
     });
 
-    return new Response(JSON.stringify({ explanation: data.choices[0].message.content }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
-  } catch (e: unknown) {
-    const message = e instanceof Error ? e.message : "Unknown error";
-    return new Response(JSON.stringify({ error: message }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    return createSuccessResponse({ explanation: data.choices[0].message.content }, corsHeaders);
+  } catch (error) {
+    logStep("ERROR", { message: getErrorForLogging(error) });
+    return createErrorResponse(CLIENT_ERRORS.SERVER_ERROR, 500, corsHeaders);
   }
 });

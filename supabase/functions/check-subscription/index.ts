@@ -1,17 +1,15 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
+import { getCorsHeaders, CLIENT_ERRORS, getErrorForLogging, createErrorResponse, createSuccessResponse } from "../_shared/security.ts";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
-
-const logStep = (step: string, details?: any) => {
+const logStep = (step: string, details?: unknown) => {
   const detailsStr = details ? ` - ${JSON.stringify(details)}` : '';
   console.log(`[CHECK-SUBSCRIPTION] ${step}${detailsStr}`);
 };
 
 serve(async (req) => {
+  const corsHeaders = getCorsHeaders(req);
+  
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -32,14 +30,15 @@ serve(async (req) => {
 
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
-      throw new Error("No authorization header");
+      return createErrorResponse(CLIENT_ERRORS.AUTH_REQUIRED, 401, corsHeaders);
     }
 
     const token = authHeader.replace("Bearer ", "");
     const { data: userData, error: userError } = await supabaseClient.auth.getUser(token);
     
     if (userError || !userData.user) {
-      throw new Error("User not authenticated");
+      logStep("Auth failed", { error: userError?.message });
+      return createErrorResponse(CLIENT_ERRORS.AUTH_FAILED, 401, corsHeaders);
     }
 
     const user = userData.user;
@@ -59,7 +58,7 @@ serve(async (req) => {
       .single();
 
     if (subError || !subscription) {
-      logStep("No active subscription found", { error: subError?.message });
+      logStep("No active subscription found");
       
       // Check if user has roles to determine account type
       const { data: roles } = await supabaseAdmin
@@ -69,15 +68,12 @@ serve(async (req) => {
 
       const isProfessional = roles?.some(r => r.role === 'professional');
       
-      return new Response(JSON.stringify({
+      return createSuccessResponse({
         subscribed: false,
         plan: null,
         usage: null,
         accountType: isProfessional ? 'professional' : 'personal',
-      }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 200,
-      });
+      }, corsHeaders);
     }
 
     logStep("Subscription found", { 
@@ -103,7 +99,7 @@ serve(async (req) => {
         .eq('user_id', user.id);
     }
 
-    return new Response(JSON.stringify({
+    return createSuccessResponse({
       subscribed: subscription.status === 'active' || subscription.status === 'trial',
       subscription: {
         id: subscription.id,
@@ -120,16 +116,9 @@ serve(async (req) => {
         chat_messages_today: 0,
       },
       accountType: subscription.plan?.type || 'personal',
-    }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 200,
-    });
+    }, corsHeaders);
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    logStep("ERROR", { message: errorMessage });
-    return new Response(JSON.stringify({ error: errorMessage }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 500,
-    });
+    logStep("ERROR", { message: getErrorForLogging(error) });
+    return createErrorResponse(CLIENT_ERRORS.SERVER_ERROR, 500, corsHeaders);
   }
 });
