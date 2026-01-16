@@ -124,10 +124,13 @@ export function useSubscription() {
     }
   };
 
+  // Combined loading state - includes auth loading
+  const isLoading = authLoading || loading;
+
   return {
     subscriptionInfo,
     plans,
-    loading,
+    loading: isLoading,
     error,
     refresh: fetchSubscription,
     createCheckout,
