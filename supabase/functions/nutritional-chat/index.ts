@@ -10,6 +10,119 @@ const logStep = (step: string, details?: unknown) => {
   console.log(`[NUTRITIONAL-CHAT] ${step}${detailsStr}`);
 };
 
+// Mensagens de limite por plano
+const LIMIT_MESSAGES: Record<string, string> = {
+  gratuito: "Você atingiu o limite diário do plano gratuito. Amanhã poderá continuar ou fazer upgrade para usar a IA com mais liberdade.",
+  premium: "Você atingiu o limite diário do seu plano. Amanhã a conversa será liberada novamente. Para ter autonomia total, conheça o Plano Pessoal.",
+  plano_pessoal_pago: "Você atingiu o limite diário de mensagens. O limite será renovado automaticamente amanhã.",
+  profissional: "Você atingiu o limite diário da IA. O acesso será renovado amanhã.",
+};
+
+// System prompts por tipo de plano
+const getSystemPrompt = (
+  planName: string, 
+  isLinkedToProfessional: boolean,
+  userContext: {
+    goal: string;
+    dailyCalories: number;
+    proteinTarget: number;
+    carbsTarget: number;
+    fatTarget: number;
+    preferences: string;
+    restrictions: string;
+  }
+): string => {
+  const baseContext = `
+Contexto do usuário:
+- Objetivo: ${userContext.goal === 'lose_weight' ? 'perder peso' : userContext.goal === 'gain_muscle' ? 'ganhar massa muscular' : 'manter peso'}
+- Meta calórica: ${userContext.dailyCalories} kcal/dia
+- Proteína: ${userContext.proteinTarget}g | Carboidratos: ${userContext.carbsTarget}g | Gordura: ${userContext.fatTarget}g
+- Preferências: ${userContext.preferences}
+- Restrições: ${userContext.restrictions}`;
+
+  // PLANO GRATUITO - IA educacional básica
+  if (planName === 'gratuito' || !planName) {
+    return `Você é um assistente nutricional EDUCACIONAL BÁSICO.
+
+REGRAS OBRIGATÓRIAS:
+- Forneça APENAS respostas curtas e genéricas
+- Explique conceitos básicos sobre alimentação saudável
+- NÃO crie planos alimentares
+- NÃO ajuste macros ou calorias
+- NÃO sugira substituições específicas
+- Limite-se a educação nutricional básica
+
+Se perguntado sobre criação de planos, ajustes ou substituições, responda:
+"Para ter acesso a planos personalizados e ajustes, considere fazer upgrade para um plano pago."
+
+${baseContext}
+
+IMPORTANTE: Mantenha respostas CURTAS (máximo 3-4 frases).`;
+  }
+
+  // PREMIUM (ALUNO VINCULADO) - IA educacional ampliada
+  if (planName === 'premium' || isLinkedToProfessional) {
+    return `Você é um assistente nutricional EDUCACIONAL para alunos acompanhados por profissionais.
+
+REGRAS OBRIGATÓRIAS:
+- Sempre reforce a importância do plano do profissional
+- Explique a lógica e função dos alimentos no plano
+- NÃO prescreva ou altere o plano alimentar
+- NÃO sugira substituições diretas
+- Incentive o aluno a consultar seu nutricionista para mudanças
+
+Quando perguntado sobre mudanças no plano, responda:
+"Para alterações no seu plano, converse com seu nutricionista. Posso explicar por que cada alimento foi escolhido."
+
+${baseContext}
+
+IMPORTANTE: Mantenha respostas moderadamente detalhadas, mas sempre redirecionando ao profissional.`;
+  }
+
+  // PLANO PESSOAL PAGO - IA completa
+  if (planName === 'plano_pessoal_pago') {
+    return `Você é um assistente nutricional COMPLETO com autonomia total.
+
+CAPACIDADES:
+- Crie e edite planos alimentares completos
+- Ajuste objetivos nutricionais
+- Recalcule macros e calorias conforme solicitado
+- Sugira substituições de alimentos
+- Forneça orientação nutricional detalhada
+
+${baseContext}
+
+ESTILO: Respostas objetivas e práticas. Quando apropriado, ofereça: "Quer que eu explique melhor?"
+
+IMPORTANTE: Você oferece orientação nutricional, não aconselhamento médico.`;
+  }
+
+  // PLANO PROFISSIONAL - IA como assistente clínica
+  if (planName === 'profissional') {
+    return `Você é um ASSISTENTE CLÍNICO NUTRICIONAL para profissionais de saúde.
+
+CAPACIDADES:
+- Forneça respostas técnicas e analíticas
+- Auxilie com cálculos nutricionais complexos
+- Sugira abordagens terapêuticas nutricionais
+- Analise dados e tendências
+
+REGRAS:
+- NÃO tome decisões finais - o profissional decide
+- Apresente análises e opções para o profissional avaliar
+- Use terminologia técnica apropriada
+
+${baseContext}
+
+ESTILO: Técnico, analítico e conciso. Apresente dados e opções.`;
+  }
+
+  // Fallback genérico
+  return `Você é um assistente nutricional. ${baseContext}
+
+Responda de forma educacional e objetiva.`;
+};
+
 serve(async (req) => {
   const corsHeaders = getCorsHeaders(req);
   
@@ -93,23 +206,35 @@ serve(async (req) => {
     
     logStep("User authenticated", { userId: user.id });
 
+    // Get user permissions and plan info
+    const { data: permissionsData } = await supabase.rpc('get_user_permissions', { _user_id: user.id });
+    const permissions = permissionsData?.[0] || { plan_name: 'gratuito', is_linked_to_professional: false };
+    const planName = permissions.plan_name || 'gratuito';
+    const isLinkedToProfessional = permissions.is_linked_to_professional || false;
+
+    logStep("User permissions fetched", { planName, isLinkedToProfessional });
+
     // Validate chat usage limit
-    const { data: canUse } = await supabase.rpc('can_use_feature', {
+    const { data: limitData } = await supabase.rpc('check_feature_limit', {
       _user_id: user.id,
       _feature: 'chat',
     });
-
-    if (!canUse) {
-      const { data: planInfo } = await supabase.rpc('get_user_plan', { _user_id: user.id });
-      const errorMsg = planInfo?.[0]?.has_chat 
-        ? `Você atingiu o limite de ${planInfo?.[0]?.chat_messages_per_day || 0} mensagens diárias.`
-        : 'O chat não está disponível no seu plano atual.';
+    
+    const limitInfo = limitData?.[0];
+    
+    if (limitInfo && !limitInfo.allowed) {
+      const limitMessage = LIMIT_MESSAGES[planName] || LIMIT_MESSAGES.gratuito;
       
       return createErrorResponse(
-        errorMsg,
+        limitMessage,
         403,
         corsHeaders,
-        { upgradeRequired: true }
+        { 
+          upgradeRequired: true,
+          currentUsage: limitInfo.current_usage,
+          maxLimit: limitInfo.max_limit,
+          planName
+        }
       );
     }
 
@@ -127,15 +252,16 @@ serve(async (req) => {
       ? (safeProfile.restrictions as unknown[]).filter(validate.isString).slice(0, 10).join(", ")
       : "Nenhuma";
 
-    const systemPrompt = `Você é um assistente nutricional educacional. Responda perguntas sobre alimentação saudável de forma clara e acessível. 
-Contexto do usuário:
-- Objetivo: ${goal === 'lose_weight' ? 'perder peso' : goal === 'gain_muscle' ? 'ganhar massa muscular' : 'manter peso'}
-- Meta calórica: ${dailyCalories} kcal/dia
-- Proteína: ${proteinTarget}g | Carboidratos: ${carbsTarget}g | Gordura: ${fatTarget}g
-- Preferências: ${preferences}
-- Restrições: ${restrictions}
-
-IMPORTANTE: Você oferece educação nutricional, não aconselhamento médico. Sugira consultar um profissional para casos específicos.`;
+    // Get plan-specific system prompt
+    const systemPrompt = getSystemPrompt(planName, isLinkedToProfessional, {
+      goal,
+      dailyCalories,
+      proteinTarget,
+      carbsTarget,
+      fatTarget,
+      preferences,
+      restrictions,
+    });
 
     const messages = [
       { role: "system", content: systemPrompt },
@@ -168,7 +294,21 @@ IMPORTANTE: Você oferece educação nutricional, não aconselhamento médico. S
       _feature: 'chat',
     });
 
-    return createSuccessResponse({ message: data.choices[0].message.content }, corsHeaders);
+    // Get updated usage for response
+    const { data: updatedLimitData } = await supabase.rpc('check_feature_limit', {
+      _user_id: user.id,
+      _feature: 'chat',
+    });
+    const updatedLimit = updatedLimitData?.[0];
+
+    return createSuccessResponse({ 
+      message: data.choices[0].message.content,
+      usage: {
+        current: updatedLimit?.current_usage || 0,
+        limit: updatedLimit?.max_limit || 0,
+      },
+      planName,
+    }, corsHeaders);
   } catch (error) {
     logStep("ERROR", { message: getErrorForLogging(error) });
     return createErrorResponse(CLIENT_ERRORS.SERVER_ERROR, 500, corsHeaders);
