@@ -76,20 +76,10 @@ export interface SubscriptionInfo {
   isLinkedToProfessional?: boolean;
 }
 
-export type BillingCycle = 'monthly' | 'quarterly' | 'semiannual' | 'annual';
+export type BillingCycle = 'monthly';
 
 export const BILLING_CYCLE_LABELS: Record<BillingCycle, string> = {
   monthly: 'Mensal',
-  quarterly: 'Trimestral',
-  semiannual: 'Semestral',
-  annual: 'Anual',
-};
-
-export const BILLING_CYCLE_DISCOUNTS: Record<BillingCycle, number> = {
-  monthly: 0,
-  quarterly: 15,
-  semiannual: 25,
-  annual: 35,
 };
 
 // Mapeamento de planos comerciais para exibição

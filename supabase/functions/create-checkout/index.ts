@@ -3,9 +3,6 @@ import Stripe from "https://esm.sh/stripe@18.5.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { getCorsHeaders, CLIENT_ERRORS, validate, getErrorForLogging, createErrorResponse, createSuccessResponse } from "../_shared/security.ts";
 
-const VALID_BILLING_CYCLES = ['monthly', 'quarterly', 'semiannual', 'annual'] as const;
-const VALID_PLAN_TYPES = ['personal', 'professional'] as const;
-
 const logStep = (step: string, details?: unknown) => {
   const detailsStr = details ? ` - ${JSON.stringify(details)}` : '';
   console.log(`[CREATE-CHECKOUT] ${step}${detailsStr}`);
@@ -33,32 +30,21 @@ serve(async (req) => {
       return createErrorResponse(CLIENT_ERRORS.INVALID_REQUEST, 400, corsHeaders);
     }
     
-    const { planId, billingCycle, billing_cycle, plan_type } = body as { 
+    const { planId, plan_type } = body as { 
       planId: unknown; 
-      billingCycle: unknown;
-      billing_cycle: unknown;
       plan_type: unknown;
     };
     
-    // Support both camelCase and snake_case for billing cycle
-    const effectiveBillingCycle = billingCycle || billing_cycle;
-    
-    // Validate billingCycle is a valid enum
-    if (!validate.isEnum(effectiveBillingCycle, [...VALID_BILLING_CYCLES])) {
-      logStep("Invalid billingCycle", { billingCycle: effectiveBillingCycle });
-      return createErrorResponse(CLIENT_ERRORS.INVALID_REQUEST, 400, corsHeaders);
-    }
-    
     // Either planId (UUID) or plan_type must be provided
     const hasPlanId = validate.isUUID(planId);
-    const hasPlanType = validate.isEnum(plan_type, [...VALID_PLAN_TYPES]);
+    const hasPlanType = validate.isEnum(plan_type, ['personal', 'professional']);
     
     if (!hasPlanId && !hasPlanType) {
       logStep("Invalid planId or plan_type", { planId, plan_type });
       return createErrorResponse(CLIENT_ERRORS.INVALID_REQUEST, 400, corsHeaders);
     }
     
-    logStep("Request validated", { planId, plan_type, billingCycle: effectiveBillingCycle });
+    logStep("Request validated", { planId, plan_type });
 
     const supabaseClient = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
@@ -94,8 +80,8 @@ serve(async (req) => {
     if (hasPlanId) {
       planQuery = planQuery.eq('id', planId);
     } else {
-      // Look up by plan type - get the first active plan of this type
-      planQuery = planQuery.eq('type', plan_type).eq('is_active', true);
+      // Look up by plan type - get the first active paid plan of this type
+      planQuery = planQuery.eq('type', plan_type).eq('is_active', true).neq('name', 'gratuito');
     }
     
     const { data: planData, error: planError } = await planQuery.limit(1).single();
@@ -173,35 +159,14 @@ serve(async (req) => {
       }
     }
 
-    // Get price based on billing cycle from database
-    const priceColumnMap: Record<string, string> = {
-      monthly: 'stripe_price_monthly',
-      quarterly: 'stripe_price_quarterly',
-      semiannual: 'stripe_price_semiannual',
-      annual: 'stripe_price_annual',
-    };
-    
-    // Try requested billing cycle first, fallback to monthly if not available
-    let priceColumn = priceColumnMap[effectiveBillingCycle];
-    let stripePriceId = plan[priceColumn] as string | null;
-    let finalBillingCycle = effectiveBillingCycle;
-    
-    // Fallback to monthly if requested cycle not available
-    if (!stripePriceId && effectiveBillingCycle !== 'monthly') {
-      logStep("Requested billing cycle not available, falling back to monthly", { 
-        requested: effectiveBillingCycle, 
-        planName: plan.name 
-      });
-      priceColumn = 'stripe_price_monthly';
-      stripePriceId = plan[priceColumn] as string | null;
-      finalBillingCycle = 'monthly';
-    }
+    // Always use monthly price (simplified - no billing cycle logic)
+    const stripePriceId = plan.stripe_price_monthly as string | null;
     
     if (!stripePriceId) {
-      logStep("No Stripe price configured", { planName: plan.name, billingCycle: effectiveBillingCycle });
+      logStep("No Stripe price configured", { planName: plan.name });
       return createErrorResponse(CLIENT_ERRORS.NOT_FOUND, 404, corsHeaders);
     }
-    logStep("Price ID determined from database", { stripePriceId, billingCycle: finalBillingCycle });
+    logStep("Price ID from database", { stripePriceId });
 
     const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", { 
       apiVersion: "2025-08-27.basil" 
@@ -233,7 +198,7 @@ serve(async (req) => {
       metadata: {
         user_id: user.id,
         plan_id: resolvedPlanId,
-        billing_cycle: finalBillingCycle,
+        billing_cycle: 'monthly',
       },
     });
 

@@ -233,30 +233,37 @@ serve(async (req) => {
       logStep("Creating plan for student", { studentId: validStudentId, professionalId: user.id });
     }
 
-    // Verificar permissão para criar plano (usa função do banco)
-    const { data: canCreate } = await supabase.rpc('can_create_plan', {
-      _user_id: targetUserId,
-    });
+    // Skip validations for initial plan (onboarding) - rule: create immediately after data collection
+    const skipValidation = isInitialPlan === true;
+    
+    if (!skipValidation) {
+      // Verificar permissão para criar plano (usa função do banco)
+      const { data: canCreate } = await supabase.rpc('can_create_plan', {
+        _user_id: targetUserId,
+      });
 
-    if (!canCreate && !validStudentId) {
-      logStep("User cannot create plan - limit reached or restricted account type");
-      return createErrorResponse('Limite de planos atingido ou conta sem permissão', 403, corsHeaders);
-    }
+      if (!canCreate && !validStudentId) {
+        logStep("User cannot create plan - limit reached or restricted account type");
+        return createErrorResponse('Limite de planos atingido ou conta sem permissão', 403, corsHeaders);
+      }
 
-    // Validate usage limit (use professional's quota when creating for student)
-    const { data: canUse } = await supabase.rpc('can_use_feature', {
-      _user_id: user.id,
-      _feature: 'diet',
-    });
+      // Validate usage limit (use professional's quota when creating for student)
+      const { data: canUse } = await supabase.rpc('can_use_feature', {
+        _user_id: user.id,
+        _feature: 'diet',
+      });
 
-    if (!canUse) {
-      logStep("Usage limit reached");
-      return createErrorResponse(
-        CLIENT_ERRORS.USAGE_LIMIT,
-        403,
-        corsHeaders,
-        { upgradeRequired: true }
-      );
+      if (!canUse) {
+        logStep("Usage limit reached");
+        return createErrorResponse(
+          CLIENT_ERRORS.USAGE_LIMIT,
+          403,
+          corsHeaders,
+          { upgradeRequired: true }
+        );
+      }
+    } else {
+      logStep("Skipping validation - initial plan creation");
     }
 
     // Fetch all foods from database

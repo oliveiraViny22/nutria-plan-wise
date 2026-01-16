@@ -18,40 +18,6 @@ import { useSubscription } from '@/hooks/useSubscription';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 
-const PLANS = [
-  {
-    id: 'monthly',
-    name: 'Mensal',
-    price: 'R$ 99',
-    period: '/mês',
-    description: 'Ideal para começar',
-    features: [
-      'Até 10 alunos ativos',
-      'Acesso aos planos dos alunos',
-      'Gestão de progresso',
-      'Suporte por email',
-    ],
-    maxStudents: 10,
-    popular: false,
-  },
-  {
-    id: 'annual',
-    name: 'Anual',
-    price: 'R$ 79',
-    period: '/mês',
-    description: '2 meses grátis',
-    features: [
-      'Até 50 alunos ativos',
-      'Acesso aos planos dos alunos',
-      'Gestão de progresso',
-      'Suporte prioritário',
-      'Relatórios avançados',
-    ],
-    maxStudents: 50,
-    popular: true,
-  },
-];
-
 const BENEFITS = [
   {
     icon: Users,
@@ -76,7 +42,6 @@ export default function BecomeProfessional() {
   const { accountType, isSubscribed, openCustomerPortal } = useSubscription();
   const isProfessionalActive = isSubscribed && accountType === 'professional';
 
-  const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
   const [isActivating, setIsActivating] = useState(false);
 
   const handleActivateLicense = async () => {
@@ -88,19 +53,14 @@ export default function BecomeProfessional() {
       return;
     }
 
-    if (!user || !selectedPlan) return;
+    if (!user) return;
 
     setIsActivating(true);
     try {
-      const plan = PLANS.find(p => p.id === selectedPlan);
-      if (!plan) throw new Error('Plano não encontrado');
-
-      // Redirect to Stripe checkout for payment - license/role activation 
-      // is handled securely via stripe-webhook after successful payment
+      // Redirect to Stripe checkout for payment - always monthly
       const { data, error } = await supabase.functions.invoke('create-checkout', {
         body: {
           plan_type: 'professional',
-          billing_cycle: selectedPlan === 'annual' ? 'annual' : 'monthly',
         },
       });
 
@@ -180,7 +140,7 @@ export default function BecomeProfessional() {
           ))}
         </motion.div>
 
-        {/* Pricing */}
+        {/* Pricing - Single Monthly Plan */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -188,64 +148,38 @@ export default function BecomeProfessional() {
           className="space-y-6"
         >
           <div className="text-center">
-            <h2 className="text-2xl font-bold mb-2">Escolha seu plano</h2>
+            <h2 className="text-2xl font-bold mb-2">Plano Profissional</h2>
             <p className="text-muted-foreground">
-              Selecione o plano que melhor se adapta às suas necessidades
+              Comece a gerenciar seus alunos hoje mesmo
             </p>
           </div>
 
-          <div className="grid md:grid-cols-2 gap-6 max-w-3xl mx-auto">
-            {PLANS.map((plan) => (
-              <Card 
-                key={plan.id}
-                className={`relative transition-all ${
-                  isProfessionalActive
-                    ? 'opacity-60'
-                    : 'cursor-pointer ' +
-                      (selectedPlan === plan.id 
-                        ? 'ring-2 ring-primary border-primary' 
-                        : 'hover:border-primary/50')
-                } ${plan.popular ? 'md:-mt-4 md:mb-4' : ''}`}
-                onClick={() => {
-                  if (isProfessionalActive) return;
-                  setSelectedPlan(plan.id);
-                }}
-              >
-                {plan.popular && (
-                  <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                    <span className="bg-primary text-primary-foreground text-xs font-medium px-3 py-1 rounded-full">
-                      Mais Popular
-                    </span>
-                  </div>
-                )}
-                <CardHeader>
-                  <CardTitle className="flex items-center justify-between">
-                    <span>{plan.name}</span>
-                    {selectedPlan === plan.id && (
-                      <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center">
-                        <Check className="h-4 w-4 text-primary-foreground" />
-                      </div>
-                    )}
-                  </CardTitle>
-                  <CardDescription>{plan.description}</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex items-baseline">
-                    <span className="text-3xl font-bold">{plan.price}</span>
-                    <span className="text-muted-foreground ml-1">{plan.period}</span>
-                  </div>
-                  <ul className="space-y-2">
-                    {plan.features.map((feature, i) => (
-                      <li key={i} className="flex items-center gap-2 text-sm">
-                        <Check className="h-4 w-4 text-primary shrink-0" />
-                        <span>{feature}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+          <Card className="max-w-md mx-auto border-primary shadow-lg shadow-primary/20">
+            <CardHeader className="text-center">
+              <CardTitle>Mensal</CardTitle>
+              <CardDescription>Até 50 alunos ativos</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="text-center">
+                <span className="text-4xl font-bold">R$ 99,00</span>
+                <span className="text-muted-foreground">/mês</span>
+              </div>
+              <ul className="space-y-3">
+                {[
+                  'Até 50 alunos ativos',
+                  'Acesso aos planos dos alunos',
+                  'Gestão de progresso',
+                  'Suporte prioritário',
+                  'Relatórios avançados',
+                ].map((feature, i) => (
+                  <li key={i} className="flex items-center gap-2 text-sm">
+                    <Check className="h-4 w-4 text-primary shrink-0" />
+                    <span>{feature}</span>
+                  </li>
+                ))}
+              </ul>
+            </CardContent>
+          </Card>
         </motion.div>
 
         {/* CTA */}
@@ -291,7 +225,7 @@ export default function BecomeProfessional() {
               <Button 
                 size="lg" 
                 className="min-w-[200px]"
-                disabled={!selectedPlan || isActivating}
+                disabled={isActivating}
                 onClick={handleActivateLicense}
               >
                 {isActivating ? (
@@ -299,7 +233,7 @@ export default function BecomeProfessional() {
                 ) : (
                   <>
                     <Calendar className="h-4 w-4 mr-2" />
-                    Ativar Licença
+                    Ativar Licença - R$ 99/mês
                   </>
                 )}
               </Button>
