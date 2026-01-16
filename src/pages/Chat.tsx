@@ -1,14 +1,19 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Send, Loader2, AlertTriangle, Bot, User } from 'lucide-react';
+import { ArrowLeft, Send, Loader2, AlertTriangle, Bot, User, Lock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Logo } from '@/components/Logo';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { ChatMessage } from '@/lib/types';
 import { toast } from 'sonner';
+import { ChatUsageIndicator } from '@/components/ChatUsageIndicator';
+
+interface ChatUsage {
+  current: number;
+  limit: number;
+}
 
 export default function Chat() {
   const navigate = useNavigate();
@@ -17,10 +22,15 @@ export default function Chat() {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [loadingHistory, setLoadingHistory] = useState(true);
+  const [usage, setUsage] = useState<ChatUsage>({ current: 0, limit: 3 });
+  const [planName, setPlanName] = useState('gratuito');
+  const [limitReached, setLimitReached] = useState(false);
+  const [limitMessage, setLimitMessage] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     fetchChatHistory();
+    fetchInitialUsage();
   }, []);
 
   useEffect(() => {
@@ -30,6 +40,31 @@ export default function Chat() {
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
+
+  const fetchInitialUsage = useCallback(async () => {
+    try {
+      const { data, error } = await supabase.rpc('check_feature_limit', {
+        _user_id: user?.id,
+        _feature: 'chat',
+      });
+      
+      if (!error && data?.[0]) {
+        setUsage({
+          current: data[0].current_usage,
+          limit: data[0].max_limit,
+        });
+        setLimitReached(!data[0].allowed);
+      }
+
+      // Get plan name
+      const { data: permData } = await supabase.rpc('get_user_permissions', { _user_id: user?.id });
+      if (permData?.[0]) {
+        setPlanName(permData[0].plan_name || 'gratuito');
+      }
+    } catch (error) {
+      console.error('Error fetching usage:', error);
+    }
+  }, [user?.id]);
 
   const fetchChatHistory = async () => {
     try {
@@ -49,7 +84,7 @@ export default function Chat() {
   };
 
   const sendMessage = async () => {
-    if (!input.trim() || loading) return;
+    if (!input.trim() || loading || limitReached) return;
 
     const userMessage = input.trim();
     setInput('');
@@ -101,6 +136,26 @@ export default function Chat() {
       });
 
       if (response.error) {
+        // Check for limit exceeded (403)
+        const errorContext = response.error?.context;
+        if (errorContext?.status === 403) {
+          try {
+            const errorData = await errorContext.json();
+            setLimitReached(true);
+            setLimitMessage(errorData.error || 'Limite de mensagens atingido.');
+            toast.error(errorData.error || 'Limite de mensagens atingido.');
+            // Remove the user message since it wasn't processed
+            setMessages((prev) => prev.filter((m) => m.id !== savedUserMsg.id));
+            // Delete from database
+            await supabase.from('chat_messages').delete().eq('id', savedUserMsg.id);
+            return;
+          } catch {
+            setLimitReached(true);
+            toast.error('Limite de mensagens atingido.');
+            return;
+          }
+        }
+
         // Check for rate limit or payment errors
         if (response.error.message?.includes('429') || response.error.message?.includes('Rate limit')) {
           toast.error('Limite de requisições excedido. Tente novamente em alguns segundos.');
@@ -114,6 +169,22 @@ export default function Chat() {
       }
 
       const assistantContent = response.data.message;
+      
+      // Update usage from response
+      if (response.data.usage) {
+        setUsage({
+          current: response.data.usage.current,
+          limit: response.data.usage.limit,
+        });
+        // Check if limit just reached
+        if (response.data.usage.current >= response.data.usage.limit) {
+          setLimitReached(true);
+        }
+      }
+      
+      if (response.data.planName) {
+        setPlanName(response.data.planName);
+      }
 
       // Save assistant message
       const { data: savedAssistantMsg, error: assistantMsgError } = await supabase
@@ -142,6 +213,35 @@ export default function Chat() {
     }
   };
 
+  const getSuggestions = () => {
+    if (planName === 'profissional') {
+      return [
+        'Analise os macros deste paciente',
+        'Sugira opções de ajuste calórico',
+        'Quais alimentos ricos em proteína?',
+      ];
+    }
+    if (planName === 'plano_pessoal_pago') {
+      return [
+        'Crie um plano de café da manhã',
+        'Posso trocar arroz por batata?',
+        'Recalcule meus macros',
+      ];
+    }
+    if (planName === 'premium') {
+      return [
+        'Por que esse alimento está no meu plano?',
+        'Qual a função da proteína?',
+        'Explique meu plano alimentar',
+      ];
+    }
+    return [
+      'O que é uma alimentação saudável?',
+      'Qual o impacto dos carboidratos?',
+      'O que são macronutrientes?',
+    ];
+  };
+
   return (
     <div className="min-h-screen bg-background flex flex-col">
       {/* Header */}
@@ -150,16 +250,27 @@ export default function Chat() {
           <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
             <ArrowLeft className="w-5 h-5" />
           </Button>
-          <div>
+          <div className="flex-1">
             <h1 className="font-semibold text-foreground">
               Assistente Nutricional
             </h1>
             <p className="text-xs text-muted-foreground">
-              Tire suas dúvidas sobre nutrição
+              {planName === 'profissional' ? 'Assistente Clínico' : 
+               planName === 'plano_pessoal_pago' ? 'IA Completa' :
+               planName === 'premium' ? 'IA Educacional' : 'IA Básica'}
             </p>
           </div>
         </div>
       </header>
+
+      {/* Usage indicator */}
+      <div className="container mx-auto px-4 py-3 max-w-2xl">
+        <ChatUsageIndicator 
+          currentUsage={usage.current}
+          maxLimit={usage.limit}
+          planName={planName}
+        />
+      </div>
 
       {/* Disclaimer */}
       <div className="bg-warning/10 border-b border-warning/20 px-4 py-2">
@@ -188,19 +299,21 @@ export default function Chat() {
                 Olá! Sou seu assistente nutricional
               </h3>
               <p className="text-sm text-muted-foreground max-w-sm mx-auto">
-                Posso responder perguntas sobre seu plano alimentar, explicar
-                escolhas nutricionais e ajudar com substituições de alimentos.
+                {planName === 'profissional' 
+                  ? 'Posso auxiliar com análises nutricionais e sugestões técnicas.'
+                  : planName === 'plano_pessoal_pago'
+                  ? 'Posso criar planos, ajustar macros e sugerir substituições.'
+                  : planName === 'premium'
+                  ? 'Posso explicar seu plano e tirar dúvidas sobre nutrição.'
+                  : 'Posso responder dúvidas básicas sobre alimentação saudável.'}
               </p>
               <div className="flex flex-wrap justify-center gap-2 mt-6">
-                {[
-                  'Por que esse alimento está no meu plano?',
-                  'Qual o impacto dessa refeição?',
-                  'Posso trocar arroz por batata?',
-                ].map((suggestion) => (
+                {getSuggestions().map((suggestion) => (
                   <button
                     key={suggestion}
                     onClick={() => setInput(suggestion)}
-                    className="text-xs px-3 py-2 bg-secondary rounded-full text-secondary-foreground hover:bg-secondary/80 transition-colors"
+                    disabled={limitReached}
+                    className="text-xs px-3 py-2 bg-secondary rounded-full text-secondary-foreground hover:bg-secondary/80 transition-colors disabled:opacity-50"
                   >
                     {suggestion}
                   </button>
@@ -262,6 +375,23 @@ export default function Chat() {
         </div>
       </main>
 
+      {/* Limit reached banner */}
+      {limitReached && (
+        <div className="bg-destructive/10 border-t border-destructive/20 px-4 py-3">
+          <div className="container mx-auto max-w-2xl flex items-center gap-3">
+            <Lock className="w-5 h-5 text-destructive flex-shrink-0" />
+            <div className="flex-1">
+              <p className="text-sm text-destructive font-medium">
+                {limitMessage || 'Limite diário atingido'}
+              </p>
+            </div>
+            <Button size="sm" onClick={() => navigate('/pricing')}>
+              Fazer Upgrade
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Input */}
       <div className="sticky bottom-0 bg-background/80 backdrop-blur-md border-t border-border p-4">
         <div className="container mx-auto max-w-2xl flex gap-2">
@@ -269,16 +399,16 @@ export default function Chat() {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyPress={handleKeyPress}
-            placeholder="Digite sua pergunta..."
+            placeholder={limitReached ? 'Limite atingido - volte amanhã' : 'Digite sua pergunta...'}
             className="flex-1 h-12"
-            disabled={loading}
+            disabled={loading || limitReached}
           />
           <Button
             variant="hero"
             size="icon"
             className="h-12 w-12"
             onClick={sendMessage}
-            disabled={!input.trim() || loading}
+            disabled={!input.trim() || loading || limitReached}
           >
             {loading ? (
               <Loader2 className="w-5 h-5 animate-spin" />

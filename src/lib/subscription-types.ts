@@ -94,15 +94,31 @@ export const BILLING_CYCLE_DISCOUNTS: Record<BillingCycle, number> = {
 // Mapeamento de planos comerciais para exibição
 export const PLAN_DISPLAY_NAMES: Record<CommercialPlan, string> = {
   gratuito: 'Gratuito',
+  premium: 'Premium Aluno',
   plano_pessoal_pago: 'Pessoal',
-  premium: 'Premium',
   profissional: 'Profissional',
 };
 
 // Descrições dos planos
 export const PLAN_DESCRIPTIONS: Record<CommercialPlan, string> = {
-  gratuito: 'Visualização apenas',
-  plano_pessoal_pago: 'Autonomia total',
-  premium: 'Simulações com IA',
-  profissional: 'Gerenciamento de alunos',
+  gratuito: 'IA educacional básica',
+  premium: 'IA educacional ampliada',
+  plano_pessoal_pago: 'IA completa com autonomia',
+  profissional: 'IA como assistente clínica',
+};
+
+// Preços mensais dos planos
+export const PLAN_PRICES: Record<CommercialPlan, number> = {
+  gratuito: 0,
+  premium: 4.90,
+  plano_pessoal_pago: 14.90,
+  profissional: 99.00,
+};
+
+// Limites de mensagens por dia
+export const PLAN_CHAT_LIMITS: Record<CommercialPlan, number> = {
+  gratuito: 3,
+  premium: 10,
+  plano_pessoal_pago: 30,
+  profissional: 100,
 };
