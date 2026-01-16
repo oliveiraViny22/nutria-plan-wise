@@ -16,17 +16,17 @@ import {
   Calendar,
   AlertCircle,
   UserCheck,
-  UserX
+  UserX,
+  UserPlus
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -49,6 +49,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Logo } from '@/components/Logo';
+import { CreateStudentForm } from '@/components/CreateStudentForm';
 import { useProfessionalStudents } from '@/hooks/useProfessionalStudents';
 import { useUserRole } from '@/hooks/useUserRole';
 import { GOALS } from '@/lib/types';
@@ -57,13 +58,11 @@ import { ptBR } from 'date-fns/locale';
 
 export default function Students() {
   const navigate = useNavigate();
-  const { students, license, loading, studentCount, isLicenseActive, addStudent, removeStudent, updateStudentStatus } = useProfessionalStudents();
-  const { isProfessional, hasActiveLicense, loading: roleLoading } = useUserRole();
+  const { students, license, loading, studentCount, isLicenseActive, removeStudent, updateStudentStatus, refresh } = useProfessionalStudents();
+  const { isProfessional, loading: roleLoading } = useUserRole();
   
   const [searchQuery, setSearchQuery] = useState('');
-  const [newStudentEmail, setNewStudentEmail] = useState('');
-  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  const [isAddingStudent, setIsAddingStudent] = useState(false);
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [studentToRemove, setStudentToRemove] = useState<string | null>(null);
 
   // Filter students by search
@@ -74,17 +73,9 @@ export default function Students() {
     return name.includes(query) || email.includes(query);
   });
 
-  const handleAddStudent = async () => {
-    if (!newStudentEmail.trim()) return;
-    
-    setIsAddingStudent(true);
-    const success = await addStudent(newStudentEmail.trim());
-    setIsAddingStudent(false);
-    
-    if (success) {
-      setNewStudentEmail('');
-      setIsAddDialogOpen(false);
-    }
+  const handleStudentCreated = () => {
+    setIsCreateDialogOpen(false);
+    refresh();
   };
 
   const handleRemoveStudent = async () => {
@@ -195,37 +186,24 @@ export default function Students() {
             />
           </div>
           
-          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+          <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
             <DialogTrigger asChild>
               <Button disabled={!isLicenseActive || studentCount >= (license?.max_students || 0)}>
-                <Plus className="h-4 w-4 mr-2" />
-                Adicionar Aluno
+                <UserPlus className="h-4 w-4 mr-2" />
+                Cadastrar Aluno
               </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="max-w-lg max-h-[90vh] overflow-hidden">
               <DialogHeader>
-                <DialogTitle>Adicionar Novo Aluno</DialogTitle>
+                <DialogTitle>Cadastrar Novo Aluno</DialogTitle>
                 <DialogDescription>
-                  Digite o email do aluno que você deseja vincular à sua conta. O aluno precisa já estar cadastrado na plataforma.
+                  Preencha todos os dados do aluno. Ele receberá as credenciais de acesso para entrar na plataforma.
                 </DialogDescription>
               </DialogHeader>
-              <div className="py-4">
-                <Input
-                  placeholder="email@exemplo.com"
-                  type="email"
-                  value={newStudentEmail}
-                  onChange={(e) => setNewStudentEmail(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleAddStudent()}
-                />
-              </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
-                  Cancelar
-                </Button>
-                <Button onClick={handleAddStudent} disabled={isAddingStudent || !newStudentEmail.trim()}>
-                  {isAddingStudent ? 'Adicionando...' : 'Adicionar'}
-                </Button>
-              </DialogFooter>
+              <CreateStudentForm
+                onSuccess={handleStudentCreated}
+                onCancel={() => setIsCreateDialogOpen(false)}
+              />
             </DialogContent>
           </Dialog>
         </div>
@@ -263,12 +241,12 @@ export default function Students() {
                 <p className="text-muted-foreground mb-4">
                   {searchQuery 
                     ? 'Tente buscar com outros termos'
-                    : 'Comece adicionando alunos pelo email'}
+                    : 'Comece cadastrando seus alunos'}
                 </p>
                 {!searchQuery && isLicenseActive && (
-                  <Button onClick={() => setIsAddDialogOpen(true)}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Adicionar Primeiro Aluno
+                  <Button onClick={() => setIsCreateDialogOpen(true)}>
+                    <UserPlus className="h-4 w-4 mr-2" />
+                    Cadastrar Primeiro Aluno
                   </Button>
                 )}
               </motion.div>
