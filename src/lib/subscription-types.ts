@@ -73,6 +73,7 @@ export interface SubscriptionInfo {
     chat_messages_today: number;
   };
   accountType: 'personal' | 'professional';
+  isLinkedToProfessional?: boolean;
 }
 
 export type BillingCycle = 'monthly' | 'quarterly' | 'semiannual' | 'annual';

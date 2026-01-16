@@ -174,5 +174,6 @@ export function useSubscription() {
     currentPlan: subscriptionInfo?.plan ?? null,
     usage: subscriptionInfo?.usage ?? null,
     accountType: subscriptionInfo?.accountType ?? 'personal',
+    isLinkedToProfessional: subscriptionInfo?.isLinkedToProfessional ?? false,
   };
 }

@@ -45,10 +45,10 @@ const App = () => (
             <Route path="/chat" element={<ProtectedRoute><Chat /></ProtectedRoute>} />
             <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
             <Route path="/progress" element={<ProtectedRoute><Progress /></ProtectedRoute>} />
-            <Route path="/students" element={<ProtectedRoute><Students /></ProtectedRoute>} />
+            <Route path="/students" element={<ProtectedRoute allowedRoles={['professional', 'admin']}><Students /></ProtectedRoute>} />
             <Route path="/become-professional" element={<ProtectedRoute><BecomeProfessional /></ProtectedRoute>} />
-            <Route path="/student/:studentId" element={<ProtectedRoute><StudentView /></ProtectedRoute>} />
-            <Route path="/professional" element={<ProtectedRoute><ProfessionalDashboard /></ProtectedRoute>} />
+            <Route path="/student/:studentId" element={<ProtectedRoute allowedRoles={['professional', 'admin']}><StudentView /></ProtectedRoute>} />
+            <Route path="/professional" element={<ProtectedRoute allowedRoles={['professional', 'admin']}><ProfessionalDashboard /></ProtectedRoute>} />
             <Route path="/pricing" element={<Pricing />} />
             <Route path="/subscription" element={<ProtectedRoute><Subscription /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
