@@ -1,17 +1,17 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
+import { getCorsHeaders, CLIENT_ERRORS, validate, getErrorForLogging, createErrorResponse, createSuccessResponse } from "../_shared/security.ts";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+const VALID_FEATURES = ['diet', 'substitution', 'adjustment', 'chat'] as const;
 
-const logStep = (step: string, details?: any) => {
+const logStep = (step: string, details?: unknown) => {
   const detailsStr = details ? ` - ${JSON.stringify(details)}` : '';
   console.log(`[VALIDATE-USAGE] ${step}${detailsStr}`);
 };
 
 serve(async (req) => {
+  const corsHeaders = getCorsHeaders(req);
+  
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -19,12 +19,30 @@ serve(async (req) => {
   try {
     logStep("Function started");
     
-    const { feature, increment = false } = await req.json();
-    logStep("Request", { feature, increment });
-
-    if (!['diet', 'substitution', 'adjustment', 'chat'].includes(feature)) {
-      throw new Error("Invalid feature type");
+    // Parse and validate input
+    let body: unknown;
+    try {
+      body = await req.json();
+    } catch {
+      return createErrorResponse(CLIENT_ERRORS.INVALID_REQUEST, 400, corsHeaders);
     }
+    
+    if (!validate.isObject(body)) {
+      return createErrorResponse(CLIENT_ERRORS.INVALID_REQUEST, 400, corsHeaders);
+    }
+    
+    const { feature, increment } = body as { feature: unknown; increment: unknown };
+    
+    // Validate feature
+    if (!validate.isEnum(feature, [...VALID_FEATURES])) {
+      logStep("Invalid feature", { feature });
+      return createErrorResponse(CLIENT_ERRORS.INVALID_REQUEST, 400, corsHeaders);
+    }
+    
+    // Validate increment (optional, defaults to false)
+    const shouldIncrement = increment === true;
+    
+    logStep("Request validated", { feature, increment: shouldIncrement });
 
     const supabaseClient = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
@@ -39,14 +57,15 @@ serve(async (req) => {
 
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
-      throw new Error("No authorization header");
+      return createErrorResponse(CLIENT_ERRORS.AUTH_REQUIRED, 401, corsHeaders);
     }
 
     const token = authHeader.replace("Bearer ", "");
     const { data: userData, error: userError } = await supabaseClient.auth.getUser(token);
     
     if (userError || !userData.user) {
-      throw new Error("User not authenticated");
+      logStep("Auth failed", { error: userError?.message });
+      return createErrorResponse(CLIENT_ERRORS.AUTH_FAILED, 401, corsHeaders);
     }
 
     const userId = userData.user.id;
@@ -59,8 +78,8 @@ serve(async (req) => {
     });
 
     if (checkError) {
-      logStep("Error checking feature", { error: checkError });
-      throw new Error("Failed to validate usage");
+      logStep("Error checking feature", { error: checkError.message });
+      return createErrorResponse(CLIENT_ERRORS.SERVER_ERROR, 500, corsHeaders);
     }
 
     logStep("Feature check result", { feature, canUse });
@@ -78,25 +97,23 @@ serve(async (req) => {
           : 'O chat não está disponível no seu plano atual.',
       };
 
-      return new Response(JSON.stringify({
-        allowed: false,
-        error: limitMessages[feature],
-        upgradeRequired: true,
-      }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 403,
-      });
+      return createErrorResponse(
+        limitMessages[feature],
+        403,
+        corsHeaders,
+        { allowed: false, upgradeRequired: true }
+      );
     }
 
     // Increment usage if requested
-    if (increment) {
+    if (shouldIncrement) {
       const { error: incError } = await supabaseAdmin.rpc('increment_usage', {
         _user_id: userId,
         _feature: feature,
       });
 
       if (incError) {
-        logStep("Error incrementing usage", { error: incError });
+        logStep("Error incrementing usage", { error: incError.message });
       } else {
         logStep("Usage incremented", { feature });
       }
@@ -111,7 +128,7 @@ serve(async (req) => {
 
     const { data: planInfo } = await supabaseAdmin.rpc('get_user_plan', { _user_id: userId });
 
-    return new Response(JSON.stringify({
+    return createSuccessResponse({
       allowed: true,
       usage: {
         diets: { used: usage?.diets_used || 0, limit: planInfo?.[0]?.diet_limit || 0 },
@@ -119,16 +136,9 @@ serve(async (req) => {
         adjustments: { used: usage?.adjustments_used || 0, limit: planInfo?.[0]?.adjustment_limit || 0 },
         chatToday: { used: usage?.chat_messages_today || 0, limit: planInfo?.[0]?.chat_messages_per_day || 0 },
       },
-    }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 200,
-    });
+    }, corsHeaders);
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    logStep("ERROR", { message: errorMessage });
-    return new Response(JSON.stringify({ error: errorMessage }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 500,
-    });
+    logStep("ERROR", { message: getErrorForLogging(error) });
+    return createErrorResponse(CLIENT_ERRORS.SERVER_ERROR, 500, corsHeaders);
   }
 });

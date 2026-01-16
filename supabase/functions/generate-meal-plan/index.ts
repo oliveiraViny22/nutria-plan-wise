@@ -1,9 +1,10 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { getCorsHeaders, CLIENT_ERRORS, validate, getErrorForLogging, createErrorResponse, createSuccessResponse } from "../_shared/security.ts";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+const logStep = (step: string, details?: unknown) => {
+  const detailsStr = details ? ` - ${JSON.stringify(details)}` : '';
+  console.log(`[GENERATE-MEAL-PLAN] ${step}${detailsStr}`);
 };
 
 interface Food {
@@ -20,7 +21,7 @@ interface Food {
 
 interface MealFood {
   food_id: string;
-  quantity: number; // in grams/ml
+  quantity: number;
 }
 
 interface MealPlan {
@@ -28,14 +29,13 @@ interface MealPlan {
   foods: MealFood[];
 }
 
-// All possible meal types
 const MEAL_TYPES = [
-  'breakfast',        // Café da manhã
-  'morning_snack',    // Lanche da manhã
-  'lunch',            // Almoço
-  'afternoon_snack',  // Lanche da tarde
-  'dinner',           // Jantar
-  'supper',           // Ceia
+  'breakfast',
+  'morning_snack',
+  'lunch',
+  'afternoon_snack',
+  'dinner',
+  'supper',
 ] as const;
 
 type MealType = typeof MEAL_TYPES[number];
@@ -49,7 +49,6 @@ const MEAL_NAMES: Record<MealType, string> = {
   supper: 'Ceia',
 };
 
-// Get meals for a given meals_per_day setting
 function getMealsForCount(mealsPerDay: number): MealType[] {
   switch (mealsPerDay) {
     case 2:
@@ -67,7 +66,6 @@ function getMealsForCount(mealsPerDay: number): MealType[] {
   }
 }
 
-// Get calorie distribution for meals
 function getMealCalorieDistribution(mealsPerDay: number): Record<MealType, number> {
   switch (mealsPerDay) {
     case 2:
@@ -85,7 +83,6 @@ function getMealCalorieDistribution(mealsPerDay: number): Record<MealType, numbe
   }
 }
 
-// Valid food categories (new taxonomy)
 const VALID_CATEGORIES = [
   'frutas',
   'hortaliças_folhosas',
@@ -98,20 +95,16 @@ const VALID_CATEGORIES = [
   'suplementos',
 ];
 
-// Processing levels allowed for meal plan generation
 const ALLOWED_PROCESSING_LEVELS = ['in_natura', 'minimamente_processado'];
 
-// Parse serving_size to extract base grams (e.g., "100g" -> 100, "1 unidade (50g)" -> 50)
 function parseServingGrams(servingSize: string): number {
   const match = servingSize.match(/(\d+)\s*(g|ml)/i);
   if (match) return parseInt(match[1], 10);
-  // Fallback: try to extract from parentheses
   const parenMatch = servingSize.match(/\((\d+)(g|ml)\)/i);
   if (parenMatch) return parseInt(parenMatch[1], 10);
-  return 100; // Default to 100g
+  return 100;
 }
 
-// Calculate nutrients for a given quantity in grams
 function calcNutrients(food: Food, gramsQty: number) {
   const baseGrams = parseServingGrams(food.serving_size);
   const multiplier = gramsQty / baseGrams;
@@ -124,76 +117,133 @@ function calcNutrients(food: Food, gramsQty: number) {
 }
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  const corsHeaders = getCorsHeaders(req);
+  
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
+  }
 
   try {
-    const { profile } = await req.json();
+    logStep("Function started");
+    
+    // Parse and validate input
+    let body: unknown;
+    try {
+      body = await req.json();
+    } catch {
+      return createErrorResponse(CLIENT_ERRORS.INVALID_REQUEST, 400, corsHeaders);
+    }
+    
+    if (!validate.isObject(body)) {
+      return createErrorResponse(CLIENT_ERRORS.INVALID_REQUEST, 400, corsHeaders);
+    }
+    
+    const { profile } = body as { profile: unknown };
+    
+    if (!validate.isObject(profile)) {
+      logStep("Invalid profile: not an object");
+      return createErrorResponse(CLIENT_ERRORS.INVALID_REQUEST, 400, corsHeaders);
+    }
+    
+    const profileData = profile as Record<string, unknown>;
+    
+    // Validate and sanitize profile fields with safe defaults
+    const targetCalories = validate.isInRange(profileData.daily_calories, 500, 10000) 
+      ? profileData.daily_calories as number 
+      : 2000;
+    const targetProtein = validate.isInRange(profileData.protein_target, 0, 500) 
+      ? profileData.protein_target as number 
+      : 150;
+    const targetCarbs = validate.isInRange(profileData.carbs_target, 0, 1000) 
+      ? profileData.carbs_target as number 
+      : 250;
+    const targetFat = validate.isInRange(profileData.fat_target, 0, 300) 
+      ? profileData.fat_target as number 
+      : 70;
+    const mealsPerDay = validate.isInRange(profileData.meals_per_day, 2, 6) 
+      ? profileData.meals_per_day as number 
+      : 4;
+    
+    // Validate preferences and restrictions
+    const preferences = validate.isArray(profileData.preferences)
+      ? (profileData.preferences as unknown[]).filter(validate.isString).slice(0, 20)
+      : [];
+    const restrictions = validate.isArray(profileData.restrictions)
+      ? (profileData.restrictions as unknown[]).filter(validate.isString).slice(0, 20)
+      : [];
+    const goal = validate.isString(profileData.goal) ? profileData.goal : 'maintain';
+    
+    logStep("Profile validated", { targetCalories, mealsPerDay });
+    
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     
     const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      return createErrorResponse(CLIENT_ERRORS.AUTH_REQUIRED, 401, corsHeaders);
+    }
+    
     const supabase = createClient(supabaseUrl, supabaseKey);
     
-    const token = authHeader?.replace("Bearer ", "");
+    const token = authHeader.replace("Bearer ", "");
     const { data: { user } } = await supabase.auth.getUser(token);
-    if (!user) throw new Error("Unauthorized");
+    if (!user) {
+      logStep("Auth failed");
+      return createErrorResponse(CLIENT_ERRORS.AUTH_FAILED, 401, corsHeaders);
+    }
+    
+    logStep("User authenticated", { userId: user.id });
 
-    // Validate usage limit before generating meal plan
+    // Validate usage limit
     const { data: canUse } = await supabase.rpc('can_use_feature', {
       _user_id: user.id,
       _feature: 'diet',
     });
 
     if (!canUse) {
-      const { data: planInfo } = await supabase.rpc('get_user_plan', { _user_id: user.id });
-      return new Response(JSON.stringify({
-        error: `Você atingiu o limite de ${planInfo?.[0]?.diet_limit || 0} dietas do seu plano.`,
-        upgradeRequired: true,
-      }), {
-        status: 403,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      logStep("Usage limit reached");
+      return createErrorResponse(
+        CLIENT_ERRORS.USAGE_LIMIT,
+        403,
+        corsHeaders,
+        { upgradeRequired: true }
+      );
     }
 
     // Fetch all foods from database
     const { data: allFoods, error: foodsError } = await supabase.from("foods").select("*");
-    if (foodsError) throw new Error("Failed to load foods");
-    if (!allFoods || allFoods.length === 0) throw new Error("No foods available");
+    if (foodsError) {
+      logStep("Failed to load foods", { error: foodsError.message });
+      return createErrorResponse(CLIENT_ERRORS.SERVER_ERROR, 500, corsHeaders);
+    }
+    if (!allFoods || allFoods.length === 0) {
+      logStep("No foods available");
+      return createErrorResponse(CLIENT_ERRORS.SERVER_ERROR, 500, corsHeaders);
+    }
 
-    // Filter foods for meal plan generation:
-    // - Exclude supplements (category = 'suplementos')
-    // - Only include in_natura and minimamente_processado
+    // Filter foods for meal plan generation
     const foods = allFoods.filter((f: Food) => {
-      // Exclude supplements
       if (f.category === 'suplementos') return false;
-      // Only allow natural and minimally processed foods
       const level = f.processing_level || 'in_natura';
       if (!ALLOWED_PROCESSING_LEVELS.includes(level)) return false;
       return true;
     });
 
-    if (foods.length === 0) throw new Error("No suitable foods available for meal plan");
+    if (foods.length === 0) {
+      logStep("No suitable foods available");
+      return createErrorResponse(CLIENT_ERRORS.SERVER_ERROR, 500, corsHeaders);
+    }
 
-    const targetCalories = profile.daily_calories || 2000;
-    const targetProtein = profile.protein_target || 150;
-    const targetCarbs = profile.carbs_target || 250;
-    const targetFat = profile.fat_target || 70;
-    const mealsPerDay = profile.meals_per_day || 4;
-
-    // Get meal configuration based on user preference
     const mealTypes = getMealsForCount(mealsPerDay);
     const calorieDistribution = getMealCalorieDistribution(mealsPerDay);
 
-    // Build meal distribution description for AI
     const mealDistributionText = mealTypes.map(m => 
       `${MEAL_NAMES[m]} (${m}): ${Math.round(calorieDistribution[m] * 100)}%`
     ).join(', ');
 
-    // Build category list for AI prompt
     const categoryList = VALID_CATEGORIES.filter(c => c !== 'suplementos').join(', ');
 
-    // AI prompt asking for quantities in grams
     const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
@@ -204,9 +254,9 @@ serve(async (req) => {
             role: "system", 
             content: `Você é um nutricionista. Crie um plano alimentar diário em JSON. 
 A meta EXATA do usuário é: ${targetCalories} calorias, ${targetProtein}g proteína, ${targetCarbs}g carboidratos, ${targetFat}g gordura.
-Preferências: ${profile.preferences?.join(", ") || "nenhuma"}. 
-Restrições: ${profile.restrictions?.join(", ") || "nenhuma"}. 
-Objetivo: ${profile.goal}.
+Preferências: ${preferences.join(", ") || "nenhuma"}. 
+Restrições: ${restrictions.join(", ") || "nenhuma"}. 
+Objetivo: ${goal}.
 
 CATEGORIAS VÁLIDAS: ${categoryList}
 TAXONOMIA NUTRICIONAL:
@@ -256,7 +306,6 @@ Lembre-se: quantity em gramas/ml, total EXATO de ${targetCalories} calorias, sem
         ["frutas", "laticínios", "óleos_oleaginosas"].includes(f.category)
       );
       
-      // Build fallback meals dynamically based on meal types
       const fallbackMeals: MealPlan[] = mealTypes.map(mealType => {
         let selectedFoods: Food[];
         let quantity: number;
@@ -307,7 +356,6 @@ Lembre-se: quantity em gramas/ml, total EXATO de ${targetCalories} calorias, sem
         const food = foods.find((fd: Food) => fd.id === f.food_id);
         if (!food) continue;
         
-        // Clamp quantity to reasonable range (10g - 500g)
         const qty = Math.min(500, Math.max(10, f.quantity || 100));
         const nutrients = calcNutrients(food, qty);
         
@@ -323,7 +371,7 @@ Lembre-se: quantity em gramas/ml, total EXATO de ${targetCalories} calorias, sem
       return { ...meal, foods: mealFoods, total_calories: mealCal, total_protein: mealP, total_carbs: mealC, total_fat: mealF };
     });
 
-    // SCALE ADJUSTMENT: adjust all quantities proportionally to hit exact target
+    // Scale adjustment
     const scaleFactor = totalCalories > 0 ? targetCalories / totalCalories : 1;
     
     let finalTotalCal = 0, finalTotalP = 0, finalTotalC = 0, finalTotalF = 0;
@@ -334,7 +382,6 @@ Lembre-se: quantity em gramas/ml, total EXATO de ${targetCalories} calorias, sem
         const food = foods.find((fd: Food) => fd.id === f.food_id);
         if (!food) return f;
         
-        // Scale quantity and round to nearest 5g for cleaner display
         const scaledQty = Math.round((f.quantity * scaleFactor) / 5) * 5;
         const finalQty = Math.min(500, Math.max(10, scaledQty));
         const nutrients = calcNutrients(food, finalQty);
@@ -362,9 +409,12 @@ Lembre-se: quantity em gramas/ml, total EXATO de ${targetCalories} calorias, sem
       };
     });
 
-    if (!adjustedMeals.length) throw new Error("Failed to generate meals");
+    if (!adjustedMeals.length) {
+      logStep("Failed to generate meals");
+      return createErrorResponse(CLIENT_ERRORS.SERVER_ERROR, 500, corsHeaders);
+    }
 
-    // Save diet plan with exact target (actual may vary slightly due to rounding)
+    // Save diet plan
     const { data: plan, error: planError } = await supabase.from("diet_plans").insert({
       user_id: user.id,
       total_calories: Math.round(finalTotalCal),
@@ -374,8 +424,8 @@ Lembre-se: quantity em gramas/ml, total EXATO de ${targetCalories} calorias, sem
     }).select().single();
 
     if (planError || !plan) {
-      console.error("Failed to create diet plan:", planError);
-      throw new Error(`Failed to create diet plan: ${planError?.message || "unknown"}`);
+      logStep("Failed to create diet plan", { error: planError?.message });
+      return createErrorResponse(CLIENT_ERRORS.SERVER_ERROR, 500, corsHeaders);
     }
 
     // Increment usage after successful plan creation
@@ -396,7 +446,7 @@ Lembre-se: quantity em gramas/ml, total EXATO de ${targetCalories} calorias, sem
       }).select().single();
       
       if (mealError || !savedMeal) {
-        console.error("Failed to create meal:", mealError);
+        logStep("Failed to create meal", { error: mealError?.message });
         continue;
       }
 
@@ -411,15 +461,9 @@ Lembre-se: quantity em gramas/ml, total EXATO de ${targetCalories} calorias, sem
       }
     }
 
-    return new Response(JSON.stringify({ success: true, plan }), { 
-      headers: { ...corsHeaders, "Content-Type": "application/json" } 
-    });
-  } catch (e: unknown) {
-    console.error("Error:", e);
-    const message = e instanceof Error ? e.message : "Unknown error";
-    return new Response(JSON.stringify({ error: message }), { 
-      status: 500, 
-      headers: { ...corsHeaders, "Content-Type": "application/json" } 
-    });
+    return createSuccessResponse({ success: true, plan }, corsHeaders);
+  } catch (error) {
+    logStep("ERROR", { message: getErrorForLogging(error) });
+    return createErrorResponse(CLIENT_ERRORS.SERVER_ERROR, 500, corsHeaders);
   }
 });

@@ -1,18 +1,18 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@18.5.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
+import { getCorsHeaders, CLIENT_ERRORS, validate, getErrorForLogging, createErrorResponse, createSuccessResponse } from "../_shared/security.ts";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+const VALID_BILLING_CYCLES = ['monthly', 'quarterly', 'semiannual', 'annual'] as const;
 
-const logStep = (step: string, details?: any) => {
+const logStep = (step: string, details?: unknown) => {
   const detailsStr = details ? ` - ${JSON.stringify(details)}` : '';
   console.log(`[CREATE-CHECKOUT] ${step}${detailsStr}`);
 };
 
 serve(async (req) => {
+  const corsHeaders = getCorsHeaders(req);
+  
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -20,20 +20,50 @@ serve(async (req) => {
   try {
     logStep("Function started");
     
-    const { planId, billingCycle } = await req.json();
-    logStep("Request body parsed", { planId, billingCycle });
+    // Parse and validate input
+    let body: unknown;
+    try {
+      body = await req.json();
+    } catch {
+      return createErrorResponse(CLIENT_ERRORS.INVALID_REQUEST, 400, corsHeaders);
+    }
+    
+    if (!validate.isObject(body)) {
+      return createErrorResponse(CLIENT_ERRORS.INVALID_REQUEST, 400, corsHeaders);
+    }
+    
+    const { planId, billingCycle } = body as { planId: unknown; billingCycle: unknown };
+    
+    // Validate planId is a valid UUID
+    if (!validate.isUUID(planId)) {
+      logStep("Invalid planId", { planId });
+      return createErrorResponse(CLIENT_ERRORS.INVALID_REQUEST, 400, corsHeaders);
+    }
+    
+    // Validate billingCycle is a valid enum
+    if (!validate.isEnum(billingCycle, [...VALID_BILLING_CYCLES])) {
+      logStep("Invalid billingCycle", { billingCycle });
+      return createErrorResponse(CLIENT_ERRORS.INVALID_REQUEST, 400, corsHeaders);
+    }
+    
+    logStep("Request validated", { planId, billingCycle });
 
     const supabaseClient = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_ANON_KEY") ?? ""
     );
 
-    const authHeader = req.headers.get("Authorization")!;
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      return createErrorResponse(CLIENT_ERRORS.AUTH_REQUIRED, 401, corsHeaders);
+    }
+    
     const token = authHeader.replace("Bearer ", "");
     const { data: userData, error: userError } = await supabaseClient.auth.getUser(token);
     
     if (userError || !userData.user?.email) {
-      throw new Error("User not authenticated");
+      logStep("Auth failed", { error: userError?.message });
+      return createErrorResponse(CLIENT_ERRORS.AUTH_FAILED, 401, corsHeaders);
     }
     
     const user = userData.user;
@@ -53,7 +83,8 @@ serve(async (req) => {
       .single();
 
     if (planError || !plan) {
-      throw new Error("Plan not found");
+      logStep("Plan not found", { planId, error: planError?.message });
+      return createErrorResponse(CLIENT_ERRORS.NOT_FOUND, 404, corsHeaders);
     }
     logStep("Plan fetched", { planName: plan.name, planType: plan.type });
 
@@ -66,14 +97,11 @@ serve(async (req) => {
     };
     
     const priceColumn = priceColumnMap[billingCycle];
-    if (!priceColumn) {
-      throw new Error(`Invalid billing cycle: ${billingCycle}`);
-    }
-    
     const stripePriceId = plan[priceColumn] as string | null;
     
     if (!stripePriceId) {
-      throw new Error(`No Stripe price configured for ${plan.name} with ${billingCycle} billing cycle. Please contact support.`);
+      logStep("No Stripe price configured", { planName: plan.name, billingCycle });
+      return createErrorResponse(CLIENT_ERRORS.NOT_FOUND, 404, corsHeaders);
     }
     logStep("Price ID determined from database", { stripePriceId, billingCycle });
 
@@ -113,16 +141,9 @@ serve(async (req) => {
 
     logStep("Checkout session created", { sessionId: session.id, url: session.url });
 
-    return new Response(JSON.stringify({ url: session.url }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 200,
-    });
+    return createSuccessResponse({ url: session.url }, corsHeaders);
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    logStep("ERROR", { message: errorMessage });
-    return new Response(JSON.stringify({ error: errorMessage }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 500,
-    });
+    logStep("ERROR", { message: getErrorForLogging(error) });
+    return createErrorResponse(CLIENT_ERRORS.SERVER_ERROR, 500, corsHeaders);
   }
 });

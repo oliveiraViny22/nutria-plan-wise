@@ -1,8 +1,9 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@18.5.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
+import { CLIENT_ERRORS, getErrorForLogging } from "../_shared/security.ts";
 
-const logStep = (step: string, details?: any) => {
+const logStep = (step: string, details?: unknown) => {
   const detailsStr = details ? ` - ${JSON.stringify(details)}` : '';
   console.log(`[STRIPE-WEBHOOK] ${step}${detailsStr}`);
 };
@@ -28,11 +29,11 @@ serve(async (req) => {
     
     const webhookSecret = Deno.env.get("STRIPE_WEBHOOK_SECRET");
     
-    // SECURITY: Always require webhook signature verification in production
+    // SECURITY: Always require webhook signature verification
     if (!webhookSecret) {
       logStep("ERROR: STRIPE_WEBHOOK_SECRET is not configured");
       return new Response(
-        JSON.stringify({ error: "Webhook configuration error" }), 
+        JSON.stringify({ error: CLIENT_ERRORS.WEBHOOK_ERROR }), 
         { status: 500 }
       );
     }
@@ -40,22 +41,20 @@ serve(async (req) => {
     if (!signature) {
       logStep("ERROR: Missing stripe-signature header");
       return new Response(
-        JSON.stringify({ error: "Missing signature" }), 
+        JSON.stringify({ error: CLIENT_ERRORS.INVALID_SIGNATURE }), 
         { status: 400 }
       );
     }
 
     try {
-      // Use async version for Deno compatibility
       event = await stripe.webhooks.constructEventAsync(body, signature, webhookSecret);
       logStep("Signature verified successfully");
     } catch (err) {
-      const errInfo = err instanceof Error
-        ? { name: err.name, message: err.message }
-        : { message: String(err) };
-
-      logStep("Webhook signature verification failed", errInfo);
-      return new Response(JSON.stringify({ error: "Invalid signature" }), { status: 400 });
+      logStep("Webhook signature verification failed", { error: getErrorForLogging(err) });
+      return new Response(
+        JSON.stringify({ error: CLIENT_ERRORS.INVALID_SIGNATURE }), 
+        { status: 400 }
+      );
     }
 
     logStep("Event type", { type: event.type });
@@ -70,11 +69,10 @@ serve(async (req) => {
         const billingCycle = session.metadata?.billing_cycle as 'monthly' | 'quarterly' | 'semiannual' | 'annual';
         
         if (!userId || !planId) {
-          logStep("Missing metadata", { userId, planId });
+          logStep("Missing metadata");
           break;
         }
 
-        // Calculate period end based on billing cycle
         const now = new Date();
         let periodEnd = new Date(now);
         switch (billingCycle) {
@@ -91,7 +89,6 @@ serve(async (req) => {
             periodEnd.setMonth(now.getMonth() + 1);
         }
 
-        // Upsert subscription
         const { error: subError } = await supabaseAdmin
           .from('subscriptions')
           .upsert({
@@ -109,15 +106,13 @@ serve(async (req) => {
           });
 
         if (subError) {
-          logStep("Error upserting subscription", { error: subError });
+          logStep("Error upserting subscription", { error: subError.message });
         } else {
-          logStep("Subscription activated", { userId, planId });
+          logStep("Subscription activated");
         }
 
-        // Reset user usage for new period
         await supabaseAdmin.rpc('reset_monthly_usage', { _user_id: userId });
         
-        // Initialize usage if doesn't exist
         await supabaseAdmin
           .from('user_usage')
           .upsert({
@@ -128,7 +123,7 @@ serve(async (req) => {
             onConflict: 'user_id',
           });
 
-        logStep("Usage reset", { userId });
+        logStep("Usage reset");
         break;
       }
 
@@ -160,7 +155,7 @@ serve(async (req) => {
               })
               .eq('user_id', profile.user_id);
 
-            logStep("Subscription status updated", { userId: profile.user_id, status });
+            logStep("Subscription status updated", { status });
           }
         }
         break;
@@ -181,7 +176,6 @@ serve(async (req) => {
             .single();
 
           if (profile) {
-            // Get account type
             const { data: roles } = await supabaseAdmin
               .from('user_roles')
               .select('role')
@@ -190,13 +184,11 @@ serve(async (req) => {
             const isProfessional = roles?.some(r => r.role === 'professional');
 
             if (isProfessional) {
-              // Professional loses access completely
               await supabaseAdmin
                 .from('subscriptions')
                 .update({ status: 'expired' })
                 .eq('user_id', profile.user_id);
             } else {
-              // Personal gets downgraded to free
               const { data: freePlan } = await supabaseAdmin
                 .from('plans')
                 .select('id')
@@ -217,7 +209,7 @@ serve(async (req) => {
               }
             }
             
-            logStep("Subscription canceled handled", { userId: profile.user_id, isProfessional });
+            logStep("Subscription canceled handled", { isProfessional });
           }
         }
         break;
@@ -243,7 +235,7 @@ serve(async (req) => {
               .update({ status: 'past_due' })
               .eq('user_id', profile.user_id);
 
-            logStep("Subscription marked as past_due", { userId: profile.user_id });
+            logStep("Subscription marked as past_due");
           }
         }
         break;
@@ -252,8 +244,10 @@ serve(async (req) => {
 
     return new Response(JSON.stringify({ received: true }), { status: 200 });
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    logStep("ERROR", { message: errorMessage });
-    return new Response(JSON.stringify({ error: errorMessage }), { status: 500 });
+    logStep("ERROR", { message: getErrorForLogging(error) });
+    return new Response(
+      JSON.stringify({ error: CLIENT_ERRORS.SERVER_ERROR }), 
+      { status: 500 }
+    );
   }
 });
