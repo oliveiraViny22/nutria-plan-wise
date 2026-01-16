@@ -522,13 +522,19 @@ export default function StudentView() {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.1 * index }}
                 >
-                  <Card className="card-interactive">
+                  <Card 
+                    className="card-interactive cursor-pointer hover:border-primary/50 transition-colors"
+                    onClick={() => navigate(`/meal/${meal.id}?studentId=${studentId}`)}
+                  >
                     <CardHeader className="pb-2">
                       <CardTitle className="text-base flex items-center justify-between">
                         <span>{MEAL_NAMES[meal.name as keyof typeof MEAL_NAMES] || meal.name}</span>
-                        <Badge variant="secondary">
-                          {meal.total_calories || 0} kcal
-                        </Badge>
+                        <div className="flex items-center gap-2">
+                          <Badge variant="secondary">
+                            {meal.total_calories || 0} kcal
+                          </Badge>
+                          <RefreshCw className="h-4 w-4 text-muted-foreground" />
+                        </div>
                       </CardTitle>
                     </CardHeader>
                     <CardContent>
@@ -547,6 +553,7 @@ export default function StudentView() {
                         <span className="text-carbs">C: {meal.total_carbs?.toFixed(0) || 0}g</span>
                         <span className="text-fat">G: {meal.total_fat?.toFixed(0) || 0}g</span>
                       </div>
+                      <p className="text-xs text-primary mt-2">Clique para editar substituições</p>
                     </CardContent>
                   </Card>
                 </motion.div>
