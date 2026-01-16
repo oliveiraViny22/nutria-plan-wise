@@ -74,6 +74,7 @@ export interface DietPlan {
   total_protein: number;
   total_carbs: number;
   total_fat: number;
+  released_to_student: boolean;
   created_at: string;
 }
 

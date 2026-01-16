@@ -16,6 +16,8 @@ import {
   Crown,
   CreditCard,
   LayoutDashboard,
+  Lock,
+  Eye,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Logo } from '@/components/Logo';
@@ -27,6 +29,7 @@ import { UpgradeDialog } from '@/components/UpgradeDialog';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useSubscription } from '@/hooks/useSubscription';
+import { useLinkedStudent } from '@/hooks/useLinkedStudent';
 import { supabase } from '@/integrations/supabase/client';
 import { DietPlan, Meal, GOALS, MEAL_NAMES, MealType } from '@/lib/types';
 import { toast } from 'sonner';
@@ -34,6 +37,7 @@ import { toast } from 'sonner';
 export default function Dashboard() {
   const { profile, signOut } = useAuth();
   const { isProfessional, hasActiveLicense } = useUserRole();
+  const { isLinkedStudent } = useLinkedStudent();
   const {
     refresh: refreshSubscription,
     currentPlan: subscriptionPlan,
@@ -49,6 +53,7 @@ export default function Dashboard() {
   const [showUpgradeDialog, setShowUpgradeDialog] = useState(false);
   const [upgradeFeature, setUpgradeFeature] = useState<string>('diet');
   const [upgradeLimit, setUpgradeLimit] = useState<number>(0);
+  const [planReleased, setPlanReleased] = useState(false);
 
   // Handle checkout success
   useEffect(() => {
@@ -76,8 +81,10 @@ export default function Dashboard() {
       if (error) throw error;
 
       if (plans && plans.length > 0) {
-        setCurrentDietPlan(plans[0] as DietPlan);
-        await fetchMeals(plans[0].id);
+        const plan = plans[0] as DietPlan;
+        setCurrentDietPlan(plan);
+        setPlanReleased(plan.released_to_student ?? false);
+        await fetchMeals(plan.id);
       }
     } catch (error: any) {
       console.error('Error fetching plan:', error);
@@ -193,6 +200,23 @@ export default function Dashboard() {
       </header>
 
       <main className="container mx-auto px-4 py-6 space-y-6 pb-24">
+        {/* Linked Student Read-Only Notice */}
+        {isLinkedStudent && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-muted/50 border border-border rounded-xl p-4 flex items-center gap-3"
+          >
+            <Eye className="w-5 h-5 text-muted-foreground flex-shrink-0" />
+            <div>
+              <p className="text-sm font-medium text-foreground">Modo Visualização</p>
+              <p className="text-xs text-muted-foreground">
+                Seu plano alimentar é gerenciado pelo seu nutricionista.
+              </p>
+            </div>
+          </motion.div>
+        )}
+
         {/* Welcome Section */}
         <motion.section
           initial={{ opacity: 0, y: 20 }}
@@ -245,64 +269,84 @@ export default function Dashboard() {
           </div>
         </motion.section>
 
-        {/* Action Buttons */}
-        <motion.section
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-          className="space-y-3"
-        >
-          <Button
-            variant="hero"
-            size="lg"
-            className="w-full"
-            onClick={generateMealPlan}
-            disabled={generating}
+        {/* Action Buttons - Hidden for linked students */}
+        {!isLinkedStudent && (
+          <motion.section
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="space-y-3"
           >
-            {generating ? (
-              <>
-                <Loader2 className="w-5 h-5 animate-spin" />
-                Gerando plano...
-              </>
-            ) : currentDietPlan ? (
-              <>
-                <RefreshCw className="w-5 h-5" />
-                Gerar novo plano
-              </>
-            ) : (
-              <>
-                <UtensilsCrossed className="w-5 h-5" />
-                Gerar plano alimentar
-              </>
-            )}
-          </Button>
+            <Button
+              variant="hero"
+              size="lg"
+              className="w-full"
+              onClick={generateMealPlan}
+              disabled={generating}
+            >
+              {generating ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  Gerando plano...
+                </>
+              ) : currentDietPlan ? (
+                <>
+                  <RefreshCw className="w-5 h-5" />
+                  Gerar novo plano
+                </>
+              ) : (
+                <>
+                  <UtensilsCrossed className="w-5 h-5" />
+                  Gerar plano alimentar
+                </>
+              )}
+            </Button>
 
-          {/* Macro Rebalancer */}
-          {currentDietPlan && (
-            <MacroRebalancer
-              planId={currentDietPlan.id}
-              targets={{
-                protein: profile?.protein_target || 150,
-                carbs: profile?.carbs_target || 250,
-                fat: profile?.fat_target || 65,
-                calories: profile?.daily_calories || 2000,
-              }}
-              currentMacros={{
-                protein: currentProtein,
-                carbs: currentCarbs,
-                fat: currentFat,
-                calories: currentCalories,
-              }}
-              onComplete={fetchCurrentPlan}
-            />
-          )}
-        </motion.section>
+            {/* Macro Rebalancer */}
+            {currentDietPlan && (
+              <MacroRebalancer
+                planId={currentDietPlan.id}
+                targets={{
+                  protein: profile?.protein_target || 150,
+                  carbs: profile?.carbs_target || 250,
+                  fat: profile?.fat_target || 65,
+                  calories: profile?.daily_calories || 2000,
+                }}
+                currentMacros={{
+                  protein: currentProtein,
+                  carbs: currentCarbs,
+                  fat: currentFat,
+                  calories: currentCalories,
+                }}
+                onComplete={fetchCurrentPlan}
+              />
+            )}
+          </motion.section>
+        )}
 
         {/* Meals Section */}
         {loading ? (
           <div className="flex items-center justify-center py-12">
             <Loader2 className="w-8 h-8 animate-spin text-primary" />
           </div>
+        ) : isLinkedStudent && !planReleased ? (
+          // Linked student without released plan
+          <motion.section
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+            className="text-center py-12"
+          >
+            <div className="w-20 h-20 rounded-full bg-muted flex items-center justify-center mx-auto mb-4">
+              <Lock className="w-10 h-10 text-muted-foreground" />
+            </div>
+            <h3 className="font-semibold text-foreground mb-2">
+              Plano ainda não liberado
+            </h3>
+            <p className="text-muted-foreground text-sm max-w-xs mx-auto">
+              Seu nutricionista está preparando seu plano alimentar. Quando estiver pronto, ele aparecerá aqui.
+            </p>
+          </motion.section>
         ) : currentDietPlan ? (
           <motion.section
             initial={{ opacity: 0, y: 20 }}
@@ -354,7 +398,10 @@ export default function Dashboard() {
               Nenhum plano gerado
             </h3>
             <p className="text-muted-foreground text-sm">
-              Clique no botão acima para gerar seu primeiro plano alimentar
+              {isLinkedStudent 
+                ? 'Aguarde seu nutricionista criar seu plano alimentar'
+                : 'Clique no botão acima para gerar seu primeiro plano alimentar'
+              }
             </p>
           </motion.section>
         )}
