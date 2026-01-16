@@ -62,93 +62,96 @@ export default function StudentView() {
   const [generating, setGenerating] = useState(false);
   const [releasing, setReleasing] = useState(false);
 
-  useEffect(() => {
+  const fetchStudentData = async () => {
     if (!studentId || !user) return;
+    
+    setLoading(true);
+    try {
+      // Verify professional has access to this student
+      const { data: linkData, error: linkError } = await supabase
+        .from('professional_students')
+        .select('id')
+        .eq('professional_id', user.id)
+        .eq('student_id', studentId)
+        .single();
 
-    const fetchStudentData = async () => {
-      setLoading(true);
-      try {
-        // Verify professional has access to this student
-        const { data: linkData, error: linkError } = await supabase
-          .from('professional_students')
-          .select('id')
-          .eq('professional_id', user.id)
-          .eq('student_id', studentId)
-          .single();
-
-        if (linkError || !linkData) {
-          toast({
-            variant: 'destructive',
-            title: 'Acesso negado',
-            description: 'Você não tem permissão para visualizar este aluno.',
-          });
-          navigate('/students');
-          return;
-        }
-
-        // Fetch student profile
-        const { data: profileData, error: profileError } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('user_id', studentId)
-          .single();
-
-        if (profileError) throw profileError;
-        setStudentProfile(profileData as Profile);
-
-        // Fetch latest diet plan
-        const { data: planData, error: planError } = await supabase
-          .from('diet_plans')
-          .select('*')
-          .eq('user_id', studentId)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .single();
-
-        if (planError && planError.code !== 'PGRST116') {
-          console.error('Error fetching diet plan:', planError);
-        }
-
-        if (planData) {
-          setDietPlan(planData as DietPlan);
-
-          // Fetch meals with foods
-          const { data: mealsData, error: mealsError } = await supabase
-            .from('meals')
-            .select(`
-              *,
-              meal_foods (
-                id,
-                quantity,
-                food:foods (
-                  id,
-                  name,
-                  calories,
-                  protein,
-                  carbs,
-                  fat,
-                  serving_size
-                )
-              )
-            `)
-            .eq('diet_plan_id', planData.id)
-            .order('created_at');
-
-          if (mealsError) throw mealsError;
-          setMeals((mealsData as MealWithFoods[]) || []);
-        }
-      } catch (error) {
-        console.error('Error fetching student data:', error);
+      if (linkError || !linkData) {
         toast({
           variant: 'destructive',
-          title: 'Erro',
-          description: 'Não foi possível carregar os dados do aluno.',
+          title: 'Acesso negado',
+          description: 'Você não tem permissão para visualizar este aluno.',
         });
-      } finally {
-        setLoading(false);
+        navigate('/students');
+        return;
       }
-    };
 
+      // Fetch student profile
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('user_id', studentId)
+        .single();
+
+      if (profileError) throw profileError;
+      setStudentProfile(profileData as Profile);
+
+      // Fetch latest diet plan
+      const { data: planData, error: planError } = await supabase
+        .from('diet_plans')
+        .select('*')
+        .eq('user_id', studentId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (planError && planError.code !== 'PGRST116') {
+        console.error('Error fetching diet plan:', planError);
+      }
+
+      if (planData) {
+        setDietPlan(planData as DietPlan);
+
+        // Fetch meals with foods
+        const { data: mealsData, error: mealsError } = await supabase
+          .from('meals')
+          .select(`
+            *,
+            meal_foods (
+              id,
+              quantity,
+              food:foods (
+                id,
+                name,
+                calories,
+                protein,
+                carbs,
+                fat,
+                serving_size
+              )
+            )
+          `)
+          .eq('diet_plan_id', planData.id)
+          .order('created_at');
+
+        if (mealsError) throw mealsError;
+        setMeals((mealsData as MealWithFoods[]) || []);
+      } else {
+        setDietPlan(null);
+        setMeals([]);
+      }
+    } catch (error) {
+      console.error('Error fetching student data:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Erro',
+        description: 'Não foi possível carregar os dados do aluno.',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     fetchStudentData();
   }, [studentId, user, navigate]);
 
@@ -181,8 +184,8 @@ export default function StudentView() {
         description: 'Plano alimentar gerado com sucesso.',
       });
       
-      // Refresh the page data
-      window.location.reload();
+      // Refresh the data without full page reload
+      await fetchStudentData();
     } catch (error: any) {
       console.error('Error generating plan:', error);
       toast({
@@ -232,7 +235,7 @@ export default function StudentView() {
 
   // Refetch after macro rebalancer completes
   const handleMacroRebalanceComplete = () => {
-    window.location.reload();
+    fetchStudentData();
   };
 
   if (!isProfessional) {

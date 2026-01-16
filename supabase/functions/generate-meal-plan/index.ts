@@ -138,7 +138,7 @@ serve(async (req) => {
       return createErrorResponse(CLIENT_ERRORS.INVALID_REQUEST, 400, corsHeaders);
     }
     
-    const { profile } = body as { profile: unknown };
+    const { profile, studentId } = body as { profile: unknown; studentId?: unknown };
     
     if (!validate.isObject(profile)) {
       logStep("Invalid profile: not an object");
@@ -173,7 +173,12 @@ serve(async (req) => {
       : [];
     const goal = validate.isString(profileData.goal) ? profileData.goal : 'maintain';
     
-    logStep("Profile validated", { targetCalories, mealsPerDay });
+    // Validate studentId if provided (must be UUID format)
+    const validStudentId = validate.isString(studentId) && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(studentId as string)
+      ? studentId as string
+      : null;
+    
+    logStep("Profile validated", { targetCalories, mealsPerDay, studentId: validStudentId });
     
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -195,7 +200,40 @@ serve(async (req) => {
     
     logStep("User authenticated", { userId: user.id });
 
-    // Validate usage limit
+    // Determine target user ID (student or self)
+    let targetUserId = user.id;
+    
+    if (validStudentId) {
+      // If studentId is provided, verify professional has access to this student
+      const { data: linkData, error: linkError } = await supabase
+        .from('professional_students')
+        .select('id')
+        .eq('professional_id', user.id)
+        .eq('student_id', validStudentId)
+        .eq('status', 'active')
+        .single();
+      
+      if (linkError || !linkData) {
+        logStep("Professional does not have access to student", { studentId: validStudentId });
+        return createErrorResponse(CLIENT_ERRORS.FORBIDDEN, 403, corsHeaders);
+      }
+      
+      // Also verify the user has professional role
+      const { data: hasRole } = await supabase.rpc('has_role', {
+        _user_id: user.id,
+        _role: 'professional',
+      });
+      
+      if (!hasRole) {
+        logStep("User is not a professional");
+        return createErrorResponse(CLIENT_ERRORS.FORBIDDEN, 403, corsHeaders);
+      }
+      
+      targetUserId = validStudentId;
+      logStep("Creating plan for student", { studentId: validStudentId, professionalId: user.id });
+    }
+
+    // Validate usage limit (use professional's quota when creating for student)
     const { data: canUse } = await supabase.rpc('can_use_feature', {
       _user_id: user.id,
       _feature: 'diet',
@@ -414,13 +452,14 @@ Lembre-se: quantity em gramas/ml, total EXATO de ${targetCalories} calorias, sem
       return createErrorResponse(CLIENT_ERRORS.SERVER_ERROR, 500, corsHeaders);
     }
 
-    // Save diet plan
+    // Save diet plan - use targetUserId (student or self)
     const { data: plan, error: planError } = await supabase.from("diet_plans").insert({
-      user_id: user.id,
+      user_id: targetUserId,
       total_calories: Math.round(finalTotalCal),
       total_protein: Math.round(finalTotalP * 10) / 10,
       total_carbs: Math.round(finalTotalC * 10) / 10,
       total_fat: Math.round(finalTotalF * 10) / 10,
+      released_to_student: false, // Default to not released
     }).select().single();
 
     if (planError || !plan) {
