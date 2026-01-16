@@ -27,11 +27,24 @@ serve(async (req) => {
     let event: Stripe.Event;
     
     const webhookSecret = Deno.env.get("STRIPE_WEBHOOK_SECRET");
-    if (webhookSecret && signature) {
+    const hasWebhookSecret = Boolean(webhookSecret);
+    const hasSignature = Boolean(signature);
+
+    logStep("Signature inputs", {
+      hasWebhookSecret,
+      hasSignature,
+      bodyLength: body.length,
+    });
+
+    if (hasWebhookSecret && hasSignature) {
       try {
-        event = stripe.webhooks.constructEvent(body, signature, webhookSecret);
+        event = stripe.webhooks.constructEvent(body, signature!, webhookSecret!);
       } catch (err) {
-        logStep("Webhook signature verification failed", { error: err });
+        const errInfo = err instanceof Error
+          ? { name: err.name, message: err.message, stack: err.stack }
+          : { message: String(err) };
+
+        logStep("Webhook signature verification failed", errInfo);
         return new Response(JSON.stringify({ error: "Invalid signature" }), { status: 400 });
       }
     } else {
