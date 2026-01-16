@@ -29,19 +29,24 @@ serve(async (req) => {
     );
 
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
       return createErrorResponse(CLIENT_ERRORS.AUTH_REQUIRED, 401, corsHeaders);
     }
 
-    const token = authHeader.replace("Bearer ", "");
-    const { data: userData, error: userError } = await supabaseClient.auth.getUser(token);
-    
-    if (userError || !userData.user) {
-      logStep("Auth failed", { error: userError?.message });
+    const token = authHeader.slice("Bearer ".length).trim();
+    if (!token) {
+      return createErrorResponse(CLIENT_ERRORS.AUTH_REQUIRED, 401, corsHeaders);
+    }
+
+    // Validate JWT using signing keys compatible method
+    const { data: claimsData, error: claimsError } = await supabaseClient.auth.getClaims(token);
+
+    if (claimsError || !claimsData?.claims?.sub) {
+      logStep("Auth failed", { error: claimsError?.message });
       return createErrorResponse(CLIENT_ERRORS.AUTH_FAILED, 401, corsHeaders);
     }
 
-    const user = userData.user;
+    const user = { id: claimsData.claims.sub };
     logStep("User authenticated", { userId: user.id });
 
     // Get user's subscription with plan details
@@ -66,7 +71,7 @@ serve(async (req) => {
         .select('role')
         .eq('user_id', user.id);
 
-      const isProfessional = roles?.some(r => r.role === 'professional');
+      const isProfessional = (roles ?? []).some((r: { role: string }) => r.role === 'professional');
       
       return createSuccessResponse({
         subscribed: false,
