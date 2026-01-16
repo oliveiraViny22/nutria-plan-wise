@@ -26,10 +26,13 @@ import { MacroChart } from '@/components/MacroChart';
 import { MacroRebalancer } from '@/components/MacroRebalancer';
 import { UsageLimits } from '@/components/UsageLimits';
 import { UpgradeDialog } from '@/components/UpgradeDialog';
+import { BlockedActionCTA } from '@/components/BlockedActionCTA';
+import { StudentRequestDialog } from '@/components/StudentRequestDialog';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useSubscription } from '@/hooks/useSubscription';
 import { useLinkedStudent } from '@/hooks/useLinkedStudent';
+import { useAccountPermissions } from '@/hooks/useAccountPermissions';
 import { supabase } from '@/integrations/supabase/client';
 import { DietPlan, Meal, GOALS, MEAL_NAMES, MealType } from '@/lib/types';
 import { toast } from 'sonner';
@@ -38,6 +41,7 @@ export default function Dashboard() {
   const { profile, signOut } = useAuth();
   const { isProfessional, hasActiveLicense } = useUserRole();
   const { isLinkedStudent } = useLinkedStudent();
+  const permissions = useAccountPermissions();
   const {
     refresh: refreshSubscription,
     currentPlan: subscriptionPlan,
@@ -54,6 +58,7 @@ export default function Dashboard() {
   const [upgradeFeature, setUpgradeFeature] = useState<string>('diet');
   const [upgradeLimit, setUpgradeLimit] = useState<number>(0);
   const [planReleased, setPlanReleased] = useState(false);
+  const [showRequestDialog, setShowRequestDialog] = useState(false);
 
   // Handle checkout success
   useEffect(() => {
@@ -106,6 +111,18 @@ export default function Dashboard() {
   };
 
   const generateMealPlan = async () => {
+    // Verificar permissões antes de gerar
+    if (!permissions.canCreatePlan) {
+      if (permissions.accountType === 'aluno' && permissions.isLinkedToProfessional) {
+        toast.error('Seu plano é gerenciado pelo seu nutricionista. Envie uma solicitação se precisar de mudanças.');
+        setShowRequestDialog(true);
+        return;
+      }
+      setShowUpgradeDialog(true);
+      setUpgradeFeature('diet');
+      return;
+    }
+
     setGenerating(true);
     try {
       const response = await supabase.functions.invoke('generate-meal-plan', {
@@ -269,8 +286,8 @@ export default function Dashboard() {
           </div>
         </motion.section>
 
-        {/* Action Buttons - Hidden for linked students */}
-        {!isLinkedStudent && (
+        {/* Action Buttons - com verificação de permissões */}
+        {permissions.canCreatePlan && !isLinkedStudent && (
           <motion.section
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -302,8 +319,8 @@ export default function Dashboard() {
               )}
             </Button>
 
-            {/* Macro Rebalancer */}
-            {currentDietPlan && (
+            {/* Macro Rebalancer - apenas se pode editar */}
+            {currentDietPlan && permissions.canAdjustMacros && (
               <MacroRebalancer
                 planId={currentDietPlan.id}
                 targets={{
@@ -321,6 +338,20 @@ export default function Dashboard() {
                 onComplete={fetchCurrentPlan}
               />
             )}
+          </motion.section>
+        )}
+
+        {/* Bloqueio para alunos vinculados */}
+        {isLinkedStudent && !planReleased && (
+          <motion.section
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+          >
+            <BlockedActionCTA
+              action="editar seu plano alimentar"
+              onRequestClick={() => setShowRequestDialog(true)}
+            />
           </motion.section>
         )}
 
@@ -435,6 +466,12 @@ export default function Dashboard() {
         feature={upgradeFeature}
         currentPlan={subscriptionPlan?.name}
         limit={upgradeLimit}
+      />
+
+      {/* Student Request Dialog */}
+      <StudentRequestDialog
+        open={showRequestDialog}
+        onOpenChange={setShowRequestDialog}
       />
     </div>
   );
