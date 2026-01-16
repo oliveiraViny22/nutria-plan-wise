@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.90.1";
 import { getCorsHeaders, CLIENT_ERRORS, getErrorForLogging, createErrorResponse, createSuccessResponse } from "../_shared/security.ts";
 
 const logStep = (step: string, details?: unknown) => {
@@ -36,12 +36,31 @@ serve(async (req) => {
 
     const authHeader = req.headers.get("Authorization");
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return createErrorResponse(CLIENT_ERRORS.AUTH_REQUIRED, 401, corsHeaders);
+      // Pricing page is public; treat unauthenticated requests as “not subscribed”
+      return createSuccessResponse(
+        {
+          subscribed: false,
+          plan: null,
+          usage: null,
+          accountType: "personal",
+          unauthenticated: true,
+        },
+        corsHeaders
+      );
     }
 
     const token = authHeader.slice("Bearer ".length).trim();
     if (!token) {
-      return createErrorResponse(CLIENT_ERRORS.AUTH_REQUIRED, 401, corsHeaders);
+      return createSuccessResponse(
+        {
+          subscribed: false,
+          plan: null,
+          usage: null,
+          accountType: "personal",
+          unauthenticated: true,
+        },
+        corsHeaders
+      );
     }
 
     // Auth client bound to this request's JWT (signing-keys compatible)
@@ -55,7 +74,7 @@ serve(async (req) => {
 
     // Fallback for older GoTrue behavior / edge-runtime quirks
     const userId =
-      (!claimsError && claimsData?.claims?.sub)
+      !claimsError && claimsData?.claims?.sub
         ? claimsData.claims.sub
         : (await supabaseAuth.auth.getUser()).data.user?.id;
 
@@ -63,7 +82,17 @@ serve(async (req) => {
       logStep("Auth failed", {
         claimsError: claimsError?.message,
       });
-      return createErrorResponse(CLIENT_ERRORS.AUTH_FAILED, 401, corsHeaders);
+      // Same as above: return a safe “not subscribed” response instead of 401
+      return createSuccessResponse(
+        {
+          subscribed: false,
+          plan: null,
+          usage: null,
+          accountType: "personal",
+          unauthenticated: true,
+        },
+        corsHeaders
+      );
     }
 
     const user = { id: userId };
