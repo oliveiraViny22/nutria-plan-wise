@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { AccountType } from '@/lib/types';
 
 export type AppRole = 'admin' | 'professional' | 'student';
 
@@ -10,11 +11,12 @@ interface UserRoleData {
   isStudent: boolean;
   isAdmin: boolean;
   hasActiveLicense: boolean;
+  accountType: AccountType;
   loading: boolean;
 }
 
 export function useUserRole(): UserRoleData {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const [roles, setRoles] = useState<AppRole[]>([]);
   const [hasActiveLicense, setHasActiveLicense] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -72,12 +74,16 @@ export function useUserRole(): UserRoleData {
     fetchRolesAndLicense();
   }, [user]);
 
+  // Derive account type from profile
+  const accountType: AccountType = (profile?.account_type as AccountType) || 'plano_pessoal';
+
   return {
     roles,
     isProfessional: roles.includes('professional'),
     isStudent: roles.includes('student'),
     isAdmin: roles.includes('admin'),
     hasActiveLicense,
+    accountType,
     loading,
   };
 }

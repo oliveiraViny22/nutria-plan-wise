@@ -1,3 +1,13 @@
+// Tipos de conta do sistema
+export type AccountType = 'aluno' | 'plano_pessoal' | 'premium' | 'profissional';
+
+// Status permitidos para planos alimentares
+export type DietPlanStatus = 'draft' | 'active' | 'finished' | 'cancelled' | 'archived';
+
+// Tipos de solicitação do aluno
+export type StudentRequestType = 'goal_change' | 'meals_change' | 'food_substitution';
+export type StudentRequestStatus = 'pending' | 'approved' | 'rejected';
+
 export interface Profile {
   id: string;
   user_id: string;
@@ -17,7 +27,22 @@ export interface Profile {
   fat_target: number | null;
   meals_per_day: number | null;
   professional_id: string | null;
+  account_type: AccountType;
   onboarding_completed: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface StudentRequest {
+  id: string;
+  student_id: string;
+  professional_id: string;
+  request_type: StudentRequestType;
+  description: string;
+  justification: string;
+  status: StudentRequestStatus;
+  professional_response: string | null;
+  professional_feedback: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -75,6 +100,8 @@ export interface DietPlan {
   total_carbs: number;
   total_fat: number;
   released_to_student: boolean;
+  status: DietPlanStatus;
+  is_initial_plan: boolean;
   created_at: string;
 }
 

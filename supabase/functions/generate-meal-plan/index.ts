@@ -138,7 +138,7 @@ serve(async (req) => {
       return createErrorResponse(CLIENT_ERRORS.INVALID_REQUEST, 400, corsHeaders);
     }
     
-    const { profile, studentId } = body as { profile: unknown; studentId?: unknown };
+    const { profile, studentId, isInitialPlan } = body as { profile: unknown; studentId?: unknown; isInitialPlan?: boolean };
     
     if (!validate.isObject(profile)) {
       logStep("Invalid profile: not an object");
@@ -231,6 +231,16 @@ serve(async (req) => {
       
       targetUserId = validStudentId;
       logStep("Creating plan for student", { studentId: validStudentId, professionalId: user.id });
+    }
+
+    // Verificar permissão para criar plano (usa função do banco)
+    const { data: canCreate } = await supabase.rpc('can_create_plan', {
+      _user_id: targetUserId,
+    });
+
+    if (!canCreate && !validStudentId) {
+      logStep("User cannot create plan - limit reached or restricted account type");
+      return createErrorResponse('Limite de planos atingido ou conta sem permissão', 403, corsHeaders);
     }
 
     // Validate usage limit (use professional's quota when creating for student)
@@ -460,6 +470,8 @@ Lembre-se: quantity em gramas/ml, total EXATO de ${targetCalories} calorias, sem
       total_carbs: Math.round(finalTotalC * 10) / 10,
       total_fat: Math.round(finalTotalF * 10) / 10,
       released_to_student: false, // Default to not released
+      status: 'active', // Status ativo por padrão
+      is_initial_plan: isInitialPlan === true, // Marca se é plano inicial automático
     }).select().single();
 
     if (planError || !plan) {

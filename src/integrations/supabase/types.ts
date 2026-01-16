@@ -42,7 +42,9 @@ export type Database = {
         Row: {
           created_at: string | null
           id: string
+          is_initial_plan: boolean
           released_to_student: boolean
+          status: string
           total_calories: number
           total_carbs: number
           total_fat: number
@@ -52,7 +54,9 @@ export type Database = {
         Insert: {
           created_at?: string | null
           id?: string
+          is_initial_plan?: boolean
           released_to_student?: boolean
+          status?: string
           total_calories: number
           total_carbs: number
           total_fat: number
@@ -62,7 +66,9 @@ export type Database = {
         Update: {
           created_at?: string | null
           id?: string
+          is_initial_plan?: boolean
           released_to_student?: boolean
+          status?: string
           total_calories?: number
           total_carbs?: number
           total_fat?: number
@@ -362,6 +368,7 @@ export type Database = {
       }
       profiles: {
         Row: {
+          account_type: Database["public"]["Enums"]["account_type"]
           activity_level: string | null
           age: number | null
           carbs_target: number | null
@@ -385,6 +392,7 @@ export type Database = {
           weight: number | null
         }
         Insert: {
+          account_type?: Database["public"]["Enums"]["account_type"]
           activity_level?: string | null
           age?: number | null
           carbs_target?: number | null
@@ -408,6 +416,7 @@ export type Database = {
           weight?: number | null
         }
         Update: {
+          account_type?: Database["public"]["Enums"]["account_type"]
           activity_level?: string | null
           age?: number | null
           carbs_target?: number | null
@@ -429,6 +438,48 @@ export type Database = {
           updated_at?: string | null
           user_id?: string
           weight?: number | null
+        }
+        Relationships: []
+      }
+      student_requests: {
+        Row: {
+          created_at: string | null
+          description: string
+          id: string
+          justification: string
+          professional_feedback: string | null
+          professional_id: string
+          professional_response: string | null
+          request_type: string
+          status: string
+          student_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          description: string
+          id?: string
+          justification: string
+          professional_feedback?: string | null
+          professional_id: string
+          professional_response?: string | null
+          request_type: string
+          status?: string
+          student_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string
+          id?: string
+          justification?: string
+          professional_feedback?: string | null
+          professional_id?: string
+          professional_response?: string | null
+          request_type?: string
+          status?: string
+          student_id?: string
+          updated_at?: string | null
         }
         Relationships: []
       }
@@ -583,6 +634,8 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      can_create_plan: { Args: { _user_id: string }; Returns: boolean }
+      can_edit_plan: { Args: { _user_id: string }; Returns: boolean }
       can_use_feature: {
         Args: { _feature: string; _user_id: string }
         Returns: boolean
@@ -619,6 +672,7 @@ export type Database = {
       reset_monthly_usage: { Args: { _user_id: string }; Returns: undefined }
     }
     Enums: {
+      account_type: "aluno" | "plano_pessoal" | "premium" | "profissional"
       app_role: "admin" | "professional" | "student"
       billing_cycle: "monthly" | "quarterly" | "semiannual" | "annual"
       plan_type: "personal" | "professional"
@@ -755,6 +809,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      account_type: ["aluno", "plano_pessoal", "premium", "profissional"],
       app_role: ["admin", "professional", "student"],
       billing_cycle: ["monthly", "quarterly", "semiannual", "annual"],
       plan_type: ["personal", "professional"],
