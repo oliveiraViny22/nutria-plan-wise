@@ -117,14 +117,27 @@ serve(async (req) => {
       annual: 'stripe_price_annual',
     };
     
-    const priceColumn = priceColumnMap[effectiveBillingCycle];
-    const stripePriceId = plan[priceColumn] as string | null;
+    // Try requested billing cycle first, fallback to monthly if not available
+    let priceColumn = priceColumnMap[effectiveBillingCycle];
+    let stripePriceId = plan[priceColumn] as string | null;
+    let finalBillingCycle = effectiveBillingCycle;
+    
+    // Fallback to monthly if requested cycle not available
+    if (!stripePriceId && effectiveBillingCycle !== 'monthly') {
+      logStep("Requested billing cycle not available, falling back to monthly", { 
+        requested: effectiveBillingCycle, 
+        planName: plan.name 
+      });
+      priceColumn = 'stripe_price_monthly';
+      stripePriceId = plan[priceColumn] as string | null;
+      finalBillingCycle = 'monthly';
+    }
     
     if (!stripePriceId) {
       logStep("No Stripe price configured", { planName: plan.name, billingCycle: effectiveBillingCycle });
       return createErrorResponse(CLIENT_ERRORS.NOT_FOUND, 404, corsHeaders);
     }
-    logStep("Price ID determined from database", { stripePriceId, billingCycle: effectiveBillingCycle });
+    logStep("Price ID determined from database", { stripePriceId, billingCycle: finalBillingCycle });
 
     const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", { 
       apiVersion: "2025-08-27.basil" 
@@ -156,7 +169,7 @@ serve(async (req) => {
       metadata: {
         user_id: user.id,
         plan_id: resolvedPlanId,
-        billing_cycle: effectiveBillingCycle,
+        billing_cycle: finalBillingCycle,
       },
     });
 
