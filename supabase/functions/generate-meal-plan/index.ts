@@ -28,6 +28,63 @@ interface MealPlan {
   foods: MealFood[];
 }
 
+// All possible meal types
+const MEAL_TYPES = [
+  'breakfast',        // Café da manhã
+  'morning_snack',    // Lanche da manhã
+  'lunch',            // Almoço
+  'afternoon_snack',  // Lanche da tarde
+  'dinner',           // Jantar
+  'supper',           // Ceia
+] as const;
+
+type MealType = typeof MEAL_TYPES[number];
+
+const MEAL_NAMES: Record<MealType, string> = {
+  breakfast: 'Café da Manhã',
+  morning_snack: 'Lanche da Manhã',
+  lunch: 'Almoço',
+  afternoon_snack: 'Lanche da Tarde',
+  dinner: 'Jantar',
+  supper: 'Ceia',
+};
+
+// Get meals for a given meals_per_day setting
+function getMealsForCount(mealsPerDay: number): MealType[] {
+  switch (mealsPerDay) {
+    case 2:
+      return ['lunch', 'dinner'];
+    case 3:
+      return ['breakfast', 'lunch', 'dinner'];
+    case 4:
+      return ['breakfast', 'lunch', 'afternoon_snack', 'dinner'];
+    case 5:
+      return ['breakfast', 'morning_snack', 'lunch', 'afternoon_snack', 'dinner'];
+    case 6:
+      return ['breakfast', 'morning_snack', 'lunch', 'afternoon_snack', 'dinner', 'supper'];
+    default:
+      return ['breakfast', 'lunch', 'afternoon_snack', 'dinner'];
+  }
+}
+
+// Get calorie distribution for meals
+function getMealCalorieDistribution(mealsPerDay: number): Record<MealType, number> {
+  switch (mealsPerDay) {
+    case 2:
+      return { breakfast: 0, morning_snack: 0, lunch: 0.5, afternoon_snack: 0, dinner: 0.5, supper: 0 };
+    case 3:
+      return { breakfast: 0.25, morning_snack: 0, lunch: 0.40, afternoon_snack: 0, dinner: 0.35, supper: 0 };
+    case 4:
+      return { breakfast: 0.25, morning_snack: 0, lunch: 0.35, afternoon_snack: 0.10, dinner: 0.30, supper: 0 };
+    case 5:
+      return { breakfast: 0.20, morning_snack: 0.10, lunch: 0.30, afternoon_snack: 0.10, dinner: 0.30, supper: 0 };
+    case 6:
+      return { breakfast: 0.20, morning_snack: 0.08, lunch: 0.28, afternoon_snack: 0.10, dinner: 0.26, supper: 0.08 };
+    default:
+      return { breakfast: 0.25, morning_snack: 0, lunch: 0.35, afternoon_snack: 0.10, dinner: 0.30, supper: 0 };
+  }
+}
+
 // Valid food categories (new taxonomy)
 const VALID_CATEGORIES = [
   'frutas',
@@ -122,6 +179,16 @@ serve(async (req) => {
     const targetProtein = profile.protein_target || 150;
     const targetCarbs = profile.carbs_target || 250;
     const targetFat = profile.fat_target || 70;
+    const mealsPerDay = profile.meals_per_day || 4;
+
+    // Get meal configuration based on user preference
+    const mealTypes = getMealsForCount(mealsPerDay);
+    const calorieDistribution = getMealCalorieDistribution(mealsPerDay);
+
+    // Build meal distribution description for AI
+    const mealDistributionText = mealTypes.map(m => 
+      `${MEAL_NAMES[m]} (${m}): ${Math.round(calorieDistribution[m] * 100)}%`
+    ).join(', ');
 
     // Build category list for AI prompt
     const categoryList = VALID_CATEGORIES.filter(c => c !== 'suplementos').join(', ');
@@ -151,18 +218,20 @@ TAXONOMIA NUTRICIONAL:
 REGRAS IMPORTANTES:
 1. As quantidades devem ser em GRAMAS ou ML (não porções).
 2. O total de calorias do plano DEVE ser EXATAMENTE ${targetCalories} calorias (margem de ±10 kcal).
-3. Distribua as calorias: café da manhã 25%, almoço 35%, jantar 30%, lanche 10%.
+3. O usuário quer ${mealsPerDay} refeições por dia: ${mealDistributionText}.
 4. Use quantidades realistas (ex: 150g de arroz, 200ml de leite, 120g de frango).
-5. NÃO use suplementos - apenas alimentos naturais ou minimamente processados.` 
+5. NÃO use suplementos - apenas alimentos naturais ou minimamente processados.
+6. Tipos de refeição válidos: ${mealTypes.join(', ')}.` 
           },
           { 
             role: "user", 
             content: `Alimentos disponíveis (id, nome, calorias por porção base, tamanho porção, categoria):
 ${foods.slice(0, 50).map((f: Food) => `- ${f.id}: ${f.name}, ${f.calories}kcal/${f.serving_size}, categoria: ${f.category}`).join("\n")}
 
-Retorne APENAS JSON válido:
-{ "meals": [{ "name": "breakfast|lunch|dinner|snack", "foods": [{ "food_id": "uuid", "quantity": 150 }] }] }
+Retorne APENAS JSON válido com EXATAMENTE ${mealsPerDay} refeições:
+{ "meals": [{ "name": "${mealTypes[0]}|${mealTypes[1]}|...", "foods": [{ "food_id": "uuid", "quantity": 150 }] }] }
 
+Use os tipos de refeição: ${mealTypes.join(', ')}.
 Lembre-se: quantity em gramas/ml, total EXATO de ${targetCalories} calorias, sem suplementos!` 
           }
         ],
@@ -176,22 +245,56 @@ Lembre-se: quantity em gramas/ml, total EXATO de ${targetCalories} calorias, sem
       const content = aiData.choices[0].message.content.replace(/```json|```/g, "").trim();
       mealPlan = JSON.parse(content);
     } catch {
-      // Fallback simple plan using new taxonomy categories
+      // Fallback: create meals based on user's meals_per_day preference
       const breakfastFoods = foods.filter((f: Food) => 
         ["cereais_tubérculos", "frutas", "laticínios"].includes(f.category)
       );
       const mainFoods = foods.filter((f: Food) => 
         ["proteínas_animais", "cereais_tubérculos", "hortaliças_folhosas", "leguminosas"].includes(f.category)
       );
+      const snackFoods = foods.filter((f: Food) => 
+        ["frutas", "laticínios", "óleos_oleaginosas"].includes(f.category)
+      );
       
-      mealPlan = {
-        meals: [
-          { name: "breakfast", foods: breakfastFoods.slice(0, 3).map((f: Food) => ({ food_id: f.id, quantity: 100 })) },
-          { name: "lunch", foods: mainFoods.slice(0, 4).map((f: Food) => ({ food_id: f.id, quantity: 150 })) },
-          { name: "dinner", foods: mainFoods.slice(2, 5).map((f: Food) => ({ food_id: f.id, quantity: 120 })) },
-          { name: "snack", foods: breakfastFoods.slice(1, 3).map((f: Food) => ({ food_id: f.id, quantity: 80 })) },
-        ]
-      };
+      // Build fallback meals dynamically based on meal types
+      const fallbackMeals: MealPlan[] = mealTypes.map(mealType => {
+        let selectedFoods: Food[];
+        let quantity: number;
+        
+        switch (mealType) {
+          case 'breakfast':
+            selectedFoods = breakfastFoods.slice(0, 3);
+            quantity = 100;
+            break;
+          case 'morning_snack':
+          case 'afternoon_snack':
+            selectedFoods = snackFoods.slice(0, 2);
+            quantity = 80;
+            break;
+          case 'lunch':
+            selectedFoods = mainFoods.slice(0, 4);
+            quantity = 150;
+            break;
+          case 'dinner':
+            selectedFoods = mainFoods.slice(2, 5);
+            quantity = 120;
+            break;
+          case 'supper':
+            selectedFoods = snackFoods.slice(1, 3);
+            quantity = 60;
+            break;
+          default:
+            selectedFoods = mainFoods.slice(0, 3);
+            quantity = 100;
+        }
+        
+        return {
+          name: mealType,
+          foods: selectedFoods.map((f: Food) => ({ food_id: f.id, quantity }))
+        };
+      });
+      
+      mealPlan = { meals: fallbackMeals };
     }
 
     // Calculate initial totals

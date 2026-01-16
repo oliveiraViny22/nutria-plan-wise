@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { MacroChart } from '@/components/MacroChart';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { Meal, MealFood, Food, MEAL_NAMES, SUBSTITUTABLE_PROCESSING_LEVELS, ProcessingLevel } from '@/lib/types';
+import { Meal, MealFood, Food, MEAL_NAMES, SUBSTITUTABLE_PROCESSING_LEVELS, ProcessingLevel, MealType } from '@/lib/types';
 import { toast } from 'sonner';
 import {
   Dialog,
@@ -347,7 +347,7 @@ export default function MealDetail() {
           </Button>
           <div>
             <h1 className="font-semibold text-foreground">
-              {MEAL_NAMES[meal.name]}
+              {MEAL_NAMES[meal.name as MealType] || meal.name}
             </h1>
             <p className="text-sm text-muted-foreground">
               {meal.total_calories} kcal

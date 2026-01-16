@@ -27,7 +27,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useSubscription } from '@/hooks/useSubscription';
 import { supabase } from '@/integrations/supabase/client';
-import { DietPlan, Meal, GOALS, MEAL_NAMES } from '@/lib/types';
+import { DietPlan, Meal, GOALS, MEAL_NAMES, MealType } from '@/lib/types';
 import { toast } from 'sonner';
 
 export default function Dashboard() {
@@ -105,6 +105,7 @@ export default function Dashboard() {
             preferences: profile?.preferences,
             restrictions: profile?.restrictions,
             goal: profile?.goal,
+            meals_per_day: (profile as any)?.meals_per_day || 4,
           },
         },
       });
@@ -313,7 +314,7 @@ export default function Dashboard() {
                   >
                     <div>
                       <h3 className="font-medium text-foreground">
-                        {MEAL_NAMES[meal.name]}
+                        {MEAL_NAMES[meal.name as MealType] || meal.name}
                       </h3>
                       <p className="text-sm text-muted-foreground">
                         {meal.total_calories} kcal • P: {Math.round(meal.total_protein)}g • C:{' '}

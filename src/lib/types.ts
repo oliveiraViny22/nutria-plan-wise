@@ -75,10 +75,22 @@ export interface DietPlan {
   created_at: string;
 }
 
+// All possible meal types
+export const MEAL_TYPES = [
+  'breakfast',        // Café da manhã
+  'morning_snack',    // Lanche da manhã
+  'lunch',            // Almoço
+  'afternoon_snack',  // Lanche da tarde
+  'dinner',           // Jantar
+  'supper',           // Ceia
+] as const;
+
+export type MealType = typeof MEAL_TYPES[number];
+
 export interface Meal {
   id: string;
   diet_plan_id: string;
-  name: 'breakfast' | 'lunch' | 'dinner' | 'snack';
+  name: MealType;
   total_calories: number;
   total_protein: number;
   total_carbs: number;
@@ -136,9 +148,47 @@ export const FOOD_RESTRICTIONS = [
   'Sem Ovos',
 ] as const;
 
-export const MEAL_NAMES = {
+export const MEAL_NAMES: Record<MealType, string> = {
   breakfast: 'Café da Manhã',
+  morning_snack: 'Lanche da Manhã',
   lunch: 'Almoço',
+  afternoon_snack: 'Lanche da Tarde',
   dinner: 'Jantar',
-  snack: 'Lanche',
+  supper: 'Ceia',
 } as const;
+
+// Get meals for a given meals_per_day setting
+export function getMealsForCount(mealsPerDay: number): MealType[] {
+  switch (mealsPerDay) {
+    case 2:
+      return ['lunch', 'dinner'];
+    case 3:
+      return ['breakfast', 'lunch', 'dinner'];
+    case 4:
+      return ['breakfast', 'lunch', 'afternoon_snack', 'dinner'];
+    case 5:
+      return ['breakfast', 'morning_snack', 'lunch', 'afternoon_snack', 'dinner'];
+    case 6:
+      return ['breakfast', 'morning_snack', 'lunch', 'afternoon_snack', 'dinner', 'supper'];
+    default:
+      return ['breakfast', 'lunch', 'afternoon_snack', 'dinner'];
+  }
+}
+
+// Get calorie distribution for meals
+export function getMealCalorieDistribution(mealsPerDay: number): Record<MealType, number> {
+  switch (mealsPerDay) {
+    case 2:
+      return { breakfast: 0, morning_snack: 0, lunch: 0.5, afternoon_snack: 0, dinner: 0.5, supper: 0 };
+    case 3:
+      return { breakfast: 0.25, morning_snack: 0, lunch: 0.40, afternoon_snack: 0, dinner: 0.35, supper: 0 };
+    case 4:
+      return { breakfast: 0.25, morning_snack: 0, lunch: 0.35, afternoon_snack: 0.10, dinner: 0.30, supper: 0 };
+    case 5:
+      return { breakfast: 0.20, morning_snack: 0.10, lunch: 0.30, afternoon_snack: 0.10, dinner: 0.30, supper: 0 };
+    case 6:
+      return { breakfast: 0.20, morning_snack: 0.08, lunch: 0.28, afternoon_snack: 0.10, dinner: 0.26, supper: 0.08 };
+    default:
+      return { breakfast: 0.25, morning_snack: 0, lunch: 0.35, afternoon_snack: 0.10, dinner: 0.30, supper: 0 };
+  }
+}
