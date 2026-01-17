@@ -102,11 +102,16 @@ serve(async (req) => {
     
     if (canUseError || !canUse) {
       logStep("Usage limit reached");
-      return createErrorResponse(
-        CLIENT_ERRORS.USAGE_LIMIT,
-        403,
+      // IMPORTANT: return 200 so the client can handle gracefully without triggering a hard runtime error
+      return createSuccessResponse(
+        {
+          allowed: false,
+          upgradeRequired: true,
+          error: CLIENT_ERRORS.USAGE_LIMIT,
+          explanation: null,
+        },
         corsHeaders,
-        { allowed: false, upgradeRequired: true }
+        200,
       );
     }
     
