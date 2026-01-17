@@ -21,6 +21,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { UpgradeDialog } from '@/components/UpgradeDialog';
 
 // Parse serving_size to extract base grams (e.g., "100g" -> 100, "1 unidade (50g)" -> 50)
 function parseServingGrams(servingSize: string): number {
@@ -84,6 +85,7 @@ export default function MealDetail() {
   const [impactExplanation, setImpactExplanation] = useState<string | null>(null);
   const [showImpact, setShowImpact] = useState(false);
   const [loadingImpact, setLoadingImpact] = useState(false);
+  const [showUpgradeDialog, setShowUpgradeDialog] = useState(false);
 
   useEffect(() => {
     fetchMealData();
@@ -212,10 +214,31 @@ export default function MealDetail() {
         },
       });
 
-      if (response.error) throw response.error;
+      if (response.error) {
+        // Check if it's a usage limit error
+        const errorData = response.error?.message ? JSON.parse(response.error.message) : response.data;
+        if (errorData?.upgradeRequired || errorData?.allowed === false) {
+          setShowUpgradeDialog(true);
+          setImpactExplanation('A quantidade foi ajustada para manter as mesmas calorias do alimento original.');
+          return;
+        }
+        throw response.error;
+      }
       setImpactExplanation(response.data.explanation);
     } catch (error: any) {
       console.error('Error getting explanation:', error);
+      // Check for 403 response with usage limit
+      if (error?.context?.body) {
+        try {
+          const body = JSON.parse(error.context.body);
+          if (body?.upgradeRequired || body?.allowed === false) {
+            setShowUpgradeDialog(true);
+            setImpactExplanation('A quantidade foi ajustada para manter as mesmas calorias do alimento original.');
+            setLoadingImpact(false);
+            return;
+          }
+        } catch {}
+      }
       setImpactExplanation('A quantidade foi ajustada para manter as mesmas calorias do alimento original.');
     } finally {
       setLoadingImpact(false);
@@ -670,6 +693,14 @@ export default function MealDetail() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <UpgradeDialog
+        open={showUpgradeDialog}
+        onOpenChange={setShowUpgradeDialog}
+        feature="substituições"
+        currentPlan="Gratuito"
+        limit={1}
+      />
     </div>
   );
 }
