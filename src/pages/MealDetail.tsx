@@ -214,31 +214,20 @@ export default function MealDetail() {
         },
       });
 
+      // Check for usage limit error in response data (403 returns data, not error.message)
+      if (response.data?.upgradeRequired || response.data?.allowed === false) {
+        setShowUpgradeDialog(true);
+        setImpactExplanation('A quantidade foi ajustada para manter as mesmas calorias do alimento original.');
+        return;
+      }
+      
       if (response.error) {
-        // Check if it's a usage limit error
-        const errorData = response.error?.message ? JSON.parse(response.error.message) : response.data;
-        if (errorData?.upgradeRequired || errorData?.allowed === false) {
-          setShowUpgradeDialog(true);
-          setImpactExplanation('A quantidade foi ajustada para manter as mesmas calorias do alimento original.');
-          return;
-        }
         throw response.error;
       }
+      
       setImpactExplanation(response.data.explanation);
     } catch (error: any) {
       console.error('Error getting explanation:', error);
-      // Check for 403 response with usage limit
-      if (error?.context?.body) {
-        try {
-          const body = JSON.parse(error.context.body);
-          if (body?.upgradeRequired || body?.allowed === false) {
-            setShowUpgradeDialog(true);
-            setImpactExplanation('A quantidade foi ajustada para manter as mesmas calorias do alimento original.');
-            setLoadingImpact(false);
-            return;
-          }
-        } catch {}
-      }
       setImpactExplanation('A quantidade foi ajustada para manter as mesmas calorias do alimento original.');
     } finally {
       setLoadingImpact(false);
