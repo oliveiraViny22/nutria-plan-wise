@@ -344,6 +344,7 @@ export function useAdminOperations() {
       let query = supabase
         .from('profiles')
         .select('user_id, name, email, account_type, user_type, is_test, onboarding_completed, professional_id, created_at', { count: 'exact' })
+        .neq('email', 'admin@nutriai.app') // Hide system admin account
         .order('created_at', { ascending: false })
         .range(offset, offset + limit - 1);
 
