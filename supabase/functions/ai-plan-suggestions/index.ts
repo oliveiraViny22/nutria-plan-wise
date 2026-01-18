@@ -23,6 +23,21 @@ const SUGGESTION_TYPES = {
   CONTEXTUAL_OPTION: "Criar opção contextual",
 };
 
+// Mapeamento de nomes técnicos para nomes legíveis em português
+const MEAL_NAMES_PT: Record<string, string> = {
+  breakfast: "Café da Manhã",
+  morning_snack: "Lanche da Manhã",
+  lunch: "Almoço",
+  afternoon_snack: "Lanche da Tarde",
+  dinner: "Jantar",
+  supper: "Ceia",
+};
+
+// Função para traduzir nome da refeição
+function translateMealName(mealName: string): string {
+  return MEAL_NAMES_PT[mealName] || mealName;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -155,15 +170,17 @@ serve(async (req) => {
         const outOfPlanLogs = mealLogEntries.filter(ml => ml.status === 'FORA_DO_PLANO');
 
         // Check for consistently skipped meals
+        const mealNamePt = translateMealName(meal.name);
+        
         if (skippedLogs.length > mealLogEntries.length * 0.5) {
           suggestions.push({
             suggestion_type: "REDUCE_MEALS",
-            hypothesis: `${meal.name} é pulada em mais de 50% dos dias`,
-            rationale: `A refeição ${meal.name} foi pulada ${skippedLogs.length} vezes em ${mealLogEntries.length} registros. ` +
+            hypothesis: `${mealNamePt} é pulada em mais de 50% dos dias`,
+            rationale: `A refeição ${mealNamePt} foi pulada ${skippedLogs.length} vezes em ${mealLogEntries.length} registros. ` +
               `Isso pode indicar que o horário não é conveniente ou que a refeição não se encaixa na rotina do paciente.`,
             proposed_changes: {
               action: "remove_meal",
-              meal_name: meal.name,
+              meal_name: mealNamePt,
               redistribute_calories: true,
             },
           });
@@ -182,12 +199,12 @@ serve(async (req) => {
             if (!optionUsage[option.id] && confirmedLogs.length > 5) {
               suggestions.push({
                 suggestion_type: "REMOVE_OPTION",
-                hypothesis: `Opção ${option.option_number} de ${meal.name} nunca é selecionada`,
-                rationale: `Após ${confirmedLogs.length} confirmações, a ${option.name} nunca foi escolhida. ` +
+                hypothesis: `Opção ${option.option_number} de ${mealNamePt} nunca é selecionada`,
+                rationale: `Após ${confirmedLogs.length} confirmações, a ${option.name || `Opção ${option.option_number}`} nunca foi escolhida. ` +
                   `Isso sugere que essa opção não atende às preferências ou rotina do paciente.`,
                 proposed_changes: {
                   action: "remove_option",
-                  meal_name: meal.name,
+                  meal_name: mealNamePt,
                   option_number: option.option_number,
                 },
               });
@@ -199,12 +216,12 @@ serve(async (req) => {
           if (usedOptions === 1 && meal.meal_options.length < 3 && confirmedLogs.length > 10) {
             suggestions.push({
               suggestion_type: "ADD_OPTION",
-              hypothesis: `Apenas uma opção é usada para ${meal.name}`,
+              hypothesis: `Apenas uma opção é usada para ${mealNamePt}`,
               rationale: `O paciente sempre escolhe a mesma opção. Adicionar uma nova alternativa pode ` +
                 `aumentar a flexibilidade sem comprometer a adesão.`,
               proposed_changes: {
                 action: "add_option",
-                meal_name: meal.name,
+                meal_name: mealNamePt,
                 base_option: Object.keys(optionUsage)[0],
               },
             });
@@ -215,12 +232,12 @@ serve(async (req) => {
         if (outOfPlanLogs.length > mealLogEntries.length * 0.3 && mealLogEntries.length > 5) {
           suggestions.push({
             suggestion_type: "CONTEXTUAL_OPTION",
-            hypothesis: `${meal.name} frequentemente substituída por alimentos fora do plano`,
+            hypothesis: `${mealNamePt} frequentemente substituída por alimentos fora do plano`,
             rationale: `Em ${Math.round(outOfPlanLogs.length / mealLogEntries.length * 100)}% das vezes, ` +
               `o paciente opta por alimentos fora do plano. Considere adicionar uma opção mais flexível ou prática.`,
             proposed_changes: {
               action: "add_contextual_option",
-              meal_name: meal.name,
+              meal_name: mealNamePt,
               context: "practical_alternative",
             },
           });
