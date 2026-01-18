@@ -204,7 +204,9 @@ export default function Admin() {
   
   // Documentation state
   const [downloadingDoc, setDownloadingDoc] = useState<string | null>(null);
-  const [uploadingDoc, setUploadingDoc] = useState<string | null>(null);
+  
+  // Foods export state
+  const [exportingFoods, setExportingFoods] = useState<string | null>(null);
 
   // Metrics state
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
@@ -633,40 +635,104 @@ export default function Admin() {
     }
   };
 
-  const handleUploadDocumentation = async (docType: 'technical' | 'commercial', file: File) => {
-    setUploadingDoc(docType);
+  const handleExportFoods = async (format: 'csv' | 'txt' | 'xls') => {
+    setExportingFoods(format);
     try {
-      const text = await file.text();
-      const settingKey = docType === 'technical' ? 'documentation_technical' : 'documentation_commercial';
-      
-      const { error } = await supabase
-        .from('system_settings')
-        .update({ value: text, updated_at: new Date().toISOString() })
-        .eq('key', settingKey);
+      // Fetch all foods from database
+      const { data: foods, error } = await supabase
+        .from('foods')
+        .select('*')
+        .order('name', { ascending: true });
       
       if (error) throw error;
       
+      if (!foods || foods.length === 0) {
+        toast({
+          title: 'Sem dados',
+          description: 'Não há alimentos cadastrados no banco de dados.',
+          variant: 'destructive',
+        });
+        return;
+      }
+      
+      let content: string;
+      let mimeType: string;
+      let extension: string;
+      
+      const headers = ['name', 'calories', 'protein', 'carbs', 'fat', 'serving_size', 'category', 'processing_level'];
+      
+      if (format === 'csv') {
+        // CSV format
+        const csvRows = [
+          headers.join(','),
+          ...foods.map(food => 
+            headers.map(h => {
+              const val = food[h as keyof typeof food];
+              if (val === null || val === undefined) return '';
+              const strVal = String(val);
+              return strVal.includes(',') || strVal.includes('"') 
+                ? `"${strVal.replace(/"/g, '""')}"` 
+                : strVal;
+            }).join(',')
+          )
+        ];
+        content = csvRows.join('\n');
+        mimeType = 'text/csv;charset=utf-8';
+        extension = 'csv';
+      } else if (format === 'txt') {
+        // TXT format (tab-separated)
+        const txtRows = [
+          headers.join('\t'),
+          ...foods.map(food => 
+            headers.map(h => {
+              const val = food[h as keyof typeof food];
+              return val === null || val === undefined ? '' : String(val);
+            }).join('\t')
+          )
+        ];
+        content = txtRows.join('\n');
+        mimeType = 'text/plain;charset=utf-8';
+        extension = 'txt';
+      } else {
+        // XLS format (tab-separated with .xls extension for Excel compatibility)
+        const xlsRows = [
+          headers.join('\t'),
+          ...foods.map(food => 
+            headers.map(h => {
+              const val = food[h as keyof typeof food];
+              return val === null || val === undefined ? '' : String(val);
+            }).join('\t')
+          )
+        ];
+        content = xlsRows.join('\n');
+        mimeType = 'application/vnd.ms-excel';
+        extension = 'xls';
+      }
+      
+      // Download file
+      const blob = new Blob([content], { type: mimeType });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `alimentos_nutriaplan_${new Date().toISOString().split('T')[0]}.${extension}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      
       toast({
-        title: 'Documentação atualizada',
-        description: `Documentação ${docType === 'technical' ? 'técnica' : 'comercial'} atualizada com sucesso.`,
+        title: 'Download concluído',
+        description: `Banco de alimentos exportado em formato ${format.toUpperCase()}.`,
       });
     } catch (error) {
       toast({
-        title: 'Erro no upload',
+        title: 'Erro no download',
         description: error instanceof Error ? error.message : 'Erro desconhecido',
         variant: 'destructive',
       });
     } finally {
-      setUploadingDoc(null);
+      setExportingFoods(null);
     }
-  };
-
-  const handleDocFileChange = (docType: 'technical' | 'commercial') => (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      handleUploadDocumentation(docType, file);
-    }
-    e.target.value = '';
   };
 
   const renderSettingEditor = (setting: { key: string; value: unknown; description: string | null }) => {
@@ -1505,41 +1571,19 @@ export default function Admin() {
                         <span>Requisitos funcionais e não funcionais</span>
                       </li>
                     </ul>
-                    <div className="flex gap-2">
-                      <Button 
-                        onClick={() => handleDownloadDocumentation('technical')}
-                        disabled={downloadingDoc !== null || uploadingDoc !== null}
-                        className="flex-1"
-                        size="lg"
-                      >
-                        {downloadingDoc === 'technical' ? (
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        ) : (
-                          <Download className="h-4 w-4 mr-2" />
-                        )}
-                        Baixar TXT
-                      </Button>
-                      <div className="relative">
-                        <input
-                          type="file"
-                          accept=".txt,.md"
-                          onChange={handleDocFileChange('technical')}
-                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                          disabled={uploadingDoc !== null || downloadingDoc !== null}
-                        />
-                        <Button 
-                          variant="outline"
-                          size="lg"
-                          disabled={uploadingDoc !== null || downloadingDoc !== null}
-                        >
-                          {uploadingDoc === 'technical' ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <Upload className="h-4 w-4" />
-                          )}
-                        </Button>
-                      </div>
-                    </div>
+                    <Button 
+                      onClick={() => handleDownloadDocumentation('technical')}
+                      disabled={downloadingDoc !== null}
+                      className="w-full"
+                      size="lg"
+                    >
+                      {downloadingDoc === 'technical' ? (
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <Download className="h-4 w-4 mr-2" />
+                      )}
+                      Baixar TXT
+                    </Button>
                   </CardContent>
                 </Card>
 
@@ -1580,53 +1624,23 @@ export default function Admin() {
                         <span>Visão de futuro e roadmap do produto</span>
                       </li>
                     </ul>
-                    <div className="flex gap-2">
-                      <Button 
-                        onClick={() => handleDownloadDocumentation('commercial')}
-                        disabled={downloadingDoc !== null || uploadingDoc !== null}
-                        className="flex-1"
-                        size="lg"
-                        variant="secondary"
-                      >
-                        {downloadingDoc === 'commercial' ? (
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        ) : (
-                          <Download className="h-4 w-4 mr-2" />
-                        )}
-                        Baixar TXT
-                      </Button>
-                      <div className="relative">
-                        <input
-                          type="file"
-                          accept=".txt,.md"
-                          onChange={handleDocFileChange('commercial')}
-                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                          disabled={uploadingDoc !== null || downloadingDoc !== null}
-                        />
-                        <Button 
-                          variant="outline"
-                          size="lg"
-                          disabled={uploadingDoc !== null || downloadingDoc !== null}
-                        >
-                          {uploadingDoc === 'commercial' ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <Upload className="h-4 w-4" />
-                          )}
-                        </Button>
-                      </div>
-                    </div>
+                    <Button 
+                      onClick={() => handleDownloadDocumentation('commercial')}
+                      disabled={downloadingDoc !== null}
+                      className="w-full"
+                      size="lg"
+                      variant="secondary"
+                    >
+                      {downloadingDoc === 'commercial' ? (
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <Download className="h-4 w-4 mr-2" />
+                      )}
+                      Baixar TXT
+                    </Button>
                   </CardContent>
                 </Card>
               </div>
-              
-              <Alert>
-                <FileText className="h-4 w-4" />
-                <AlertTitle>Atualização de Documentação</AlertTitle>
-                <AlertDescription>
-                  Clique no ícone de upload para enviar um arquivo .txt ou .md com o novo conteúdo. O download sempre gerará a versão mais atualizada.
-                </AlertDescription>
-              </Alert>
             </motion.div>
           </TabsContent>
 
@@ -2083,48 +2097,107 @@ export default function Admin() {
 
           {/* Foods Upload Tab */}
           <TabsContent value="foods">
-            <Card>
-              <CardHeader>
-                <CardTitle>Upload de Alimentos</CardTitle>
-                <CardDescription>
-                  Faça upload de um arquivo CSV ou Excel com os alimentos para adicionar ao banco.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex gap-4">
-                  <Button variant="outline" onClick={downloadTemplate}>
-                    <Download className="h-4 w-4 mr-2" />
-                    Baixar Modelo CSV
-                  </Button>
-                  
-                  <div className="relative">
-                    <Input
-                      type="file"
-                      accept=".csv,.xlsx,.xls"
-                      onChange={handleFileUpload}
-                      className="hidden"
-                      id="food-upload"
-                    />
-                    <Label htmlFor="food-upload" asChild>
-                      <Button variant="default" className="cursor-pointer">
-                        <Upload className="h-4 w-4 mr-2" />
-                        Selecionar Arquivo
-                      </Button>
-                    </Label>
+            <div className="space-y-6">
+              {/* Export Section */}
+              <Card className="border-2 border-primary/20">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Download className="h-5 w-5" />
+                    Exportar Banco de Alimentos
+                  </CardTitle>
+                  <CardDescription>
+                    Baixe a base de dados atual de alimentos para padronizar suas importações.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex flex-wrap gap-3">
+                    <Button 
+                      variant="outline"
+                      onClick={() => handleExportFoods('csv')}
+                      disabled={exportingFoods !== null}
+                    >
+                      {exportingFoods === 'csv' ? (
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <Download className="h-4 w-4 mr-2" />
+                      )}
+                      Exportar CSV
+                    </Button>
+                    <Button 
+                      variant="outline"
+                      onClick={() => handleExportFoods('txt')}
+                      disabled={exportingFoods !== null}
+                    >
+                      {exportingFoods === 'txt' ? (
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <Download className="h-4 w-4 mr-2" />
+                      )}
+                      Exportar TXT
+                    </Button>
+                    <Button 
+                      variant="outline"
+                      onClick={() => handleExportFoods('xls')}
+                      disabled={exportingFoods !== null}
+                    >
+                      {exportingFoods === 'xls' ? (
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <Download className="h-4 w-4 mr-2" />
+                      )}
+                      Exportar XLS
+                    </Button>
                   </div>
-                </div>
+                  <p className="text-xs text-muted-foreground mt-3">
+                    Use os arquivos exportados como referência para manter o formato correto nas importações.
+                  </p>
+                </CardContent>
+              </Card>
 
-                <Alert>
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertTitle>Formato esperado</AlertTitle>
-                  <AlertDescription>
-                    Colunas obrigatórias: <code className="text-xs bg-muted px-1 rounded">name, calories, protein, carbs, fat</code>
-                    <br />
-                    Colunas opcionais: <code className="text-xs bg-muted px-1 rounded">serving_size, category, processing_level</code>
-                  </AlertDescription>
-                </Alert>
-              </CardContent>
-            </Card>
+              {/* Import Section */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Importar Alimentos</CardTitle>
+                  <CardDescription>
+                    Faça upload de um arquivo CSV ou Excel com os alimentos para adicionar ao banco.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex gap-4">
+                    <Button variant="outline" onClick={downloadTemplate}>
+                      <Download className="h-4 w-4 mr-2" />
+                      Baixar Modelo CSV
+                    </Button>
+                    
+                    <div className="relative">
+                      <Input
+                        type="file"
+                        accept=".csv,.xlsx,.xls"
+                        onChange={handleFileUpload}
+                        className="hidden"
+                        id="food-upload"
+                      />
+                      <Label htmlFor="food-upload" asChild>
+                        <Button variant="default" className="cursor-pointer">
+                          <Upload className="h-4 w-4 mr-2" />
+                          Selecionar Arquivo
+                        </Button>
+                      </Label>
+                    </div>
+                  </div>
+
+                  <Alert>
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertTitle>Formato esperado</AlertTitle>
+                    <AlertDescription>
+                      Colunas obrigatórias: <code className="text-xs bg-muted px-1 rounded">name, calories, protein, carbs, fat</code>
+                      <br />
+                      Colunas opcionais: <code className="text-xs bg-muted px-1 rounded">serving_size, category, processing_level</code>
+                    </AlertDescription>
+                  </Alert>
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
 
           {/* Import History Tab */}
