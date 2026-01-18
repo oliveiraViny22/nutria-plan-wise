@@ -5,3 +5,18 @@ verify_jwt = false
 
 [functions.reconcile-subscriptions]
 verify_jwt = false
+
+[functions.generate-meal-plan-v2]
+verify_jwt = false
+
+[functions.confirm-meal]
+verify_jwt = false
+
+[functions.adherence-report]
+verify_jwt = false
+
+[functions.ai-plan-suggestions]
+verify_jwt = false
+
+[functions.review-suggestion]
+verify_jwt = false
