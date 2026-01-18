@@ -227,34 +227,34 @@ export default function Onboarding() {
   };
 
   return (
-    <div className="min-h-screen gradient-hero flex flex-col">
+    <div className="min-h-screen gradient-hero flex flex-col pt-safe">
       {/* Header */}
-      <header className="p-6">
+      <header className="p-4 sm:p-6">
         <Logo />
       </header>
 
       {/* Progress */}
-      <div className="px-6 mb-8">
+      <div className="px-4 sm:px-6 mb-6 sm:mb-8">
         <div className="max-w-2xl mx-auto">
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center justify-between mb-3 sm:mb-4">
             {steps.map((step, index) => (
               <div key={step.id} className="flex items-center">
                 <div
-                  className={`w-10 h-10 rounded-full flex items-center justify-center font-medium transition-colors ${
+                  className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center font-medium text-xs sm:text-sm transition-colors ${
                     currentStep >= step.id
                       ? 'bg-primary text-primary-foreground'
                       : 'bg-muted text-muted-foreground'
                   }`}
                 >
                   {currentStep > step.id ? (
-                    <Check className="w-5 h-5" />
+                    <Check className="w-4 h-4 sm:w-5 sm:h-5" />
                   ) : (
                     step.id
                   )}
                 </div>
                 {index < steps.length - 1 && (
                   <div
-                    className={`h-1 w-8 sm:w-16 mx-1 sm:mx-2 rounded-full transition-colors ${
+                    className={`h-1 w-6 xs:w-8 sm:w-16 mx-0.5 xs:mx-1 sm:mx-2 rounded-full transition-colors ${
                       currentStep > step.id ? 'bg-primary' : 'bg-muted'
                     }`}
                   />
@@ -263,10 +263,10 @@ export default function Onboarding() {
             ))}
           </div>
           <div className="text-center">
-            <h2 className="text-lg font-semibold text-foreground">
+            <h2 className="text-base sm:text-lg font-semibold text-foreground">
               {steps[currentStep - 1].title}
             </h2>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-xs sm:text-sm text-muted-foreground">
               {steps[currentStep - 1].description}
             </p>
           </div>
@@ -274,7 +274,7 @@ export default function Onboarding() {
       </div>
 
       {/* Content */}
-      <div className="flex-1 px-6 pb-24">
+      <div className="flex-1 px-4 sm:px-6 pb-24 sm:pb-28 overflow-y-auto scrollbar-hide">
         <div className="max-w-2xl mx-auto">
           <AnimatePresence mode="wait">
             {currentStep === 1 && (
@@ -283,11 +283,11 @@ export default function Onboarding() {
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -20 }}
-                className="card-elevated rounded-2xl p-6 sm:p-8"
+                className="card-elevated rounded-xl sm:rounded-2xl p-4 sm:p-6 md:p-8"
               >
-                <div className="grid gap-6 sm:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="age">Idade</Label>
+                <div className="grid gap-4 sm:gap-6 sm:grid-cols-2">
+                  <div className="space-y-1.5 sm:space-y-2">
+                    <Label htmlFor="age" className="text-sm">Idade</Label>
                     <Input
                       id="age"
                       type="number"
@@ -298,32 +298,32 @@ export default function Onboarding() {
                       onChange={(e) =>
                         setFormData({ ...formData, age: e.target.value })
                       }
-                      className="h-12"
+                      className="h-10 sm:h-12"
                     />
                   </div>
 
-                  <div className="space-y-2">
-                    <Label>Sexo</Label>
-                    <div className="grid grid-cols-3 gap-2">
+                  <div className="space-y-1.5 sm:space-y-2">
+                    <Label className="text-sm">Sexo</Label>
+                    <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
                       {(['male', 'female', 'other'] as const).map((sex) => (
                         <button
                           key={sex}
                           type="button"
                           onClick={() => setFormData({ ...formData, sex })}
-                          className={`h-12 rounded-lg border transition-colors ${
+                          className={`h-10 sm:h-12 rounded-lg border transition-colors text-xs sm:text-sm ${
                             formData.sex === sex
                               ? 'border-primary bg-primary/10 text-primary'
                               : 'border-border hover:border-primary/50'
                           }`}
                         >
-                          {sex === 'male' ? 'Masculino' : sex === 'female' ? 'Feminino' : 'Outro'}
+                          {sex === 'male' ? 'Masc.' : sex === 'female' ? 'Fem.' : 'Outro'}
                         </button>
                       ))}
                     </div>
                   </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="height">Altura (cm)</Label>
+                  <div className="space-y-1.5 sm:space-y-2">
+                    <Label htmlFor="height" className="text-sm">Altura (cm)</Label>
                     <Input
                       id="height"
                       type="number"
@@ -334,12 +334,12 @@ export default function Onboarding() {
                       onChange={(e) =>
                         setFormData({ ...formData, height: e.target.value })
                       }
-                      className="h-12"
+                      className="h-10 sm:h-12"
                     />
                   </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="weight">Peso (kg)</Label>
+                  <div className="space-y-1.5 sm:space-y-2">
+                    <Label htmlFor="weight" className="text-sm">Peso (kg)</Label>
                     <Input
                       id="weight"
                       type="number"
@@ -351,7 +351,7 @@ export default function Onboarding() {
                       onChange={(e) =>
                         setFormData({ ...formData, weight: e.target.value })
                       }
-                      className="h-12"
+                      className="h-10 sm:h-12"
                     />
                   </div>
                 </div>
@@ -364,12 +364,12 @@ export default function Onboarding() {
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -20 }}
-                className="card-elevated rounded-2xl p-6 sm:p-8"
+                className="card-elevated rounded-xl sm:rounded-2xl p-4 sm:p-6 md:p-8"
               >
-                <div className="space-y-6">
-                  <div className="space-y-3">
-                    <Label>Qual seu objetivo principal?</Label>
-                    <div className="grid gap-3">
+                <div className="space-y-4 sm:space-y-6">
+                  <div className="space-y-2 sm:space-y-3">
+                    <Label className="text-sm">Qual seu objetivo principal?</Label>
+                    <div className="grid gap-2 sm:gap-3">
                       {(Object.entries(GOALS) as [keyof typeof GOALS, typeof GOALS[keyof typeof GOALS]][]).map(
                         ([key, value]) => (
                           <button
@@ -378,13 +378,13 @@ export default function Onboarding() {
                             onClick={() =>
                               setFormData({ ...formData, goal: key })
                             }
-                            className={`p-4 rounded-xl border text-left transition-all ${
+                            className={`p-3 sm:p-4 rounded-lg sm:rounded-xl border text-left transition-all ${
                               formData.goal === key
                                 ? 'border-primary bg-primary/10'
                                 : 'border-border hover:border-primary/50'
                             }`}
                           >
-                            <span className="font-medium text-foreground">
+                            <span className="font-medium text-foreground text-sm sm:text-base">
                               {value.label}
                             </span>
                           </button>
@@ -393,9 +393,9 @@ export default function Onboarding() {
                     </div>
                   </div>
 
-                  <div className="space-y-3">
-                    <Label>Nível de atividade física</Label>
-                    <div className="grid gap-3">
+                  <div className="space-y-2 sm:space-y-3">
+                    <Label className="text-sm">Nível de atividade física</Label>
+                    <div className="grid gap-2 sm:gap-3">
                       {(Object.entries(ACTIVITY_LEVELS) as [keyof typeof ACTIVITY_LEVELS, typeof ACTIVITY_LEVELS[keyof typeof ACTIVITY_LEVELS]][]).map(
                         ([key, value]) => (
                           <button
@@ -404,16 +404,16 @@ export default function Onboarding() {
                             onClick={() =>
                               setFormData({ ...formData, activity_level: key })
                             }
-                            className={`p-4 rounded-xl border text-left transition-all ${
+                            className={`p-3 sm:p-4 rounded-lg sm:rounded-xl border text-left transition-all ${
                               formData.activity_level === key
                                 ? 'border-primary bg-primary/10'
                                 : 'border-border hover:border-primary/50'
                             }`}
                           >
-                            <span className="font-medium text-foreground block">
+                            <span className="font-medium text-foreground text-sm sm:text-base block">
                               {value.label}
                             </span>
-                            <span className="text-sm text-muted-foreground">
+                            <span className="text-xs sm:text-sm text-muted-foreground">
                               {value.description}
                             </span>
                           </button>
@@ -431,20 +431,20 @@ export default function Onboarding() {
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -20 }}
-                className="card-elevated rounded-2xl p-6 sm:p-8"
+                className="card-elevated rounded-xl sm:rounded-2xl p-4 sm:p-6 md:p-8"
               >
-                <div className="space-y-6">
-                  <div className="text-center mb-6">
-                    <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
-                      <Utensils className="w-8 h-8 text-primary" />
+                <div className="space-y-4 sm:space-y-6">
+                  <div className="text-center mb-4 sm:mb-6">
+                    <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-3 sm:mb-4">
+                      <Utensils className="w-6 h-6 sm:w-8 sm:h-8 text-primary" />
                     </div>
-                    <h3 className="text-lg font-semibold">Quantas refeições por dia?</h3>
-                    <p className="text-sm text-muted-foreground">
+                    <h3 className="text-base sm:text-lg font-semibold">Quantas refeições por dia?</h3>
+                    <p className="text-xs sm:text-sm text-muted-foreground">
                       Isso nos ajuda a distribuir melhor suas calorias
                     </p>
                   </div>
 
-                  <div className="grid gap-3">
+                  <div className="grid gap-2 sm:gap-3">
                     {MEALS_OPTIONS.map((option) => (
                       <button
                         key={option.value}
@@ -452,16 +452,16 @@ export default function Onboarding() {
                         onClick={() =>
                           setFormData({ ...formData, meals_per_day: option.value })
                         }
-                        className={`p-4 rounded-xl border text-left transition-all ${
+                        className={`p-3 sm:p-4 rounded-lg sm:rounded-xl border text-left transition-all ${
                           formData.meals_per_day === option.value
                             ? 'border-primary bg-primary/10'
                             : 'border-border hover:border-primary/50'
                         }`}
                       >
-                        <span className="font-medium text-foreground block">
+                        <span className="font-medium text-foreground text-sm sm:text-base block">
                           {option.label}
                         </span>
-                        <span className="text-sm text-muted-foreground">
+                        <span className="text-xs sm:text-sm text-muted-foreground">
                           {option.description}
                         </span>
                       </button>
@@ -477,18 +477,18 @@ export default function Onboarding() {
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -20 }}
-                className="card-elevated rounded-2xl p-6 sm:p-8"
+                className="card-elevated rounded-xl sm:rounded-2xl p-4 sm:p-6 md:p-8"
               >
-                <div className="space-y-6">
-                  <div className="space-y-3">
-                    <Label>Preferências alimentares (opcional)</Label>
-                    <div className="flex flex-wrap gap-2">
+                <div className="space-y-4 sm:space-y-6">
+                  <div className="space-y-2 sm:space-y-3">
+                    <Label className="text-sm">Preferências alimentares (opcional)</Label>
+                    <div className="flex flex-wrap gap-1.5 sm:gap-2">
                       {FOOD_PREFERENCES.map((pref) => (
                         <button
                           key={pref}
                           type="button"
                           onClick={() => togglePreference(pref)}
-                          className={`px-4 py-2 rounded-full border transition-all ${
+                          className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-full border transition-all text-xs sm:text-sm ${
                             formData.preferences.includes(pref)
                               ? 'border-primary bg-primary text-primary-foreground'
                               : 'border-border hover:border-primary/50'
@@ -500,15 +500,15 @@ export default function Onboarding() {
                     </div>
                   </div>
 
-                  <div className="space-y-3">
-                    <Label>Restrições alimentares (opcional)</Label>
-                    <div className="flex flex-wrap gap-2">
+                  <div className="space-y-2 sm:space-y-3">
+                    <Label className="text-sm">Restrições alimentares (opcional)</Label>
+                    <div className="flex flex-wrap gap-1.5 sm:gap-2">
                       {FOOD_RESTRICTIONS.map((rest) => (
                         <button
                           key={rest}
                           type="button"
                           onClick={() => toggleRestriction(rest)}
-                          className={`px-4 py-2 rounded-full border transition-all ${
+                          className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-full border transition-all text-xs sm:text-sm ${
                             formData.restrictions.includes(rest)
                               ? 'border-destructive bg-destructive text-destructive-foreground'
                               : 'border-border hover:border-destructive/50'
@@ -527,36 +527,38 @@ export default function Onboarding() {
       </div>
 
       {/* Footer Navigation */}
-      <div className="fixed bottom-0 left-0 right-0 p-6 bg-background/80 backdrop-blur-md border-t border-border">
-        <div className="max-w-2xl mx-auto flex items-center justify-between">
+      <div className="fixed bottom-0 left-0 right-0 p-4 sm:p-6 bg-background/80 backdrop-blur-md border-t border-border pb-safe">
+        <div className="max-w-2xl mx-auto flex items-center justify-between gap-3">
           <Button
             variant="ghost"
             onClick={() => setCurrentStep(currentStep - 1)}
             disabled={currentStep === 1}
+            className="text-sm h-10 sm:h-11"
           >
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Voltar
+            <ArrowLeft className="w-4 h-4 mr-1 sm:mr-2" />
+            <span className="hidden xs:inline">Voltar</span>
           </Button>
 
           <Button
             variant="hero"
             onClick={handleNext}
             disabled={!canProceed() || loading}
+            className="text-sm h-10 sm:h-11 min-w-[120px] sm:min-w-[140px]"
           >
             {loading ? (
               <>
                 <Loader2 className="w-4 h-4 animate-spin" />
-                Gerando plano...
+                <span className="hidden sm:inline ml-1">Gerando plano...</span>
               </>
             ) : currentStep === steps.length ? (
               <>
                 Concluir
-                <Check className="w-4 h-4 ml-2" />
+                <Check className="w-4 h-4 ml-1 sm:ml-2" />
               </>
             ) : (
               <>
                 Próximo
-                <ArrowRight className="w-4 h-4 ml-2" />
+                <ArrowRight className="w-4 h-4 ml-1 sm:ml-2" />
               </>
             )}
           </Button>
