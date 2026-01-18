@@ -9,8 +9,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useSubscription } from '@/hooks/useSubscription';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
-import { Plan } from '@/lib/subscription-types';
+import { Plan, PLAN_DESCRIPTIONS, PLAN_DISPLAY_NAMES } from '@/lib/subscription-types';
 import { MobileNav } from '@/components/MobileNav';
+import { CommercialPlan } from '@/lib/types';
 
 export default function Pricing() {
   const navigate = useNavigate();
@@ -227,15 +228,11 @@ export default function Pricing() {
                     }`}>
                       {getPlanIcon(plan.name)}
                     </div>
-                    <CardTitle className="text-2xl capitalize">
-                      {plan.name === 'plano_pessoal_pago' ? 'Pessoal' : 
-                       plan.name === 'profissional' ? 'Profissional' :
-                       plan.name === 'premium' ? 'Premium (Aluno)' : 'Gratuito'}
+                    <CardTitle className="text-2xl">
+                      {PLAN_DISPLAY_NAMES[plan.name as CommercialPlan] || plan.name}
                     </CardTitle>
-                    <CardDescription>
-                      {plan.name === 'premium' 
-                        ? 'Plano exclusivo para alunos vinculados a profissionais'
-                        : (plan.description || 'Plano de nutrição')}
+                    <CardDescription className="text-sm min-h-[40px]">
+                      {PLAN_DESCRIPTIONS[plan.name as CommercialPlan] || plan.description || 'Plano de nutrição'}
                     </CardDescription>
                   </CardHeader>
 

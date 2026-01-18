@@ -8,7 +8,8 @@ export type UserType = 'aluno' | 'usuario' | 'profissional';
 // =====================================================
 export type CommercialPlan = 'gratuito' | 'plano_pessoal_pago' | 'premium' | 'profissional';
 
-// Legacy - manter para compatibilidade
+// Legacy - manter para compatibilidade com profiles.account_type (enum do banco)
+// NOTA: 'plano_pessoal' no account_type é equivalente a 'plano_pessoal_pago' em CommercialPlan
 export type AccountType = 'aluno' | 'plano_pessoal' | 'premium' | 'profissional';
 
 // Status permitidos para planos alimentares
