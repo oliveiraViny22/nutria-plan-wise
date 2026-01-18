@@ -626,6 +626,75 @@ export function useAdminOperations() {
     }
   }, [invokeAdmin, toast]);
 
+  // Food management
+  const searchFoods = useCallback(async (query: string, limit = 50, offset = 0) => {
+    setLoading(true);
+    try {
+      const data = await invokeAdmin('search_foods', { query, limit, offset });
+      return data as { foods: FoodRow[]; total: number };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erro ao buscar alimentos';
+      toast({ title: 'Erro', description: message, variant: 'destructive' });
+      return { foods: [], total: 0 };
+    } finally {
+      setLoading(false);
+    }
+  }, [invokeAdmin, toast]);
+
+  const updateFood = useCallback(async (foodId: string, updates: Partial<FoodRow>) => {
+    setSavingKeys(prev => new Set(prev).add(`food_${foodId}`));
+    try {
+      const data = await invokeAdmin('update_food', { foodId, updates });
+      toast({ title: 'Sucesso', description: 'Alimento atualizado com sucesso.' });
+      setSavedKeys(prev => new Set(prev).add(`food_${foodId}`));
+      setTimeout(() => {
+        setSavedKeys(prev => {
+          const next = new Set(prev);
+          next.delete(`food_${foodId}`);
+          return next;
+        });
+      }, 2000);
+      return data.food;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erro ao atualizar alimento';
+      toast({ title: 'Erro', description: message, variant: 'destructive' });
+      setErrorKeys(prev => new Set(prev).add(`food_${foodId}`));
+      setTimeout(() => {
+        setErrorKeys(prev => {
+          const next = new Set(prev);
+          next.delete(`food_${foodId}`);
+          return next;
+        });
+      }, 3000);
+      throw error;
+    } finally {
+      setSavingKeys(prev => {
+        const next = new Set(prev);
+        next.delete(`food_${foodId}`);
+        return next;
+      });
+    }
+  }, [invokeAdmin, toast]);
+
+  const deleteFood = useCallback(async (foodId: string) => {
+    setSavingKeys(prev => new Set(prev).add(`delete_food_${foodId}`));
+    try {
+      await invokeAdmin('delete_food', { foodId });
+      toast({ title: 'Sucesso', description: 'Alimento excluído com sucesso.' });
+      return true;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erro ao excluir alimento';
+      toast({ title: 'Erro', description: message, variant: 'destructive' });
+      throw error;
+    } finally {
+      setSavingKeys(prev => {
+        const next = new Set(prev);
+        next.delete(`delete_food_${foodId}`);
+        return next;
+      });
+    }
+  }, [invokeAdmin, toast]);
+
   return {
     loading,
     settingsLoading,
@@ -658,5 +727,8 @@ export function useAdminOperations() {
     deleteUser,
     fetchPlans,
     updatePlan,
+    searchFoods,
+    updateFood,
+    deleteFood,
   };
 }

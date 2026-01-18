@@ -136,6 +136,18 @@ serve(async (req) => {
         result = await updatePlan(supabaseAdmin, userId, params.planId, params.updates, req.headers);
         break;
 
+      case 'search_foods':
+        result = await searchFoods(supabaseAdmin, params.query, params.limit, params.offset);
+        break;
+
+      case 'update_food':
+        result = await updateFood(supabaseAdmin, userId, params.foodId, params.updates, req.headers);
+        break;
+
+      case 'delete_food':
+        result = await deleteFood(supabaseAdmin, userId, params.foodId, req.headers);
+        break;
+
       default:
         throw new Error(`Ação desconhecida: ${action}`);
     }
@@ -1037,4 +1049,176 @@ async function previewDeleteUser(
     records: preview,
     totalRecords,
   };
+}
+
+// deno-lint-ignore no-explicit-any
+async function searchFoods(
+  supabase: any,
+  query: string,
+  limit: number = 50,
+  offset: number = 0
+) {
+  logStep('Searching foods', { query, limit, offset });
+
+  let dbQuery = supabase
+    .from('foods')
+    .select('*', { count: 'exact' });
+
+  if (query && query.trim() !== '') {
+    dbQuery = dbQuery.ilike('name', `%${query.trim()}%`);
+  }
+
+  const { data, error, count } = await dbQuery
+    .order('name')
+    .range(offset, offset + limit - 1);
+
+  if (error) {
+    logStep('Error searching foods', { error: error.message });
+    throw new Error(`Erro ao buscar alimentos: ${error.message}`);
+  }
+
+  return { foods: data || [], total: count || 0 };
+}
+
+// deno-lint-ignore no-explicit-any
+async function updateFood(
+  supabase: any,
+  adminId: string,
+  foodId: string,
+  updates: Record<string, unknown>,
+  headers: Headers
+) {
+  if (!foodId) {
+    throw new Error('ID do alimento é obrigatório');
+  }
+
+  logStep('Updating food', { foodId, updates });
+
+  // Validate updates
+  const allowedFields = ['name', 'calories', 'protein', 'carbs', 'fat', 'serving_size', 'category', 'processing_level'];
+  const filteredUpdates: Record<string, unknown> = {};
+
+  for (const [key, value] of Object.entries(updates)) {
+    if (allowedFields.includes(key)) {
+      if (key === 'category') {
+        if (value && !VALID_CATEGORIES.includes(String(value))) {
+          throw new Error(`Categoria inválida: ${value}`);
+        }
+        filteredUpdates[key] = value || null;
+      } else if (key === 'processing_level') {
+        if (value && !VALID_PROCESSING_LEVELS.includes(String(value))) {
+          throw new Error(`Nível de processamento inválido: ${value}`);
+        }
+        filteredUpdates[key] = value || 'in_natura';
+      } else if (['calories', 'protein', 'carbs', 'fat'].includes(key)) {
+        const numValue = Number(value);
+        if (isNaN(numValue) || numValue < 0) {
+          throw new Error(`${key} deve ser um número >= 0`);
+        }
+        filteredUpdates[key] = numValue;
+      } else {
+        filteredUpdates[key] = value;
+      }
+    }
+  }
+
+  if (Object.keys(filteredUpdates).length === 0) {
+    throw new Error('Nenhum campo válido para atualizar');
+  }
+
+  // Get old values for audit
+  const { data: oldFood } = await supabase
+    .from('foods')
+    .select('*')
+    .eq('id', foodId)
+    .single();
+
+  const { data, error } = await supabase
+    .from('foods')
+    .update(filteredUpdates)
+    .eq('id', foodId)
+    .select()
+    .single();
+
+  if (error) {
+    logStep('Error updating food', { error: error.message });
+    throw new Error(`Erro ao atualizar alimento: ${error.message}`);
+  }
+
+  // Audit log
+  await supabase.from('admin_audit_log').insert({
+    user_id: adminId,
+    action: 'update_food',
+    entity_type: 'food',
+    entity_id: foodId,
+    old_value: oldFood,
+    new_value: data,
+    user_agent: headers.get('user-agent'),
+  });
+
+  logStep('Food updated successfully', { foodId });
+  return { food: data };
+}
+
+// deno-lint-ignore no-explicit-any
+async function deleteFood(
+  supabase: any,
+  adminId: string,
+  foodId: string,
+  headers: Headers
+) {
+  if (!foodId) {
+    throw new Error('ID do alimento é obrigatório');
+  }
+
+  logStep('Deleting food', { foodId });
+
+  // Get food data for audit before deleting
+  const { data: oldFood, error: fetchError } = await supabase
+    .from('foods')
+    .select('*')
+    .eq('id', foodId)
+    .single();
+
+  if (fetchError) {
+    throw new Error(`Alimento não encontrado: ${fetchError.message}`);
+  }
+
+  // Check if food is in use
+  const { count: mealFoodsCount } = await supabase
+    .from('meal_foods')
+    .select('id', { count: 'exact', head: true })
+    .eq('food_id', foodId);
+
+  const { count: mealOptionFoodsCount } = await supabase
+    .from('meal_option_foods')
+    .select('id', { count: 'exact', head: true })
+    .eq('food_id', foodId);
+
+  if ((mealFoodsCount || 0) > 0 || (mealOptionFoodsCount || 0) > 0) {
+    throw new Error(`Este alimento está em uso em ${(mealFoodsCount || 0) + (mealOptionFoodsCount || 0)} refeições e não pode ser excluído`);
+  }
+
+  const { error } = await supabase
+    .from('foods')
+    .delete()
+    .eq('id', foodId);
+
+  if (error) {
+    logStep('Error deleting food', { error: error.message });
+    throw new Error(`Erro ao excluir alimento: ${error.message}`);
+  }
+
+  // Audit log
+  await supabase.from('admin_audit_log').insert({
+    user_id: adminId,
+    action: 'delete_food',
+    entity_type: 'food',
+    entity_id: foodId,
+    old_value: oldFood,
+    user_agent: headers.get('user-agent'),
+  });
+
+  logStep('Food deleted successfully', { foodId });
+  return { success: true };
 }

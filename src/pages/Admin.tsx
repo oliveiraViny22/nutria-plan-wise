@@ -185,6 +185,9 @@ export default function Admin() {
     deleteUser,
     fetchPlans,
     updatePlan,
+    searchFoods,
+    updateFood,
+    deleteFood,
   } = useAdminOperations();
 
   const [activeTab, setActiveTab] = useState('metrics');
@@ -220,6 +223,15 @@ export default function Admin() {
   
   // Foods export state
   const [exportingFoods, setExportingFoods] = useState<string | null>(null);
+
+  // Foods management state
+  const [foodsSearch, setFoodsSearch] = useState('');
+  const [foodsData, setFoodsData] = useState<{ foods: FoodRow[]; total: number }>({ foods: [], total: 0 });
+  const [foodsLoading, setFoodsLoading] = useState(false);
+  const [foodsPage, setFoodsPage] = useState(0);
+  const [editingFood, setEditingFood] = useState<FoodRow & { id: string } | null>(null);
+  const [editedFoodData, setEditedFoodData] = useState<Partial<FoodRow>>({});
+  const [deletingFoodId, setDeletingFoodId] = useState<string | null>(null);
 
   // Metrics state
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
@@ -609,6 +621,42 @@ export default function Admin() {
       });
     } finally {
       setSeedingData(false);
+    }
+  };
+
+  // Foods management handlers
+  const handleSearchFoods = useCallback(async (page = 0) => {
+    setFoodsLoading(true);
+    try {
+      const result = await searchFoods(foodsSearch, 20, page * 20);
+      setFoodsData(result);
+      setFoodsPage(page);
+    } finally {
+      setFoodsLoading(false);
+    }
+  }, [foodsSearch, searchFoods]);
+
+  const handleUpdateFood = async () => {
+    if (!editingFood) return;
+    try {
+      await updateFood(editingFood.id, editedFoodData);
+      setEditingFood(null);
+      setEditedFoodData({});
+      // Refresh the list
+      handleSearchFoods(foodsPage);
+    } catch {
+      // Error handled in hook
+    }
+  };
+
+  const handleDeleteFood = async (foodId: string) => {
+    try {
+      await deleteFood(foodId);
+      setDeletingFoodId(null);
+      // Refresh the list
+      handleSearchFoods(foodsPage);
+    } catch {
+      // Error handled in hook
     }
   };
 
@@ -2230,6 +2278,147 @@ export default function Admin() {
                 </CardContent>
               </Card>
             </div>
+
+              {/* Manage Foods Section */}
+              <Card className="mt-6">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Database className="h-5 w-5" />
+                    Gerenciar Alimentos
+                  </CardTitle>
+                  <CardDescription>
+                    Busque, edite ou exclua alimentos existentes no banco de dados.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {/* Search */}
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Buscar alimentos por nome..."
+                        value={foodsSearch}
+                        onChange={(e) => setFoodsSearch(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && handleSearchFoods(0)}
+                        className="pl-10"
+                      />
+                    </div>
+                    <Button onClick={() => handleSearchFoods(0)} disabled={foodsLoading}>
+                      {foodsLoading ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Search className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </div>
+
+                  {/* Results */}
+                  {foodsData.total > 0 && (
+                    <div className="text-sm text-muted-foreground">
+                      {foodsData.total} alimento(s) encontrado(s)
+                    </div>
+                  )}
+
+                  <ScrollArea className="h-[400px] border rounded-lg">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-[200px]">Nome</TableHead>
+                          <TableHead className="text-right">Kcal</TableHead>
+                          <TableHead className="text-right">Prot</TableHead>
+                          <TableHead className="text-right">Carb</TableHead>
+                          <TableHead className="text-right">Gord</TableHead>
+                          <TableHead>Porção</TableHead>
+                          <TableHead>Categoria</TableHead>
+                          <TableHead className="text-right">Ações</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {foodsData.foods.map((food: FoodRow & { id?: string }) => (
+                          <TableRow key={food.id || food.name}>
+                            <TableCell className="font-medium">{food.name}</TableCell>
+                            <TableCell className="text-right">{food.calories}</TableCell>
+                            <TableCell className="text-right">{food.protein}g</TableCell>
+                            <TableCell className="text-right">{food.carbs}g</TableCell>
+                            <TableCell className="text-right">{food.fat}g</TableCell>
+                            <TableCell className="text-xs">{food.serving_size || '100g'}</TableCell>
+                            <TableCell className="text-xs">
+                              {food.category ? (
+                                <Badge variant="outline" className="text-xs">
+                                  {food.category.replace(/_/g, ' ')}
+                                </Badge>
+                              ) : '-'}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex justify-end gap-1">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => {
+                                    setEditingFood(food as FoodRow & { id: string });
+                                    setEditedFoodData(food);
+                                  }}
+                                >
+                                  <Edit2 className="h-3.5 w-3.5" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="text-destructive hover:text-destructive"
+                                  onClick={() => setDeletingFoodId(food.id || null)}
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                        {foodsData.foods.length === 0 && !foodsLoading && (
+                          <TableRow>
+                            <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
+                              {foodsSearch ? 'Nenhum alimento encontrado.' : 'Digite um termo para buscar alimentos.'}
+                            </TableCell>
+                          </TableRow>
+                        )}
+                        {foodsLoading && (
+                          <TableRow>
+                            <TableCell colSpan={8} className="text-center py-8">
+                              <Loader2 className="h-6 w-6 animate-spin mx-auto text-muted-foreground" />
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </TableBody>
+                    </Table>
+                  </ScrollArea>
+
+                  {/* Pagination */}
+                  {foodsData.total > 20 && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">
+                        Página {foodsPage + 1} de {Math.ceil(foodsData.total / 20)}
+                      </span>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleSearchFoods(foodsPage - 1)}
+                          disabled={foodsPage === 0 || foodsLoading}
+                        >
+                          <ChevronLeft className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleSearchFoods(foodsPage + 1)}
+                          disabled={(foodsPage + 1) * 20 >= foodsData.total || foodsLoading}
+                        >
+                          <ChevronRight className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
           </TabsContent>
 
           {/* Import History Tab */}
@@ -3047,6 +3236,179 @@ export default function Admin() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Edit Food Dialog */}
+      <Dialog open={!!editingFood} onOpenChange={(open) => {
+        if (!open) {
+          setEditingFood(null);
+          setEditedFoodData({});
+        }
+      }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Edit2 className="h-5 w-5" />
+              Editar Alimento
+            </DialogTitle>
+            <DialogDescription>
+              Atualize as informações nutricionais do alimento.
+            </DialogDescription>
+          </DialogHeader>
+
+          {editingFood && (
+            <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto">
+              <div className="space-y-2">
+                <Label>Nome</Label>
+                <Input
+                  value={editedFoodData.name ?? editingFood.name}
+                  onChange={(e) => setEditedFoodData(prev => ({ ...prev, name: e.target.value }))}
+                  placeholder="Nome do alimento"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Calorias (kcal)</Label>
+                  <Input
+                    type="number"
+                    value={editedFoodData.calories ?? editingFood.calories}
+                    onChange={(e) => setEditedFoodData(prev => ({ ...prev, calories: Number(e.target.value) }))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Proteína (g)</Label>
+                  <Input
+                    type="number"
+                    step="0.1"
+                    value={editedFoodData.protein ?? editingFood.protein}
+                    onChange={(e) => setEditedFoodData(prev => ({ ...prev, protein: Number(e.target.value) }))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Carboidratos (g)</Label>
+                  <Input
+                    type="number"
+                    step="0.1"
+                    value={editedFoodData.carbs ?? editingFood.carbs}
+                    onChange={(e) => setEditedFoodData(prev => ({ ...prev, carbs: Number(e.target.value) }))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Gordura (g)</Label>
+                  <Input
+                    type="number"
+                    step="0.1"
+                    value={editedFoodData.fat ?? editingFood.fat}
+                    onChange={(e) => setEditedFoodData(prev => ({ ...prev, fat: Number(e.target.value) }))}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Porção</Label>
+                <Input
+                  value={editedFoodData.serving_size ?? editingFood.serving_size ?? '100g'}
+                  onChange={(e) => setEditedFoodData(prev => ({ ...prev, serving_size: e.target.value }))}
+                  placeholder="Ex: 100g, 1 unidade"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Categoria</Label>
+                  <Select
+                    value={editedFoodData.category ?? editingFood.category ?? ''}
+                    onValueChange={(value) => setEditedFoodData(prev => ({ ...prev, category: value || null }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">Nenhuma</SelectItem>
+                      <SelectItem value="frutas">Frutas</SelectItem>
+                      <SelectItem value="hortaliças_folhosas">Hortaliças Folhosas</SelectItem>
+                      <SelectItem value="legumes">Legumes</SelectItem>
+                      <SelectItem value="cereais_tubérculos">Cereais e Tubérculos</SelectItem>
+                      <SelectItem value="leguminosas">Leguminosas</SelectItem>
+                      <SelectItem value="proteínas_animais">Proteínas Animais</SelectItem>
+                      <SelectItem value="laticínios">Laticínios</SelectItem>
+                      <SelectItem value="óleos_oleaginosas">Óleos e Oleaginosas</SelectItem>
+                      <SelectItem value="suplementos">Suplementos</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Nível Processamento</Label>
+                  <Select
+                    value={editedFoodData.processing_level ?? editingFood.processing_level ?? 'in_natura'}
+                    onValueChange={(value) => setEditedFoodData(prev => ({ ...prev, processing_level: value }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="in_natura">In Natura</SelectItem>
+                      <SelectItem value="minimamente_processado">Minimamente Processado</SelectItem>
+                      <SelectItem value="processado">Processado</SelectItem>
+                      <SelectItem value="ultraprocessado">Ultraprocessado</SelectItem>
+                      <SelectItem value="suplemento">Suplemento</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditingFood(null)}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleUpdateFood}
+              disabled={savingKeys.has(`food_${editingFood?.id}`)}
+            >
+              {savingKeys.has(`food_${editingFood?.id}`) ? (
+                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+              ) : (
+                <Save className="h-4 w-4 mr-1" />
+              )}
+              Salvar Alimento
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Food Confirmation */}
+      <AlertDialog open={!!deletingFoodId} onOpenChange={(open) => !open && setDeletingFoodId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-destructive" />
+              Excluir Alimento
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir este alimento? Esta ação não pode ser desfeita.
+              <br /><br />
+              <strong>Nota:</strong> Alimentos em uso em refeições não podem ser excluídos.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deletingFoodId && handleDeleteFood(deletingFoodId)}
+              disabled={savingKeys.has(`delete_food_${deletingFoodId}`)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {savingKeys.has(`delete_food_${deletingFoodId}`) ? (
+                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+              ) : (
+                <Trash2 className="h-4 w-4 mr-1" />
+              )}
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
