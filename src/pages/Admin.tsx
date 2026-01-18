@@ -202,8 +202,9 @@ export default function Admin() {
   const [editingPlan, setEditingPlan] = useState<Plan | null>(null);
   const [editedPlanData, setEditedPlanData] = useState<Partial<Plan>>({});
   
-  // Documentation download state
+  // Documentation state
   const [downloadingDoc, setDownloadingDoc] = useState<string | null>(null);
+  const [uploadingDoc, setUploadingDoc] = useState<string | null>(null);
 
   // Metrics state
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
@@ -630,6 +631,42 @@ export default function Admin() {
     } finally {
       setDownloadingDoc(null);
     }
+  };
+
+  const handleUploadDocumentation = async (docType: 'technical' | 'commercial', file: File) => {
+    setUploadingDoc(docType);
+    try {
+      const text = await file.text();
+      const settingKey = docType === 'technical' ? 'documentation_technical' : 'documentation_commercial';
+      
+      const { error } = await supabase
+        .from('system_settings')
+        .update({ value: text, updated_at: new Date().toISOString() })
+        .eq('key', settingKey);
+      
+      if (error) throw error;
+      
+      toast({
+        title: 'Documentação atualizada',
+        description: `Documentação ${docType === 'technical' ? 'técnica' : 'comercial'} atualizada com sucesso.`,
+      });
+    } catch (error) {
+      toast({
+        title: 'Erro no upload',
+        description: error instanceof Error ? error.message : 'Erro desconhecido',
+        variant: 'destructive',
+      });
+    } finally {
+      setUploadingDoc(null);
+    }
+  };
+
+  const handleDocFileChange = (docType: 'technical' | 'commercial') => (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      handleUploadDocumentation(docType, file);
+    }
+    e.target.value = '';
   };
 
   const renderSettingEditor = (setting: { key: string; value: unknown; description: string | null }) => {
@@ -1426,7 +1463,7 @@ export default function Admin() {
               <div className="flex items-center justify-between">
                 <div>
                   <h2 className="text-2xl font-bold">Documentação do Sistema</h2>
-                  <p className="text-muted-foreground">Baixe a documentação oficial do NutriaPlan em PDF</p>
+                  <p className="text-muted-foreground">Gerencie e baixe a documentação oficial do NutriaPlan</p>
                 </div>
               </div>
               
@@ -1468,19 +1505,41 @@ export default function Admin() {
                         <span>Requisitos funcionais e não funcionais</span>
                       </li>
                     </ul>
-                    <Button 
-                      onClick={() => handleDownloadDocumentation('technical')}
-                      disabled={downloadingDoc !== null}
-                      className="w-full"
-                      size="lg"
-                    >
-                      {downloadingDoc === 'technical' ? (
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      ) : (
-                        <Download className="h-4 w-4 mr-2" />
-                      )}
-                      Baixar TXT Técnico
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button 
+                        onClick={() => handleDownloadDocumentation('technical')}
+                        disabled={downloadingDoc !== null || uploadingDoc !== null}
+                        className="flex-1"
+                        size="lg"
+                      >
+                        {downloadingDoc === 'technical' ? (
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                          <Download className="h-4 w-4 mr-2" />
+                        )}
+                        Baixar TXT
+                      </Button>
+                      <div className="relative">
+                        <input
+                          type="file"
+                          accept=".txt,.md"
+                          onChange={handleDocFileChange('technical')}
+                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                          disabled={uploadingDoc !== null || downloadingDoc !== null}
+                        />
+                        <Button 
+                          variant="outline"
+                          size="lg"
+                          disabled={uploadingDoc !== null || downloadingDoc !== null}
+                        >
+                          {uploadingDoc === 'technical' ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Upload className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </div>
+                    </div>
                   </CardContent>
                 </Card>
 
@@ -1521,29 +1580,51 @@ export default function Admin() {
                         <span>Visão de futuro e roadmap do produto</span>
                       </li>
                     </ul>
-                    <Button 
-                      onClick={() => handleDownloadDocumentation('commercial')}
-                      disabled={downloadingDoc !== null}
-                      className="w-full"
-                      size="lg"
-                      variant="secondary"
-                    >
-                      {downloadingDoc === 'commercial' ? (
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      ) : (
-                        <Download className="h-4 w-4 mr-2" />
-                      )}
-                      Baixar TXT Comercial
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button 
+                        onClick={() => handleDownloadDocumentation('commercial')}
+                        disabled={downloadingDoc !== null || uploadingDoc !== null}
+                        className="flex-1"
+                        size="lg"
+                        variant="secondary"
+                      >
+                        {downloadingDoc === 'commercial' ? (
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                          <Download className="h-4 w-4 mr-2" />
+                        )}
+                        Baixar TXT
+                      </Button>
+                      <div className="relative">
+                        <input
+                          type="file"
+                          accept=".txt,.md"
+                          onChange={handleDocFileChange('commercial')}
+                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                          disabled={uploadingDoc !== null || downloadingDoc !== null}
+                        />
+                        <Button 
+                          variant="outline"
+                          size="lg"
+                          disabled={uploadingDoc !== null || downloadingDoc !== null}
+                        >
+                          {uploadingDoc === 'commercial' ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Upload className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </div>
+                    </div>
                   </CardContent>
                 </Card>
               </div>
               
               <Alert>
                 <FileText className="h-4 w-4" />
-                <AlertTitle>Formato PDF</AlertTitle>
+                <AlertTitle>Atualização de Documentação</AlertTitle>
                 <AlertDescription>
-                  Os documentos são gerados em PDF com formatação profissional, prontos para impressão ou compartilhamento.
+                  Clique no ícone de upload para enviar um arquivo .txt ou .md com o novo conteúdo. O download sempre gerará a versão mais atualizada.
                 </AlertDescription>
               </Alert>
             </motion.div>
