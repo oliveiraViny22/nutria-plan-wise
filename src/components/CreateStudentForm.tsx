@@ -34,13 +34,15 @@ interface CreateStudentFormProps {
   onCancel: () => void;
 }
 
+/**
+ * Generate a cryptographically secure random password
+ * Uses Web Crypto API instead of Math.random() for security
+ */
 function generatePassword(length = 12): string {
-  const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%';
-  let password = '';
-  for (let i = 0; i < length; i++) {
-    password += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return password;
+  const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*';
+  const randomValues = new Uint8Array(length);
+  crypto.getRandomValues(randomValues);
+  return Array.from(randomValues, v => chars.charAt(v % chars.length)).join('');
 }
 
 export function CreateStudentForm({ onSuccess, onCancel }: CreateStudentFormProps) {
