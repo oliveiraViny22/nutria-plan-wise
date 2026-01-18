@@ -119,16 +119,19 @@ interface SubscriptionData {
   plan_name?: string;
 }
 
-// CSV parsing helper
-function parseCSV(text: string): Record<string, unknown>[] {
-  const lines = text.trim().split('\n');
+// Delimited file parsing helper (CSV, TXT, XLS)
+function parseDelimited(text: string, delimiter: string): Record<string, unknown>[] {
+  const lines = text.trim().split(/\r?\n/);
   if (lines.length < 2) return [];
   
-  const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+  const headers = lines[0].split(delimiter).map(h => h.trim().toLowerCase());
   const rows: Record<string, unknown>[] = [];
   
   for (let i = 1; i < lines.length; i++) {
-    const values = lines[i].split(',').map(v => v.trim());
+    const line = lines[i].trim();
+    if (!line) continue; // Skip empty lines
+    
+    const values = line.split(delimiter).map(v => v.trim());
     const row: Record<string, unknown> = {};
     headers.forEach((header, index) => {
       row[header] = values[index] || '';
@@ -137,6 +140,14 @@ function parseCSV(text: string): Record<string, unknown>[] {
   }
   
   return rows;
+}
+
+// Get delimiter based on file extension
+function getDelimiterForFile(filename: string): string {
+  const ext = filename.toLowerCase().split('.').pop();
+  if (ext === 'csv') return ',';
+  // TXT and XLS use tab delimiter (matching export format)
+  return '\t';
 }
 
 export default function Admin() {
@@ -545,10 +556,15 @@ export default function Admin() {
     setCsvFile(file);
     
     const text = await file.text();
-    const rows = parseCSV(text);
+    const delimiter = getDelimiterForFile(file.name);
+    const rows = parseDelimited(text, delimiter);
     
     if (rows.length === 0) {
-      toast({ title: 'Arquivo vazio', description: 'O arquivo não contém dados válidos.', variant: 'destructive' });
+      toast({ 
+        title: 'Arquivo vazio', 
+        description: 'O arquivo não contém dados válidos. Verifique se o formato corresponde ao modelo exportado.', 
+        variant: 'destructive' 
+      });
       return;
     }
 
@@ -2172,7 +2188,7 @@ export default function Admin() {
                     <div className="relative">
                       <Input
                         type="file"
-                        accept=".csv,.xlsx,.xls"
+                        accept=".csv,.txt,.xls,.xlsx"
                         onChange={handleFileUpload}
                         className="hidden"
                         id="food-upload"
@@ -2180,7 +2196,7 @@ export default function Admin() {
                       <Label htmlFor="food-upload" asChild>
                         <Button variant="default" className="cursor-pointer">
                           <Upload className="h-4 w-4 mr-2" />
-                          Selecionar Arquivo
+                          Selecionar Arquivo (CSV, TXT, XLS)
                         </Button>
                       </Label>
                     </div>
@@ -2190,6 +2206,10 @@ export default function Admin() {
                     <AlertCircle className="h-4 w-4" />
                     <AlertTitle>Formato esperado</AlertTitle>
                     <AlertDescription>
+                      <strong>Formatos aceitos:</strong> CSV (vírgula), TXT (tab), XLS (tab)
+                      <br />
+                      <strong>Dica:</strong> Exporte o banco atual para obter um arquivo no formato correto.
+                      <br /><br />
                       Colunas obrigatórias: <code className="text-xs bg-muted px-1 rounded">name, calories, protein, carbs, fat</code>
                       <br />
                       Colunas opcionais: <code className="text-xs bg-muted px-1 rounded">serving_size, category, processing_level</code>
