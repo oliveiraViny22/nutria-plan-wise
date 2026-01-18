@@ -8,11 +8,14 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useSubscription } from '@/hooks/useSubscription';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
 import { Plan } from '@/lib/subscription-types';
+import { MobileNav } from '@/components/MobileNav';
 
 export default function Pricing() {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { user } = useAuth();
   const { plans, currentPlan, loading, createCheckout, accountType, isLinkedToProfessional } = useSubscription();
   const [accountTab, setAccountTab] = useState<'personal' | 'professional'>(accountType);
   const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null);
@@ -29,6 +32,17 @@ export default function Pricing() {
   });
 
   const handleSubscribe = async (plan: Plan) => {
+    // Require authentication before checkout
+    if (!user) {
+      toast({
+        title: 'Autenticação necessária',
+        description: 'Faça login para assinar um plano.',
+        variant: 'destructive',
+      });
+      navigate('/login', { state: { from: { pathname: '/pricing' } } });
+      return;
+    }
+
     if (plan.name === 'gratuito') {
       toast({ title: 'Você já está no plano gratuito!' });
       return;
@@ -104,7 +118,8 @@ export default function Pricing() {
             <ArrowLeft className="h-4 w-4 sm:h-5 sm:w-5" />
           </Button>
           <h1 className="text-lg sm:text-xl font-bold">Planos e Preços</h1>
-          <div className="w-9 sm:w-10" />
+          <MobileNav />
+          <div className="w-9 sm:w-10 hidden md:block" />
         </div>
       </header>
 
