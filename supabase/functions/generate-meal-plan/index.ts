@@ -97,6 +97,137 @@ const VALID_CATEGORIES = [
 
 const ALLOWED_PROCESSING_LEVELS = ['in_natura', 'minimamente_processado'];
 
+// Category priorities by meal type
+const MEAL_CATEGORY_PRIORITIES: Record<MealType, string[]> = {
+  breakfast: ['cereais_tubérculos', 'frutas', 'laticínios', 'óleos_oleaginosas'],
+  morning_snack: ['frutas', 'óleos_oleaginosas', 'laticínios'],
+  lunch: ['proteínas_animais', 'cereais_tubérculos', 'leguminosas', 'hortaliças_folhosas', 'legumes'],
+  afternoon_snack: ['frutas', 'laticínios', 'óleos_oleaginosas'],
+  dinner: ['proteínas_animais', 'hortaliças_folhosas', 'legumes', 'cereais_tubérculos'],
+  supper: ['laticínios', 'frutas', 'óleos_oleaginosas'],
+};
+
+// Goal-based macro priorities
+const GOAL_MACRO_WEIGHTS: Record<string, { protein: number; carbs: number; fat: number }> = {
+  lose_weight: { protein: 1.3, carbs: 0.7, fat: 0.9 },
+  gain_muscle: { protein: 1.4, carbs: 1.1, fat: 0.8 },
+  maintain: { protein: 1.0, carbs: 1.0, fat: 1.0 },
+};
+
+// Intelligent food selection based on goal, macros, and categories
+function selectFoodsIntelligently(
+  allFoods: Food[],
+  goal: string,
+  targetProtein: number,
+  targetCarbs: number,
+  targetFat: number,
+  preferences: string[],
+  restrictions: string[],
+  maxFoods: number = 80
+): Food[] {
+  const weights = GOAL_MACRO_WEIGHTS[goal] || GOAL_MACRO_WEIGHTS.maintain;
+  
+  // Filter out supplements and ultra-processed
+  const eligibleFoods = allFoods.filter((f: Food) => {
+    if (f.category === 'suplementos') return false;
+    const level = f.processing_level || 'in_natura';
+    if (!ALLOWED_PROCESSING_LEVELS.includes(level)) return false;
+    
+    // Check restrictions
+    const foodName = f.name.toLowerCase();
+    const isRestricted = restrictions.some(r => {
+      const restriction = r.toLowerCase();
+      if (restriction.includes('lactose') && f.category === 'laticínios') return true;
+      if (restriction.includes('gluten') && (foodName.includes('trigo') || foodName.includes('aveia') || foodName.includes('pão'))) return true;
+      if (restriction.includes('vegetariano') && f.category === 'proteínas_animais') return true;
+      if (restriction.includes('vegano') && (f.category === 'proteínas_animais' || f.category === 'laticínios')) return true;
+      return foodName.includes(restriction);
+    });
+    
+    return !isRestricted;
+  });
+  
+  // Score each food based on goal alignment and macro density
+  const scoredFoods = eligibleFoods.map((f: Food) => {
+    let score = 0;
+    const servingGrams = parseServingGrams(f.serving_size);
+    
+    // Macro density per 100g (normalized)
+    const proteinDensity = (Number(f.protein) / servingGrams) * 100;
+    const carbsDensity = (Number(f.carbs) / servingGrams) * 100;
+    const fatDensity = (Number(f.fat) / servingGrams) * 100;
+    
+    // Score based on goal-weighted macros
+    score += proteinDensity * weights.protein;
+    score += carbsDensity * weights.carbs * 0.3; // Carbs weighted less
+    score += fatDensity * weights.fat * 0.5;
+    
+    // Bonus for preferences
+    const foodName = f.name.toLowerCase();
+    if (preferences.some(p => foodName.includes(p.toLowerCase()))) {
+      score *= 1.5;
+    }
+    
+    // Category diversity bonus
+    const categoryBonus: Record<string, number> = {
+      'proteínas_animais': goal === 'gain_muscle' ? 2 : 1.2,
+      'hortaliças_folhosas': goal === 'lose_weight' ? 1.8 : 1.2,
+      'legumes': 1.3,
+      'leguminosas': 1.4,
+      'frutas': 1.2,
+      'cereais_tubérculos': goal === 'gain_muscle' ? 1.5 : 1,
+      'laticínios': 1.2,
+      'óleos_oleaginosas': 1.1,
+    };
+    score *= categoryBonus[f.category] || 1;
+    
+    return { food: f, score };
+  });
+  
+  // Sort by score descending
+  scoredFoods.sort((a, b) => b.score - a.score);
+  
+  // Ensure category diversity - pick foods from each category
+  const selectedFoods: Food[] = [];
+  const categoryQuotas: Record<string, number> = {
+    'proteínas_animais': Math.ceil(maxFoods * 0.2),
+    'cereais_tubérculos': Math.ceil(maxFoods * 0.15),
+    'hortaliças_folhosas': Math.ceil(maxFoods * 0.15),
+    'legumes': Math.ceil(maxFoods * 0.1),
+    'frutas': Math.ceil(maxFoods * 0.15),
+    'leguminosas': Math.ceil(maxFoods * 0.08),
+    'laticínios': Math.ceil(maxFoods * 0.1),
+    'óleos_oleaginosas': Math.ceil(maxFoods * 0.07),
+  };
+  
+  const categoryCount: Record<string, number> = {};
+  
+  for (const { food } of scoredFoods) {
+    const cat = food.category;
+    const quota = categoryQuotas[cat] || 3;
+    const current = categoryCount[cat] || 0;
+    
+    if (current < quota) {
+      selectedFoods.push(food);
+      categoryCount[cat] = current + 1;
+      
+      if (selectedFoods.length >= maxFoods) break;
+    }
+  }
+  
+  // If we haven't filled the quota, add more high-scoring foods
+  if (selectedFoods.length < maxFoods) {
+    for (const { food } of scoredFoods) {
+      if (!selectedFoods.includes(food)) {
+        selectedFoods.push(food);
+        if (selectedFoods.length >= maxFoods) break;
+      }
+    }
+  }
+  
+  return selectedFoods;
+}
+
 function parseServingGrams(servingSize: string): number {
   const match = servingSize.match(/(\d+)\s*(g|ml)/i);
   if (match) return parseInt(match[1], 10);
@@ -166,10 +297,10 @@ serve(async (req) => {
     
     // Validate preferences and restrictions
     const preferences = validate.isArray(profileData.preferences)
-      ? (profileData.preferences as unknown[]).filter(validate.isString).slice(0, 20)
+      ? (profileData.preferences as unknown[]).filter(validate.isString).slice(0, 20) as string[]
       : [];
     const restrictions = validate.isArray(profileData.restrictions)
-      ? (profileData.restrictions as unknown[]).filter(validate.isString).slice(0, 20)
+      ? (profileData.restrictions as unknown[]).filter(validate.isString).slice(0, 20) as string[]
       : [];
     const goal = validate.isString(profileData.goal) ? profileData.goal : 'maintain';
     
@@ -178,7 +309,7 @@ serve(async (req) => {
       ? studentId as string
       : null;
     
-    logStep("Profile validated", { targetCalories, mealsPerDay, studentId: validStudentId });
+    logStep("Profile validated", { targetCalories, mealsPerDay, goal, studentId: validStudentId });
     
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -277,12 +408,22 @@ serve(async (req) => {
       return createErrorResponse(CLIENT_ERRORS.SERVER_ERROR, 500, corsHeaders);
     }
 
-    // Filter foods for meal plan generation
-    const foods = allFoods.filter((f: Food) => {
-      if (f.category === 'suplementos') return false;
-      const level = f.processing_level || 'in_natura';
-      if (!ALLOWED_PROCESSING_LEVELS.includes(level)) return false;
-      return true;
+    // Use intelligent food selection instead of fixed slice
+    const foods = selectFoodsIntelligently(
+      allFoods as Food[],
+      goal,
+      targetProtein,
+      targetCarbs,
+      targetFat,
+      preferences,
+      restrictions,
+      80 // Select up to 80 diverse foods
+    );
+
+    logStep("Foods selected intelligently", { 
+      totalAvailable: allFoods.length, 
+      selected: foods.length,
+      goal,
     });
 
     if (foods.length === 0) {
@@ -299,6 +440,18 @@ serve(async (req) => {
 
     const categoryList = VALID_CATEGORIES.filter(c => c !== 'suplementos').join(', ');
 
+    // Group foods by category for better AI context
+    const foodsByCategory: Record<string, string[]> = {};
+    for (const f of foods) {
+      const cat = f.category || 'outros';
+      if (!foodsByCategory[cat]) foodsByCategory[cat] = [];
+      foodsByCategory[cat].push(`${f.id}: ${f.name} (${f.calories}kcal/${f.serving_size})`);
+    }
+
+    const foodsContextText = Object.entries(foodsByCategory)
+      .map(([cat, items]) => `\n### ${cat}:\n${items.join('\n')}`)
+      .join('\n');
+
     const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
@@ -311,7 +464,7 @@ serve(async (req) => {
 A meta EXATA do usuário é: ${targetCalories} calorias, ${targetProtein}g proteína, ${targetCarbs}g carboidratos, ${targetFat}g gordura.
 Preferências: ${preferences.join(", ") || "nenhuma"}. 
 Restrições: ${restrictions.join(", ") || "nenhuma"}. 
-Objetivo: ${goal}.
+Objetivo: ${goal === 'lose_weight' ? 'perder peso' : goal === 'gain_muscle' ? 'ganhar massa muscular' : 'manter peso'}.
 
 CATEGORIAS VÁLIDAS: ${categoryList}
 TAXONOMIA NUTRICIONAL:
@@ -326,18 +479,20 @@ REGRAS IMPORTANTES:
 3. O usuário quer ${mealsPerDay} refeições por dia: ${mealDistributionText}.
 4. Use quantidades realistas (ex: 150g de arroz, 200ml de leite, 120g de frango).
 5. NÃO use suplementos - apenas alimentos naturais ou minimamente processados.
-6. Tipos de refeição válidos: ${mealTypes.join(', ')}.` 
+6. Tipos de refeição válidos: ${mealTypes.join(', ')}.
+7. GARANTA VARIEDADE: use alimentos diferentes em cada refeição, não repita o mesmo alimento.
+8. PRIORIZE proteínas no objetivo ${goal === 'gain_muscle' ? 'ganhar massa' : goal === 'lose_weight' ? 'perder peso' : 'manter peso'}.` 
           },
           { 
             role: "user", 
-            content: `Alimentos disponíveis (id, nome, calorias por porção base, tamanho porção, categoria):
-${foods.slice(0, 50).map((f: Food) => `- ${f.id}: ${f.name}, ${f.calories}kcal/${f.serving_size}, categoria: ${f.category}`).join("\n")}
+            content: `Alimentos disponíveis organizados por categoria:
+${foodsContextText}
 
 Retorne APENAS JSON válido com EXATAMENTE ${mealsPerDay} refeições:
 { "meals": [{ "name": "${mealTypes[0]}|${mealTypes[1]}|...", "foods": [{ "food_id": "uuid", "quantity": 150 }] }] }
 
 Use os tipos de refeição: ${mealTypes.join(', ')}.
-Lembre-se: quantity em gramas/ml, total EXATO de ${targetCalories} calorias, sem suplementos!` 
+Lembre-se: quantity em gramas/ml, total EXATO de ${targetCalories} calorias, sem suplementos, VARIEDADE de alimentos!` 
           }
         ],
       }),
