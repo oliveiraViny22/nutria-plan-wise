@@ -54,11 +54,13 @@ interface MigrationResult {
 
 interface FoodAuditProps {
   onApplySuggestion?: (foodId: string, updates: Record<string, string | null>) => Promise<void>;
-  onApplyBatch?: (updates: Array<{ foodId: string; updates: Record<string, string | null> }>) => Promise<void>;
+  onApplyBatch?: (updates: Array<{ foodId: string; updates: { category?: string; processing_level?: string } }>) => Promise<{ success: number; failed: number; errors: Array<{ foodId: string; error: string }> }>;
+  onApplyAll?: (updates: Array<{ foodId: string; updates: { category?: string; processing_level?: string } }>) => Promise<{ success: number; failed: number; errors: Array<{ foodId: string; error: string }> }>;
 }
 
-export function FoodAudit({ onApplySuggestion, onApplyBatch }: FoodAuditProps) {
+export function FoodAudit({ onApplySuggestion, onApplyBatch, onApplyAll }: FoodAuditProps) {
   const [isLoading, setIsLoading] = useState(false);
+  const [isApplyingAll, setIsApplyingAll] = useState(false);
   const [auditResult, setAuditResult] = useState<MigrationResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selectedSuggestions, setSelectedSuggestions] = useState<Set<string>>(new Set());
@@ -204,6 +206,7 @@ export function FoodAudit({ onApplySuggestion, onApplyBatch }: FoodAuditProps) {
   const applySelectedSuggestions = async () => {
     if (!onApplyBatch || !auditResult || selectedSuggestions.size === 0) return;
 
+    setIsApplyingAll(true);
     const updates = auditResult.suggestions
       .filter(s => selectedSuggestions.has(s.food_id))
       .map(s => ({
@@ -215,7 +218,7 @@ export function FoodAudit({ onApplySuggestion, onApplyBatch }: FoodAuditProps) {
       }));
 
     try {
-      await onApplyBatch(updates);
+      const result = await onApplyBatch(updates);
 
       // Remove applied from results
       setAuditResult(prev => {
@@ -224,7 +227,7 @@ export function FoodAudit({ onApplySuggestion, onApplyBatch }: FoodAuditProps) {
           ...prev,
           summary: {
             ...prev.summary,
-            to_update: prev.summary.to_update - selectedSuggestions.size,
+            to_update: prev.summary.to_update - result.success,
           },
           suggestions: prev.suggestions.filter(s => !selectedSuggestions.has(s.food_id)),
         };
@@ -234,7 +237,7 @@ export function FoodAudit({ onApplySuggestion, onApplyBatch }: FoodAuditProps) {
 
       toast({
         title: 'Reclassificações aplicadas',
-        description: `${updates.length} alimentos atualizados.`,
+        description: `${result.success} alimentos atualizados${result.failed > 0 ? `, ${result.failed} falharam` : ''}.`,
       });
     } catch (err) {
       toast({
@@ -242,6 +245,63 @@ export function FoodAudit({ onApplySuggestion, onApplyBatch }: FoodAuditProps) {
         description: err instanceof Error ? err.message : 'Erro desconhecido',
         variant: 'destructive',
       });
+    } finally {
+      setIsApplyingAll(false);
+    }
+  };
+
+  const applyAllSuggestions = async () => {
+    if (!onApplyAll || !auditResult) return;
+    
+    const suggestionsWithChanges = auditResult.suggestions.filter(hasChanges);
+    if (suggestionsWithChanges.length === 0) return;
+
+    setIsApplyingAll(true);
+    const updates = suggestionsWithChanges.map(s => ({
+      foodId: s.food_id,
+      updates: {
+        category: s.proposed_category,
+        processing_level: s.proposed_processing_level,
+      },
+    }));
+
+    try {
+      const result = await onApplyAll(updates);
+
+      // Clear all results on success
+      if (result.success > 0) {
+        setAuditResult(prev => {
+          if (!prev) return prev;
+          
+          // Keep only the ones that failed
+          const failedIds = new Set(result.errors.map(e => e.foodId));
+          const remainingSuggestions = prev.suggestions.filter(s => failedIds.has(s.food_id));
+          
+          return {
+            ...prev,
+            summary: {
+              ...prev.summary,
+              to_update: remainingSuggestions.filter(hasChanges).length,
+            },
+            suggestions: remainingSuggestions,
+          };
+        });
+
+        setSelectedSuggestions(new Set());
+      }
+
+      toast({
+        title: 'Migração concluída!',
+        description: `${result.success} alimentos reclassificados com sucesso${result.failed > 0 ? `. ${result.failed} falharam` : ''}.`,
+      });
+    } catch (err) {
+      toast({
+        title: 'Erro ao aplicar todas as reclassificações',
+        description: err instanceof Error ? err.message : 'Erro desconhecido',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsApplyingAll(false);
     }
   };
 
@@ -371,11 +431,12 @@ export function FoodAudit({ onApplySuggestion, onApplyBatch }: FoodAuditProps) {
               {suggestionsToUpdate.length > 0 && (
                 <>
                   {/* Batch actions */}
-                  <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                  <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg flex-wrap gap-2">
                     <div className="flex items-center gap-2">
                       <Checkbox
                         checked={selectedSuggestions.size === suggestionsToUpdate.length && suggestionsToUpdate.length > 0}
                         onCheckedChange={toggleAllSelection}
+                        disabled={isApplyingAll}
                       />
                       <span className="text-sm">
                         {selectedSuggestions.size > 0 
@@ -383,12 +444,43 @@ export function FoodAudit({ onApplySuggestion, onApplyBatch }: FoodAuditProps) {
                           : 'Selecionar todos'}
                       </span>
                     </div>
-                    {selectedSuggestions.size > 0 && onApplyBatch && (
-                      <Button size="sm" onClick={applySelectedSuggestions}>
-                        <CheckCircle className="w-4 h-4 mr-2" />
-                        Aplicar Selecionados
-                      </Button>
-                    )}
+                    <div className="flex items-center gap-2">
+                      {selectedSuggestions.size > 0 && onApplyBatch && (
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          onClick={applySelectedSuggestions}
+                          disabled={isApplyingAll}
+                        >
+                          {isApplyingAll ? (
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          ) : (
+                            <CheckCircle className="w-4 h-4 mr-2" />
+                          )}
+                          Aplicar Selecionados ({selectedSuggestions.size})
+                        </Button>
+                      )}
+                      {onApplyAll && (
+                        <Button 
+                          size="sm" 
+                          onClick={applyAllSuggestions}
+                          disabled={isApplyingAll}
+                          className="bg-primary"
+                        >
+                          {isApplyingAll ? (
+                            <>
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              Aplicando...
+                            </>
+                          ) : (
+                            <>
+                              <Sparkles className="w-4 h-4 mr-2" />
+                              Aplicar Todos ({suggestionsToUpdate.length})
+                            </>
+                          )}
+                        </Button>
+                      )}
+                    </div>
                   </div>
 
                   {/* Suggestions table */}
