@@ -60,6 +60,10 @@ export default function Admin() {
   const { isAdmin, loading: roleLoading } = useUserRole();
   const { 
     loading, 
+    settingsLoading,
+    savingKeys,
+    savedKeys,
+    errorKeys,
     settings, 
     foodImports, 
     auditLogs,
@@ -179,6 +183,50 @@ export default function Admin() {
   const renderSettingEditor = (setting: { key: string; value: unknown; description: string | null }) => {
     const currentValue = editedSettings[setting.key] ?? setting.value;
     const hasChanges = setting.key in editedSettings;
+    const isSaving = savingKeys.has(setting.key);
+    const isSaved = savedKeys.has(setting.key);
+    const hasError = errorKeys.has(setting.key);
+
+    const StatusIndicator = () => {
+      if (isSaving) {
+        return (
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.8 }} 
+            animate={{ opacity: 1, scale: 1 }}
+            className="flex items-center gap-1 text-muted-foreground"
+          >
+            <Loader2 className="h-4 w-4 animate-spin" />
+            <span className="text-xs">Salvando...</span>
+          </motion.div>
+        );
+      }
+      if (isSaved) {
+        return (
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.8 }} 
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0 }}
+            className="flex items-center gap-1 text-green-600"
+          >
+            <CheckCircle className="h-4 w-4" />
+            <span className="text-xs">Salvo!</span>
+          </motion.div>
+        );
+      }
+      if (hasError) {
+        return (
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.8 }} 
+            animate={{ opacity: 1, scale: 1 }}
+            className="flex items-center gap-1 text-destructive"
+          >
+            <AlertCircle className="h-4 w-4" />
+            <span className="text-xs">Erro ao salvar</span>
+          </motion.div>
+        );
+      }
+      return null;
+    };
 
     if (typeof setting.value === 'object' && setting.value !== null) {
       return (
@@ -193,46 +241,105 @@ export default function Admin() {
                 // Invalid JSON, keep as string for now
               }
             }}
-            className="font-mono text-xs min-h-[100px]"
+            className={`font-mono text-xs min-h-[100px] transition-colors ${
+              isSaved ? 'border-green-500 bg-green-50/50' : 
+              hasError ? 'border-destructive bg-destructive/5' : ''
+            }`}
+            disabled={isSaving}
           />
-          {hasChanges && (
-            <Button size="sm" onClick={() => handleSaveSetting(setting.key)} disabled={loading}>
-              <Save className="h-4 w-4 mr-1" /> Salvar
-            </Button>
-          )}
+          <div className="flex items-center gap-2">
+            {hasChanges && (
+              <Button 
+                size="sm" 
+                onClick={() => handleSaveSetting(setting.key)} 
+                disabled={isSaving}
+                className="transition-all"
+              >
+                {isSaving ? (
+                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                ) : (
+                  <Save className="h-4 w-4 mr-1" />
+                )}
+                Salvar
+              </Button>
+            )}
+            <StatusIndicator />
+          </div>
         </div>
       );
     }
 
     if (typeof setting.value === 'boolean') {
       return (
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           <Switch
             checked={currentValue as boolean}
             onCheckedChange={(checked) => {
               handleSettingChange(setting.key, checked);
               updateSetting(setting.key, checked);
             }}
+            disabled={isSaving}
+            className={isSaved ? 'data-[state=checked]:bg-green-600' : ''}
           />
-          <span className="text-sm text-muted-foreground">{currentValue ? 'Ativado' : 'Desativado'}</span>
+          <span className="text-sm text-muted-foreground">
+            {currentValue ? 'Ativado' : 'Desativado'}
+          </span>
+          <StatusIndicator />
         </div>
       );
     }
 
     return (
-      <div className="flex gap-2">
-        <Input
-          value={String(currentValue)}
-          onChange={(e) => handleSettingChange(setting.key, e.target.value)}
-        />
-        {hasChanges && (
-          <Button size="sm" onClick={() => handleSaveSetting(setting.key)} disabled={loading}>
-            <Save className="h-4 w-4" />
-          </Button>
-        )}
+      <div className="space-y-2">
+        <div className="flex gap-2">
+          <Input
+            value={String(currentValue)}
+            onChange={(e) => handleSettingChange(setting.key, e.target.value)}
+            disabled={isSaving}
+            className={`transition-colors ${
+              isSaved ? 'border-green-500 bg-green-50/50' : 
+              hasError ? 'border-destructive bg-destructive/5' : ''
+            }`}
+          />
+          {hasChanges && (
+            <Button 
+              size="sm" 
+              onClick={() => handleSaveSetting(setting.key)} 
+              disabled={isSaving}
+            >
+              {isSaving ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Save className="h-4 w-4" />
+              )}
+            </Button>
+          )}
+        </div>
+        <StatusIndicator />
       </div>
     );
   };
+
+  const SettingsSkeleton = () => (
+    <div className="space-y-6">
+      {[1, 2, 3].map((i) => (
+        <Card key={i}>
+          <CardHeader>
+            <div className="h-6 w-32 bg-muted animate-pulse rounded" />
+            <div className="h-4 w-48 bg-muted animate-pulse rounded mt-2" />
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {[1, 2].map((j) => (
+              <div key={j} className="space-y-2">
+                <div className="h-4 w-24 bg-muted animate-pulse rounded" />
+                <div className="h-10 w-full bg-muted animate-pulse rounded" />
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  );
 
   if (roleLoading) {
     return (
@@ -299,38 +406,71 @@ export default function Admin() {
 
           {/* Settings Tab */}
           <TabsContent value="settings">
-            <div className="grid gap-6">
-              {Object.entries(groupedSettings).map(([category, categorySettings]) => (
-                <Card key={category}>
-                  <CardHeader>
-                    <CardTitle className="capitalize">{category}</CardTitle>
-                    <CardDescription>
-                      Configurações de {category === 'limits' ? 'limites do sistema' : 
-                        category === 'ai' ? 'inteligência artificial' :
-                        category === 'features' ? 'funcionalidades' :
-                        category === 'content' ? 'conteúdo' :
-                        category === 'food' ? 'alimentos' : category}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    {categorySettings.map((setting) => (
-                      <div key={setting.key} className="space-y-2">
-                        <Label className="flex items-center gap-2">
-                          {setting.key.replace(/_/g, ' ')}
-                          {setting.is_sensitive && (
-                            <Badge variant="secondary" className="text-xs">Sensível</Badge>
-                          )}
-                        </Label>
-                        {setting.description && (
-                          <p className="text-xs text-muted-foreground">{setting.description}</p>
-                        )}
-                        {renderSettingEditor(setting)}
-                      </div>
-                    ))}
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+            {settingsLoading ? (
+              <SettingsSkeleton />
+            ) : settings.length === 0 ? (
+              <Card>
+                <CardContent className="py-12 text-center">
+                  <AlertCircle className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                  <p className="text-muted-foreground">Nenhuma configuração encontrada.</p>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Verifique se a tabela system_settings foi populada corretamente.
+                  </p>
+                </CardContent>
+              </Card>
+            ) : (
+              <motion.div 
+                className="grid gap-6"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3 }}
+              >
+                {Object.entries(groupedSettings).map(([category, categorySettings], idx) => (
+                  <motion.div
+                    key={category}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: idx * 0.1 }}
+                  >
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="capitalize flex items-center gap-2">
+                          {category === 'limits' && <Settings className="h-5 w-5 text-primary" />}
+                          {category === 'ai' && <Database className="h-5 w-5 text-primary" />}
+                          {category === 'features' && <Shield className="h-5 w-5 text-primary" />}
+                          {category === 'content' && <FileText className="h-5 w-5 text-primary" />}
+                          {category === 'food' && <Upload className="h-5 w-5 text-primary" />}
+                          {category}
+                        </CardTitle>
+                        <CardDescription>
+                          Configurações de {category === 'limits' ? 'limites do sistema' : 
+                            category === 'ai' ? 'inteligência artificial' :
+                            category === 'features' ? 'funcionalidades' :
+                            category === 'content' ? 'conteúdo' :
+                            category === 'food' ? 'alimentos' : category}
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-6">
+                        {categorySettings.map((setting) => (
+                          <div key={setting.key} className="space-y-2 pb-4 border-b last:border-0 last:pb-0">
+                            <Label className="flex items-center gap-2 text-sm font-medium">
+                              {setting.key.replace(/_/g, ' ')}
+                              {setting.is_sensitive && (
+                                <Badge variant="secondary" className="text-xs">Sensível</Badge>
+                              )}
+                            </Label>
+                            {setting.description && (
+                              <p className="text-xs text-muted-foreground mb-2">{setting.description}</p>
+                            )}
+                            {renderSettingEditor(setting)}
+                          </div>
+                        ))}
+                      </CardContent>
+                    </Card>
+                  </motion.div>
+                ))}
+              </motion.div>
+            )}
           </TabsContent>
 
           {/* Foods Upload Tab */}
