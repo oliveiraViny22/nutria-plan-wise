@@ -61,6 +61,7 @@ interface ValidationResult {
   valid: boolean;
   errors: string[];
   validRows: FoodRow[];
+  warnings?: string[];
 }
 
 interface FoodTemplate {
@@ -248,7 +249,7 @@ export function useAdminOperations() {
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Erro ao validar arquivo';
       toast({ title: 'Erro', description: message, variant: 'destructive' });
-      return { valid: false, errors: [message], validRows: [] };
+      return { valid: false, errors: [message], validRows: [], warnings: [] };
     }
   }, [invokeAdmin, toast]);
 

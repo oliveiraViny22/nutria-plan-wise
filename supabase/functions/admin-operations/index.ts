@@ -226,67 +226,108 @@ async function getFoodImports(supabase: any) {
   return { imports: data };
 }
 
-function validateFoodCSV(rows: Record<string, unknown>[]): { valid: boolean; errors: string[]; validRows: FoodRow[] } {
+// Average nutritional values for estimating missing data (per 100g)
+const AVERAGE_NUTRITIONAL_VALUES = {
+  calories: 150,  // Average kcal
+  protein: 8,     // Average grams
+  carbs: 20,      // Average grams
+  fat: 5,         // Average grams
+};
+
+function validateFoodCSV(rows: Record<string, unknown>[]): { valid: boolean; errors: string[]; validRows: FoodRow[]; warnings: string[] } {
   const errors: string[] = [];
+  const warnings: string[] = [];
   const validRows: FoodRow[] = [];
 
-  const requiredColumns = ['name', 'calories', 'protein', 'carbs', 'fat'];
+  const allColumns = ['name', 'calories', 'protein', 'carbs', 'fat', 'serving_size', 'category', 'processing_level'];
   
   if (!rows || rows.length === 0) {
-    return { valid: false, errors: ['Arquivo vazio ou inválido'], validRows: [] };
+    return { valid: false, errors: ['Arquivo vazio ou inválido'], validRows: [], warnings: [] };
   }
 
-  // Check if first row has required columns
+  // Check if first row has at least the name column
   const firstRow = rows[0];
-  const missingColumns = requiredColumns.filter(col => !(col in firstRow));
-  
-  if (missingColumns.length > 0) {
+  if (!('name' in firstRow)) {
     return { 
       valid: false, 
-      errors: [`Colunas obrigatórias ausentes: ${missingColumns.join(', ')}`], 
-      validRows: [] 
+      errors: ['Coluna "name" é obrigatória'], 
+      validRows: [],
+      warnings: []
     };
+  }
+
+  // Warn about missing optional columns
+  const missingColumns = allColumns.filter(col => !(col in firstRow));
+  if (missingColumns.length > 0) {
+    warnings.push(`Colunas ausentes serão preenchidas com valores padrão: ${missingColumns.join(', ')}`);
   }
 
   rows.forEach((row, index) => {
     const rowNum = index + 2; // +2 because of header row and 0-indexing
     const rowErrors: string[] = [];
+    const rowWarnings: string[] = [];
 
-    // Validate name
+    // Validate name - this is the only truly required field
     if (!row.name || String(row.name).trim() === '') {
       rowErrors.push(`Linha ${rowNum}: nome é obrigatório`);
     }
 
-    // Validate numeric fields
-    const numericFields = ['calories', 'protein', 'carbs', 'fat'];
+    // Parse and validate/estimate numeric fields
+    const numericFields = ['calories', 'protein', 'carbs', 'fat'] as const;
+    const parsedValues: Record<string, number> = {};
+    
     numericFields.forEach(field => {
-      const value = Number(row[field]);
-      if (isNaN(value) || value < 0) {
-        rowErrors.push(`Linha ${rowNum}: ${field} deve ser um número >= 0`);
+      const rawValue = row[field];
+      if (rawValue === undefined || rawValue === null || String(rawValue).trim() === '') {
+        // Use average value and warn
+        parsedValues[field] = AVERAGE_NUTRITIONAL_VALUES[field];
+        rowWarnings.push(`Linha ${rowNum}: ${field} ausente, usando valor médio (${AVERAGE_NUTRITIONAL_VALUES[field]})`);
+      } else {
+        const value = Number(rawValue);
+        if (isNaN(value) || value < 0) {
+          // Try to use average if invalid
+          parsedValues[field] = AVERAGE_NUTRITIONAL_VALUES[field];
+          rowWarnings.push(`Linha ${rowNum}: ${field} inválido, usando valor médio (${AVERAGE_NUTRITIONAL_VALUES[field]})`);
+        } else {
+          parsedValues[field] = value;
+        }
       }
     });
 
     // Validate category if provided
-    if (row.category && !VALID_CATEGORIES.includes(String(row.category))) {
-      rowErrors.push(`Linha ${rowNum}: categoria inválida "${row.category}"`);
+    let category: string | null = null;
+    if (row.category && String(row.category).trim() !== '') {
+      if (VALID_CATEGORIES.includes(String(row.category))) {
+        category = String(row.category);
+      } else {
+        rowWarnings.push(`Linha ${rowNum}: categoria inválida "${row.category}", será ignorada`);
+      }
     }
 
     // Validate processing_level if provided
-    if (row.processing_level && !VALID_PROCESSING_LEVELS.includes(String(row.processing_level))) {
-      rowErrors.push(`Linha ${rowNum}: nível de processamento inválido "${row.processing_level}"`);
+    let processingLevel = 'in_natura';
+    if (row.processing_level && String(row.processing_level).trim() !== '') {
+      if (VALID_PROCESSING_LEVELS.includes(String(row.processing_level))) {
+        processingLevel = String(row.processing_level);
+      } else {
+        rowWarnings.push(`Linha ${rowNum}: nível de processamento inválido "${row.processing_level}", usando "in_natura"`);
+      }
     }
 
     if (rowErrors.length === 0) {
       validRows.push({
         name: String(row.name).trim(),
-        calories: Number(row.calories),
-        protein: Number(row.protein),
-        carbs: Number(row.carbs),
-        fat: Number(row.fat),
-        serving_size: row.serving_size ? String(row.serving_size) : '100g',
-        category: row.category ? String(row.category) : null,
-        processing_level: row.processing_level ? String(row.processing_level) : 'in_natura',
+        calories: parsedValues.calories,
+        protein: parsedValues.protein,
+        carbs: parsedValues.carbs,
+        fat: parsedValues.fat,
+        serving_size: row.serving_size && String(row.serving_size).trim() !== '' 
+          ? String(row.serving_size) 
+          : '100g',
+        category: category,
+        processing_level: processingLevel,
       } as FoodRow);
+      warnings.push(...rowWarnings);
     } else {
       errors.push(...rowErrors);
     }
@@ -295,7 +336,8 @@ function validateFoodCSV(rows: Record<string, unknown>[]): { valid: boolean; err
   return {
     valid: errors.length === 0,
     errors: errors.slice(0, 20), // Limit errors shown
-    validRows
+    validRows,
+    warnings: warnings.slice(0, 30) // Limit warnings shown
   };
 }
 

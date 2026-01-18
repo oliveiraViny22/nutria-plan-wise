@@ -190,7 +190,7 @@ export default function Admin() {
   const [activeTab, setActiveTab] = useState('metrics');
   const [editedSettings, setEditedSettings] = useState<Record<string, unknown>>({});
   const [csvFile, setCsvFile] = useState<File | null>(null);
-  const [csvPreview, setCsvPreview] = useState<{ rows: Record<string, unknown>[]; validation: { valid: boolean; errors: string[]; validRows: unknown[] } | null }>({ rows: [], validation: null });
+  const [csvPreview, setCsvPreview] = useState<{ rows: Record<string, unknown>[]; validation: { valid: boolean; errors: string[]; validRows: unknown[]; warnings?: string[] } | null }>({ rows: [], validation: null });
   const [showPreview, setShowPreview] = useState(false);
   const [auditPage, setAuditPage] = useState(0);
   const [seedingData, setSeedingData] = useState(false);
@@ -2179,27 +2179,20 @@ export default function Admin() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="flex gap-4">
-                    <Button variant="outline" onClick={downloadTemplate}>
-                      <Download className="h-4 w-4 mr-2" />
-                      Baixar Modelo CSV
-                    </Button>
-                    
-                    <div className="relative">
-                      <Input
-                        type="file"
-                        accept=".csv,.txt,.xls,.xlsx"
-                        onChange={handleFileUpload}
-                        className="hidden"
-                        id="food-upload"
-                      />
-                      <Label htmlFor="food-upload" asChild>
-                        <Button variant="default" className="cursor-pointer">
-                          <Upload className="h-4 w-4 mr-2" />
-                          Selecionar Arquivo (CSV, TXT, XLS)
-                        </Button>
-                      </Label>
-                    </div>
+                  <div className="relative">
+                    <Input
+                      type="file"
+                      accept=".csv,.txt,.xls,.xlsx"
+                      onChange={handleFileUpload}
+                      className="hidden"
+                      id="food-upload"
+                    />
+                    <Label htmlFor="food-upload" asChild>
+                      <Button variant="default" className="cursor-pointer">
+                        <Upload className="h-4 w-4 mr-2" />
+                        Selecionar Arquivo (CSV, TXT, XLS)
+                      </Button>
+                    </Label>
                   </div>
 
                   <Alert>
@@ -2208,11 +2201,13 @@ export default function Admin() {
                     <AlertDescription>
                       <strong>Formatos aceitos:</strong> CSV (vírgula), TXT (tab), XLS (tab)
                       <br />
-                      <strong>Dica:</strong> Exporte o banco atual para obter um arquivo no formato correto.
+                      <strong>Dica:</strong> Exporte o banco atual acima para obter um arquivo no formato correto.
                       <br /><br />
-                      Colunas obrigatórias: <code className="text-xs bg-muted px-1 rounded">name, calories, protein, carbs, fat</code>
+                      <strong>Colunas:</strong> <code className="text-xs bg-muted px-1 rounded">name, calories, protein, carbs, fat, serving_size, category, processing_level</code>
                       <br />
-                      Colunas opcionais: <code className="text-xs bg-muted px-1 rounded">serving_size, category, processing_level</code>
+                      <span className="text-muted-foreground text-xs">
+                        Dados nutricionais incompletos serão preenchidos automaticamente com valores médios estimados.
+                      </span>
                     </AlertDescription>
                   </Alert>
                 </CardContent>
@@ -2484,6 +2479,29 @@ export default function Admin() {
                         <li>... e mais {csvPreview.validation.errors.length - 10} erros</li>
                       )}
                     </ul>
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {/* Warnings section - values filled with defaults */}
+              {csvPreview.validation.warnings && csvPreview.validation.warnings.length > 0 && (
+                <Alert className="bg-amber-50 border-amber-200">
+                  <AlertCircle className="h-4 w-4 text-amber-600" />
+                  <AlertTitle className="text-amber-800">Valores estimados automaticamente</AlertTitle>
+                  <AlertDescription className="text-amber-700">
+                    <p className="text-sm mb-2">
+                      Alguns dados nutricionais estavam ausentes ou inválidos e foram preenchidos com valores médios:
+                    </p>
+                    <ScrollArea className="max-h-[120px]">
+                      <ul className="list-disc list-inside text-sm space-y-1">
+                        {csvPreview.validation.warnings.slice(0, 15).map((warn, i) => (
+                          <li key={i}>{warn}</li>
+                        ))}
+                        {csvPreview.validation.warnings.length > 15 && (
+                          <li className="font-medium">... e mais {csvPreview.validation.warnings.length - 15} avisos</li>
+                        )}
+                      </ul>
+                    </ScrollArea>
                   </AlertDescription>
                 </Alert>
               )}
