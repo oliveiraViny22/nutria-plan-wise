@@ -146,6 +146,18 @@ export default function Login() {
           </p>
         </motion.div>
       </div>
+
+      {/* Footer */}
+      <footer className="absolute bottom-0 left-0 right-0 py-4 px-4 lg:w-1/2">
+        <div className="flex items-center justify-center gap-4">
+          <Link to="/terms" className="text-xs text-muted-foreground hover:text-primary transition-colors">
+            Termos de Uso
+          </Link>
+          <Link to="/privacy" className="text-xs text-muted-foreground hover:text-primary transition-colors">
+            Política de Privacidade
+          </Link>
+        </div>
+      </footer>
     </div>
   );
 }

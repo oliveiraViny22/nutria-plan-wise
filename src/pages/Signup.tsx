@@ -5,6 +5,7 @@ import { Eye, EyeOff, Loader2, Mail, Lock, User, AlertCircle, CheckCircle2 } fro
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Logo } from '@/components/Logo';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
@@ -16,6 +17,7 @@ export default function Signup() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [loading, setLoading] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const { signUp } = useAuth();
@@ -30,6 +32,13 @@ export default function Signup() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setFieldErrors({});
+
+    // Check terms acceptance first
+    if (!acceptedTerms) {
+      setFieldErrors({ terms: 'Você deve aceitar os termos para continuar' });
+      toast.error('Você deve aceitar os Termos de Uso e Política de Privacidade');
+      return;
+    }
 
     // Validate all fields with zod schema
     const result = signupSchema.safeParse({ name, email, password, confirmPassword });
@@ -229,12 +238,43 @@ export default function Signup() {
               )}
             </div>
 
+            {/* Terms acceptance checkbox */}
+            <div className="space-y-1.5">
+              <div className="flex items-start gap-3">
+                <Checkbox
+                  id="acceptTerms"
+                  checked={acceptedTerms}
+                  onCheckedChange={(checked) => setAcceptedTerms(checked === true)}
+                  className={fieldErrors.terms ? 'border-destructive' : ''}
+                />
+                <label
+                  htmlFor="acceptTerms"
+                  className="text-xs text-muted-foreground leading-relaxed cursor-pointer"
+                >
+                  Li e aceito os{' '}
+                  <Link to="/terms" className="text-primary hover:underline" target="_blank">
+                    Termos de Uso
+                  </Link>{' '}
+                  e a{' '}
+                  <Link to="/privacy" className="text-primary hover:underline" target="_blank">
+                    Política de Privacidade
+                  </Link>
+                </label>
+              </div>
+              {fieldErrors.terms && (
+                <p className="text-xs text-destructive flex items-center gap-1">
+                  <AlertCircle className="w-3 h-3" />
+                  {fieldErrors.terms}
+                </p>
+              )}
+            </div>
+
             <Button
               type="submit"
               variant="hero"
               size="lg"
               className="w-full h-10 sm:h-12 text-sm sm:text-base"
-              disabled={loading}
+              disabled={loading || !acceptedTerms}
             >
               {loading ? (
                 <>
@@ -246,18 +286,6 @@ export default function Signup() {
               )}
             </Button>
           </form>
-
-          <p className="text-center text-xs text-muted-foreground mt-4 px-4">
-            Ao criar sua conta, você concorda com nossos{' '}
-            <Link to="/terms" className="text-primary hover:underline">
-              Termos de Uso
-            </Link>{' '}
-            e{' '}
-            <Link to="/privacy" className="text-primary hover:underline">
-              Política de Privacidade
-            </Link>
-            .
-          </p>
 
           <p className="text-center text-sm text-muted-foreground mt-5 sm:mt-6">
             Já tem uma conta?{' '}
