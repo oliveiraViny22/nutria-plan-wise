@@ -17,6 +17,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Progress } from '@/components/ui/progress';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -248,8 +249,64 @@ export function AdherenceDashboard({ studentId, dietPlanId, studentName }: Adher
           <CollapsibleContent>
             <CardContent className="space-y-6">
               {loading && !report ? (
-                <div className="flex items-center justify-center py-12">
-                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                <div className="space-y-6 animate-fade-in">
+                  {/* Executive Summary Skeleton */}
+                  <div className="p-4 rounded-lg bg-muted/50 border">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Skeleton className="h-4 w-4" />
+                      <Skeleton className="h-5 w-32" />
+                    </div>
+                    <Skeleton className="h-4 w-full" />
+                    <Skeleton className="h-4 w-3/4 mt-2" />
+                  </div>
+
+                  {/* Stats Grid Skeleton */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    {[...Array(4)].map((_, i) => (
+                      <Card key={i}>
+                        <CardContent className="p-4 text-center space-y-2">
+                          <Skeleton className="h-8 w-16 mx-auto" />
+                          <Skeleton className="h-3 w-20 mx-auto" />
+                          <Skeleton className="h-5 w-14 mx-auto rounded-full" />
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+
+                  {/* Charts Skeleton */}
+                  <div className="grid md:grid-cols-2 gap-6">
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <div className="flex items-center gap-2">
+                          <Skeleton className="h-4 w-4" />
+                          <Skeleton className="h-4 w-32" />
+                        </div>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="h-[200px] flex flex-col justify-center gap-3">
+                          {[...Array(4)].map((_, i) => (
+                            <div key={i} className="flex items-center gap-3">
+                              <Skeleton className="h-4 w-20" />
+                              <Skeleton className="h-6 flex-1 rounded" />
+                            </div>
+                          ))}
+                        </div>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <div className="flex items-center gap-2">
+                          <Skeleton className="h-4 w-4" />
+                          <Skeleton className="h-4 w-24" />
+                        </div>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="h-[200px] flex items-center justify-center">
+                          <Skeleton className="h-32 w-32 rounded-full" />
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
                 </div>
               ) : !report ? (
                 <div className="text-center py-8">
