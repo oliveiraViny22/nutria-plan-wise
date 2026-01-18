@@ -182,32 +182,32 @@ export default function Progress() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background overflow-x-hidden">
       {/* Header */}
       <header className="sticky top-0 z-50 glass border-b">
-        <div className="container mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard')}>
-              <ArrowLeft className="h-5 w-5" />
+        <div className="container mx-auto px-3 sm:px-4 py-2 sm:py-3 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <Button variant="ghost" size="icon" className="w-9 h-9 sm:w-10 sm:h-10" onClick={() => navigate('/dashboard')}>
+              <ArrowLeft className="h-4 w-4 sm:h-5 sm:w-5" />
             </Button>
             <Logo size="sm" />
           </div>
-          <h1 className="text-lg font-semibold">Progresso</h1>
+          <h1 className="text-base sm:text-lg font-semibold">Progresso</h1>
           <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
             <DialogTrigger asChild>
-              <Button size="sm">
-                <Plus className="h-4 w-4 mr-1" />
-                Peso
+              <Button size="sm" className="text-xs sm:text-sm h-8 sm:h-9 px-2 sm:px-3">
+                <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
+                <span className="hidden xs:inline">Peso</span>
               </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="mx-4 sm:mx-0 max-w-sm">
               <DialogHeader>
-                <DialogTitle>Registrar Peso</DialogTitle>
-                <DialogDescription>
+                <DialogTitle className="text-base sm:text-lg">Registrar Peso</DialogTitle>
+                <DialogDescription className="text-xs sm:text-sm">
                   Adicione seu peso de hoje para acompanhar sua evolução
                 </DialogDescription>
               </DialogHeader>
-              <div className="py-4">
+              <div className="py-3 sm:py-4">
                 <div className="flex items-center gap-2">
                   <Input
                     type="number"
@@ -217,16 +217,16 @@ export default function Progress() {
                     placeholder="70.5"
                     value={newWeight}
                     onChange={(e) => setNewWeight(e.target.value)}
-                    className="text-lg"
+                    className="text-base sm:text-lg h-10 sm:h-12"
                   />
-                  <span className="text-muted-foreground">kg</span>
+                  <span className="text-muted-foreground text-sm">kg</span>
                 </div>
               </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
+              <DialogFooter className="gap-2 sm:gap-0">
+                <Button variant="outline" size="sm" onClick={() => setIsAddDialogOpen(false)}>
                   Cancelar
                 </Button>
-                <Button onClick={handleAddWeight} disabled={addingWeight || !newWeight}>
+                <Button size="sm" onClick={handleAddWeight} disabled={addingWeight || !newWeight}>
                   {addingWeight ? 'Salvando...' : 'Salvar'}
                 </Button>
               </DialogFooter>
@@ -235,62 +235,62 @@ export default function Progress() {
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-6 space-y-6">
-        <Tabs defaultValue="weight" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="weight">
-              <Scale className="h-4 w-4 mr-2" />
+      <main className="container mx-auto px-3 sm:px-4 py-4 sm:py-6 space-y-4 sm:space-y-6">
+        <Tabs defaultValue="weight" className="space-y-4 sm:space-y-6">
+          <TabsList className="grid w-full grid-cols-2 h-auto">
+            <TabsTrigger value="weight" className="text-xs sm:text-sm py-2 sm:py-2.5">
+              <Scale className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
               Peso
             </TabsTrigger>
-            <TabsTrigger value="history">
-              <History className="h-4 w-4 mr-2" />
+            <TabsTrigger value="history" className="text-xs sm:text-sm py-2 sm:py-2.5">
+              <History className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
               Histórico
             </TabsTrigger>
           </TabsList>
 
           {/* Weight Tab */}
-          <TabsContent value="weight" className="space-y-6">
-            {/* Stats Cards */}
+          <TabsContent value="weight" className="space-y-4 sm:space-y-6">
+            {/* Stats Cards - 2x2 grid on mobile, 4 columns on tablet+ */}
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              className="grid grid-cols-2 sm:grid-cols-4 gap-4"
+              className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4"
             >
               <Card>
-                <CardContent className="pt-4 text-center">
-                  <Scale className="h-5 w-5 mx-auto text-primary mb-2" />
-                  <p className="text-2xl font-bold">{currentWeight.toFixed(1)}</p>
-                  <p className="text-xs text-muted-foreground">Peso Atual</p>
+                <CardContent className="pt-3 sm:pt-4 text-center p-3 sm:p-4">
+                  <Scale className="h-4 w-4 sm:h-5 sm:w-5 mx-auto text-primary mb-1 sm:mb-2" />
+                  <p className="text-lg sm:text-2xl font-bold">{currentWeight.toFixed(1)}</p>
+                  <p className="text-[10px] sm:text-xs text-muted-foreground">Peso Atual</p>
                 </CardContent>
               </Card>
 
               <Card>
-                <CardContent className="pt-4 text-center">
-                  <Target className="h-5 w-5 mx-auto text-accent mb-2" />
-                  <p className="text-2xl font-bold">{goalWeight.toFixed(1)}</p>
-                  <p className="text-xs text-muted-foreground">Meta</p>
+                <CardContent className="pt-3 sm:pt-4 text-center p-3 sm:p-4">
+                  <Target className="h-4 w-4 sm:h-5 sm:w-5 mx-auto text-accent mb-1 sm:mb-2" />
+                  <p className="text-lg sm:text-2xl font-bold">{goalWeight.toFixed(1)}</p>
+                  <p className="text-[10px] sm:text-xs text-muted-foreground">Meta</p>
                 </CardContent>
               </Card>
 
               <Card>
-                <CardContent className="pt-4 text-center">
+                <CardContent className="pt-3 sm:pt-4 text-center p-3 sm:p-4">
                   {totalChange <= 0 ? (
-                    <TrendingDown className="h-5 w-5 mx-auto text-primary mb-2" />
+                    <TrendingDown className="h-4 w-4 sm:h-5 sm:w-5 mx-auto text-primary mb-1 sm:mb-2" />
                   ) : (
-                    <TrendingUp className="h-5 w-5 mx-auto text-destructive mb-2" />
+                    <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5 mx-auto text-destructive mb-1 sm:mb-2" />
                   )}
-                  <p className="text-2xl font-bold">
+                  <p className="text-lg sm:text-2xl font-bold">
                     {totalChange > 0 ? '+' : ''}{totalChange.toFixed(1)}
                   </p>
-                  <p className="text-xs text-muted-foreground">Total</p>
+                  <p className="text-[10px] sm:text-xs text-muted-foreground">Total</p>
                 </CardContent>
               </Card>
 
               <Card>
-                <CardContent className="pt-4 text-center">
-                  <Calendar className="h-5 w-5 mx-auto text-muted-foreground mb-2" />
-                  <p className="text-2xl font-bold">{daysTracking}</p>
-                  <p className="text-xs text-muted-foreground">Dias</p>
+                <CardContent className="pt-3 sm:pt-4 text-center p-3 sm:p-4">
+                  <Calendar className="h-4 w-4 sm:h-5 sm:w-5 mx-auto text-muted-foreground mb-1 sm:mb-2" />
+                  <p className="text-lg sm:text-2xl font-bold">{daysTracking}</p>
+                  <p className="text-[10px] sm:text-xs text-muted-foreground">Dias</p>
                 </CardContent>
               </Card>
             </motion.div>

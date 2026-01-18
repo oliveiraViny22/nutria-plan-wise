@@ -117,39 +117,39 @@ export default function Students() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background overflow-x-hidden">
       {/* Header */}
       <header className="sticky top-0 z-50 glass border-b">
-        <div className="container mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard')}>
-              <ArrowLeft className="h-5 w-5" />
+        <div className="container mx-auto px-3 sm:px-4 py-2 sm:py-3 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <Button variant="ghost" size="icon" className="w-9 h-9 sm:w-10 sm:h-10" onClick={() => navigate('/dashboard')}>
+              <ArrowLeft className="h-4 w-4 sm:h-5 sm:w-5" />
             </Button>
             <Logo size="sm" />
           </div>
-          <h1 className="text-lg font-semibold">Gestão de Alunos</h1>
-          <div className="w-10" /> {/* Spacer for alignment */}
+          <h1 className="text-sm sm:text-lg font-semibold truncate">Gestão de Alunos</h1>
+          <div className="w-9 sm:w-10" /> {/* Spacer for alignment */}
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-6 space-y-6">
+      <main className="container mx-auto px-3 sm:px-4 py-4 sm:py-6 space-y-4 sm:space-y-6">
         {/* License Status */}
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
         >
           <Card className={`border-l-4 ${isLicenseActive ? 'border-l-primary' : 'border-l-destructive'}`}>
-            <CardContent className="py-4">
-              <div className="flex items-center justify-between flex-wrap gap-4">
-                <div className="flex items-center gap-3">
-                  <div className={`p-2 rounded-full ${isLicenseActive ? 'bg-primary/10' : 'bg-destructive/10'}`}>
-                    <Crown className={`h-5 w-5 ${isLicenseActive ? 'text-primary' : 'text-destructive'}`} />
+            <CardContent className="py-3 sm:py-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <div className={`p-1.5 sm:p-2 rounded-full ${isLicenseActive ? 'bg-primary/10' : 'bg-destructive/10'}`}>
+                    <Crown className={`h-4 w-4 sm:h-5 sm:w-5 ${isLicenseActive ? 'text-primary' : 'text-destructive'}`} />
                   </div>
                   <div>
-                    <p className="font-medium">
+                    <p className="font-medium text-sm sm:text-base">
                       Licença {license?.license_type === 'annual' ? 'Anual' : 'Mensal'}
                     </p>
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-xs sm:text-sm text-muted-foreground">
                       {isLicenseActive 
                         ? `${getDaysRemaining()} dias restantes`
                         : 'Licença expirada'}
@@ -157,13 +157,13 @@ export default function Students() {
                   </div>
                 </div>
                 
-                <div className="flex items-center gap-4 text-sm">
-                  <div className="flex items-center gap-2">
-                    <Users className="h-4 w-4 text-muted-foreground" />
-                    <span>{studentCount} / {license?.max_students || 0} alunos</span>
+                <div className="flex items-center gap-3 sm:gap-4 text-xs sm:text-sm ml-8 sm:ml-0">
+                  <div className="flex items-center gap-1 sm:gap-2">
+                    <Users className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
+                    <span>{studentCount} / {license?.max_students || 0}</span>
                   </div>
                   {license && (
-                    <div className="flex items-center gap-2 text-muted-foreground">
+                    <div className="hidden sm:flex items-center gap-2 text-muted-foreground">
                       <Calendar className="h-4 w-4" />
                       <span>Expira em {format(new Date(license.expires_at), "dd/MM/yyyy", { locale: ptBR })}</span>
                     </div>
@@ -174,29 +174,32 @@ export default function Students() {
           </Card>
         </motion.div>
 
-        {/* Actions Bar */}
-        <div className="flex items-center gap-3 flex-wrap">
-          <div className="relative flex-1 min-w-[200px]">
+        {/* Actions Bar - stack on mobile */}
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+          <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Buscar aluno por nome ou email..."
+              placeholder="Buscar aluno..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9"
+              className="pl-9 h-10 text-sm"
             />
           </div>
           
           <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
             <DialogTrigger asChild>
-              <Button disabled={!isLicenseActive || studentCount >= (license?.max_students || 0)}>
+              <Button 
+                disabled={!isLicenseActive || studentCount >= (license?.max_students || 0)}
+                className="w-full sm:w-auto text-sm h-10"
+              >
                 <UserPlus className="h-4 w-4 mr-2" />
                 Cadastrar Aluno
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-lg max-h-[90vh] overflow-hidden">
+            <DialogContent className="mx-4 sm:mx-0 max-w-lg max-h-[90vh] overflow-hidden">
               <DialogHeader>
-                <DialogTitle>Cadastrar Novo Aluno</DialogTitle>
-                <DialogDescription>
+                <DialogTitle className="text-base sm:text-lg">Cadastrar Novo Aluno</DialogTitle>
+                <DialogDescription className="text-xs sm:text-sm">
                   Preencha todos os dados do aluno. Ele receberá as credenciais de acesso para entrar na plataforma.
                 </DialogDescription>
               </DialogHeader>
