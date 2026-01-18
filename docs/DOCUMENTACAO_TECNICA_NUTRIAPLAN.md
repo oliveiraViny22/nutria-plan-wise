@@ -1,30 +1,128 @@
 # DOCUMENTAÇÃO TÉCNICA OFICIAL — NUTRIAPLAN
 
-## Versão do Documento: 1.0
+## Versão do Documento: 1.1
 ## Data de Geração: 18 de Janeiro de 2026
+## Última Atualização: 18 de Janeiro de 2026
 
 ---
 
-# SUMÁRIO
+# 📑 SUMÁRIO NAVEGÁVEL
 
-1. [Visão Técnica Geral do Sistema](#1-visão-técnica-geral-do-sistema)
-2. [Objetivo do Produto sob a Ótica Técnica](#2-objetivo-do-produto-sob-a-ótica-técnica)
-3. [Arquitetura Geral](#3-arquitetura-geral)
-4. [Stack Tecnológica](#4-stack-tecnológica)
-5. [Tipos de Usuário e Papéis do Sistema](#5-tipos-de-usuário-e-papéis-do-sistema)
-6. [Regras de Negócio Detalhadas](#6-regras-de-negócio-detalhadas)
-7. [Fluxos Técnicos do Sistema](#7-fluxos-técnicos-do-sistema)
-8. [Funcionamento da IA](#8-funcionamento-da-ia)
-9. [Persistência de Dados](#9-persistência-de-dados)
-10. [Estrutura Conceitual do Banco de Dados](#10-estrutura-conceitual-do-banco-de-dados)
-11. [Integrações Externas](#11-integrações-externas)
-12. [Requisitos Funcionais](#12-requisitos-funcionais)
-13. [Requisitos Não Funcionais](#13-requisitos-não-funcionais)
-14. [Erros Conhecidos e Pontos Críticos](#14-erros-conhecidos-e-pontos-críticos)
-15. [Decisões Técnicas Já Tomadas](#15-decisões-técnicas-já-tomadas)
-16. [Riscos Técnicos e Limitações Atuais](#16-riscos-técnicos-e-limitações-atuais)
-17. [Boas Práticas e Padrões Adotados](#17-boas-práticas-e-padrões-adotados)
-18. [Próximos Passos Técnicos Sugeridos](#18-próximos-passos-técnicos-sugeridos)
+## Visão Geral
+- [1. Visão Técnica Geral do Sistema](#1-visão-técnica-geral-do-sistema)
+  - [1.1 Propósito Técnico](#11-propósito-técnico)
+  - [1.2 Características Principais](#12-características-principais)
+- [2. Objetivo do Produto sob a Ótica Técnica](#2-objetivo-do-produto-sob-a-ótica-técnica)
+  - [2.1 Problemas Técnicos Resolvidos](#21-problemas-técnicos-resolvidos)
+  - [2.2 Escopo Técnico](#22-escopo-técnico)
+
+## Arquitetura e Stack
+- [3. Arquitetura Geral](#3-arquitetura-geral)
+  - [3.1 Arquitetura em Camadas](#31-arquitetura-em-camadas)
+  - [3.2 Componentes Principais](#32-componentes-principais)
+  - [3.3 Diagrama de Arquitetura (Mermaid)](#33-diagrama-de-arquitetura-mermaid)
+- [4. Stack Tecnológica](#4-stack-tecnológica)
+  - [4.1 Frontend](#41-frontend)
+  - [4.2 Backend](#42-backend)
+  - [4.3 Integrações](#43-integrações)
+  - [4.4 Infraestrutura](#44-infraestrutura)
+
+## Usuários e Permissões
+- [5. Tipos de Usuário e Papéis do Sistema](#5-tipos-de-usuário-e-papéis-do-sistema)
+  - [5.1 Tipos de Usuário (user_type)](#51-tipos-de-usuário-user_type---imutável)
+  - [5.2 Papéis do Sistema (app_role)](#52-papéis-do-sistema-app_role)
+  - [5.3 Planos Comerciais](#53-planos-comerciais-commercialplan)
+  - [5.4 Matriz de Permissões](#54-matriz-de-permissões)
+  - [5.5 Restrições por Perfil](#55-restrições-por-perfil)
+
+## Regras de Negócio
+- [6. Regras de Negócio Detalhadas](#6-regras-de-negócio-detalhadas)
+  - [6.1 Estrutura de Planos Alimentares](#61-estrutura-de-planos-alimentares)
+  - [6.2 Fluxo de Confirmação de Refeições](#62-fluxo-de-confirmação-de-refeições)
+  - [6.3 Cálculo de Adesão](#63-cálculo-de-adesão)
+  - [6.4 Alertas de Adesão](#64-alertas-de-adesão)
+  - [6.5 Geração de Planos via IA](#65-geração-de-planos-via-ia)
+  - [6.6 Limites de Uso](#66-limites-de-uso)
+  - [6.7 Solicitações de Alunos](#67-solicitações-de-alunos)
+
+## Fluxos Técnicos
+- [7. Fluxos Técnicos do Sistema](#7-fluxos-técnicos-do-sistema)
+  - [7.1 Fluxo de Cadastro](#71-fluxo-de-cadastro)
+  - [7.2 Fluxo de Login](#72-fluxo-de-login)
+  - [7.3 Fluxo de Geração de Plano Alimentar](#73-fluxo-de-geração-de-plano-alimentar)
+  - [7.4 Fluxo de Atualização de Plano (MacroRebalancer)](#74-fluxo-de-atualização-de-plano-macrorebalancer)
+  - [7.5 Fluxo de Substituição de Alimentos](#75-fluxo-de-substituição-de-alimentos)
+  - [7.6 Fluxo de Histórico e Progresso](#76-fluxo-de-histórico-e-progresso)
+  - [7.7 Fluxo de Chat Nutricional](#77-fluxo-de-chat-nutricional)
+  - [7.8 Fluxo de Solicitações (Student Requests)](#78-fluxo-de-solicitações-student-requests)
+
+## Inteligência Artificial
+- [8. Funcionamento da IA](#8-funcionamento-da-ia)
+  - [8.1 Arquitetura da IA](#81-arquitetura-da-ia)
+  - [8.2 Governança da IA por Perfil](#82-governança-da-ia-por-perfil)
+  - [8.3 Limitações e Guardrails](#83-limitações-e-guardrails)
+  - [8.4 Serviços Internos](#84-serviços-internos)
+
+## Banco de Dados
+- [9. Persistência de Dados](#9-persistência-de-dados)
+  - [9.1 O Que É Salvo no Banco](#91-o-que-é-salvo-no-banco)
+  - [9.2 O Que NÃO Deve Ser Salvo](#92-o-que-não-deve-ser-salvo)
+  - [9.3 Estratégia de Histórico](#93-estratégia-de-histórico)
+- [10. Estrutura Conceitual do Banco de Dados](#10-estrutura-conceitual-do-banco-de-dados)
+  - [10.1 Diagrama ER Simplificado](#101-diagrama-er-simplificado)
+  - [10.2 Tabelas Principais](#102-tabelas-principais)
+  - [10.3 Enums do Banco](#103-enums-do-banco)
+  - [10.4 Funções RPC Principais](#104-funções-rpc-principais)
+
+## Integrações
+- [11. Integrações Externas](#11-integrações-externas)
+  - [11.1 Stripe](#111-stripe)
+  - [11.2 Lovable AI Gateway](#112-lovable-ai-gateway)
+
+## Requisitos
+- [12. Requisitos Funcionais](#12-requisitos-funcionais)
+  - [12.1 Autenticação e Autorização](#121-autenticação-e-autorização)
+  - [12.2 Onboarding](#122-onboarding)
+  - [12.3 Planos Alimentares](#123-planos-alimentares)
+  - [12.4 Confirmação de Refeições](#124-confirmação-de-refeições)
+  - [12.5 Adesão e Métricas](#125-adesão-e-métricas)
+  - [12.6 Chat Nutricional](#126-chat-nutricional)
+  - [12.7 Gerenciamento de Alunos](#127-gerenciamento-de-alunos-profissionais)
+  - [12.8 Solicitações de Alunos](#128-solicitações-de-alunos)
+  - [12.9 Progresso e Histórico](#129-progresso-e-histórico)
+  - [12.10 Assinaturas e Pagamentos](#1210-assinaturas-e-pagamentos)
+- [13. Requisitos Não Funcionais](#13-requisitos-não-funcionais)
+  - [13.1 Performance](#131-performance)
+  - [13.2 Segurança](#132-segurança)
+  - [13.3 Escalabilidade](#133-escalabilidade)
+  - [13.4 Disponibilidade](#134-disponibilidade)
+  - [13.5 Usabilidade](#135-usabilidade)
+  - [13.6 Manutenibilidade](#136-manutenibilidade)
+
+## Diagnóstico e Evolução
+- [14. Erros Conhecidos e Pontos Críticos](#14-erros-conhecidos-e-pontos-críticos)
+  - [14.1 Erros Conhecidos](#141-erros-conhecidos)
+  - [14.2 Pontos Críticos](#142-pontos-críticos)
+- [15. Decisões Técnicas Já Tomadas](#15-decisões-técnicas-já-tomadas)
+  - [15.1 Arquiteturais](#151-arquiteturais)
+  - [15.2 Banco de Dados](#152-banco-de-dados)
+  - [15.3 Negócio](#153-negócio)
+  - [15.4 UX](#154-ux)
+- [16. Riscos Técnicos e Limitações Atuais](#16-riscos-técnicos-e-limitações-atuais)
+  - [16.1 Riscos Técnicos](#161-riscos-técnicos)
+  - [16.2 Limitações Atuais](#162-limitações-atuais)
+- [17. Boas Práticas e Padrões Adotados](#17-boas-práticas-e-padrões-adotados)
+- [18. Próximos Passos Técnicos Sugeridos](#18-próximos-passos-técnicos-sugeridos)
+  - [18.1 Curto Prazo (1-2 meses)](#181-curto-prazo-1-2-meses)
+  - [18.2 Médio Prazo (3-6 meses)](#182-médio-prazo-3-6-meses)
+  - [18.3 Longo Prazo (6-12 meses)](#183-longo-prazo-6-12-meses)
+
+## Apêndices
+- [A. Categorias de Alimentos](#a-categorias-de-alimentos)
+- [B. Níveis de Processamento](#b-níveis-de-processamento)
+- [C. Tipos de Refeição](#c-tipos-de-refeição)
+- [D. Fórmula de Mifflin-St Jeor](#d-fórmula-de-mifflin-st-jeor)
+- [E. Ajuste Calórico por Objetivo](#e-ajuste-calórico-por-objetivo)
 
 ---
 
@@ -100,6 +198,212 @@ O sistema foi projetado para:
 │                  CAMADA DE INTEGRAÇÕES                         │
 │     Lovable AI Gateway + Stripe API + Supabase Auth           │
 └──────────────────────────────────────────────────────────────┘
+```
+
+## 3.3 Diagrama de Arquitetura (Mermaid)
+
+```mermaid
+flowchart TB
+    subgraph Cliente["🖥️ CLIENTE (Browser)"]
+        React["React 18.3 SPA"]
+        TQ["TanStack Query"]
+        Auth["AuthContext"]
+        UI["shadcn/ui + Tailwind"]
+    end
+
+    subgraph Backend["☁️ LOVABLE CLOUD / SUPABASE"]
+        subgraph EdgeFunctions["Edge Functions (Deno)"]
+            GMP["generate-meal-plan"]
+            NC["nutritional-chat"]
+            CM["confirm-meal"]
+            CS["create-student"]
+            CC["create-checkout"]
+            SW["stripe-webhook"]
+            AR["adherence-report"]
+            APS["ai-plan-suggestions"]
+        end
+        
+        subgraph Database["PostgreSQL + RLS"]
+            Profiles["profiles"]
+            DietPlans["diet_plans"]
+            Meals["meals"]
+            MealOptions["meal_options"]
+            Foods["foods"]
+            DailyLogs["daily_logs"]
+            Subscriptions["subscriptions"]
+            ChatMessages["chat_messages"]
+        end
+        
+        SupaAuth["Supabase Auth"]
+        Storage["Supabase Storage"]
+    end
+
+    subgraph External["🔗 INTEGRAÇÕES EXTERNAS"]
+        LovableAI["Lovable AI Gateway<br/>Gemini / GPT-5"]
+        Stripe["Stripe API<br/>Pagamentos"]
+    end
+
+    React --> TQ
+    TQ --> Auth
+    React --> UI
+    
+    TQ <-->|"supabase-js"| EdgeFunctions
+    TQ <-->|"supabase-js"| Database
+    TQ <-->|"supabase-js"| SupaAuth
+    
+    GMP -->|"API Call"| LovableAI
+    NC -->|"API Call"| LovableAI
+    APS -->|"API Call"| LovableAI
+    
+    CC -->|"Checkout Session"| Stripe
+    SW <-->|"Webhooks"| Stripe
+    
+    EdgeFunctions --> Database
+    SupaAuth --> Profiles
+
+    style Cliente fill:#e0f2fe,stroke:#0284c7
+    style Backend fill:#dcfce7,stroke:#16a34a
+    style External fill:#fef3c7,stroke:#d97706
+```
+
+## 3.4 Diagrama de Fluxo de Dados
+
+```mermaid
+flowchart LR
+    subgraph Entrada["📥 ENTRADA"]
+        User["Usuário"]
+        Stripe_WH["Stripe Webhook"]
+    end
+
+    subgraph Processamento["⚙️ PROCESSAMENTO"]
+        Auth["Autenticação"]
+        Permissions["Verificação de Permissões"]
+        AI["Processamento IA"]
+        Business["Lógica de Negócio"]
+    end
+
+    subgraph Persistencia["💾 PERSISTÊNCIA"]
+        DB[(PostgreSQL)]
+        Cache["Cache Local<br/>(60s)"]
+    end
+
+    subgraph Saida["📤 SAÍDA"]
+        UI_Response["Resposta UI"]
+        PDF["Relatório PDF"]
+        Email["Notificações"]
+    end
+
+    User --> Auth
+    Stripe_WH --> Business
+    Auth --> Permissions
+    Permissions --> AI
+    Permissions --> Business
+    AI --> Business
+    Business --> DB
+    DB --> Cache
+    Cache --> UI_Response
+    Business --> PDF
+    Business --> Email
+
+    style Entrada fill:#dbeafe,stroke:#2563eb
+    style Processamento fill:#fce7f3,stroke:#db2777
+    style Persistencia fill:#d1fae5,stroke:#059669
+    style Saida fill:#fef3c7,stroke:#d97706
+```
+
+## 3.5 Diagrama de Hierarquia de Planos Alimentares
+
+```mermaid
+erDiagram
+    DIET_PLANS ||--o{ MEALS : "contém"
+    MEALS ||--o{ MEAL_OPTIONS : "possui opções"
+    MEAL_OPTIONS ||--o{ MEAL_OPTION_FOODS : "inclui alimentos"
+    MEAL_OPTION_FOODS }o--|| FOODS : "referencia"
+    
+    DIET_PLANS {
+        uuid id PK
+        uuid user_id FK
+        int total_calories
+        int total_protein
+        int total_carbs
+        int total_fat
+        string status
+        boolean released_to_student
+    }
+    
+    MEALS {
+        uuid id PK
+        uuid diet_plan_id FK
+        string name
+        int total_calories
+    }
+    
+    MEAL_OPTIONS {
+        uuid id PK
+        uuid meal_id FK
+        int option_number
+        string name
+        int total_calories
+    }
+    
+    MEAL_OPTION_FOODS {
+        uuid id PK
+        uuid meal_option_id FK
+        uuid food_id FK
+        float quantity
+    }
+    
+    FOODS {
+        uuid id PK
+        string name
+        int calories
+        float protein
+        float carbs
+        float fat
+        string category
+    }
+```
+
+## 3.6 Fluxo de Governança da IA
+
+```mermaid
+stateDiagram-v2
+    [*] --> IdentificarPerfil
+    
+    IdentificarPerfil --> AlunoGratuito: user_type = aluno<br/>plan = gratuito
+    IdentificarPerfil --> AlunoPremium: user_type = aluno<br/>plan = premium
+    IdentificarPerfil --> UsuarioPago: user_type = usuario<br/>plan = pessoal_pago
+    IdentificarPerfil --> Profissional: user_type = profissional
+
+    state AlunoGratuito {
+        [*] --> SoExplicar
+        SoExplicar --> Responder: 2-4 frases
+        Responder --> BloquearAcoes
+        BloquearAcoes --> [*]
+    }
+
+    state AlunoPremium {
+        [*] --> ExplicarAnalisar
+        ExplicarAnalisar --> Simular: simulação apenas
+        Simular --> NaoPersistir
+        NaoPersistir --> [*]
+    }
+
+    state UsuarioPago {
+        [*] --> AcessoCompleto
+        AcessoCompleto --> Propor
+        Propor --> PedirConfirmacao
+        PedirConfirmacao --> Executar: usuário confirma
+        Executar --> [*]
+    }
+
+    state Profissional {
+        [*] --> AnalisarPropor
+        AnalisarPropor --> GerarSugestao
+        GerarSugestao --> AguardarAprovacao
+        AguardarAprovacao --> ExecutarAprovado: profissional aprova
+        ExecutarAprovado --> [*]
+    }
 ```
 
 ## 3.2 Componentes Principais
