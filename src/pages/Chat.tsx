@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { ArrowLeft, Send, Loader2, AlertTriangle, Bot, User, Lock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { MobileNav } from '@/components/MobileNav';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { ChatMessage } from '@/lib/types';
@@ -247,7 +248,8 @@ export default function Chat() {
       {/* Header - Mobile responsive */}
       <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-md border-b border-border">
         <div className="container mx-auto px-3 sm:px-4 py-3 sm:py-4 flex items-center gap-2 sm:gap-4">
-          <Button variant="ghost" size="icon" className="shrink-0 w-9 h-9 sm:w-10 sm:h-10" onClick={() => navigate(-1)}>
+          <MobileNav />
+          <Button variant="ghost" size="icon" className="hidden md:flex shrink-0 w-9 h-9 sm:w-10 sm:h-10" onClick={() => navigate(-1)}>
             <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5" />
           </Button>
           <div className="flex-1 min-w-0">

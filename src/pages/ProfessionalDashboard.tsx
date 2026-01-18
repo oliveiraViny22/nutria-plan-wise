@@ -23,6 +23,7 @@ import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Progress } from '@/components/ui/progress';
 import { Logo } from '@/components/Logo';
+import { MobileNav } from '@/components/MobileNav';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useProfessionalStudents } from '@/hooks/useProfessionalStudents';
 import { supabase } from '@/integrations/supabase/client';
@@ -199,7 +200,8 @@ export default function ProfessionalDashboard() {
       <header className="sticky top-0 z-50 glass border-b pt-safe">
         <div className="container mx-auto px-3 sm:px-4 py-2.5 sm:py-3 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 sm:gap-3">
-            <Button variant="ghost" size="icon" className="h-9 w-9 sm:h-10 sm:w-10" onClick={() => navigate('/dashboard')}>
+            <MobileNav />
+            <Button variant="ghost" size="icon" className="hidden md:flex h-9 w-9 sm:h-10 sm:w-10" onClick={() => navigate('/dashboard')}>
               <ArrowLeft className="h-4 w-4 sm:h-5 sm:w-5" />
             </Button>
             <Logo size="sm" />

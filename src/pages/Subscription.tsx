@@ -5,6 +5,7 @@ import { CreditCard, AlertTriangle, Check, ExternalLink, ArrowLeft, Users, BarCh
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { MobileNav } from '@/components/MobileNav';
 import { useSubscription } from '@/hooks/useSubscription';
 import { useToast } from '@/hooks/use-toast';
 import { useUserRole } from '@/hooks/useUserRole';
@@ -61,9 +62,12 @@ export default function Subscription() {
     <div className="min-h-screen bg-background overflow-x-hidden">
       <header className="border-b bg-card/50 backdrop-blur-sm sticky top-0 z-50">
         <div className="container mx-auto px-3 sm:px-4 py-3 sm:py-4 flex items-center justify-between">
-          <Button variant="ghost" size="icon" className="w-9 h-9 sm:w-10 sm:h-10" onClick={() => navigate(-1)}>
-            <ArrowLeft className="h-4 w-4 sm:h-5 sm:w-5" />
-          </Button>
+          <div className="flex items-center gap-2">
+            <MobileNav />
+            <Button variant="ghost" size="icon" className="hidden md:flex w-9 h-9 sm:w-10 sm:h-10" onClick={() => navigate(-1)}>
+              <ArrowLeft className="h-4 w-4 sm:h-5 sm:w-5" />
+            </Button>
+          </div>
           <h1 className="text-base sm:text-xl font-bold">Minha Assinatura</h1>
           <div className="w-9 sm:w-10" />
         </div>
