@@ -32,3 +32,6 @@ verify_jwt = false
 
 [functions.validate-food-import]
 verify_jwt = false
+
+[functions.audit-foods]
+verify_jwt = false

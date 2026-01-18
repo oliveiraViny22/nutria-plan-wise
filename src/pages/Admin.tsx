@@ -61,6 +61,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { FoodImportValidator, ValidationResult as FoodValidationResult, FoodRow } from '@/components/FoodImportValidator';
 import { AIFoodValidation } from '@/components/AIFoodValidation';
+import { FoodAudit } from '@/components/FoodAudit';
 // Chart colors
 const CHART_COLORS = [
   'hsl(var(--primary))',
@@ -2280,6 +2281,17 @@ export default function Admin() {
                   )}
                 </CardContent>
               </Card>
+              {/* AI Audit Section */}
+              <FoodAudit 
+                onApplySuggestion={async (foodId, updates) => {
+                  await updateFood(foodId, updates as any);
+                }}
+                onApplyBatch={async (batchUpdates) => {
+                  for (const { foodId, updates } of batchUpdates) {
+                    await updateFood(foodId, updates as any);
+                  }
+                }}
+              />
             </div>
 
               {/* Manage Foods Section */}
