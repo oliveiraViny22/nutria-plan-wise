@@ -5,14 +5,10 @@ import {
   AlertTriangle,
   CheckCircle,
   Loader2,
-  Edit2,
-  Copy,
-  X,
   ChevronDown,
   ChevronUp,
-  Flag,
   Sparkles,
-  RefreshCw,
+  ArrowRight,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -35,29 +31,25 @@ import {
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
-interface AuditSuggestion {
-  food_id: string;
-  fields: ('name' | 'category' | 'processing_level')[];
-  current: {
-    name: string;
-    category: string | null;
-    processing_level: string | null;
-  };
-  suggested: {
-    name: string | null;
-    category: string | null;
-    processing_level: string | null;
-  };
-  flags: ('duplicate' | 'review')[];
+// New migration structure
+interface MigrationSuggestion {
+  name: string;
+  old_category: string | null;
+  old_processing_level: string | null;
+  proposed_category: string;
+  proposed_processing_level: string;
+  justification: string;
   confidence: number;
+  food_id: string;
 }
 
-interface AuditResult {
+interface MigrationResult {
   summary: {
     total: number;
-    suggestable: number;
+    to_update: number;
+    unchanged: number;
   };
-  suggestions: AuditSuggestion[];
+  suggestions: MigrationSuggestion[];
 }
 
 interface FoodAuditProps {
@@ -67,7 +59,7 @@ interface FoodAuditProps {
 
 export function FoodAudit({ onApplySuggestion, onApplyBatch }: FoodAuditProps) {
   const [isLoading, setIsLoading] = useState(false);
-  const [auditResult, setAuditResult] = useState<AuditResult | null>(null);
+  const [auditResult, setAuditResult] = useState<MigrationResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selectedSuggestions, setSelectedSuggestions] = useState<Set<string>>(new Set());
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
@@ -94,7 +86,7 @@ export function FoodAudit({ onApplySuggestion, onApplyBatch }: FoodAuditProps) {
             'Authorization': `Bearer ${session.access_token}`,
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ limit: 200 }),
+          body: JSON.stringify({ limit: 200, mode: 'migration' }),
         }
       );
 
@@ -103,20 +95,20 @@ export function FoodAudit({ onApplySuggestion, onApplyBatch }: FoodAuditProps) {
         throw new Error(errorData.error || 'Erro ao executar auditoria');
       }
 
-      const result: AuditResult = await response.json();
+      const result: MigrationResult = await response.json();
       setAuditResult(result);
 
       if (result.suggestions.length === 0) {
         toast({
-          title: 'Auditoria concluída',
-          description: 'Nenhuma sugestão de correção encontrada.',
+          title: 'Migração concluída',
+          description: 'Nenhum alimento precisa de reclassificação.',
         });
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Erro desconhecido';
       setError(message);
       toast({
-        title: 'Erro na auditoria',
+        title: 'Erro na migração',
         description: message,
         variant: 'destructive',
       });
@@ -140,10 +132,15 @@ export function FoodAudit({ onApplySuggestion, onApplyBatch }: FoodAuditProps) {
   const toggleAllSelection = () => {
     if (!auditResult) return;
     
-    if (selectedSuggestions.size === auditResult.suggestions.length) {
+    const suggestionsToUpdate = auditResult.suggestions.filter(s => 
+      s.proposed_category !== s.old_category || 
+      s.proposed_processing_level !== s.old_processing_level
+    );
+    
+    if (selectedSuggestions.size === suggestionsToUpdate.length) {
       setSelectedSuggestions(new Set());
     } else {
-      setSelectedSuggestions(new Set(auditResult.suggestions.map(s => s.food_id)));
+      setSelectedSuggestions(new Set(suggestionsToUpdate.map(s => s.food_id)));
     }
   };
 
@@ -159,16 +156,16 @@ export function FoodAudit({ onApplySuggestion, onApplyBatch }: FoodAuditProps) {
     });
   };
 
-  const applySingleSuggestion = async (suggestion: AuditSuggestion) => {
+  const applySingleSuggestion = async (suggestion: MigrationSuggestion) => {
     if (!onApplySuggestion) return;
 
     setApplyingIds(prev => new Set(prev).add(suggestion.food_id));
 
     try {
-      const updates: Record<string, string | null> = {};
-      if (suggestion.suggested.name) updates.name = suggestion.suggested.name;
-      if (suggestion.suggested.category) updates.category = suggestion.suggested.category;
-      if (suggestion.suggested.processing_level) updates.processing_level = suggestion.suggested.processing_level;
+      const updates: Record<string, string | null> = {
+        category: suggestion.proposed_category,
+        processing_level: suggestion.proposed_processing_level,
+      };
 
       await onApplySuggestion(suggestion.food_id, updates);
 
@@ -179,15 +176,15 @@ export function FoodAudit({ onApplySuggestion, onApplyBatch }: FoodAuditProps) {
           ...prev,
           summary: {
             ...prev.summary,
-            suggestable: prev.summary.suggestable - 1,
+            to_update: prev.summary.to_update - 1,
           },
           suggestions: prev.suggestions.filter(s => s.food_id !== suggestion.food_id),
         };
       });
 
       toast({
-        title: 'Sugestão aplicada',
-        description: `Alimento "${suggestion.current.name}" atualizado.`,
+        title: 'Reclassificação aplicada',
+        description: `Alimento "${suggestion.name}" atualizado.`,
       });
     } catch (err) {
       toast({
@@ -212,9 +209,8 @@ export function FoodAudit({ onApplySuggestion, onApplyBatch }: FoodAuditProps) {
       .map(s => ({
         foodId: s.food_id,
         updates: {
-          ...(s.suggested.name && { name: s.suggested.name }),
-          ...(s.suggested.category && { category: s.suggested.category }),
-          ...(s.suggested.processing_level && { processing_level: s.suggested.processing_level }),
+          category: s.proposed_category,
+          processing_level: s.proposed_processing_level,
         },
       }));
 
@@ -228,7 +224,7 @@ export function FoodAudit({ onApplySuggestion, onApplyBatch }: FoodAuditProps) {
           ...prev,
           summary: {
             ...prev.summary,
-            suggestable: prev.summary.suggestable - selectedSuggestions.size,
+            to_update: prev.summary.to_update - selectedSuggestions.size,
           },
           suggestions: prev.suggestions.filter(s => !selectedSuggestions.has(s.food_id)),
         };
@@ -237,7 +233,7 @@ export function FoodAudit({ onApplySuggestion, onApplyBatch }: FoodAuditProps) {
       setSelectedSuggestions(new Set());
 
       toast({
-        title: 'Sugestões aplicadas',
+        title: 'Reclassificações aplicadas',
         description: `${updates.length} alimentos atualizados.`,
       });
     } catch (err) {
@@ -255,36 +251,48 @@ export function FoodAudit({ onApplySuggestion, onApplyBatch }: FoodAuditProps) {
     return 'text-red-600 dark:text-red-400';
   };
 
-  const getFlagBadge = (flag: 'duplicate' | 'review') => {
-    if (flag === 'duplicate') {
-      return <Badge variant="outline" className="text-orange-600 border-orange-600"><Copy className="w-3 h-3 mr-1" />Duplicado</Badge>;
-    }
-    return <Badge variant="outline" className="text-red-600 border-red-600"><AlertTriangle className="w-3 h-3 mr-1" />Revisar</Badge>;
+  const hasChanges = (suggestion: MigrationSuggestion) => {
+    return suggestion.proposed_category !== suggestion.old_category || 
+           suggestion.proposed_processing_level !== suggestion.old_processing_level;
   };
 
   const getCategoryLabel = (cat: string | null) => {
+    if (!cat) return '—';
+    // Normalize and display
     const labels: Record<string, string> = {
-      proteinas: 'Proteínas',
-      carboidratos: 'Carboidratos',
-      vegetais: 'Vegetais',
-      frutas: 'Frutas',
-      laticinios: 'Laticínios',
-      gorduras: 'Gorduras',
-      bebidas: 'Bebidas',
-      outros: 'Outros',
+      'carboidratos': 'Carboidratos',
+      'proteinas': 'Proteínas',
+      'gorduras': 'Gorduras',
+      'frutas': 'Frutas',
+      'vegetais': 'Vegetais',
+      'leguminosas': 'Leguminosas',
+      'laticinios': 'Laticínios',
+      'suplementos': 'Suplementos',
+      'mistos': 'Mistos',
+      'bebidas': 'Bebidas',
+      'outros': 'Outros',
     };
-    return cat ? labels[cat] || cat : '—';
+    const normalized = cat.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    return labels[normalized] || cat;
   };
 
   const getProcessingLabel = (level: string | null) => {
+    if (!level) return '—';
     const labels: Record<string, string> = {
-      natural: 'Natural',
-      minimamente_processado: 'Minimamente Processado',
-      processado: 'Processado',
-      ultraprocessado: 'Ultraprocessado',
+      'in natura': 'In Natura',
+      'in_natura': 'In Natura',
+      'natural': 'In Natura',
+      'minimamente processado': 'Minimamente Processado',
+      'minimamente_processado': 'Minimamente Processado',
+      'processado': 'Processado',
+      'ultraprocessado': 'Ultraprocessado',
+      'suplemento': 'Suplemento',
     };
-    return level ? labels[level] || level : '—';
+    const normalized = level.toLowerCase();
+    return labels[normalized] || level;
   };
+
+  const suggestionsToUpdate = auditResult?.suggestions.filter(hasChanges) || [];
 
   return (
     <Card>
@@ -293,22 +301,22 @@ export function FoodAudit({ onApplySuggestion, onApplyBatch }: FoodAuditProps) {
           <div>
             <CardTitle className="flex items-center gap-2">
               <Sparkles className="w-5 h-5 text-primary" />
-              Auditoria de Alimentos com IA
+              Migração de Classificação com IA
             </CardTitle>
             <CardDescription>
-              Analisa alimentos existentes e sugere correções de normalização
+              Reclassifica alimentos usando as novas regras nutricionais determinísticas
             </CardDescription>
           </div>
           <Button onClick={runAudit} disabled={isLoading}>
             {isLoading ? (
               <>
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Analisando...
+                Processando...
               </>
             ) : (
               <>
                 <Search className="w-4 h-4 mr-2" />
-                Iniciar Auditoria
+                Iniciar Migração
               </>
             )}
           </Button>
@@ -345,24 +353,28 @@ export function FoodAudit({ onApplySuggestion, onApplyBatch }: FoodAuditProps) {
               className="space-y-4"
             >
               {/* Summary */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-3 gap-4">
                 <Card className="p-4">
                   <div className="text-2xl font-bold">{auditResult.summary.total}</div>
                   <div className="text-sm text-muted-foreground">Alimentos analisados</div>
                 </Card>
                 <Card className="p-4">
-                  <div className="text-2xl font-bold text-primary">{auditResult.summary.suggestable}</div>
-                  <div className="text-sm text-muted-foreground">Sugestões de correção</div>
+                  <div className="text-2xl font-bold text-primary">{auditResult.summary.to_update}</div>
+                  <div className="text-sm text-muted-foreground">Para reclassificar</div>
+                </Card>
+                <Card className="p-4">
+                  <div className="text-2xl font-bold text-green-600">{auditResult.summary.unchanged}</div>
+                  <div className="text-sm text-muted-foreground">Sem alteração</div>
                 </Card>
               </div>
 
-              {auditResult.suggestions.length > 0 && (
+              {suggestionsToUpdate.length > 0 && (
                 <>
                   {/* Batch actions */}
                   <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
                     <div className="flex items-center gap-2">
                       <Checkbox
-                        checked={selectedSuggestions.size === auditResult.suggestions.length}
+                        checked={selectedSuggestions.size === suggestionsToUpdate.length && suggestionsToUpdate.length > 0}
                         onCheckedChange={toggleAllSelection}
                       />
                       <span className="text-sm">
@@ -386,14 +398,14 @@ export function FoodAudit({ onApplySuggestion, onApplyBatch }: FoodAuditProps) {
                         <TableRow>
                           <TableHead className="w-10"></TableHead>
                           <TableHead>Alimento</TableHead>
-                          <TableHead>Campos</TableHead>
-                          <TableHead>Flags</TableHead>
+                          <TableHead>Categoria</TableHead>
+                          <TableHead>Processamento</TableHead>
                           <TableHead className="text-right">Confiança</TableHead>
                           <TableHead className="w-10"></TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {auditResult.suggestions.map((suggestion) => (
+                        {suggestionsToUpdate.map((suggestion) => (
                           <Collapsible
                             key={suggestion.food_id}
                             open={expandedRows.has(suggestion.food_id)}
@@ -412,7 +424,7 @@ export function FoodAudit({ onApplySuggestion, onApplyBatch }: FoodAuditProps) {
                                 <TableCell>
                                   <CollapsibleTrigger asChild>
                                     <div className="flex items-center gap-2">
-                                      <span className="font-medium">{suggestion.current.name}</span>
+                                      <span className="font-medium">{suggestion.name}</span>
                                       {expandedRows.has(suggestion.food_id) 
                                         ? <ChevronUp className="w-4 h-4" />
                                         : <ChevronDown className="w-4 h-4" />
@@ -421,20 +433,25 @@ export function FoodAudit({ onApplySuggestion, onApplyBatch }: FoodAuditProps) {
                                   </CollapsibleTrigger>
                                 </TableCell>
                                 <TableCell>
-                                  <div className="flex flex-wrap gap-1">
-                                    {suggestion.fields.map(field => (
-                                      <Badge key={field} variant="secondary" className="text-xs">
-                                        {field === 'name' ? 'Nome' : 
-                                         field === 'category' ? 'Categoria' : 'Processamento'}
-                                      </Badge>
-                                    ))}
+                                  <div className="flex items-center gap-2">
+                                    <Badge variant="outline" className="text-muted-foreground">
+                                      {getCategoryLabel(suggestion.old_category)}
+                                    </Badge>
+                                    <ArrowRight className="w-3 h-3 text-primary" />
+                                    <Badge variant="default">
+                                      {getCategoryLabel(suggestion.proposed_category)}
+                                    </Badge>
                                   </div>
                                 </TableCell>
                                 <TableCell>
-                                  <div className="flex flex-wrap gap-1">
-                                    {suggestion.flags.map(flag => (
-                                      <span key={flag}>{getFlagBadge(flag)}</span>
-                                    ))}
+                                  <div className="flex items-center gap-2">
+                                    <Badge variant="outline" className="text-muted-foreground">
+                                      {getProcessingLabel(suggestion.old_processing_level)}
+                                    </Badge>
+                                    <ArrowRight className="w-3 h-3 text-primary" />
+                                    <Badge variant="default">
+                                      {getProcessingLabel(suggestion.proposed_processing_level)}
+                                    </Badge>
                                   </div>
                                 </TableCell>
                                 <TableCell className="text-right">
@@ -462,7 +479,7 @@ export function FoodAudit({ onApplySuggestion, onApplyBatch }: FoodAuditProps) {
                                             }
                                           </Button>
                                         </TooltipTrigger>
-                                        <TooltipContent>Aplicar sugestão</TooltipContent>
+                                        <TooltipContent>Aplicar reclassificação</TooltipContent>
                                       </Tooltip>
                                     </TooltipProvider>
                                   )}
@@ -471,26 +488,30 @@ export function FoodAudit({ onApplySuggestion, onApplyBatch }: FoodAuditProps) {
                               <CollapsibleContent asChild>
                                 <TableRow className="bg-muted/30">
                                   <TableCell colSpan={6} className="p-4">
-                                    <div className="grid grid-cols-2 gap-4 text-sm">
+                                    <div className="space-y-3">
                                       <div>
-                                        <h4 className="font-medium mb-2">Atual</h4>
-                                        <div className="space-y-1 text-muted-foreground">
-                                          <div><strong>Nome:</strong> {suggestion.current.name}</div>
-                                          <div><strong>Categoria:</strong> {getCategoryLabel(suggestion.current.category)}</div>
-                                          <div><strong>Processamento:</strong> {getProcessingLabel(suggestion.current.processing_level)}</div>
-                                        </div>
+                                        <h4 className="font-medium mb-1 text-primary">Justificativa</h4>
+                                        <p className="text-sm text-muted-foreground">
+                                          {suggestion.justification || 'Classificação baseada nas regras nutricionais determinísticas.'}
+                                        </p>
                                       </div>
-                                      <div>
-                                        <h4 className="font-medium mb-2 text-primary">Sugerido</h4>
-                                        <div className="space-y-1">
-                                          <div className={suggestion.suggested.name ? 'text-primary font-medium' : 'text-muted-foreground'}>
-                                            <strong>Nome:</strong> {suggestion.suggested.name || '(sem alteração)'}
+                                      <div className="grid grid-cols-2 gap-4 text-sm">
+                                        <div>
+                                          <h4 className="font-medium mb-2">Classificação Atual</h4>
+                                          <div className="space-y-1 text-muted-foreground">
+                                            <div><strong>Categoria:</strong> {getCategoryLabel(suggestion.old_category)}</div>
+                                            <div><strong>Processamento:</strong> {getProcessingLabel(suggestion.old_processing_level)}</div>
                                           </div>
-                                          <div className={suggestion.suggested.category ? 'text-primary font-medium' : 'text-muted-foreground'}>
-                                            <strong>Categoria:</strong> {suggestion.suggested.category ? getCategoryLabel(suggestion.suggested.category) : '(sem alteração)'}
-                                          </div>
-                                          <div className={suggestion.suggested.processing_level ? 'text-primary font-medium' : 'text-muted-foreground'}>
-                                            <strong>Processamento:</strong> {suggestion.suggested.processing_level ? getProcessingLabel(suggestion.suggested.processing_level) : '(sem alteração)'}
+                                        </div>
+                                        <div>
+                                          <h4 className="font-medium mb-2 text-primary">Nova Classificação</h4>
+                                          <div className="space-y-1">
+                                            <div className="text-primary font-medium">
+                                              <strong>Categoria:</strong> {getCategoryLabel(suggestion.proposed_category)}
+                                            </div>
+                                            <div className="text-primary font-medium">
+                                              <strong>Processamento:</strong> {getProcessingLabel(suggestion.proposed_processing_level)}
+                                            </div>
                                           </div>
                                         </div>
                                       </div>
@@ -507,11 +528,11 @@ export function FoodAudit({ onApplySuggestion, onApplyBatch }: FoodAuditProps) {
                 </>
               )}
 
-              {auditResult.suggestions.length === 0 && (
+              {suggestionsToUpdate.length === 0 && (
                 <div className="text-center py-8 text-muted-foreground">
                   <CheckCircle className="w-12 h-12 mx-auto mb-3 text-green-500" />
-                  <p className="font-medium">Nenhuma correção necessária</p>
-                  <p className="text-sm">Todos os alimentos estão corretamente normalizados.</p>
+                  <p className="font-medium">Nenhuma reclassificação necessária</p>
+                  <p className="text-sm">Todos os alimentos já estão corretamente classificados.</p>
                 </div>
               )}
             </motion.div>
@@ -521,7 +542,7 @@ export function FoodAudit({ onApplySuggestion, onApplyBatch }: FoodAuditProps) {
         {!isLoading && !auditResult && !error && (
           <div className="text-center py-8 text-muted-foreground">
             <Search className="w-12 h-12 mx-auto mb-3 opacity-50" />
-            <p>Clique em "Iniciar Auditoria" para analisar os alimentos</p>
+            <p>Clique em "Iniciar Migração" para analisar os alimentos</p>
           </div>
         )}
       </CardContent>
