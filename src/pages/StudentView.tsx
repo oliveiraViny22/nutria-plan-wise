@@ -15,6 +15,7 @@ import {
   Lock,
   Unlock,
   Sparkles,
+  BarChart3,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -24,6 +25,7 @@ import { MobileNav } from '@/components/MobileNav';
 import { CalorieRing } from '@/components/CalorieRing';
 import { MacroChart } from '@/components/MacroChart';
 import { MacroRebalancer } from '@/components/MacroRebalancer';
+import { AISuggestionsReview } from '@/components/AISuggestionsReview';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserRole } from '@/hooks/useUserRole';
@@ -488,6 +490,21 @@ export default function StudentView() {
                 />
               </CardContent>
             </Card>
+          </motion.div>
+        )}
+
+        {/* AI Suggestions Review */}
+        {dietPlan && studentId && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.15 }}
+          >
+            <AISuggestionsReview
+              studentId={studentId}
+              dietPlanId={dietPlan.id}
+              onSuggestionApplied={fetchStudentData}
+            />
           </motion.div>
         )}
 
