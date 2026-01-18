@@ -487,35 +487,294 @@ async function deleteUser(
     throw new Error('Você não pode excluir sua própria conta');
   }
 
-  logStep('Deleting user', { targetUserId });
-
-  // Get user info for audit before deletion
-  const { data: userProfile } = await supabase
+  // Prevent deleting system admin
+  const { data: targetProfile } = await supabase
     .from('profiles')
-    .select('name, email')
+    .select('email, name')
     .eq('user_id', targetUserId)
     .single();
 
-  // Delete from auth (this will cascade delete from profiles due to FK)
-  const { error } = await supabase.auth.admin.deleteUser(targetUserId);
-
-  if (error) {
-    logStep('Error deleting user', { error: error.message });
-    throw new Error(`Erro ao excluir usuário: ${error.message}`);
+  if (targetProfile?.email === 'admin@nutriai.app') {
+    throw new Error('Não é possível excluir a conta de administrador do sistema');
   }
 
-  // Audit log
-  await supabase.from('admin_audit_log').insert({
-    user_id: adminId,
-    action: 'delete_user',
-    entity_type: 'user',
-    entity_id: targetUserId,
-    old_value: userProfile,
-    user_agent: headers.get('user-agent'),
-  });
+  logStep('Starting complete user deletion', { targetUserId, email: targetProfile?.email });
 
-  logStep('User deleted successfully', { targetUserId });
-  return { success: true };
+  const deletionStats: Record<string, number> = {};
+
+  try {
+    // 1. Get all diet_plan IDs for this user (needed for cascading deletes)
+    const { data: dietPlans } = await supabase
+      .from('diet_plans')
+      .select('id')
+      .eq('user_id', targetUserId);
+    
+    const dietPlanIds = dietPlans?.map((dp: { id: string }) => dp.id) || [];
+    logStep('Found diet plans', { count: dietPlanIds.length });
+
+    // 2. Get all daily_log IDs for this user
+    const { data: dailyLogs } = await supabase
+      .from('daily_logs')
+      .select('id')
+      .eq('user_id', targetUserId);
+    
+    const dailyLogIds = dailyLogs?.map((dl: { id: string }) => dl.id) || [];
+
+    // 3. Get all meal IDs from user's diet plans
+    const { data: meals } = await supabase
+      .from('meals')
+      .select('id')
+      .in('diet_plan_id', dietPlanIds.length > 0 ? dietPlanIds : ['00000000-0000-0000-0000-000000000000']);
+    
+    const mealIds = meals?.map((m: { id: string }) => m.id) || [];
+
+    // 4. Get all meal_option IDs
+    const { data: mealOptions } = await supabase
+      .from('meal_options')
+      .select('id')
+      .in('meal_id', mealIds.length > 0 ? mealIds : ['00000000-0000-0000-0000-000000000000']);
+    
+    const mealOptionIds = mealOptions?.map((mo: { id: string }) => mo.id) || [];
+
+    // === START DELETION (order matters due to FK relationships) ===
+
+    // Delete meal_logs (depends on daily_logs)
+    if (dailyLogIds.length > 0) {
+      const { count } = await supabase
+        .from('meal_logs')
+        .delete({ count: 'exact' })
+        .in('daily_log_id', dailyLogIds);
+      deletionStats['meal_logs'] = count || 0;
+    }
+
+    // Delete daily_logs
+    {
+      const { count } = await supabase
+        .from('daily_logs')
+        .delete({ count: 'exact' })
+        .eq('user_id', targetUserId);
+      deletionStats['daily_logs'] = count || 0;
+    }
+
+    // Delete meal_option_foods (depends on meal_options)
+    if (mealOptionIds.length > 0) {
+      const { count } = await supabase
+        .from('meal_option_foods')
+        .delete({ count: 'exact' })
+        .in('meal_option_id', mealOptionIds);
+      deletionStats['meal_option_foods'] = count || 0;
+    }
+
+    // Delete meal_options (depends on meals)
+    if (mealIds.length > 0) {
+      const { count } = await supabase
+        .from('meal_options')
+        .delete({ count: 'exact' })
+        .in('meal_id', mealIds);
+      deletionStats['meal_options'] = count || 0;
+    }
+
+    // Delete meal_foods (depends on meals)
+    if (mealIds.length > 0) {
+      const { count } = await supabase
+        .from('meal_foods')
+        .delete({ count: 'exact' })
+        .in('meal_id', mealIds);
+      deletionStats['meal_foods'] = count || 0;
+    }
+
+    // Delete meals (depends on diet_plans)
+    if (dietPlanIds.length > 0) {
+      const { count } = await supabase
+        .from('meals')
+        .delete({ count: 'exact' })
+        .in('diet_plan_id', dietPlanIds);
+      deletionStats['meals'] = count || 0;
+    }
+
+    // Delete ai_suggestions (depends on diet_plans)
+    if (dietPlanIds.length > 0) {
+      const { count } = await supabase
+        .from('ai_suggestions')
+        .delete({ count: 'exact' })
+        .in('diet_plan_id', dietPlanIds);
+      deletionStats['ai_suggestions'] = count || 0;
+    }
+
+    // Delete plan_versions (depends on diet_plans)
+    if (dietPlanIds.length > 0) {
+      const { count } = await supabase
+        .from('plan_versions')
+        .delete({ count: 'exact' })
+        .in('diet_plan_id', dietPlanIds);
+      deletionStats['plan_versions'] = count || 0;
+    }
+
+    // Delete adherence_metrics (depends on diet_plans)
+    {
+      const { count } = await supabase
+        .from('adherence_metrics')
+        .delete({ count: 'exact' })
+        .eq('user_id', targetUserId);
+      deletionStats['adherence_metrics'] = count || 0;
+    }
+
+    // Delete diet_plans
+    {
+      const { count } = await supabase
+        .from('diet_plans')
+        .delete({ count: 'exact' })
+        .eq('user_id', targetUserId);
+      deletionStats['diet_plans'] = count || 0;
+    }
+
+    // Delete chat_messages
+    {
+      const { count } = await supabase
+        .from('chat_messages')
+        .delete({ count: 'exact' })
+        .eq('user_id', targetUserId);
+      deletionStats['chat_messages'] = count || 0;
+    }
+
+    // Delete weight_logs
+    {
+      const { count } = await supabase
+        .from('weight_logs')
+        .delete({ count: 'exact' })
+        .eq('user_id', targetUserId);
+      deletionStats['weight_logs'] = count || 0;
+    }
+
+    // Delete plan_history
+    {
+      const { count } = await supabase
+        .from('plan_history')
+        .delete({ count: 'exact' })
+        .eq('user_id', targetUserId);
+      deletionStats['plan_history'] = count || 0;
+    }
+
+    // Delete adherence_report_files
+    {
+      const { count } = await supabase
+        .from('adherence_report_files')
+        .delete({ count: 'exact' })
+        .or(`user_id.eq.${targetUserId},student_id.eq.${targetUserId}`);
+      deletionStats['adherence_report_files'] = count || 0;
+    }
+
+    // Delete subscriptions
+    {
+      const { count } = await supabase
+        .from('subscriptions')
+        .delete({ count: 'exact' })
+        .eq('user_id', targetUserId);
+      deletionStats['subscriptions'] = count || 0;
+    }
+
+    // Delete user_usage
+    {
+      const { count } = await supabase
+        .from('user_usage')
+        .delete({ count: 'exact' })
+        .eq('user_id', targetUserId);
+      deletionStats['user_usage'] = count || 0;
+    }
+
+    // Delete user_roles
+    {
+      const { count } = await supabase
+        .from('user_roles')
+        .delete({ count: 'exact' })
+        .eq('user_id', targetUserId);
+      deletionStats['user_roles'] = count || 0;
+    }
+
+    // Delete professional_students (as student or professional)
+    {
+      const { count } = await supabase
+        .from('professional_students')
+        .delete({ count: 'exact' })
+        .or(`student_id.eq.${targetUserId},professional_id.eq.${targetUserId}`);
+      deletionStats['professional_students'] = count || 0;
+    }
+
+    // Delete professional_licenses
+    {
+      const { count } = await supabase
+        .from('professional_licenses')
+        .delete({ count: 'exact' })
+        .eq('user_id', targetUserId);
+      deletionStats['professional_licenses'] = count || 0;
+    }
+
+    // Delete student_requests (as student or professional)
+    {
+      const { count } = await supabase
+        .from('student_requests')
+        .delete({ count: 'exact' })
+        .or(`student_id.eq.${targetUserId},professional_id.eq.${targetUserId}`);
+      deletionStats['student_requests'] = count || 0;
+    }
+
+    // Delete adherence_alert_configs
+    {
+      const { count } = await supabase
+        .from('adherence_alert_configs')
+        .delete({ count: 'exact' })
+        .eq('professional_id', targetUserId);
+      deletionStats['adherence_alert_configs'] = count || 0;
+    }
+
+    // Delete adherence_alerts (as student or professional)
+    {
+      const { count } = await supabase
+        .from('adherence_alerts')
+        .delete({ count: 'exact' })
+        .or(`student_id.eq.${targetUserId},professional_id.eq.${targetUserId}`);
+      deletionStats['adherence_alerts'] = count || 0;
+    }
+
+    // Delete profile
+    {
+      const { count } = await supabase
+        .from('profiles')
+        .delete({ count: 'exact' })
+        .eq('user_id', targetUserId);
+      deletionStats['profiles'] = count || 0;
+    }
+
+    logStep('All user data deleted from tables', deletionStats);
+
+    // Finally, delete from auth
+    const { error } = await supabase.auth.admin.deleteUser(targetUserId);
+
+    if (error) {
+      logStep('Error deleting auth user', { error: error.message });
+      throw new Error(`Erro ao excluir conta de autenticação: ${error.message}`);
+    }
+
+    // Audit log with full deletion stats
+    await supabase.from('admin_audit_log').insert({
+      user_id: adminId,
+      action: 'delete_user_complete',
+      entity_type: 'user',
+      entity_id: targetUserId,
+      old_value: {
+        profile: targetProfile,
+        deletion_stats: deletionStats
+      },
+      user_agent: headers.get('user-agent'),
+    });
+
+    logStep('User deleted completely', { targetUserId, stats: deletionStats });
+    return { success: true, deletedRecords: deletionStats };
+
+  } catch (error) {
+    logStep('Error during user deletion', { error: error instanceof Error ? error.message : String(error) });
+    throw error;
+  }
 }
 
 // deno-lint-ignore no-explicit-any
