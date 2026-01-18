@@ -1,7 +1,17 @@
 # DOCUMENTAÇÃO COMERCIAL E INSTITUCIONAL — NUTRIAPLAN
 
-## Versão do Documento: 1.0
+## Versão do Documento: 2.0
 ## Data de Geração: 18 de Janeiro de 2026
+## Última Atualização: 18 de Janeiro de 2026
+
+---
+
+## CHANGELOG
+
+| Versão | Data | Alterações |
+|--------|------|------------|
+| 2.0 | 18/01/2026 | Versão consolidada e alinhada com documentação técnica v2.0, detalhamento de funcionalidades por perfil, clarificação de limites |
+| 1.0 | 18/01/2026 | Versão inicial |
 
 ---
 
@@ -36,15 +46,11 @@ O **NutriaPlan** é uma plataforma inteligente de nutrição que revoluciona a f
 
 - **Para profissionais de nutrição**: Uma ferramenta completa para atender mais pacientes com qualidade, automatizando tarefas repetitivas e focando no que realmente importa: o cuidado personalizado.
 
-## 1.2 Visão Geral
-
-O NutriaPlan nasceu da necessidade de tornar a nutrição personalizada mais acessível, eficiente e baseada em dados. Nossa plataforma permite que qualquer pessoa acompanhe sua alimentação de forma inteligente, enquanto profissionais de nutrição podem escalar seu atendimento sem perder qualidade.
-
-## 1.3 Missão
+## 1.2 Missão
 
 Democratizar o acesso à nutrição de qualidade através de tecnologia, conectando pessoas aos melhores recursos nutricionais e ajudando profissionais a impactar mais vidas.
 
-## 1.4 Visão
+## 1.3 Visão
 
 Ser a plataforma líder em nutrição inteligente na América Latina, referência em inovação e resultados para usuários e profissionais.
 
@@ -54,37 +60,31 @@ Ser a plataforma líder em nutrição inteligente na América Latina, referênci
 
 ## 2.1 Para Pessoas Físicas
 
-### 2.1.1 Dificuldade em Manter Dietas
-- **78% das pessoas** abandonam dietas em menos de 3 meses
+### Dificuldade em Manter Dietas
+- 78% das pessoas abandonam dietas em menos de 3 meses
 - Falta de variedade e flexibilidade nos planos
 - Ausência de acompanhamento e feedback
-- Dificuldade em adaptar o plano à rotina
 
-### 2.1.2 Alto Custo de Acompanhamento Nutricional
+### Alto Custo de Acompanhamento
 - Consultas presenciais frequentes são caras
 - Falta de suporte entre consultas
-- Dúvidas sem resposta geram desistência
 
-### 2.1.3 Falta de Personalização Real
+### Falta de Personalização Real
 - Planos genéricos que não consideram preferências
 - Sem adaptação a restrições alimentares
-- Metas irreais ou mal calculadas
 
 ## 2.2 Para Profissionais de Nutrição
 
-### 2.2.1 Limitação de Atendimento
+### Limitação de Atendimento
 - Tempo gasto em tarefas administrativas
 - Dificuldade em escalar sem perder qualidade
-- Cálculos repetitivos e suscetíveis a erros
 
-### 2.2.2 Falta de Visibilidade da Adesão
+### Falta de Visibilidade da Adesão
 - Sem dados sobre o que o paciente realmente come
-- Feedback apenas em consultas presenciais
 - Decisões baseadas em relatos imprecisos
 
-### 2.2.3 Dificuldade em Monetizar Conhecimento
-- Modelo de negócio limitado a consultas
-- Baixa escalabilidade
+### Dificuldade em Monetizar
+- Modelo limitado a consultas
 - Sem receita recorrente previsível
 
 ---
@@ -99,7 +99,6 @@ Ser a plataforma líder em nutrição inteligente na América Latina, referênci
 - **Flexibilidade real**: Múltiplas opções por refeição, todas nutricionalmente equivalentes
 - **Suporte 24/7**: Assistente de IA para tirar dúvidas a qualquer momento
 - **Acompanhamento de progresso**: Veja sua evolução com gráficos e métricas claras
-- **Conexão com profissionais**: Acesso a nutricionistas quando precisar
 
 ## 3.2 Para Profissionais
 
@@ -109,7 +108,6 @@ Ser a plataforma líder em nutrição inteligente na América Latina, referênci
 - **Visibilidade total**: Saiba exatamente o que seus pacientes estão comendo
 - **Alertas proativos**: Seja notificado quando um paciente está com baixa adesão
 - **Escalabilidade**: Gerencie até 50 pacientes com facilidade
-- **Receita recorrente**: Modelo de assinatura previsível
 
 ---
 
@@ -117,68 +115,36 @@ Ser a plataforma líder em nutrição inteligente na América Latina, referênci
 
 ## 4.1 Público Primário
 
-### 4.1.1 Pessoas em Busca de Emagrecimento
-- **Perfil**: Adultos de 25-55 anos, classe B/C
-- **Dor principal**: Já tentaram várias dietas sem sucesso
-- **Motivação**: Saúde, estética, qualidade de vida
-- **Comportamento**: Usam apps de saúde, buscam praticidade
+### Pessoas em Busca de Emagrecimento
+- Adultos de 25-55 anos
+- Já tentaram várias dietas sem sucesso
+- Buscam praticidade e resultados
 
-### 4.1.2 Praticantes de Atividade Física
-- **Perfil**: Adultos de 18-45 anos, frequentadores de academia
-- **Dor principal**: Dificuldade em otimizar nutrição para resultados
-- **Motivação**: Performance, hipertrofia, definição
-- **Comportamento**: Engajados com fitness, dispostos a pagar por resultados
+### Praticantes de Atividade Física
+- Adultos de 18-45 anos
+- Dificuldade em otimizar nutrição para resultados
+- Dispostos a pagar por performance
 
-### 4.1.3 Nutricionistas e Profissionais de Saúde
-- **Perfil**: Profissionais de 25-50 anos, autônomos ou em clínicas
-- **Dor principal**: Limitação de tempo e escalabilidade
-- **Motivação**: Aumentar carteira de clientes, melhorar resultados
-- **Comportamento**: Buscam tecnologia para otimizar atendimento
+### Nutricionistas e Profissionais de Saúde
+- Profissionais de 25-50 anos
+- Buscam tecnologia para otimizar atendimento
 
 ## 4.2 Público Secundário
 
-### 4.2.1 Pessoas com Restrições Alimentares
-- Diabéticos, celíacos, intolerantes a lactose
-- Vegetarianos e veganos
-- Alérgicos alimentares
-
-### 4.2.2 Clínicas de Nutrição
-- Buscam software para gerenciar múltiplos profissionais
-- Interesse em white-label (futuro)
-
-### 4.2.3 Empresas (Wellness Corporativo)
-- Programas de saúde para colaboradores
-- Interesse em planos empresariais (futuro)
+- Pessoas com restrições alimentares
+- Clínicas de nutrição
+- Empresas (Wellness Corporativo)
 
 ---
 
 # 5. COMO A PLATAFORMA FUNCIONA
 
-## 5.1 Visão Simplificada
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    NUTRIAPLAN                                 │
-│                                                               │
-│   ┌───────────┐     ┌───────────┐     ┌───────────┐        │
-│   │  VOCÊ     │ --> │  PLANO    │ --> │ PROGRESSO │        │
-│   │  INFORMA  │     │   IA      │     │   REAL    │        │
-│   └───────────┘     └───────────┘     └───────────┘        │
-│        ▼                  ▲                  ▼               │
-│   ┌───────────┐     ┌───────────┐     ┌───────────┐        │
-│   │ OBJETIVOS │     │ NUTRIÇÃO- │     │  AJUSTES  │        │
-│   │PREFERÊNCIAS│     │   ISTA    │     │  CONTÍNUOS│        │
-│   │ RESTRIÇÕES│     │ (opcional)│     │           │        │
-│   └───────────┘     └───────────┘     └───────────┘        │
-└─────────────────────────────────────────────────────────────┘
-```
-
-## 5.2 Passo a Passo para Usuários
+## 5.1 Para Usuários Autônomos
 
 ### Passo 1: Cadastro e Perfil
 1. Crie sua conta com email e senha
 2. Informe seus dados (idade, peso, altura)
-3. Selecione seu objetivo (emagrecer, manter, ganhar massa)
+3. Selecione seu objetivo
 4. Indique seu nível de atividade física
 5. Escolha quantas refeições faz por dia (2 a 6)
 6. Informe preferências e restrições alimentares
@@ -187,24 +153,18 @@ Ser a plataforma líder em nutrição inteligente na América Latina, referênci
 - A IA calcula suas necessidades calóricas e de macros
 - Gera um plano com múltiplas opções por refeição
 - Todas as opções são nutricionalmente equivalentes
-- Você escolhe o que comer dentre as opções
 
 ### Passo 3: Registro Diário
 - Confirme o que você realmente comeu
 - Registre se pulou ou comeu fora do plano
 - Acompanhe seu progresso diário
 
-### Passo 4: Acompanhamento
-- Veja sua taxa de adesão
-- Acompanhe sua evolução de peso
-- Tire dúvidas com a IA a qualquer momento
-
-### Passo 5: Ajustes Contínuos
+### Passo 4: Ajustes Contínuos
 - O sistema aprende com sua adesão
 - Receba sugestões de ajuste
 - Evolua seu plano conforme progride
 
-## 5.3 Para Profissionais
+## 5.2 Para Profissionais
 
 ### Criação de Alunos
 1. Acesse seu painel profissional
@@ -218,15 +178,12 @@ Ser a plataforma líder em nutrição inteligente na América Latina, referênci
 2. Receba alertas quando adesão cair
 3. Acesse histórico detalhado de cada aluno
 4. Responda solicitações de alteração
-5. Ajuste planos com base em dados reais
 
 ---
 
 # 6. DIFERENCIAIS COMPETITIVOS
 
 ## 6.1 IA com Governança Clínica
-
-Diferente de apps genéricos, nossa IA respeita uma estrutura de governança:
 
 | Tipo de Usuário | O que a IA Pode Fazer |
 |-----------------|------------------------|
@@ -246,34 +203,19 @@ Cada refeição oferece múltiplas opções que são **nutricionalmente equivale
 - Mesmo range de carboidratos (±10g)
 - Mesmo range de gordura (±3g)
 
-**Você tem liberdade de escolha sem comprometer resultados.**
-
 ## 6.3 Confirmação vs Escolha
 
 O NutriaPlan não pergunta "o que você vai comer", mas sim "o que você comeu".
 
-- Plano é referência, não imposição
 - Dados reais de adesão, não intenções
 - Base para decisões baseadas em evidências
 
 ## 6.4 Métricas de Adesão Avançadas
 
-Não apenas "seguiu ou não seguiu", mas:
-
 - Taxa de adesão geral
 - Adesão por tipo de refeição
 - Padrões de exceções
 - Tendências ao longo do tempo
-- Correlação com evolução de peso
-
-## 6.5 Conexão Profissional-Aluno
-
-Diferente de apps standalone:
-
-- Profissional tem visibilidade total
-- Aluno tem suporte contínuo
-- Comunicação estruturada via solicitações
-- Relatórios compartilháveis
 
 ---
 
@@ -281,7 +223,7 @@ Diferente de apps standalone:
 
 ## 7.1 Aluno Gratuito
 
-**Perfil**: Pessoa vinculada a um nutricionista, usando o básico da plataforma.
+**Para quem é**: Pessoa vinculada a um nutricionista.
 
 | Recurso | Disponível |
 |---------|------------|
@@ -292,58 +234,51 @@ Diferente de apps standalone:
 | Histórico | 7 dias |
 | Criar/editar plano | ✗ |
 
-**Ideal para**: Pacientes de nutricionistas que querem acompanhar o plano prescrito.
+**Custo**: Gratuito
 
 ## 7.2 Aluno Premium
 
-**Perfil**: Aluno vinculado que deseja mais recursos.
+**Para quem é**: Alunos que querem mais recursos.
 
 | Recurso | Disponível |
 |---------|------------|
 | Tudo do Gratuito | ✓ |
-| Chat educacional ampliado | ✓ (10 mensagens/dia) |
+| Chat IA ampliado | ✓ (10 mensagens/dia) |
 | Simulações nutricionais | ✓ |
 | Histórico | 30 dias |
-| Explicações detalhadas do plano | ✓ |
 
-**Preço**: R$ 4,90/mês
-
-**Ideal para**: Alunos engajados que querem entender mais sobre seu plano.
+**Custo**: R$ 4,90/mês
 
 ## 7.3 Usuário Pessoal (Plano Pessoal Pago)
 
-**Perfil**: Pessoa que quer autonomia total, sem vínculo com profissional.
+**Para quem é**: Pessoas com autonomia total.
 
 | Recurso | Disponível |
 |---------|------------|
-| Criar planos alimentares | ✓ (5/mês) |
+| Criar planos personalizados | ✓ (5/mês) |
 | Editar e ajustar planos | ✓ |
-| Substituir alimentos | ✓ (20/mês) |
+| Substituição de alimentos | ✓ (20/mês) |
 | Ajustes de macros | ✓ (10/mês) |
 | Chat IA completo | ✓ (30 mensagens/dia) |
 | Histórico | 90 dias |
 
-**Preço**: R$ 14,90/mês
-
-**Ideal para**: Pessoas que querem gerenciar sua própria nutrição com suporte de IA.
+**Custo**: R$ 14,90/mês
 
 ## 7.4 Profissional
 
-**Perfil**: Nutricionistas e profissionais de saúde.
+**Para quem é**: Nutricionistas e profissionais de saúde.
 
 | Recurso | Disponível |
 |---------|------------|
 | Gerenciar alunos | ✓ (até 50) |
-| Criar planos para alunos | ✓ (ilimitado) |
-| Ver adesão de alunos | ✓ |
-| Receber alertas | ✓ |
+| Criação ilimitada de planos | ✓ |
+| IA como assistente clínico | ✓ |
+| Alertas de adesão configuráveis | ✓ |
+| Relatórios PDF de adesão | ✓ |
 | Chat IA clínico | ✓ (100 mensagens/dia) |
-| Relatórios de adesão | ✓ |
 | Histórico | Ilimitado |
 
-**Preço**: R$ 99,00/mês
-
-**Ideal para**: Nutricionistas que querem escalar seu atendimento.
+**Custo**: R$ 99,00/mês
 
 ---
 
@@ -352,60 +287,19 @@ Diferente de apps standalone:
 ## 8.1 Jornada do Aluno Vinculado
 
 ```
-DESCOBERTA          ATIVAÇÃO           USO REGULAR         ENGAJAMENTO
-     │                   │                   │                   │
-     ▼                   ▼                   ▼                   ▼
-┌─────────┐       ┌─────────┐       ┌─────────┐       ┌─────────┐
-│Nutrici- │       │Login com│       │Confirmar│       │Ver      │
-│onista   │ ----> │credencial│ ----> │refeições│ ----> │progresso│
-│convida  │       │criada   │       │diárias  │       │e evolução│
-└─────────┘       └─────────┘       └─────────┘       └─────────┘
-                        │                                    │
-                        ▼                                    ▼
-                  ┌─────────┐                         ┌─────────┐
-                  │Ver plano│                         │Upgrade  │
-                  │liberado │                         │Premium  │
-                  └─────────┘                         └─────────┘
+CONVITE → LOGIN → VER PLANO → CONFIRMAR REFEIÇÕES → VER PROGRESSO → UPGRADE (opcional)
 ```
 
 ## 8.2 Jornada do Usuário Autônomo
 
 ```
-DESCOBERTA          ATIVAÇÃO           USO REGULAR         RETENÇÃO
-     │                   │                   │                   │
-     ▼                   ▼                   ▼                   ▼
-┌─────────┐       ┌─────────┐       ┌─────────┐       ┌─────────┐
-│Descobre │       │Completa │       │Segue    │       │Ajusta   │
-│o app    │ ----> │onboarding│ ----> │plano   │ ----> │e evolui │
-│         │       │         │       │gerado   │       │plano    │
-└─────────┘       └─────────┘       └─────────┘       └─────────┘
-     │                 │                   │                   │
-     ▼                 ▼                   ▼                   ▼
-┌─────────┐       ┌─────────┐       ┌─────────┐       ┌─────────┐
-│Cadastro │       │Recebe   │       │Registra │       │Atinge   │
-│grátis   │       │1º plano │       │consumo  │       │objetivos│
-│         │       │automático│       │real     │       │         │
-└─────────┘       └─────────┘       └─────────┘       └─────────┘
+CADASTRO → ONBOARDING → PLANO GERADO → SEGUIR PLANO → AJUSTAR → EVOLUIR
 ```
 
 ## 8.3 Jornada do Profissional
 
 ```
-DESCOBERTA          ATIVAÇÃO           USO REGULAR         CRESCIMENTO
-     │                   │                   │                   │
-     ▼                   ▼                   ▼                   ▼
-┌─────────┐       ┌─────────┐       ┌─────────┐       ┌─────────┐
-│Conhece  │       │Cadastra │       │Acompanha│       │Escala   │
-│ferramenta│ ----> │primeiros│ ----> │adesão   │ ----> │para     │
-│         │       │alunos   │       │e ajusta │       │50+      │
-└─────────┘       └─────────┘       └─────────┘       └─────────┘
-     │                 │                   │                   │
-     ▼                 ▼                   ▼                   ▼
-┌─────────┐       ┌─────────┐       ┌─────────┐       ┌─────────┐
-│Trial    │       │Cria     │       │Recebe   │       │ROI      │
-│grátis   │       │planos   │       │alertas  │       │positivo │
-│         │       │com IA   │       │proativos│       │         │
-└─────────┘       └─────────┘       └─────────┘       └─────────┘
+CADASTRO → CRIAR ALUNOS → GERAR PLANOS → ACOMPANHAR ADESÃO → AJUSTAR → ESCALAR
 ```
 
 ---
@@ -414,30 +308,22 @@ DESCOBERTA          ATIVAÇÃO           USO REGULAR         CRESCIMENTO
 
 ## 9.1 O Que a IA Faz?
 
-Nossa Inteligência Artificial é treinada para auxiliar em nutrição de forma segura e personalizada:
-
-### 9.1.1 Para Criação de Planos
-- Calcula necessidades calóricas baseadas em dados científicos (Mifflin-St Jeor)
-- Seleciona alimentos adequados ao objetivo (emagrecimento, manutenção, hipertrofia)
-- Respeita preferências alimentares (vegetariano, low carb, etc.)
-- Evita restrições (glúten, lactose, alérgenos)
-- Distribui calorias adequadamente entre refeições
+### Para Criação de Planos
+- Calcula necessidades calóricas (fórmula científica Mifflin-St Jeor)
+- Seleciona alimentos adequados ao objetivo
+- Respeita preferências e restrições
 - Cria opções equivalentes para flexibilidade
 
-### 9.1.2 Para Assistência Conversacional
-- Responde dúvidas sobre nutrição e alimentação
-- Explica a função de cada alimento no plano
+### Para Assistência Conversacional
+- Responde dúvidas sobre nutrição
+- Explica a função de cada alimento
 - Sugere substituições quando solicitado
-- Oferece educação nutricional contínua
 
-### 9.1.3 Para Análise de Dados
+### Para Análise de Dados
 - Identifica padrões de adesão
 - Sugere ajustes baseados em comportamento real
-- Gera insights sobre preferências do usuário
 
 ## 9.2 O Que a IA NÃO Faz?
-
-Para garantir segurança, nossa IA tem limitações claras:
 
 | Ação | Permitido? |
 |------|------------|
@@ -445,15 +331,12 @@ Para garantir segurança, nossa IA tem limitações claras:
 | Dar diagnósticos médicos | ❌ Nunca |
 | Prescrever suplementos | ❌ Nunca |
 | Substituir consulta médica | ❌ Nunca |
-| Ignorar orientações do profissional | ❌ Nunca |
 
 ## 9.3 Governança da IA
 
-A IA opera sob um sistema de governança que garante:
-
-1. **Transparência**: Toda sugestão é claramente identificada como da IA
-2. **Revisão humana**: Propostas passam por aprovação quando necessário
-3. **Limites claros**: Cada perfil de usuário tem permissões específicas
+1. **Transparência**: Toda sugestão é claramente identificada
+2. **Revisão humana**: Propostas passam por aprovação
+3. **Limites claros**: Cada perfil tem permissões específicas
 4. **Rastreabilidade**: Todas as ações são registradas
 
 ---
@@ -465,79 +348,13 @@ A IA opera sob um sistema de governança que garante:
 | Recurso | Gratuito | Premium | Pessoal | Profissional |
 |---------|----------|---------|---------|--------------|
 | **Preço/mês** | R$ 0 | R$ 4,90 | R$ 14,90 | R$ 99,00 |
-| **Tipo** | Aluno | Aluno | Autônomo | Profissional |
 | Visualizar plano | ✓ | ✓ | ✓ | ✓ |
 | Confirmar refeições | ✓ | ✓ | ✓ | ✓ |
 | Criar planos | - | - | 5/mês | Ilimitado |
 | Substituições | - | - | 20/mês | Ilimitado |
-| Ajustes de macro | - | - | 10/mês | Ilimitado |
 | Chat IA/dia | 3 | 10 | 30 | 100 |
 | Histórico | 7 dias | 30 dias | 90 dias | Ilimitado |
-| Simulações | - | ✓ | ✓ | ✓ |
 | Gerenciar alunos | - | - | - | Até 50 |
-| Alertas de adesão | - | - | - | ✓ |
-| Relatórios PDF | - | - | ✓ | ✓ |
-
-## 10.2 Plano Gratuito
-
-**Para quem é**: Alunos vinculados a nutricionistas que usam o NutriaPlan.
-
-**O que oferece**:
-- Acesso ao plano criado pelo seu nutricionista
-- Registro diário de consumo
-- Chat educacional básico (3 mensagens/dia)
-- Possibilidade de enviar solicitações ao profissional
-- Histórico de 7 dias
-
-**Custo**: Gratuito
-
-## 10.3 Plano Premium
-
-**Para quem é**: Alunos que querem mais recursos sem deixar o acompanhamento profissional.
-
-**O que oferece**:
-- Tudo do plano Gratuito
-- Chat IA ampliado (10 mensagens/dia)
-- Simulações nutricionais (ver impacto de mudanças)
-- Explicações detalhadas do plano
-- Histórico de 30 dias
-
-**Custo**: R$ 4,90/mês
-
-**Economia**: Menos que um café por semana para ter mais autonomia.
-
-## 10.4 Plano Pessoal Pago
-
-**Para quem é**: Pessoas que querem gerenciar sua própria nutrição com autonomia total.
-
-**O que oferece**:
-- Criação de planos personalizados (5/mês)
-- Edição e ajustes de macros
-- Substituição de alimentos
-- Chat IA completo (30 mensagens/dia)
-- Histórico de 90 dias
-- Sem vínculo com profissional
-
-**Custo**: R$ 14,90/mês
-
-**Economia**: Menos de R$ 0,50/dia para ter um assistente nutricional 24/7.
-
-## 10.5 Plano Profissional
-
-**Para quem é**: Nutricionistas e profissionais de saúde.
-
-**O que oferece**:
-- Gerenciamento de até 50 alunos
-- Criação ilimitada de planos
-- IA como assistente clínico
-- Alertas de adesão configuráveis
-- Relatórios PDF de adesão
-- Dashboard completo
-- Histórico ilimitado
-
-**Custo**: R$ 99,00/mês
-
-**ROI**: Com apenas 2-3 alunos pagando Premium, o plano se paga.
 
 ---
 
@@ -545,7 +362,7 @@ A IA opera sob um sistema de governança que garante:
 
 ## 11.1 Fontes de Receita
 
-### 11.1.1 Assinaturas Recorrentes (Principal)
+### Assinaturas Recorrentes (Principal)
 
 | Plano | Preço | Target |
 |-------|-------|--------|
@@ -553,88 +370,37 @@ A IA opera sob um sistema de governança que garante:
 | Pessoal | R$ 14,90/mês | Usuários autônomos |
 | Profissional | R$ 99,00/mês | Nutricionistas |
 
-### 11.1.2 Receita por Cadeia de Valor
+### Efeito Multiplicador
 
 ```
-Profissional (R$ 99) --> Cria Alunos --> Alguns fazem upgrade (R$ 4,90)
+Profissional (R$ 99) → Cria 30 Alunos → 20% upgrade = R$ 99 + (6 × R$ 4,90) = R$ 128,40/mês
 ```
 
-**Efeito multiplicador**: 1 profissional com 30 alunos, 20% fazendo upgrade = R$ 99 + (6 × R$ 4,90) = R$ 128,40/mês por "célula".
+## 11.2 Expansão de Receita (Futuro)
 
-## 11.2 Métricas de Negócio (Projeções)
-
-| Métrica | Valor Estimado |
-|---------|----------------|
-| CAC (Custo de Aquisição) | R$ 30-50 |
-| LTV Pessoal (12 meses) | R$ 178,80 |
-| LTV Profissional (12 meses) | R$ 1.188,00 |
-| Churn estimado | 5-8%/mês |
-| LTV/CAC | 4-6x |
-
-## 11.3 Expansão de Receita (Futuro)
-
-- **White-label para clínicas**: Licenciamento da plataforma
-- **Planos empresariais**: Wellness corporativo
-- **Marketplace**: Profissionais vendem planos prontos
-- **Integrações premium**: Wearables, exames laboratoriais
+- White-label para clínicas
+- Planos empresariais
+- Marketplace de planos prontos
 
 ---
 
 # 12. BENEFÍCIOS PARA ALUNOS E PROFISSIONAIS
 
-## 12.1 Benefícios para Alunos
+## 12.1 Para Alunos
 
-### 12.1.1 Flexibilidade
-- Múltiplas opções por refeição
-- Todas nutricionalmente equivalentes
-- Liberdade de escolha sem culpa
+- **Flexibilidade**: Múltiplas opções por refeição
+- **Praticidade**: Plano sempre no celular
+- **Suporte Contínuo**: IA disponível 24/7
+- **Resultados**: Decisões baseadas em dados
+- **Economia**: Menos consultas presenciais
 
-### 12.1.2 Praticidade
-- Plano sempre disponível no celular
-- Registro rápido de consumo
-- Progresso visual e motivador
+## 12.2 Para Profissionais
 
-### 12.1.3 Suporte Contínuo
-- IA disponível 24/7
-- Conexão direta com profissional
-- Dúvidas respondidas na hora
-
-### 12.1.4 Resultados
-- Decisões baseadas em dados
-- Ajustes personalizados
-- Acompanhamento de evolução
-
-### 12.1.5 Economia
-- Menos consultas presenciais necessárias
-- Planos sempre atualizados
-- Suporte entre consultas
-
-## 12.2 Benefícios para Profissionais
-
-### 12.2.1 Produtividade
-- IA cria rascunhos de planos
-- Menos tempo em cálculos
-- Foco no atendimento personalizado
-
-### 12.2.2 Escalabilidade
-- Atenda até 50 alunos
-- Sem proporcionalmente mais trabalho
-- Mais pacientes = mais receita
-
-### 12.2.3 Visibilidade
-- Dados reais de adesão
-- Alertas proativos
-- Decisões baseadas em evidências
-
-### 12.2.4 Diferenciação
-- Tecnologia como diferencial competitivo
-- Experiência moderna para pacientes
-- Relatórios profissionais
-
-### 12.2.5 Receita
-- Modelo de assinatura previsível
-- Alunos podem fazer upgrade
-- Retenção através de engajamento
+- **Produtividade**: IA cria rascunhos de planos
+- **Escalabilidade**: Até 50 alunos
+- **Visibilidade**: Dados reais de adesão
+- **Diferenciação**: Tecnologia como diferencial
+- **Receita**: Modelo previsível
 
 ---
 
@@ -642,40 +408,21 @@ Profissional (R$ 99) --> Cria Alunos --> Alguns fazem upgrade (R$ 4,90)
 
 ## 13.1 Modelo de Crescimento
 
-### 13.1.1 Rede de Efeito
 ```
-Profissional assina --> Convida alunos --> Alunos usam grátis ou fazem upgrade
-                    --> Alunos indicam profissional --> Novos profissionais
+Profissional assina → Convida alunos → Alunos usam/upgrade → Indicações → Novos profissionais
 ```
-
-### 13.1.2 Viralidade Orgânica
-- Alunos satisfeitos indicam o profissional
-- Profissionais indicam para colegas
-- Resultados geram depoimentos
 
 ## 13.2 Capacidade de Escala
 
-### 13.2.1 Infraestrutura
 - Arquitetura serverless (escala automática)
 - Banco de dados gerenciado
 - IA em nuvem (sem limite de capacidade)
 
-### 13.2.2 Custos Marginais
-- Custo por usuário decresce com escala
-- IA paga por uso (eficiente)
-- Sem necessidade de equipe de suporte proporcional
-
 ## 13.3 Expansão Geográfica
 
 - **Fase 1**: Brasil (atual)
-- **Fase 2**: América Latina (PT/ES)
-- **Fase 3**: Global (EN)
-
-## 13.4 Expansão de Produto
-
-- **Curto prazo**: App mobile nativo
-- **Médio prazo**: Integração com wearables
-- **Longo prazo**: IA preditiva, exames laboratoriais
+- **Fase 2**: América Latina
+- **Fase 3**: Global
 
 ---
 
@@ -683,48 +430,18 @@ Profissional assina --> Convida alunos --> Alunos usam grátis ou fazem upgrade
 
 ## 14.1 Proteção de Dados
 
-### 14.1.1 Conformidade
-- Dados armazenados em conformidade com LGPD
+- Conformidade com LGPD
 - Criptografia em trânsito e em repouso
 - Backup automático diário
 
-### 14.1.2 Privacidade
-- Dados de saúde tratados como sensíveis
-- Acesso restrito por função
-- Logs de auditoria
-
 ## 14.2 Segurança de Acesso
 
-### 14.2.1 Autenticação
-- Login seguro com email/senha
-- Recuperação de senha por email
-- Sessões gerenciadas automaticamente
-
-### 14.2.2 Autorização
+- Login seguro
 - Cada usuário vê apenas seus dados
-- Profissionais veem apenas seus alunos
 - Permissões granulares por perfil
 
-## 14.3 Governança da IA
+## 14.3 Pagamentos
 
-### 14.3.1 Limitações Claras
-- IA não substitui profissional de saúde
-- Não faz diagnósticos
-- Não prescreve medicamentos
-
-### 14.3.2 Transparência
-- Respostas da IA são identificadas
-- Propostas passam por aprovação
-- Todas as ações são registradas
-
-## 14.4 Confiabilidade
-
-### 14.4.1 Disponibilidade
-- Infraestrutura em nuvem confiável
-- Uptime superior a 99,5%
-- Suporte técnico disponível
-
-### 14.4.2 Pagamentos
 - Processados via Stripe (líder global)
 - PCI-DSS compliant
 - Dados de cartão nunca tocam nossos servidores
@@ -733,135 +450,58 @@ Profissional assina --> Convida alunos --> Alunos usam grátis ou fazem upgrade
 
 # 15. CASOS DE USO
 
-## 15.1 Caso 1: Maria, 35 anos, quer emagrecer
+## 15.1 Maria, 35 anos - Emagrecimento
 
-**Situação**: Maria já tentou várias dietas, mas sempre desiste por falta de flexibilidade e suporte.
+**Situação**: Já tentou várias dietas sem sucesso.
 
-**Solução NutriaPlan**:
-1. Maria se cadastra e completa o onboarding
-2. Recebe plano personalizado para emagrecimento
-3. Cada refeição tem 3 opções equivalentes
-4. Pode perguntar para IA quando tem dúvidas
-5. Registra o que come diariamente
-6. Vê seu progresso e ajusta quando necessário
+**Solução**: Plano personalizado com opções flexíveis e suporte de IA.
 
-**Resultado**: Maria perdeu 5kg em 2 meses com adesão de 78% ao plano.
+**Resultado**: Perdeu 5kg em 2 meses com 78% de adesão.
 
-## 15.2 Caso 2: João, 28 anos, quer ganhar massa
+## 15.2 João, 28 anos - Hipertrofia
 
-**Situação**: João malha 5x por semana mas não consegue ganhar massa muscular por não saber comer corretamente.
+**Situação**: Malha muito mas não ganha massa.
 
-**Solução NutriaPlan**:
-1. João usa o plano Pessoal Pago
-2. Cria plano para hipertrofia com alta proteína
-3. IA sugere ajustes baseados em seu progresso
-4. Substitui alimentos quando enjoa
-5. Acompanha evolução de peso
+**Solução**: Plano para hipertrofia com ajustes baseados em progresso.
 
-**Resultado**: João ganhou 3kg de massa magra em 3 meses.
+**Resultado**: Ganhou 3kg de massa magra em 3 meses.
 
-## 15.3 Caso 3: Dra. Ana, nutricionista
+## 15.3 Dra. Ana - Nutricionista
 
-**Situação**: Dra. Ana atende 20 pacientes por semana e não consegue acompanhar todos adequadamente entre consultas.
+**Situação**: Atende 20 pacientes e não consegue acompanhar todos.
 
-**Solução NutriaPlan**:
-1. Dra. Ana assina o plano Profissional
-2. Cadastra seus 20 pacientes na plataforma
-3. IA cria rascunhos de planos que ela revisa
-4. Recebe alertas quando alguém está com baixa adesão
-5. Pacientes podem tirar dúvidas com IA entre consultas
+**Solução**: Plano Profissional com alertas de adesão e IA.
 
-**Resultado**: Dra. Ana aumentou para 35 pacientes ativos, com melhor acompanhamento e 25% a mais de faturamento.
-
-## 15.4 Caso 4: Carlos, aluno de nutricionista
-
-**Situação**: Carlos foi a uma nutricionista mas esquece o plano e não sabe o que comer fora de casa.
-
-**Solução NutriaPlan**:
-1. Nutricionista cadastra Carlos no sistema
-2. Carlos acessa o plano pelo celular a qualquer momento
-3. Confirma o que comeu diariamente
-4. Pode ver opções equivalentes para situações diferentes
-5. Se precisar mudar algo, envia solicitação
-
-**Resultado**: Carlos manteve 85% de adesão e atingiu seu objetivo em 4 meses.
+**Resultado**: Aumentou para 35 pacientes com melhor acompanhamento.
 
 ---
 
 # 16. VISÃO DE FUTURO DO PRODUTO
 
-## 16.1 Roadmap de Produto
+## 16.1 Roadmap
 
-### 16.1.1 Curto Prazo (1-3 meses)
-- [ ] App mobile nativo (iOS/Android)
-- [ ] Notificações push para lembretes
-- [ ] Melhoria de performance do banco de dados
-- [ ] Mais opções de alimentos no cadastro
+### Curto Prazo (1-3 meses)
+- App mobile nativo
+- Notificações push
 
-### 16.1.2 Médio Prazo (3-6 meses)
-- [ ] Integração com wearables (Apple Health, Google Fit)
-- [ ] Relatórios avançados para profissionais
-- [ ] Multi-idioma (Espanhol)
-- [ ] API pública para integrações
+### Médio Prazo (3-6 meses)
+- Integração com wearables
+- Multi-idioma
 
-### 16.1.3 Longo Prazo (6-12 meses)
-- [ ] IA preditiva (prever abandonos, sugerir intervenções)
-- [ ] Integração com exames laboratoriais
-- [ ] Marketplace de planos
-- [ ] White-label para clínicas
-- [ ] Planos empresariais
+### Longo Prazo (6-12 meses)
+- IA preditiva
+- Marketplace de planos
+- White-label para clínicas
 
 ## 16.2 Visão de Longo Prazo
 
-O NutriaPlan aspira ser o **ecossistema completo de nutrição digital**, conectando:
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                    ECOSSISTEMA NUTRIAPLAN                        │
-│                                                                   │
-│   ┌─────────┐   ┌─────────┐   ┌─────────┐   ┌─────────┐        │
-│   │PESSOAS  │   │PROFIS-  │   │CLÍNICAS │   │EMPRESAS │        │
-│   │         │   │SIONAIS  │   │         │   │         │        │
-│   └────┬────┘   └────┬────┘   └────┬────┘   └────┬────┘        │
-│        │             │             │             │              │
-│        └─────────────┴─────────────┴─────────────┘              │
-│                           │                                      │
-│                    ┌──────┴──────┐                              │
-│                    │  PLATAFORMA │                              │
-│                    │  NUTRIAPLAN │                              │
-│                    └──────┬──────┘                              │
-│                           │                                      │
-│        ┌─────────────┬────┴────┬─────────────┐                 │
-│        │             │         │             │                  │
-│   ┌────┴────┐   ┌────┴────┐  ┌─┴───────┐  ┌─┴───────┐        │
-│   │WEARABLES│   │ EXAMES  │  │DELIVERY │  │MERCADOS │        │
-│   │         │   │ LAB     │  │         │  │         │        │
-│   └─────────┘   └─────────┘  └─────────┘  └─────────┘        │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-## 16.3 Oportunidades de Mercado
-
-### 16.3.1 Mercado Brasileiro
-- 67 milhões de brasileiros com sobrepeso
-- Mercado de dietas estimado em R$ 2 bilhões/ano
-- Crescimento de apps de saúde de 40% ao ano
-
-### 16.3.2 Mercado Latino-Americano
-- 300 milhões de potenciais usuários
-- Baixa penetração de soluções digitais
-- Alta demanda por soluções acessíveis
-
-### 16.3.3 Mercado Global
-- US$ 300 bilhões em nutrição e wellness
-- Tendência de personalização via IA
-- Crescimento pós-pandemia sustentado
+Ser o **ecossistema completo de nutrição digital**, conectando pessoas, profissionais, clínicas e empresas.
 
 ---
 
 # CONCLUSÃO
 
-O NutriaPlan representa uma nova era na nutrição personalizada, combinando:
+O NutriaPlan representa uma nova era na nutrição personalizada:
 
 ✅ **Tecnologia de ponta**: IA generativa com governança clínica
 
@@ -871,18 +511,16 @@ O NutriaPlan representa uma nova era na nutrição personalizada, combinando:
 
 ✅ **Mercado em crescimento**: Nutrição digital é tendência global
 
-✅ **Time comprometido**: Foco em entregar valor real para usuários
-
 ---
 
 ## Contato
 
 Para mais informações sobre parcerias, investimentos ou dúvidas comerciais:
 
-- **Email**: [contato@nutriaplan.com.br]
-- **Website**: [nutriaplan.com.br]
+- **Email**: contato@nutriaplan.com.br
+- **Website**: nutriaplan.com.br
 
 ---
 
-*Documento gerado automaticamente em 18 de Janeiro de 2026*
-*Versão 1.0 - NutriaPlan*
+*Documento consolidado em 18 de Janeiro de 2026*
+*Versão 2.0 - NutriaPlan*
