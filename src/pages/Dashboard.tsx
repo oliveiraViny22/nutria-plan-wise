@@ -180,57 +180,70 @@ export default function Dashboard() {
           </div>
           {/* Desktop navigation - hidden on mobile */}
           <div className="hidden md:flex items-center gap-1">
-            {(isSubscribed && accountType === 'professional') || (isProfessional && hasActiveLicense) ? (
+            {/* Admin vê apenas o escudo */}
+            {isAdmin ? (
               <>
-                <Link to="/professional">
-                  <Button variant="ghost" size="icon" className="w-10 h-10 relative" title="Painel Profissional">
-                    <LayoutDashboard className="w-5 h-5" />
-                    {unreadCount > 0 && (
-                      <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-[10px] font-medium text-destructive-foreground">
-                        {unreadCount > 9 ? '9+' : unreadCount}
-                      </span>
-                    )}
-                  </Button>
-                </Link>
-                <Link to="/students">
-                  <Button variant="ghost" size="icon" className="w-10 h-10" title="Gerenciar Alunos">
-                    <Users className="w-5 h-5" />
+                <Link to="/admin">
+                  <Button variant="ghost" size="icon" className="w-10 h-10" title="Painel Admin">
+                    <Shield className="w-5 h-5 text-primary" />
                   </Button>
                 </Link>
               </>
             ) : (
-              <Link to="/become-professional">
-                <Button variant="ghost" size="icon" className="w-10 h-10" title="Seja Profissional">
-                  <Crown className="w-5 h-5" />
-                </Button>
-              </Link>
-            )}
-            <Link to="/subscription">
-              <Button variant="ghost" size="icon" className="w-10 h-10">
-                <CreditCard className="w-5 h-5" />
-              </Button>
-            </Link>
-            <Link to="/progress">
-              <Button variant="ghost" size="icon" className="w-10 h-10">
-                <TrendingUp className="w-5 h-5" />
-              </Button>
-            </Link>
-            <Link to="/profile">
-              <Button variant="ghost" size="icon" className="w-10 h-10">
-                <User className="w-5 h-5" />
-              </Button>
-            </Link>
-            <Link to="/chat">
-              <Button variant="ghost" size="icon" className="w-10 h-10">
-                <MessageCircle className="w-5 h-5" />
-              </Button>
-            </Link>
-            {isAdmin && (
-              <Link to="/admin">
-                <Button variant="ghost" size="icon" className="w-10 h-10" title="Painel Admin">
-                  <Shield className="w-5 h-5 text-primary" />
-                </Button>
-              </Link>
+              <>
+                {/* Profissionais com licença ativa */}
+                {(isSubscribed && accountType === 'professional') || (isProfessional && hasActiveLicense) ? (
+                  <>
+                    <Link to="/professional">
+                      <Button variant="ghost" size="icon" className="w-10 h-10 relative" title="Painel Profissional">
+                        <LayoutDashboard className="w-5 h-5" />
+                        {unreadCount > 0 && (
+                          <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-[10px] font-medium text-destructive-foreground">
+                            {unreadCount > 9 ? '9+' : unreadCount}
+                          </span>
+                        )}
+                      </Button>
+                    </Link>
+                    <Link to="/students">
+                      <Button variant="ghost" size="icon" className="w-10 h-10" title="Gerenciar Alunos">
+                        <Users className="w-5 h-5" />
+                      </Button>
+                    </Link>
+                  </>
+                ) : !isLinkedStudent && (
+                  /* Usuário comum (não vinculado) pode ver opção de virar profissional */
+                  <Link to="/become-professional">
+                    <Button variant="ghost" size="icon" className="w-10 h-10" title="Seja Profissional">
+                      <Crown className="w-5 h-5" />
+                    </Button>
+                  </Link>
+                )}
+                
+                {/* Assinatura - Profissional não vê (já gerencia no painel), Aluno vinculado não vê (gerenciado pelo profissional) */}
+                {!isProfessional && !isLinkedStudent && (
+                  <Link to="/subscription">
+                    <Button variant="ghost" size="icon" className="w-10 h-10">
+                      <CreditCard className="w-5 h-5" />
+                    </Button>
+                  </Link>
+                )}
+                
+                <Link to="/progress">
+                  <Button variant="ghost" size="icon" className="w-10 h-10">
+                    <TrendingUp className="w-5 h-5" />
+                  </Button>
+                </Link>
+                <Link to="/profile">
+                  <Button variant="ghost" size="icon" className="w-10 h-10">
+                    <User className="w-5 h-5" />
+                  </Button>
+                </Link>
+                <Link to="/chat">
+                  <Button variant="ghost" size="icon" className="w-10 h-10">
+                    <MessageCircle className="w-5 h-5" />
+                  </Button>
+                </Link>
+              </>
             )}
             <Button variant="ghost" size="icon" className="w-10 h-10" onClick={handleSignOut}>
               <LogOut className="w-5 h-5" />

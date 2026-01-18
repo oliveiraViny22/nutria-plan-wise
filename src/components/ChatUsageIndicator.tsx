@@ -4,6 +4,8 @@ import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import { PLAN_DISPLAY_NAMES } from '@/lib/subscription-types';
 import { CommercialPlan } from '@/lib/types';
+import { useSubscription } from '@/hooks/useSubscription';
+import { useUserRole } from '@/hooks/useUserRole';
 
 interface ChatUsageIndicatorProps {
   currentUsage: number;
@@ -26,6 +28,9 @@ export function ChatUsageIndicator({
   compact = false 
 }: ChatUsageIndicatorProps) {
   const navigate = useNavigate();
+  const { isLinkedToProfessional } = useSubscription();
+  const { isProfessional } = useUserRole();
+  
   const remaining = Math.max(0, maxLimit - currentUsage);
   const percentage = maxLimit > 0 ? (currentUsage / maxLimit) * 100 : 0;
   const isLimitReached = remaining <= 0;
@@ -33,6 +38,9 @@ export function ChatUsageIndicator({
 
   const displayName = PLAN_DISPLAY_NAMES[planName as CommercialPlan] || planName;
   const price = PLAN_PRICES[planName] || '';
+  
+  // Profissionais e alunos vinculados não veem opção de upgrade
+  const showUpgradeButton = !isProfessional && !isLinkedToProfessional;
 
   if (compact) {
     return (
@@ -75,7 +83,7 @@ export function ChatUsageIndicator({
           : `${remaining} mensagens restantes hoje`}
       </p>
       
-      {(isLimitReached || planName === 'gratuito') && (
+      {showUpgradeButton && (isLimitReached || planName === 'gratuito') && (
         <Button 
           variant="outline" 
           size="sm" 

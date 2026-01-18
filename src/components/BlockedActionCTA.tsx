@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { Lock, Send, Crown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAccountPermissions } from '@/hooks/useAccountPermissions';
+import { useUserRole } from '@/hooks/useUserRole';
 
 interface BlockedActionCTAProps {
   action: string;
@@ -10,7 +11,14 @@ interface BlockedActionCTAProps {
 
 export function BlockedActionCTA({ action, onRequestClick }: BlockedActionCTAProps) {
   const { user_type, is_linked_to_professional, can_send_requests } = useAccountPermissions();
+  const { isProfessional, isAdmin } = useUserRole();
   
+  // Admin e Profissional não veem CTAs de upgrade
+  if (isAdmin || isProfessional) {
+    return null;
+  }
+  
+  // Aluno vinculado a profissional
   if (user_type === 'aluno' && is_linked_to_professional) {
     return (
       <div className="bg-muted/50 border border-border rounded-xl p-4 text-center">
@@ -28,6 +36,7 @@ export function BlockedActionCTA({ action, onRequestClick }: BlockedActionCTAPro
     );
   }
   
+  // Usuário comum - mostra opção de upgrade
   return (
     <div className="bg-muted/50 border border-border rounded-xl p-4 text-center">
       <Crown className="w-8 h-8 text-primary mx-auto mb-2" />
