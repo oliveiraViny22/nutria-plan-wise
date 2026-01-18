@@ -27,6 +27,7 @@ import {
   CreditCard,
   DollarSign,
   AlertTriangle,
+  BookOpen,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -45,6 +46,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { useUserRole } from '@/hooks/useUserRole';
 import { useAdminOperations, UserProfile, Plan, DeleteUserPreview } from '@/hooks/useAdminOperations';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 // CSV parsing helper
 function parseCSV(text: string): Record<string, unknown>[] {
@@ -128,6 +130,9 @@ export default function Admin() {
   // Plans management state
   const [editingPlan, setEditingPlan] = useState<Plan | null>(null);
   const [editedPlanData, setEditedPlanData] = useState<Partial<Plan>>({});
+  
+  // Documentation download state
+  const [downloadingDoc, setDownloadingDoc] = useState<string | null>(null);
 
   // Redirect if not admin
   useEffect(() => {
@@ -219,6 +224,51 @@ export default function Admin() {
       });
     } finally {
       setSeedingData(false);
+    }
+  };
+
+  const handleDownloadDocumentation = async (docType: 'technical' | 'commercial') => {
+    setDownloadingDoc(docType);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast({ title: 'Erro', description: 'Sessão expirada', variant: 'destructive' });
+        return;
+      }
+
+      const response = await supabase.functions.invoke('generate-documentation-pdf', {
+        body: { docType },
+      });
+
+      if (response.error) {
+        throw new Error(response.error.message);
+      }
+
+      // Create download link
+      const blob = new Blob([response.data], { type: 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = docType === 'technical' 
+        ? 'DOCUMENTACAO_TECNICA_NUTRIAPLAN.txt' 
+        : 'DOCUMENTACAO_COMERCIAL_NUTRIAPLAN.txt';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      toast({
+        title: 'Download concluído',
+        description: `Documentação ${docType === 'technical' ? 'técnica' : 'comercial'} baixada com sucesso.`,
+      });
+    } catch (error) {
+      toast({
+        title: 'Erro no download',
+        description: error instanceof Error ? error.message : 'Erro desconhecido',
+        variant: 'destructive',
+      });
+    } finally {
+      setDownloadingDoc(null);
     }
   };
 
@@ -423,7 +473,7 @@ export default function Admin() {
 
       <main className="container mx-auto px-4 py-6">
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full max-w-4xl grid-cols-7 mb-6">
+          <TabsList className="grid w-full max-w-5xl grid-cols-8 mb-6">
             <TabsTrigger value="settings" className="flex items-center gap-1">
               <Settings className="h-4 w-4" />
               <span className="hidden sm:inline">Config</span>
@@ -452,7 +502,87 @@ export default function Admin() {
               <Database className="h-4 w-4" />
               <span className="hidden sm:inline">Seed</span>
             </TabsTrigger>
+            <TabsTrigger value="docs" className="flex items-center gap-1">
+              <BookOpen className="h-4 w-4" />
+              <span className="hidden sm:inline">Docs</span>
+            </TabsTrigger>
           </TabsList>
+
+          {/* Documentation Tab */}
+          <TabsContent value="docs">
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="grid gap-6 md:grid-cols-2"
+            >
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <FileText className="h-5 w-5 text-primary" />
+                    Documentação Técnica
+                  </CardTitle>
+                  <CardDescription>
+                    Documentação completa para desenvolvedores, arquitetos de software e times técnicos.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <ul className="text-sm text-muted-foreground space-y-1">
+                    <li>• Arquitetura do sistema e stack tecnológica</li>
+                    <li>• Regras de negócio e fluxos técnicos</li>
+                    <li>• Funcionamento da IA e governança</li>
+                    <li>• Banco de dados e integrações</li>
+                    <li>• Requisitos funcionais e não funcionais</li>
+                  </ul>
+                  <Button 
+                    onClick={() => handleDownloadDocumentation('technical')}
+                    disabled={downloadingDoc !== null}
+                    className="w-full"
+                  >
+                    {downloadingDoc === 'technical' ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <Download className="h-4 w-4 mr-2" />
+                    )}
+                    Baixar Documentação Técnica
+                  </Button>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <BookOpen className="h-5 w-5 text-primary" />
+                    Documentação Comercial
+                  </CardTitle>
+                  <CardDescription>
+                    Documentação para investidores, parceiros, clientes e área comercial.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <ul className="text-sm text-muted-foreground space-y-1">
+                    <li>• Apresentação e proposta de valor</li>
+                    <li>• Público-alvo e diferenciais</li>
+                    <li>• Planos, preços e monetização</li>
+                    <li>• Benefícios e casos de uso</li>
+                    <li>• Visão de futuro do produto</li>
+                  </ul>
+                  <Button 
+                    onClick={() => handleDownloadDocumentation('commercial')}
+                    disabled={downloadingDoc !== null}
+                    className="w-full"
+                    variant="secondary"
+                  >
+                    {downloadingDoc === 'commercial' ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <Download className="h-4 w-4 mr-2" />
+                    )}
+                    Baixar Documentação Comercial
+                  </Button>
+                </CardContent>
+              </Card>
+            </motion.div>
+          </TabsContent>
 
           {/* Settings Tab */}
           <TabsContent value="settings">
