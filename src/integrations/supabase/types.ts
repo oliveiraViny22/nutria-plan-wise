@@ -14,6 +14,93 @@ export type Database = {
   }
   public: {
     Tables: {
+      adherence_alert_configs: {
+        Row: {
+          check_period_days: number
+          created_at: string
+          id: string
+          is_active: boolean
+          notify_on_low: boolean
+          notify_on_warning: boolean
+          professional_id: string
+          threshold_low: number
+          threshold_warning: number
+          updated_at: string
+        }
+        Insert: {
+          check_period_days?: number
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          notify_on_low?: boolean
+          notify_on_warning?: boolean
+          professional_id: string
+          threshold_low?: number
+          threshold_warning?: number
+          updated_at?: string
+        }
+        Update: {
+          check_period_days?: number
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          notify_on_low?: boolean
+          notify_on_warning?: boolean
+          professional_id?: string
+          threshold_low?: number
+          threshold_warning?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      adherence_alerts: {
+        Row: {
+          adherence_rate: number
+          alert_type: string
+          created_at: string
+          diet_plan_id: string
+          id: string
+          is_read: boolean
+          message: string
+          period_end: string
+          period_start: string
+          professional_id: string
+          read_at: string | null
+          student_id: string
+          threshold_used: number
+        }
+        Insert: {
+          adherence_rate: number
+          alert_type: string
+          created_at?: string
+          diet_plan_id: string
+          id?: string
+          is_read?: boolean
+          message: string
+          period_end: string
+          period_start: string
+          professional_id: string
+          read_at?: string | null
+          student_id: string
+          threshold_used: number
+        }
+        Update: {
+          adherence_rate?: number
+          alert_type?: string
+          created_at?: string
+          diet_plan_id?: string
+          id?: string
+          is_read?: boolean
+          message?: string
+          period_end?: string
+          period_start?: string
+          professional_id?: string
+          read_at?: string | null
+          student_id?: string
+          threshold_used?: number
+        }
+        Relationships: []
+      }
       adherence_metrics: {
         Row: {
           adherence_by_meal: Json | null

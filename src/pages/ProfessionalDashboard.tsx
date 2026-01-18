@@ -15,7 +15,8 @@ import {
   UserPlus,
   BarChart3,
   Calendar,
-  Target
+  Target,
+  Settings2,
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -25,6 +26,8 @@ import { Progress } from '@/components/ui/progress';
 import { Logo } from '@/components/Logo';
 import { MobileNav } from '@/components/MobileNav';
 import { ProfessionalOnboarding } from '@/components/ProfessionalOnboarding';
+import { AdherenceAlertsBell } from '@/components/AdherenceAlertsList';
+import { AdherenceAlertConfig } from '@/components/AdherenceAlertConfig';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useProfessionalStudents } from '@/hooks/useProfessionalStudents';
 import { supabase } from '@/integrations/supabase/client';
@@ -229,10 +232,13 @@ export default function ProfessionalDashboard() {
             <Logo size="sm" />
           </div>
           <h1 className="text-sm sm:text-lg font-semibold truncate hidden xs:block">Painel Profissional</h1>
-          <Button size="sm" className="text-xs sm:text-sm h-8 sm:h-9" onClick={() => navigate('/students')}>
-            <UserPlus className="h-3.5 w-3.5 sm:h-4 sm:w-4 sm:mr-2" />
-            <span className="hidden sm:inline">Gerenciar</span>
-          </Button>
+          <div className="flex items-center gap-1 sm:gap-2">
+            <AdherenceAlertsBell />
+            <Button size="sm" className="text-xs sm:text-sm h-8 sm:h-9" onClick={() => navigate('/students')}>
+              <UserPlus className="h-3.5 w-3.5 sm:h-4 sm:w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Gerenciar</span>
+            </Button>
+          </div>
         </div>
       </header>
 
@@ -399,6 +405,15 @@ export default function ProfessionalDashboard() {
               <span className="text-xs sm:text-sm">Ver Todos Alunos</span>
             </Button>
           </div>
+        </motion.div>
+
+        {/* Alert Configuration */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.38 }}
+        >
+          <AdherenceAlertConfig />
         </motion.div>
 
         {/* Students List */}
