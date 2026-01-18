@@ -68,6 +68,10 @@ interface FoodTemplate {
 
 export function useAdminOperations() {
   const [loading, setLoading] = useState(false);
+  const [settingsLoading, setSettingsLoading] = useState(false);
+  const [savingKeys, setSavingKeys] = useState<Set<string>>(new Set());
+  const [savedKeys, setSavedKeys] = useState<Set<string>>(new Set());
+  const [errorKeys, setErrorKeys] = useState<Set<string>>(new Set());
   const [settings, setSettings] = useState<SystemSetting[]>([]);
   const [foodImports, setFoodImports] = useState<FoodImport[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
@@ -87,7 +91,7 @@ export function useAdminOperations() {
   }, []);
 
   const fetchSettings = useCallback(async (category?: string) => {
-    setLoading(true);
+    setSettingsLoading(true);
     try {
       const data = await invokeAdmin('get_settings', { category });
       setSettings(data.settings || []);
@@ -97,26 +101,64 @@ export function useAdminOperations() {
       toast({ title: 'Erro', description: message, variant: 'destructive' });
       return [];
     } finally {
-      setLoading(false);
+      setSettingsLoading(false);
     }
   }, [invokeAdmin, toast]);
 
   const updateSetting = useCallback(async (key: string, value: unknown) => {
-    setLoading(true);
+    // Add to saving state
+    setSavingKeys(prev => new Set(prev).add(key));
+    setSavedKeys(prev => {
+      const next = new Set(prev);
+      next.delete(key);
+      return next;
+    });
+    setErrorKeys(prev => {
+      const next = new Set(prev);
+      next.delete(key);
+      return next;
+    });
+
     try {
       const data = await invokeAdmin('update_setting', { key, value });
-      toast({ title: 'Sucesso', description: 'Configuração atualizada com sucesso.' });
       
       // Update local state
       setSettings(prev => prev.map(s => s.key === key ? { ...s, value, updated_at: new Date().toISOString() } : s));
+      
+      // Mark as saved
+      setSavedKeys(prev => new Set(prev).add(key));
+      
+      // Clear saved indicator after 2 seconds
+      setTimeout(() => {
+        setSavedKeys(prev => {
+          const next = new Set(prev);
+          next.delete(key);
+          return next;
+        });
+      }, 2000);
       
       return data.setting;
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Erro ao atualizar configuração';
       toast({ title: 'Erro', description: message, variant: 'destructive' });
+      setErrorKeys(prev => new Set(prev).add(key));
+      
+      // Clear error indicator after 3 seconds
+      setTimeout(() => {
+        setErrorKeys(prev => {
+          const next = new Set(prev);
+          next.delete(key);
+          return next;
+        });
+      }, 3000);
+      
       throw error;
     } finally {
-      setLoading(false);
+      setSavingKeys(prev => {
+        const next = new Set(prev);
+        next.delete(key);
+        return next;
+      });
     }
   }, [invokeAdmin, toast]);
 
@@ -238,6 +280,10 @@ export function useAdminOperations() {
 
   return {
     loading,
+    settingsLoading,
+    savingKeys,
+    savedKeys,
+    errorKeys,
     settings,
     foodImports,
     auditLogs,
