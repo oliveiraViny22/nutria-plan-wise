@@ -30,7 +30,7 @@ export interface Subscription {
   user_id: string;
   plan_id: string;
   status: 'trial' | 'active' | 'past_due' | 'canceled' | 'expired';
-  billing_cycle: 'monthly' | 'quarterly' | 'semiannual' | 'annual';
+  billing_cycle: 'monthly';
   provider?: string;
   provider_subscription_id?: string;
   provider_customer_id?: string;

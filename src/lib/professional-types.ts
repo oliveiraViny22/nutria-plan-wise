@@ -1,4 +1,4 @@
-export type LicenseType = 'monthly' | 'annual';
+export type LicenseType = 'monthly';
 
 export interface ProfessionalLicense {
   id: string;

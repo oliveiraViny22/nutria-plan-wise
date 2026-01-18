@@ -1,14 +1,11 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@18.5.0";
 import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
-import { CLIENT_ERRORS, getErrorForLogging } from "../_shared/security.ts";
+import { CLIENT_ERRORS } from "../_shared/security.ts";
+import { createLogger, getErrorDetails } from "../_shared/logger.ts";
 
 const GRACE_PERIOD_DAYS = 7;
-
-const logStep = (step: string, details?: unknown) => {
-  const detailsStr = details ? ` - ${JSON.stringify(details)}` : '';
-  console.log(`[STRIPE-WEBHOOK] ${step}${detailsStr}`);
-};
+const log = createLogger('stripe-webhook');
 
 // Check if event was already processed (idempotency)
 // deno-lint-ignore no-explicit-any
@@ -49,7 +46,7 @@ function calculateGracePeriodEnd(): string {
 
 serve(async (req) => {
   try {
-    logStep("Webhook received");
+    log.info("Webhook received");
     
     const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", { 
       apiVersion: "2025-08-27.basil" 
@@ -70,7 +67,7 @@ serve(async (req) => {
     
     // SECURITY: Always require webhook signature verification
     if (!webhookSecret) {
-      logStep("ERROR: STRIPE_WEBHOOK_SECRET is not configured");
+      log.error("STRIPE_WEBHOOK_SECRET is not configured");
       return new Response(
         JSON.stringify({ error: CLIENT_ERRORS.WEBHOOK_ERROR }), 
         { status: 500 }
@@ -78,7 +75,7 @@ serve(async (req) => {
     }
 
     if (!signature) {
-      logStep("ERROR: Missing stripe-signature header");
+      log.error("Missing stripe-signature header");
       return new Response(
         JSON.stringify({ error: CLIENT_ERRORS.INVALID_SIGNATURE }), 
         { status: 400 }
@@ -87,9 +84,9 @@ serve(async (req) => {
 
     try {
       event = await stripe.webhooks.constructEventAsync(body, signature, webhookSecret);
-      logStep("Signature verified successfully");
+      log.info("Signature verified successfully");
     } catch (err) {
-      logStep("Webhook signature verification failed", { error: getErrorForLogging(err) });
+      log.error("Webhook signature verification failed", getErrorDetails(err));
       return new Response(
         JSON.stringify({ error: CLIENT_ERRORS.INVALID_SIGNATURE }), 
         { status: 400 }
@@ -98,41 +95,31 @@ serve(async (req) => {
 
     // Idempotency check - skip if already processed
     if (await isEventProcessed(supabaseAdmin, event.id)) {
-      logStep("Event already processed, skipping", { eventId: event.id });
+      log.info("Event already processed, skipping", { eventId: event.id });
       return new Response(JSON.stringify({ received: true, skipped: true }), { status: 200 });
     }
 
-    logStep("Event type", { type: event.type, eventId: event.id });
+    log.info("Processing event", { type: event.type, eventId: event.id });
 
     switch (event.type) {
       case "checkout.session.completed": {
         const session = event.data.object as Stripe.Checkout.Session;
-        logStep("Checkout completed", { sessionId: session.id });
+        log.info("Checkout completed", { sessionId: session.id });
         
         const userId = session.metadata?.user_id;
         const planId = session.metadata?.plan_id;
-        const billingCycle = session.metadata?.billing_cycle as 'monthly' | 'quarterly' | 'semiannual' | 'annual';
+        // Always monthly - ignore any other billing_cycle in metadata
+        const billingCycle = 'monthly';
         
         if (!userId || !planId) {
-          logStep("Missing metadata");
+          log.warn("Missing metadata", { userId, planId });
           break;
         }
 
         const now = new Date();
-        let periodEnd = new Date(now);
-        switch (billingCycle) {
-          case 'quarterly':
-            periodEnd.setMonth(now.getMonth() + 3);
-            break;
-          case 'semiannual':
-            periodEnd.setMonth(now.getMonth() + 6);
-            break;
-          case 'annual':
-            periodEnd.setFullYear(now.getFullYear() + 1);
-            break;
-          default:
-            periodEnd.setMonth(now.getMonth() + 1);
-        }
+        const periodEnd = new Date(now);
+        // Always monthly period
+        periodEnd.setMonth(now.getMonth() + 1);
 
         const { error: subError } = await supabaseAdmin
           .from('subscriptions')
@@ -146,18 +133,17 @@ serve(async (req) => {
             provider_customer_id: session.customer as string,
             current_period_start: now.toISOString().split('T')[0],
             current_period_end: periodEnd.toISOString().split('T')[0],
-            grace_period_end: null, // Clear any previous grace period
+            grace_period_end: null,
             last_reconciled: now.toISOString(),
           }, {
             onConflict: 'user_id',
           });
 
         if (subError) {
-          logStep("Error upserting subscription", { error: subError.message });
-          // Don't mark as processed if upsert failed - allow retry
+          log.error("Error upserting subscription", { error: subError.message });
           throw new Error(`Subscription upsert failed: ${subError.message}`);
         } else {
-          logStep("Subscription activated");
+          log.info("Subscription activated", { userId, planId });
         }
 
         await supabaseAdmin.rpc('reset_monthly_usage', { _user_id: userId });
@@ -172,13 +158,13 @@ serve(async (req) => {
             onConflict: 'user_id',
           });
 
-        logStep("Usage reset");
+        log.info("Usage reset completed", { userId });
         break;
       }
 
       case "customer.subscription.updated": {
         const subscription = event.data.object as Stripe.Subscription;
-        logStep("Subscription updated", { subscriptionId: subscription.id, stripeStatus: subscription.status });
+        log.info("Subscription updated", { subscriptionId: subscription.id, stripeStatus: subscription.status });
         
         const customerId = subscription.customer as string;
         const customer = await stripe.customers.retrieve(customerId);
@@ -194,13 +180,11 @@ serve(async (req) => {
             let newStatus: string;
             let gracePeriodEnd: string | null = null;
 
-            // Map Stripe status to our subscription states
             switch (subscription.status) {
               case 'active':
                 newStatus = 'active';
                 break;
               case 'past_due':
-                // Enter grace period on first past_due
                 const { data: currentSub } = await supabaseAdmin
                   .from('subscriptions')
                   .select('status, grace_period_end')
@@ -208,15 +192,13 @@ serve(async (req) => {
                   .single();
 
                 if (currentSub?.status === 'active') {
-                  // Transition to grace_period
                   newStatus = 'grace_period';
                   gracePeriodEnd = calculateGracePeriodEnd();
-                  logStep("Entering grace period", { gracePeriodEnd });
+                  log.info("Entering grace period", { gracePeriodEnd });
                 } else if (currentSub?.status === 'grace_period') {
-                  // Check if grace period expired
                   if (currentSub.grace_period_end && new Date(currentSub.grace_period_end) < new Date()) {
                     newStatus = 'suspended';
-                    logStep("Grace period expired, suspending");
+                    log.info("Grace period expired, suspending");
                   } else {
                     newStatus = 'grace_period';
                     gracePeriodEnd = currentSub.grace_period_end;
@@ -252,11 +234,11 @@ serve(async (req) => {
               .eq('user_id', profile.user_id);
 
             if (updateError) {
-              logStep("Error updating subscription", { error: updateError.message });
+              log.error("Error updating subscription", { error: updateError.message });
               throw new Error(`Subscription update failed: ${updateError.message}`);
             }
 
-            logStep("Subscription status updated", { status: newStatus });
+            log.info("Subscription status updated", { status: newStatus });
           }
         }
         break;
@@ -264,7 +246,7 @@ serve(async (req) => {
 
       case "customer.subscription.deleted": {
         const subscription = event.data.object as Stripe.Subscription;
-        logStep("Subscription deleted", { subscriptionId: subscription.id });
+        log.info("Subscription deleted", { subscriptionId: subscription.id });
         
         const customerId = subscription.customer as string;
         const customer = await stripe.customers.retrieve(customerId);
@@ -285,7 +267,6 @@ serve(async (req) => {
             const isProfessional = roles?.some(r => r.role === 'professional');
 
             if (isProfessional) {
-              // For professionals, mark as suspended (not downgrade to free)
               await supabaseAdmin
                 .from('subscriptions')
                 .update({ 
@@ -294,7 +275,7 @@ serve(async (req) => {
                 })
                 .eq('user_id', profile.user_id);
               
-              logStep("Professional subscription suspended");
+              log.info("Professional subscription suspended");
             } else {
               const { data: freePlan } = await supabaseAdmin
                 .from('plans')
@@ -318,7 +299,7 @@ serve(async (req) => {
                   .eq('user_id', profile.user_id);
               }
               
-              logStep("Downgraded to free plan");
+              log.info("Downgraded to free plan");
             }
           }
         }
@@ -327,7 +308,7 @@ serve(async (req) => {
 
       case "invoice.payment_failed": {
         const invoice = event.data.object as Stripe.Invoice;
-        logStep("Payment failed", { invoiceId: invoice.id });
+        log.info("Payment failed", { invoiceId: invoice.id });
         
         const customerId = invoice.customer as string;
         const customer = await stripe.customers.retrieve(customerId);
@@ -340,7 +321,6 @@ serve(async (req) => {
             .single();
 
           if (profile) {
-            // Check current status to determine transition
             const { data: currentSub } = await supabaseAdmin
               .from('subscriptions')
               .select('status, grace_period_end')
@@ -351,15 +331,13 @@ serve(async (req) => {
             let gracePeriodEnd: string | null = null;
 
             if (currentSub?.status === 'active') {
-              // First payment failure - enter grace period
               newStatus = 'grace_period';
               gracePeriodEnd = calculateGracePeriodEnd();
-              logStep("Entering grace period due to payment failure");
+              log.info("Entering grace period due to payment failure");
             } else if (currentSub?.status === 'grace_period') {
-              // Already in grace period - check if expired
               if (currentSub.grace_period_end && new Date(currentSub.grace_period_end) < new Date()) {
                 newStatus = 'suspended';
-                logStep("Grace period expired, suspending due to continued payment failure");
+                log.info("Grace period expired, suspending");
               } else {
                 newStatus = 'grace_period';
                 gracePeriodEnd = currentSub.grace_period_end;
@@ -381,11 +359,11 @@ serve(async (req) => {
               .eq('user_id', profile.user_id);
 
             if (updateError) {
-              logStep("Error updating subscription", { error: updateError.message });
+              log.error("Error updating subscription", { error: updateError.message });
               throw new Error(`Subscription update failed: ${updateError.message}`);
             }
 
-            logStep("Subscription status updated", { status: newStatus });
+            log.info("Subscription status updated", { status: newStatus });
           }
         }
         break;
@@ -393,9 +371,8 @@ serve(async (req) => {
 
       case "invoice.payment_succeeded": {
         const invoice = event.data.object as Stripe.Invoice;
-        logStep("Payment succeeded", { invoiceId: invoice.id });
+        log.info("Payment succeeded", { invoiceId: invoice.id });
         
-        // Clear grace period on successful payment
         const customerId = invoice.customer as string;
         const customer = await stripe.customers.retrieve(customerId);
         
@@ -416,7 +393,7 @@ serve(async (req) => {
               })
               .eq('user_id', profile.user_id);
 
-            logStep("Subscription reactivated after successful payment");
+            log.info("Subscription reactivated after successful payment");
           }
         }
         break;
@@ -425,11 +402,11 @@ serve(async (req) => {
 
     // Mark event as processed after successful handling
     await markEventProcessed(supabaseAdmin, event.id, event.type, { processed: true });
-    logStep("Event processed and marked", { eventId: event.id });
+    log.info("Event processed and marked", { eventId: event.id });
 
     return new Response(JSON.stringify({ received: true }), { status: 200 });
   } catch (error) {
-    logStep("ERROR", { message: getErrorForLogging(error) });
+    log.error("Webhook processing failed", getErrorDetails(error));
     // Return 500 to trigger Stripe retry
     return new Response(
       JSON.stringify({ error: CLIENT_ERRORS.SERVER_ERROR }), 
