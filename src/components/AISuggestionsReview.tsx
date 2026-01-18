@@ -61,6 +61,62 @@ const SUGGESTION_TYPE_LABELS: Record<string, { label: string; icon: React.ReactN
   CONTEXTUAL_OPTION: { label: 'Opção Contextual', icon: <Lightbulb className="h-4 w-4" />, color: 'bg-cyan-500/10 text-cyan-600' },
 };
 
+// Mapeamento de ações para textos amigáveis
+const ACTION_LABELS: Record<string, string> = {
+  remove_meal: 'Remover refeição',
+  remove_option: 'Remover opção',
+  add_option: 'Adicionar nova opção',
+  add_contextual_option: 'Adicionar opção prática',
+  simplify_all: 'Simplificar plano completo',
+  review_schedule: 'Revisar horários',
+  ai_insights: 'Insights adicionais',
+};
+
+// Função para formatar mudanças propostas de forma amigável
+const formatProposedChanges = (changes: any): string => {
+  if (!changes) return '';
+  
+  const lines: string[] = [];
+  
+  if (changes.action) {
+    lines.push(`**Ação:** ${ACTION_LABELS[changes.action] || changes.action}`);
+  }
+  
+  if (changes.meal_name) {
+    lines.push(`**Refeição:** ${changes.meal_name}`);
+  }
+  
+  if (changes.option_number) {
+    lines.push(`**Opção:** ${changes.option_number}`);
+  }
+  
+  if (changes.redistribute_calories) {
+    lines.push('• Redistribuir calorias entre outras refeições');
+  }
+  
+  if (changes.target_meals) {
+    lines.push(`• Reduzir para ${changes.target_meals} refeições`);
+  }
+  
+  if (changes.target_options_per_meal) {
+    lines.push(`• ${changes.target_options_per_meal} opção por refeição`);
+  }
+  
+  if (changes.late_confirmation_rate) {
+    lines.push(`• Taxa de confirmação tardia: ${changes.late_confirmation_rate}%`);
+  }
+  
+  if (changes.context === 'practical_alternative') {
+    lines.push('• Criar alternativa prática para situações do dia-a-dia');
+  }
+  
+  if (changes.details && typeof changes.details === 'string') {
+    lines.push(`\n${changes.details}`);
+  }
+  
+  return lines.join('\n');
+};
+
 export function AISuggestionsReview({ studentId, dietPlanId, onSuggestionApplied }: AISuggestionsReviewProps) {
   const [suggestions, setSuggestions] = useState<AISuggestion[]>([]);
   const [loading, setLoading] = useState(false);
@@ -299,9 +355,22 @@ export function AISuggestionsReview({ studentId, dietPlanId, onSuggestionApplied
                                     <h5 className="text-xs font-medium text-muted-foreground mb-2">
                                       Mudanças Propostas
                                     </h5>
-                                    <pre className="text-xs bg-muted p-2 rounded-lg overflow-x-auto">
-                                      {JSON.stringify(suggestion.proposed_changes, null, 2)}
-                                    </pre>
+                                    <div className="text-sm bg-muted p-3 rounded-lg space-y-1">
+                                      {formatProposedChanges(suggestion.proposed_changes).split('\n').map((line, idx) => (
+                                        <p key={idx} className="text-foreground/80">
+                                          {line.startsWith('**') ? (
+                                            <span>
+                                              <strong className="text-foreground">{line.replace(/\*\*/g, '').split(':')[0]}:</strong>
+                                              {line.replace(/\*\*/g, '').split(':').slice(1).join(':')}
+                                            </span>
+                                          ) : line.startsWith('•') ? (
+                                            <span className="text-muted-foreground">{line}</span>
+                                          ) : (
+                                            line
+                                          )}
+                                        </p>
+                                      ))}
+                                    </div>
                                   </div>
                                 )}
 
