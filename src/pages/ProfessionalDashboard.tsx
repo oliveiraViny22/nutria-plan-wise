@@ -196,23 +196,23 @@ export default function ProfessionalDashboard() {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="sticky top-0 z-50 glass border-b">
-        <div className="container mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard')}>
-              <ArrowLeft className="h-5 w-5" />
+      <header className="sticky top-0 z-50 glass border-b pt-safe">
+        <div className="container mx-auto px-3 sm:px-4 py-2.5 sm:py-3 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <Button variant="ghost" size="icon" className="h-9 w-9 sm:h-10 sm:w-10" onClick={() => navigate('/dashboard')}>
+              <ArrowLeft className="h-4 w-4 sm:h-5 sm:w-5" />
             </Button>
             <Logo size="sm" />
           </div>
-          <h1 className="text-lg font-semibold">Painel Profissional</h1>
-          <Button size="sm" onClick={() => navigate('/students')}>
-            <UserPlus className="h-4 w-4 mr-2" />
-            Gerenciar
+          <h1 className="text-sm sm:text-lg font-semibold truncate hidden xs:block">Painel Profissional</h1>
+          <Button size="sm" className="text-xs sm:text-sm h-8 sm:h-9" onClick={() => navigate('/students')}>
+            <UserPlus className="h-3.5 w-3.5 sm:h-4 sm:w-4 sm:mr-2" />
+            <span className="hidden sm:inline">Gerenciar</span>
           </Button>
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-6 space-y-6 pb-24">
+      <main className="container mx-auto px-3 sm:px-4 py-4 sm:py-6 space-y-4 sm:space-y-6 pb-24">
         {/* License Warning */}
         {!isLicenseActive && (
           <motion.div
@@ -220,16 +220,18 @@ export default function ProfessionalDashboard() {
             animate={{ opacity: 1, y: 0 }}
           >
             <Card className="border-destructive/50 bg-destructive/10">
-              <CardContent className="py-4">
-                <div className="flex items-center gap-3">
-                  <AlertCircle className="h-5 w-5 text-destructive" />
-                  <div className="flex-1">
-                    <p className="font-medium text-destructive">Licença Inativa ou Expirada</p>
-                    <p className="text-sm text-muted-foreground">
-                      Renove sua licença para continuar gerenciando alunos.
-                    </p>
+              <CardContent className="py-3 sm:py-4">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+                  <div className="flex items-center gap-3 flex-1">
+                    <AlertCircle className="h-5 w-5 text-destructive flex-shrink-0" />
+                    <div>
+                      <p className="font-medium text-destructive text-sm sm:text-base">Licença Inativa ou Expirada</p>
+                      <p className="text-xs sm:text-sm text-muted-foreground">
+                        Renove sua licença para continuar gerenciando alunos.
+                      </p>
+                    </div>
                   </div>
-                  <Button size="sm" variant="destructive" onClick={() => navigate('/become-professional')}>
+                  <Button size="sm" variant="destructive" className="w-full sm:w-auto" onClick={() => navigate('/become-professional')}>
                     Renovar
                   </Button>
                 </div>
@@ -239,21 +241,21 @@ export default function ProfessionalDashboard() {
         )}
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
           >
             <Card>
-              <CardContent className="pt-6">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-primary/10">
-                    <Users className="h-5 w-5 text-primary" />
+              <CardContent className="pt-4 sm:pt-6 px-3 sm:px-6">
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <div className="p-1.5 sm:p-2 rounded-lg bg-primary/10">
+                    <Users className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
                   </div>
                   <div>
-                    <p className="text-2xl font-bold">{activeStudents}</p>
-                    <p className="text-sm text-muted-foreground">Alunos Ativos</p>
+                    <p className="text-xl sm:text-2xl font-bold">{activeStudents}</p>
+                    <p className="text-[10px] sm:text-sm text-muted-foreground">Alunos Ativos</p>
                   </div>
                 </div>
               </CardContent>
@@ -266,14 +268,14 @@ export default function ProfessionalDashboard() {
             transition={{ delay: 0.15 }}
           >
             <Card>
-              <CardContent className="pt-6">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-green-500/10">
-                    <Utensils className="h-5 w-5 text-green-500" />
+              <CardContent className="pt-4 sm:pt-6 px-3 sm:px-6">
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <div className="p-1.5 sm:p-2 rounded-lg bg-green-500/10">
+                    <Utensils className="h-4 w-4 sm:h-5 sm:w-5 text-green-500" />
                   </div>
                   <div>
-                    <p className="text-2xl font-bold">{metrics.totalDiets}</p>
-                    <p className="text-sm text-muted-foreground">Total de Dietas</p>
+                    <p className="text-xl sm:text-2xl font-bold">{metrics.totalDiets}</p>
+                    <p className="text-[10px] sm:text-sm text-muted-foreground">Total de Dietas</p>
                   </div>
                 </div>
               </CardContent>
@@ -286,14 +288,14 @@ export default function ProfessionalDashboard() {
             transition={{ delay: 0.2 }}
           >
             <Card>
-              <CardContent className="pt-6">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-blue-500/10">
-                    <Calendar className="h-5 w-5 text-blue-500" />
+              <CardContent className="pt-4 sm:pt-6 px-3 sm:px-6">
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <div className="p-1.5 sm:p-2 rounded-lg bg-blue-500/10">
+                    <Calendar className="h-4 w-4 sm:h-5 sm:w-5 text-blue-500" />
                   </div>
                   <div>
-                    <p className="text-2xl font-bold">{metrics.dietsThisMonth}</p>
-                    <p className="text-sm text-muted-foreground">Dietas este Mês</p>
+                    <p className="text-xl sm:text-2xl font-bold">{metrics.dietsThisMonth}</p>
+                    <p className="text-[10px] sm:text-sm text-muted-foreground">Dietas este Mês</p>
                   </div>
                 </div>
               </CardContent>
@@ -306,14 +308,14 @@ export default function ProfessionalDashboard() {
             transition={{ delay: 0.25 }}
           >
             <Card>
-              <CardContent className="pt-6">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-orange-500/10">
-                    <TrendingUp className="h-5 w-5 text-orange-500" />
+              <CardContent className="pt-4 sm:pt-6 px-3 sm:px-6">
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <div className="p-1.5 sm:p-2 rounded-lg bg-orange-500/10">
+                    <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5 text-orange-500" />
                   </div>
                   <div>
-                    <p className="text-2xl font-bold">{metrics.averageCalories}</p>
-                    <p className="text-sm text-muted-foreground">Média kcal</p>
+                    <p className="text-xl sm:text-2xl font-bold">{metrics.averageCalories}</p>
+                    <p className="text-[10px] sm:text-sm text-muted-foreground">Média kcal</p>
                   </div>
                 </div>
               </CardContent>
@@ -328,20 +330,20 @@ export default function ProfessionalDashboard() {
           transition={{ delay: 0.3 }}
         >
           <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base flex items-center gap-2">
-                <Target className="h-4 w-4" />
+            <CardHeader className="pb-2 sm:pb-3 px-4 sm:px-6">
+              <CardTitle className="text-sm sm:text-base flex items-center gap-2">
+                <Target className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                 Uso da Licença
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex justify-between text-sm">
+            <CardContent className="space-y-2 sm:space-y-3 px-4 sm:px-6">
+              <div className="flex justify-between text-xs sm:text-sm">
                 <span>Alunos vinculados</span>
                 <span className="font-medium">{studentCount} / {license?.max_students || 0}</span>
               </div>
-              <Progress value={licenseUsage} className="h-2" />
+              <Progress value={licenseUsage} className="h-1.5 sm:h-2" />
               {license?.expires_at && (
-                <p className="text-xs text-muted-foreground">
+                <p className="text-[10px] sm:text-xs text-muted-foreground">
                   Licença válida até {new Date(license.expires_at).toLocaleDateString('pt-BR')}
                 </p>
               )}
@@ -355,22 +357,22 @@ export default function ProfessionalDashboard() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.35 }}
         >
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-3 sm:gap-4">
             <Button 
               variant="outline" 
-              className="h-auto py-4 flex-col gap-2"
+              className="h-auto py-3 sm:py-4 flex-col gap-1.5 sm:gap-2"
               onClick={() => navigate('/students')}
             >
-              <UserPlus className="h-5 w-5" />
-              <span>Adicionar Aluno</span>
+              <UserPlus className="h-4 w-4 sm:h-5 sm:w-5" />
+              <span className="text-xs sm:text-sm">Adicionar Aluno</span>
             </Button>
             <Button 
               variant="outline" 
-              className="h-auto py-4 flex-col gap-2"
+              className="h-auto py-3 sm:py-4 flex-col gap-1.5 sm:gap-2"
               onClick={() => navigate('/students')}
             >
-              <BarChart3 className="h-5 w-5" />
-              <span>Ver Todos Alunos</span>
+              <BarChart3 className="h-4 w-4 sm:h-5 sm:w-5" />
+              <span className="text-xs sm:text-sm">Ver Todos Alunos</span>
             </Button>
           </div>
         </motion.div>

@@ -89,33 +89,33 @@ export default function BecomeProfessional() {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="sticky top-0 z-50 glass border-b">
-        <div className="container mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard')}>
-              <ArrowLeft className="h-5 w-5" />
+      <header className="sticky top-0 z-50 glass border-b pt-safe">
+        <div className="container mx-auto px-3 sm:px-4 py-2.5 sm:py-3 flex items-center justify-between">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <Button variant="ghost" size="icon" className="h-9 w-9 sm:h-10 sm:w-10" onClick={() => navigate('/dashboard')}>
+              <ArrowLeft className="h-4 w-4 sm:h-5 sm:w-5" />
             </Button>
             <Logo size="sm" />
           </div>
-          <h1 className="text-lg font-semibold">Seja Profissional</h1>
-          <div className="w-10" />
+          <h1 className="text-base sm:text-lg font-semibold truncate">Seja Profissional</h1>
+          <div className="w-9 sm:w-10" />
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-8 space-y-12">
+      <main className="container mx-auto px-3 sm:px-4 py-6 sm:py-8 space-y-8 sm:space-y-12 pb-safe">
         {/* Hero */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           className="text-center max-w-2xl mx-auto"
         >
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/10 mb-6">
-            <Crown className="h-8 w-8 text-primary" />
+          <div className="inline-flex items-center justify-center w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-primary/10 mb-4 sm:mb-6">
+            <Crown className="h-6 w-6 sm:h-8 sm:w-8 text-primary" />
           </div>
-          <h1 className="text-3xl md:text-4xl font-bold mb-4">
+          <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-3 sm:mb-4">
             Gerencie seus alunos com o NutriAI
           </h1>
-          <p className="text-lg text-muted-foreground">
+          <p className="text-base sm:text-lg text-muted-foreground px-2">
             Torne-se um profissional e tenha controle total sobre os planos alimentares dos seus alunos, acompanhando seu progresso em tempo real.
           </p>
         </motion.div>
@@ -125,16 +125,16 @@ export default function BecomeProfessional() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.2 }}
-          className="grid md:grid-cols-3 gap-6"
+          className="grid sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6"
         >
           {BENEFITS.map((benefit, index) => (
             <Card key={index} className="card-elevated">
-              <CardContent className="pt-6">
-                <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
-                  <benefit.icon className="h-6 w-6 text-primary" />
+              <CardContent className="pt-5 sm:pt-6">
+                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-primary/10 flex items-center justify-center mb-3 sm:mb-4">
+                  <benefit.icon className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
                 </div>
-                <h3 className="font-semibold mb-2">{benefit.title}</h3>
-                <p className="text-sm text-muted-foreground">{benefit.description}</p>
+                <h3 className="font-semibold mb-1.5 sm:mb-2 text-sm sm:text-base">{benefit.title}</h3>
+                <p className="text-xs sm:text-sm text-muted-foreground">{benefit.description}</p>
               </CardContent>
             </Card>
           ))}
@@ -145,26 +145,26 @@ export default function BecomeProfessional() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.3 }}
-          className="space-y-6"
+          className="space-y-4 sm:space-y-6"
         >
           <div className="text-center">
-            <h2 className="text-2xl font-bold mb-2">Plano Profissional</h2>
-            <p className="text-muted-foreground">
+            <h2 className="text-xl sm:text-2xl font-bold mb-1.5 sm:mb-2">Plano Profissional</h2>
+            <p className="text-sm sm:text-base text-muted-foreground">
               Comece a gerenciar seus alunos hoje mesmo
             </p>
           </div>
 
           <Card className="max-w-md mx-auto border-primary shadow-lg shadow-primary/20">
-            <CardHeader className="text-center">
-              <CardTitle>Mensal</CardTitle>
-              <CardDescription>Até 50 alunos ativos</CardDescription>
+            <CardHeader className="text-center pb-3 sm:pb-4">
+              <CardTitle className="text-lg sm:text-xl">Mensal</CardTitle>
+              <CardDescription className="text-xs sm:text-sm">Até 50 alunos ativos</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6">
+            <CardContent className="space-y-4 sm:space-y-6 px-4 sm:px-6">
               <div className="text-center">
-                <span className="text-4xl font-bold">R$ 99,00</span>
-                <span className="text-muted-foreground">/mês</span>
+                <span className="text-3xl sm:text-4xl font-bold">R$ 99,00</span>
+                <span className="text-muted-foreground text-sm sm:text-base">/mês</span>
               </div>
-              <ul className="space-y-3">
+              <ul className="space-y-2 sm:space-y-3">
                 {[
                   'Até 50 alunos ativos',
                   'Acesso aos planos dos alunos',
@@ -172,8 +172,8 @@ export default function BecomeProfessional() {
                   'Suporte prioritário',
                   'Relatórios avançados',
                 ].map((feature, i) => (
-                  <li key={i} className="flex items-center gap-2 text-sm">
-                    <Check className="h-4 w-4 text-primary shrink-0" />
+                  <li key={i} className="flex items-center gap-2 text-xs sm:text-sm">
+                    <Check className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-primary shrink-0" />
                     <span>{feature}</span>
                   </li>
                 ))}

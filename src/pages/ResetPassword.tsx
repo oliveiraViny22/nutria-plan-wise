@@ -86,28 +86,28 @@ const ResetPassword = () => {
 
   if (!hasSession) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-secondary/5 p-4">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-secondary/5 p-4 pt-safe pb-safe">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           className="w-full max-w-md"
         >
-          <div className="bg-card rounded-2xl shadow-xl p-8 text-center">
+          <div className="bg-card rounded-xl sm:rounded-2xl shadow-xl p-5 sm:p-8 text-center">
             <Logo />
-            <h1 className="text-2xl font-bold text-foreground mb-4">
+            <h1 className="text-xl sm:text-2xl font-bold text-foreground mb-3 sm:mb-4 mt-4">
               Link inválido ou expirado
             </h1>
-            <p className="text-muted-foreground mb-6">
+            <p className="text-sm sm:text-base text-muted-foreground mb-4 sm:mb-6">
               Este link de recuperação de senha não é mais válido. 
               Por favor, solicite um novo link.
             </p>
-            <Button onClick={() => navigate('/forgot-password')} className="w-full">
+            <Button onClick={() => navigate('/forgot-password')} className="w-full h-10 sm:h-12 text-sm sm:text-base">
               Solicitar novo link
             </Button>
             <Button
               variant="ghost"
               onClick={() => navigate('/login')}
-              className="w-full mt-2"
+              className="w-full mt-2 text-sm sm:text-base"
             >
               <ArrowLeft className="w-4 h-4 mr-2" />
               Voltar ao login
@@ -120,24 +120,24 @@ const ResetPassword = () => {
 
   if (success) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-secondary/5 p-4">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-secondary/5 p-4 pt-safe pb-safe">
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           className="w-full max-w-md"
         >
-          <div className="bg-card rounded-2xl shadow-xl p-8 text-center">
-            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
-              <CheckCircle className="w-8 h-8 text-green-600" />
+          <div className="bg-card rounded-xl sm:rounded-2xl shadow-xl p-5 sm:p-8 text-center">
+            <div className="w-12 h-12 sm:w-16 sm:h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4 sm:mb-6">
+              <CheckCircle className="w-6 h-6 sm:w-8 sm:h-8 text-green-600" />
             </div>
-            <h1 className="text-2xl font-bold text-foreground mb-4">
+            <h1 className="text-xl sm:text-2xl font-bold text-foreground mb-3 sm:mb-4">
               Senha atualizada!
             </h1>
-            <p className="text-muted-foreground mb-6">
+            <p className="text-sm sm:text-base text-muted-foreground mb-4 sm:mb-6">
               Sua senha foi atualizada com sucesso. 
               Você será redirecionado para o login em instantes.
             </p>
-            <Button onClick={() => navigate('/login')} className="w-full">
+            <Button onClick={() => navigate('/login')} className="w-full h-10 sm:h-12 text-sm sm:text-base">
               Ir para o login
             </Button>
           </div>
@@ -147,32 +147,32 @@ const ResetPassword = () => {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-secondary/5 p-4">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-secondary/5 p-4 pt-safe pb-safe">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         className="w-full max-w-md"
       >
-        <div className="bg-card rounded-2xl shadow-xl p-8">
-          <div className="text-center mb-8">
+        <div className="bg-card rounded-xl sm:rounded-2xl shadow-xl p-5 sm:p-8">
+          <div className="text-center mb-6 sm:mb-8">
             <Logo />
-            <h1 className="text-2xl font-bold text-foreground">
+            <h1 className="text-xl sm:text-2xl font-bold text-foreground mt-4">
               Criar nova senha
             </h1>
-            <p className="text-muted-foreground mt-2">
+            <p className="text-sm sm:text-base text-muted-foreground mt-1.5 sm:mt-2">
               Digite sua nova senha abaixo
             </p>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-4">
             <div className="relative">
-              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-muted-foreground" />
               <Input
                 type={showPassword ? 'text' : 'password'}
                 placeholder="Nova senha"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="pl-10 pr-10"
+                className="pl-9 sm:pl-10 pr-10 h-10 sm:h-12"
                 required
                 minLength={6}
               />
@@ -181,24 +181,24 @@ const ResetPassword = () => {
                 onClick={() => setShowPassword(!showPassword)}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
               >
-                {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                {showPassword ? <EyeOff className="w-4 h-4 sm:w-5 sm:h-5" /> : <Eye className="w-4 h-4 sm:w-5 sm:h-5" />}
               </button>
             </div>
 
             <div className="relative">
-              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-muted-foreground" />
               <Input
                 type={showPassword ? 'text' : 'password'}
                 placeholder="Confirmar nova senha"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                className="pl-10"
+                className="pl-9 sm:pl-10 h-10 sm:h-12"
                 required
                 minLength={6}
               />
             </div>
 
-            <Button type="submit" className="w-full" disabled={loading}>
+            <Button type="submit" className="w-full h-10 sm:h-12 text-sm sm:text-base" disabled={loading}>
               {loading ? (
                 <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
               ) : (
@@ -207,11 +207,11 @@ const ResetPassword = () => {
             </Button>
           </form>
 
-          <div className="mt-6 text-center">
+          <div className="mt-4 sm:mt-6 text-center">
             <Button
               variant="ghost"
               onClick={() => navigate('/login')}
-              className="text-muted-foreground"
+              className="text-muted-foreground text-sm sm:text-base"
             >
               <ArrowLeft className="w-4 h-4 mr-2" />
               Voltar ao login

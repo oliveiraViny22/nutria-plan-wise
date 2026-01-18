@@ -288,47 +288,53 @@ export default function StudentView() {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="sticky top-0 z-50 glass border-b">
-        <div className="container mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" onClick={() => navigate('/students')}>
-              <ArrowLeft className="h-5 w-5" />
+      <header className="sticky top-0 z-50 glass border-b pt-safe">
+        <div className="container mx-auto px-3 sm:px-4 py-2.5 sm:py-3 flex items-center justify-between">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <Button variant="ghost" size="icon" className="h-9 w-9 sm:h-10 sm:w-10" onClick={() => navigate('/students')}>
+              <ArrowLeft className="h-4 w-4 sm:h-5 sm:w-5" />
             </Button>
             <Logo size="sm" />
           </div>
-          <h1 className="text-lg font-semibold truncate max-w-[200px]">
+          <h1 className="text-sm sm:text-lg font-semibold truncate max-w-[140px] sm:max-w-[200px]">
             {studentProfile.name || 'Aluno'}
           </h1>
-          <div className="w-10" />
+          <div className="w-9 sm:w-10" />
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-6 space-y-6">
+      <main className="container mx-auto px-3 sm:px-4 py-4 sm:py-6 space-y-4 sm:space-y-6 pb-safe">
         {/* Student Info */}
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
         >
           <Card>
-            <CardContent className="py-4">
-              <div className="flex items-center gap-4 flex-wrap">
-                <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center">
-                  <span className="text-xl font-semibold text-primary">
-                    {(studentProfile.name || 'A')[0].toUpperCase()}
-                  </span>
+            <CardContent className="py-3 sm:py-4 px-3 sm:px-6">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4">
+                <div className="flex items-center gap-3 w-full sm:w-auto">
+                  <div className="w-10 h-10 sm:w-14 sm:h-14 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                    <span className="text-base sm:text-xl font-semibold text-primary">
+                      {(studentProfile.name || 'A')[0].toUpperCase()}
+                    </span>
+                  </div>
+                  <div className="flex-1 min-w-0 sm:hidden">
+                    <h2 className="text-base font-semibold truncate">{studentProfile.name || 'Aluno'}</h2>
+                    <p className="text-xs text-muted-foreground truncate">{studentProfile.email}</p>
+                  </div>
                 </div>
-                <div className="flex-1 min-w-0">
+                <div className="hidden sm:block flex-1 min-w-0">
                   <h2 className="text-xl font-semibold">{studentProfile.name || 'Aluno'}</h2>
                   <p className="text-muted-foreground">{studentProfile.email}</p>
                 </div>
-                <div className="flex items-center gap-4 text-sm flex-wrap">
-                  <Badge variant="outline" className="gap-1">
-                    <Target className="h-3 w-3" />
+                <div className="flex items-center gap-2 sm:gap-4 text-xs sm:text-sm flex-wrap w-full sm:w-auto">
+                  <Badge variant="outline" className="gap-1 text-[10px] sm:text-xs">
+                    <Target className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
                     {goalLabel}
                   </Badge>
                   {studentProfile.daily_calories && (
-                    <Badge variant="outline" className="gap-1">
-                      <Flame className="h-3 w-3" />
+                    <Badge variant="outline" className="gap-1 text-[10px] sm:text-xs">
+                      <Flame className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
                       {studentProfile.daily_calories} kcal/dia
                     </Badge>
                   )}
