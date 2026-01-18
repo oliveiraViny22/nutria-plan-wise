@@ -149,7 +149,7 @@ export default function Students() {
                   </div>
                   <div>
                     <p className="font-medium text-sm sm:text-base">
-                      Licença {license?.license_type === 'annual' ? 'Anual' : 'Mensal'}
+                      Licença Mensal
                     </p>
                     <p className="text-xs sm:text-sm text-muted-foreground">
                       {isLicenseActive 

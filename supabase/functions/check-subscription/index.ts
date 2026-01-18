@@ -1,11 +1,9 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.90.1";
-import { getCorsHeaders, CLIENT_ERRORS, getErrorForLogging, createErrorResponse, createSuccessResponse } from "../_shared/security.ts";
+import { getCorsHeaders, CLIENT_ERRORS, createErrorResponse, createSuccessResponse } from "../_shared/security.ts";
+import { createLogger, getErrorDetails } from "../_shared/logger.ts";
 
-const logStep = (step: string, details?: unknown) => {
-  const detailsStr = details ? ` - ${JSON.stringify(details)}` : '';
-  console.log(`[CHECK-SUBSCRIPTION] ${step}${detailsStr}`);
-};
+const log = createLogger('check-subscription');
 
 serve(async (req) => {
   const corsHeaders = getCorsHeaders(req);
@@ -15,14 +13,14 @@ serve(async (req) => {
   }
 
   try {
-    logStep("Function started");
+    log.info("Function started");
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
     const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
     const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 
     if (!supabaseUrl || !supabaseAnonKey || !supabaseServiceRoleKey) {
-      logStep("Missing required env", {
+      log.error("Missing required env", {
         hasUrl: Boolean(supabaseUrl),
         hasAnon: Boolean(supabaseAnonKey),
         hasServiceRole: Boolean(supabaseServiceRoleKey),
@@ -106,7 +104,7 @@ serve(async (req) => {
       .maybeSingle();
     
     const isLinkedToProfessional = Boolean(profileData?.professional_id);
-    logStep("Checked professional link", { isLinkedToProfessional });
+    log.info("Checked professional link", { isLinkedToProfessional });
 
     // Get student access level if linked to professional
     let studentAccess = null;
@@ -125,7 +123,7 @@ serve(async (req) => {
           canSubstitute: accessData[0].can_substitute,
           professionalStatus: accessData[0].professional_status,
         };
-        logStep("Student access level", studentAccess);
+        log.info("Student access level", studentAccess);
       }
     }
 
@@ -143,7 +141,7 @@ serve(async (req) => {
       .single();
 
     if (subError || !subscription) {
-      logStep("No active subscription found");
+      log.info("No active subscription found");
       
       // Check if user has roles to determine account type
       const { data: roles } = await supabaseAdmin
@@ -163,7 +161,7 @@ serve(async (req) => {
       }, corsHeaders);
     }
 
-    logStep("Subscription found", { 
+    log.info("Subscription found", { 
       planName: subscription.plan?.name, 
       status: subscription.status 
     });
@@ -182,13 +180,13 @@ serve(async (req) => {
           .upsert({ user_id: user.id, role: 'professional' }, { onConflict: 'user_id,role' });
 
         if (roleUpsertError) {
-          logStep('Failed to upsert professional role', { error: roleUpsertError.message });
+          log.warn('Failed to upsert professional role', { error: roleUpsertError.message });
         } else {
-          logStep('Professional role ensured');
+          log.info('Professional role ensured');
         }
 
-        // Ensure professional license exists/updated
-        const licenseType = subscription.billing_cycle === 'annual' ? 'annual' : 'monthly';
+        // Ensure professional license exists/updated - always monthly
+        const licenseType = 'monthly';
         const startsAt = subscription.current_period_start || new Date().toISOString().split('T')[0];
         const expiresAt = subscription.current_period_end || new Date().toISOString().split('T')[0];
         const maxStudents = subscription.plan?.patients_limit ?? 0;
@@ -202,7 +200,7 @@ serve(async (req) => {
           .maybeSingle();
 
         if (existingLicenseError) {
-          logStep('Failed to check existing license', { error: existingLicenseError.message });
+          log.warn('Failed to check existing license', { error: existingLicenseError.message });
         }
 
         if (existingLicense?.id) {
@@ -218,9 +216,9 @@ serve(async (req) => {
             .eq('id', existingLicense.id);
 
           if (licenseUpdateError) {
-            logStep('Failed to update license', { error: licenseUpdateError.message });
+            log.warn('Failed to update license', { error: licenseUpdateError.message });
           } else {
-            logStep('Professional license updated', { expiresAt, maxStudents });
+            log.info('Professional license updated', { expiresAt, maxStudents });
           }
         } else {
           const { error: licenseInsertError } = await supabaseAdmin
@@ -235,13 +233,13 @@ serve(async (req) => {
             });
 
           if (licenseInsertError) {
-            logStep('Failed to insert license', { error: licenseInsertError.message });
+            log.warn('Failed to insert license', { error: licenseInsertError.message });
           } else {
-            logStep('Professional license created', { expiresAt, maxStudents });
+            log.info('Professional license created', { expiresAt, maxStudents });
           }
         }
       } catch (syncError) {
-        logStep('Entitlement sync error', { message: getErrorForLogging(syncError) });
+        log.error('Entitlement sync error', getErrorDetails(syncError));
       }
     }
 
@@ -285,7 +283,7 @@ serve(async (req) => {
       studentAccess,
     }, corsHeaders);
   } catch (error) {
-    logStep("ERROR", { message: getErrorForLogging(error) });
+    log.error("Unexpected error", getErrorDetails(error));
     return createErrorResponse(CLIENT_ERRORS.SERVER_ERROR, 500, corsHeaders);
   }
 });
