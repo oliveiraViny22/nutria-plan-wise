@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { 
@@ -58,7 +58,7 @@ import { useUserRole } from '@/hooks/useUserRole';
 import { useAdminOperations, UserProfile, Plan, DeleteUserPreview } from '@/hooks/useAdminOperations';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-
+import { FoodImportValidator, ValidationResult as FoodValidationResult, FoodRow } from '@/components/FoodImportValidator';
 // Chart colors
 const CHART_COLORS = [
   'hsl(var(--primary))',
@@ -190,8 +190,10 @@ export default function Admin() {
   const [activeTab, setActiveTab] = useState('metrics');
   const [editedSettings, setEditedSettings] = useState<Record<string, unknown>>({});
   const [csvFile, setCsvFile] = useState<File | null>(null);
-  const [csvPreview, setCsvPreview] = useState<{ rows: Record<string, unknown>[]; validation: { valid: boolean; errors: string[]; validRows: unknown[]; warnings?: string[] } | null }>({ rows: [], validation: null });
+  const [csvPreview, setCsvPreview] = useState<{ rows: Record<string, unknown>[]; validation: FoodValidationResult | null }>({ rows: [], validation: null });
   const [showPreview, setShowPreview] = useState(false);
+  const [showValidating, setShowValidating] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [auditPage, setAuditPage] = useState(0);
   const [seedingData, setSeedingData] = useState(false);
   const [seedResults, setSeedResults] = useState<Record<string, unknown> | null>(null);
@@ -554,33 +556,37 @@ export default function Admin() {
     if (!file) return;
 
     setCsvFile(file);
-    
-    const text = await file.text();
-    const delimiter = getDelimiterForFile(file.name);
-    const rows = parseDelimited(text, delimiter);
-    
-    if (rows.length === 0) {
-      toast({ 
-        title: 'Arquivo vazio', 
-        description: 'O arquivo não contém dados válidos. Verifique se o formato corresponde ao modelo exportado.', 
-        variant: 'destructive' 
-      });
-      return;
-    }
+    setShowValidating(true);
+    setShowPreview(false);
+    setCsvPreview({ rows: [], validation: null });
+  }, []);
 
-    const validation = await validateFoodCSV(rows);
+  const handleValidationComplete = useCallback((validation: FoodValidationResult, rows: Record<string, unknown>[]) => {
     setCsvPreview({ rows, validation });
+    setShowValidating(false);
     setShowPreview(true);
-  }, [toast, validateFoodCSV]);
+  }, []);
+
+  const handleCancelValidation = useCallback(() => {
+    setShowValidating(false);
+    setCsvFile(null);
+    setCsvPreview({ rows: [], validation: null });
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  }, []);
 
   const handleImport = async () => {
     if (!csvFile || !csvPreview.validation?.validRows.length) return;
 
     try {
-      await importFoods(csvFile.name, csvPreview.validation.validRows as never);
+      await importFoods(csvFile.name, csvPreview.validation.validRows as FoodRow[]);
       setShowPreview(false);
       setCsvFile(null);
       setCsvPreview({ rows: [], validation: null });
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
     } catch {
       // Error handled in hook
     }
@@ -2179,37 +2185,48 @@ export default function Admin() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="relative">
-                    <Input
-                      type="file"
-                      accept=".csv,.txt,.xls,.xlsx"
-                      onChange={handleFileUpload}
-                      className="hidden"
-                      id="food-upload"
-                    />
-                    <Label htmlFor="food-upload" asChild>
-                      <Button variant="default" className="cursor-pointer">
-                        <Upload className="h-4 w-4 mr-2" />
-                        Selecionar Arquivo (CSV, TXT, XLS)
-                      </Button>
-                    </Label>
-                  </div>
+                  {!showValidating ? (
+                    <>
+                      <div className="relative">
+                        <Input
+                          ref={fileInputRef}
+                          type="file"
+                          accept=".csv,.txt,.xls,.xlsx"
+                          onChange={handleFileUpload}
+                          className="hidden"
+                          id="food-upload"
+                        />
+                        <Label htmlFor="food-upload" asChild>
+                          <Button variant="default" className="cursor-pointer">
+                            <Upload className="h-4 w-4 mr-2" />
+                            Selecionar Arquivo (CSV, TXT, XLS)
+                          </Button>
+                        </Label>
+                      </div>
 
-                  <Alert>
-                    <AlertCircle className="h-4 w-4" />
-                    <AlertTitle>Formato esperado</AlertTitle>
-                    <AlertDescription>
-                      <strong>Formatos aceitos:</strong> CSV (vírgula), TXT (tab), XLS (tab)
-                      <br />
-                      <strong>Dica:</strong> Exporte o banco atual acima para obter um arquivo no formato correto.
-                      <br /><br />
-                      <strong>Colunas:</strong> <code className="text-xs bg-muted px-1 rounded">name, calories, protein, carbs, fat, serving_size, category, processing_level</code>
-                      <br />
-                      <span className="text-muted-foreground text-xs">
-                        Dados nutricionais incompletos serão preenchidos automaticamente com valores médios estimados.
-                      </span>
-                    </AlertDescription>
-                  </Alert>
+                      <Alert>
+                        <AlertCircle className="h-4 w-4" />
+                        <AlertTitle>Formato esperado</AlertTitle>
+                        <AlertDescription>
+                          <strong>Formatos aceitos:</strong> CSV (vírgula), TXT (tab), XLS (tab)
+                          <br />
+                          <strong>Dica:</strong> Exporte o banco atual acima para obter um arquivo no formato correto.
+                          <br /><br />
+                          <strong>Colunas:</strong> <code className="text-xs bg-muted px-1 rounded">name, calories, protein, carbs, fat, serving_size, category, processing_level</code>
+                          <br />
+                          <span className="text-muted-foreground text-xs">
+                            Dados nutricionais incompletos serão preenchidos automaticamente com valores médios estimados.
+                          </span>
+                        </AlertDescription>
+                      </Alert>
+                    </>
+                  ) : (
+                    <FoodImportValidator
+                      file={csvFile}
+                      onValidationComplete={handleValidationComplete}
+                      onCancel={handleCancelValidation}
+                    />
+                  )}
                 </CardContent>
               </Card>
             </div>
@@ -2530,7 +2547,14 @@ export default function Admin() {
               </ScrollArea>
 
               <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={() => setShowPreview(false)}>
+                <Button variant="outline" onClick={() => {
+                  setShowPreview(false);
+                  setCsvFile(null);
+                  setCsvPreview({ rows: [], validation: null });
+                  if (fileInputRef.current) {
+                    fileInputRef.current.value = '';
+                  }
+                }}>
                   <X className="h-4 w-4 mr-1" /> Cancelar
                 </Button>
                 <Button 
