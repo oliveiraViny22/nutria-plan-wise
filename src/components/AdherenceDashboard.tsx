@@ -294,13 +294,13 @@ export function AdherenceDashboard({ studentId, dietPlanId, studentName }: Adher
                     <Card>
                       <CardContent className="p-4 text-center">
                         <div className="text-2xl sm:text-3xl font-bold text-primary">
-                          {report.daysWithRecords}
+                          {report.daysWithRecords ?? 0}
                         </div>
                         <p className="text-xs text-muted-foreground mt-1">
-                          de {report.totalDays} dias
+                          de {report.totalDays ?? 0} dias
                         </p>
                         <Progress 
-                          value={(report.daysWithRecords / report.totalDays) * 100} 
+                          value={report.totalDays ? ((report.daysWithRecords ?? 0) / report.totalDays) * 100 : 0} 
                           className="mt-2 h-1.5"
                         />
                       </CardContent>
@@ -311,7 +311,7 @@ export function AdherenceDashboard({ studentId, dietPlanId, studentName }: Adher
                         <div className="flex items-center justify-center gap-1 text-green-500">
                           <CheckCircle2 className="h-5 w-5" />
                           <span className="text-2xl sm:text-3xl font-bold">
-                            {Object.values(report.mealAdherence).reduce((sum, m) => sum + m.confirmed, 0)}
+                            {Object.values(report.mealAdherence || {}).reduce((sum, m) => sum + (m?.confirmed ?? 0), 0)}
                           </span>
                         </div>
                         <p className="text-xs text-muted-foreground mt-1">Confirmadas</p>
@@ -323,7 +323,7 @@ export function AdherenceDashboard({ studentId, dietPlanId, studentName }: Adher
                         <div className="flex items-center justify-center gap-1 text-destructive">
                           <XCircle className="h-5 w-5" />
                           <span className="text-2xl sm:text-3xl font-bold">
-                            {report.exceptionStates.skipped}
+                            {report.exceptionStates?.skipped ?? 0}
                           </span>
                         </div>
                         <p className="text-xs text-muted-foreground mt-1">Puladas</p>
@@ -458,7 +458,7 @@ export function AdherenceDashboard({ studentId, dietPlanId, studentName }: Adher
                               return acc;
                             }, {} as Record<string, typeof report.optionComparison[string][]>)
                           ).map(([meal, options]) => {
-                            const totalSelections = options.reduce((sum, o) => sum + o.timesSelected, 0);
+                            const totalSelections = options.reduce((sum, o) => sum + (o?.timesSelected ?? 0), 0);
                             return (
                               <div key={meal} className="space-y-1.5">
                                 <div className="flex items-center justify-between">
