@@ -5,11 +5,13 @@ import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useSubscription } from '@/hooks/useSubscription';
+import { useUserRole } from '@/hooks/useUserRole';
 import { useNavigate } from 'react-router-dom';
 
 export function UsageLimits() {
   const navigate = useNavigate();
-  const { subscriptionInfo, currentPlan, usage, loading } = useSubscription();
+  const { subscriptionInfo, currentPlan, usage, loading, isLinkedToProfessional } = useSubscription();
+  const { isProfessional } = useUserRole();
 
   if (loading || !currentPlan) {
     return null;
@@ -123,16 +125,19 @@ export function UsageLimits() {
           </div>
         )}
 
-        <div className="pt-3">
-          <Button 
-            variant="outline" 
-            size="sm" 
-            className="w-full"
-            onClick={() => navigate('/pricing')}
-          >
-            {currentPlan.name === 'gratuito' ? 'Fazer Upgrade' : 'Gerenciar Plano'}
-          </Button>
-        </div>
+        {/* Não mostra botão para profissionais ou alunos vinculados */}
+        {!isProfessional && !isLinkedToProfessional && (
+          <div className="pt-3">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="w-full"
+              onClick={() => navigate('/pricing')}
+            >
+              {currentPlan.name === 'gratuito' ? 'Fazer Upgrade' : 'Gerenciar Plano'}
+            </Button>
+          </div>
+        )}
       </CardContent>
     </Card>
   );

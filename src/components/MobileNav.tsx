@@ -46,14 +46,17 @@ export function MobileNav() {
   const [open, setOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
-  const { signOut } = useAuth();
+  const { signOut, profile } = useAuth();
   const { isProfessional, hasActiveLicense, isAdmin, loading: roleLoading } = useUserRole();
-  const { accountType, isSubscribed } = useSubscription();
+  const { accountType, isSubscribed, isLinkedToProfessional } = useSubscription();
   const { unreadCount, canSeeAlerts } = useUnreadAlerts();
 
   const showProfessionalLinks = 
     (isSubscribed && accountType === 'professional') || 
     (isProfessional && hasActiveLicense);
+  
+  // Aluno vinculado ao profissional
+  const isLinkedStudent = profile?.professional_id && isLinkedToProfessional;
   
   // Show notification badge for professionals and plano_pessoal_pago users
   const showNotificationBadge = !roleLoading && canSeeAlerts && unreadCount > 0;
@@ -64,7 +67,18 @@ export function MobileNav() {
     navigate('/login');
   };
 
-  const navItems: NavItem[] = [
+  // Admin vê apenas opções administrativas
+  const adminNavItems: NavItem[] = [
+    {
+      label: 'Painel Admin',
+      href: '/admin',
+      icon: <Shield className="h-5 w-5" />,
+      show: true,
+    },
+  ];
+
+  // Itens de navegação padrão
+  const standardNavItems: NavItem[] = [
     {
       label: 'Dashboard',
       href: '/dashboard',
@@ -94,7 +108,8 @@ export function MobileNav() {
       label: 'Seja Profissional',
       href: '/become-professional',
       icon: <Crown className="h-5 w-5" />,
-      show: !showProfessionalLinks,
+      // Só mostra se não é profissional E não é aluno vinculado
+      show: !showProfessionalLinks && !isLinkedStudent,
     },
     {
       label: 'Progresso',
@@ -118,15 +133,13 @@ export function MobileNav() {
       label: 'Assinatura',
       href: '/subscription',
       icon: <CreditCard className="h-5 w-5" />,
-      show: true,
-    },
-    {
-      label: 'Painel Admin',
-      href: '/admin',
-      icon: <Shield className="h-5 w-5" />,
-      show: isAdmin,
+      // Profissional não vê (gerencia no painel), Aluno vinculado não vê (gerenciado pelo profissional)
+      show: !isProfessional && !isLinkedStudent,
     },
   ];
+
+  // Escolhe os itens de navegação baseado no papel
+  const navItems = isAdmin ? adminNavItems : standardNavItems;
 
   const isActive = (href: string) => location.pathname === href;
 

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { CreditCard, AlertTriangle, Check, ExternalLink, ArrowLeft, Users, BarChart3, UserPlus } from 'lucide-react';
+import { CreditCard, AlertTriangle, Check, ExternalLink, ArrowLeft, Users, BarChart3, UserPlus, Lock } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -14,9 +14,12 @@ import { BILLING_CYCLE_LABELS } from '@/lib/subscription-types';
 export default function Subscription() {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { subscriptionInfo, currentPlan, usage, loading, openCustomerPortal, refresh } = useSubscription();
-  const { isProfessional } = useUserRole();
+  const { subscriptionInfo, currentPlan, usage, loading, openCustomerPortal, refresh, isLinkedToProfessional } = useSubscription();
+  const { isProfessional, isAdmin } = useUserRole();
   const [portalLoading, setPortalLoading] = useState(false);
+  
+  // Aluno vinculado não deve ver opções de compra pessoal
+  const isLinkedStudent = isLinkedToProfessional;
 
   const handleManageSubscription = async () => {
     setPortalLoading(true);
@@ -133,25 +136,37 @@ export default function Subscription() {
                 </div>
               )}
 
-              <div className="flex gap-3 pt-2">
-                {currentPlan?.name !== 'gratuito' && subscriptionInfo?.subscription && (
-                  <Button 
-                    variant="outline" 
-                    onClick={handleManageSubscription}
-                    disabled={portalLoading}
-                  >
-                    {portalLoading ? (
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current mr-2" />
-                    ) : (
-                      <CreditCard className="h-4 w-4 mr-2" />
-                    )}
-                    Gerenciar Pagamento
+              {/* Alunos vinculados veem mensagem informativa */}
+              {isLinkedStudent ? (
+                <div className="bg-muted/50 border border-border rounded-lg p-3 mt-2">
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <Lock className="h-4 w-4" />
+                    <p className="text-sm">
+                      Sua assinatura é gerenciada pelo seu nutricionista.
+                    </p>
+                  </div>
+                </div>
+              ) : !isAdmin && !isProfessional && (
+                <div className="flex gap-3 pt-2">
+                  {currentPlan?.name !== 'gratuito' && subscriptionInfo?.subscription && (
+                    <Button 
+                      variant="outline" 
+                      onClick={handleManageSubscription}
+                      disabled={portalLoading}
+                    >
+                      {portalLoading ? (
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current mr-2" />
+                      ) : (
+                        <CreditCard className="h-4 w-4 mr-2" />
+                      )}
+                      Gerenciar Pagamento
+                    </Button>
+                  )}
+                  <Button onClick={() => navigate('/pricing')}>
+                    {currentPlan?.name === 'gratuito' ? 'Fazer Upgrade' : 'Alterar Plano'}
                   </Button>
-                )}
-                <Button onClick={() => navigate('/pricing')}>
-                  {currentPlan?.name === 'gratuito' ? 'Fazer Upgrade' : 'Alterar Plano'}
-                </Button>
-              </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </motion.div>
@@ -302,8 +317,8 @@ export default function Subscription() {
           </motion.div>
         )}
 
-        {/* Become Professional CTA */}
-        {!isProfessional && (
+        {/* Become Professional CTA - Não mostra para profissionais, admins ou alunos vinculados */}
+        {!isProfessional && !isAdmin && !isLinkedStudent && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
