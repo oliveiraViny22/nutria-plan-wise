@@ -278,15 +278,15 @@ export function AdherenceDashboard({ studentId, dietPlanId, studentName }: Adher
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                     <Card>
                       <CardContent className="p-4 text-center">
-                        <div className={`text-2xl sm:text-3xl font-bold ${getAdherenceColor(report.overallAdherenceRate)}`}>
-                          {report.overallAdherenceRate.toFixed(0)}%
+                        <div className={`text-2xl sm:text-3xl font-bold ${getAdherenceColor(report.overallAdherenceRate ?? 0)}`}>
+                          {(report.overallAdherenceRate ?? 0).toFixed(0)}%
                         </div>
                         <p className="text-xs text-muted-foreground mt-1">Adesão Geral</p>
                         <Badge 
-                          variant={getAdherenceBadge(report.overallAdherenceRate).variant}
+                          variant={getAdherenceBadge(report.overallAdherenceRate ?? 0).variant}
                           className="mt-2 text-[10px]"
                         >
-                          {getAdherenceBadge(report.overallAdherenceRate).label}
+                          {getAdherenceBadge(report.overallAdherenceRate ?? 0).label}
                         </Badge>
                       </CardContent>
                     </Card>
@@ -487,7 +487,7 @@ export function AdherenceDashboard({ studentId, dietPlanId, studentName }: Adher
                                           key={opt.optionNumber}
                                           className={`${colors[idx % colors.length]} relative group`}
                                           style={{ width: `${percentage}%` }}
-                                          title={`Opção ${opt.optionNumber}: ${opt.timesSelected} (${percentage.toFixed(0)}%)`}
+                                          title={`Opção ${opt.optionNumber}: ${opt.timesSelected ?? 0} (${(percentage ?? 0).toFixed(0)}%)`}
                                         />
                                       );
                                     })}
