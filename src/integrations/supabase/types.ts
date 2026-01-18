@@ -1408,7 +1408,23 @@ export type Database = {
         Args: { _feature: string; _user_id: string }
         Returns: boolean
       }
+      professional_manages_meal: {
+        Args: { _meal_id: string; _professional_id: string }
+        Returns: boolean
+      }
+      professional_manages_meal_option: {
+        Args: { _meal_option_id: string; _professional_id: string }
+        Returns: boolean
+      }
       reset_monthly_usage: { Args: { _user_id: string }; Returns: undefined }
+      user_owns_meal: {
+        Args: { _meal_id: string; _user_id: string }
+        Returns: boolean
+      }
+      user_owns_meal_option: {
+        Args: { _meal_option_id: string; _user_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
       account_type: "aluno" | "plano_pessoal" | "premium" | "profissional"
