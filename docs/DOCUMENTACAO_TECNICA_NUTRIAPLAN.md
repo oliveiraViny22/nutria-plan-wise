@@ -1,8 +1,17 @@
 # DOCUMENTAÇÃO TÉCNICA OFICIAL — NUTRIAPLAN
 
-## Versão do Documento: 1.1
+## Versão do Documento: 2.0
 ## Data de Geração: 18 de Janeiro de 2026
 ## Última Atualização: 18 de Janeiro de 2026
+
+---
+
+## CHANGELOG
+
+| Versão | Data | Alterações |
+|--------|------|------------|
+| 2.0 | 18/01/2026 | Versão consolidada: adicionados fluxos completos por perfil (Admin, Profissional, Aluno), detalhamento de gestão de alimentos, estrutura completa do banco de dados com cardinalidades, aprofundamento da IA, seção de auditoria administrativa, edge functions recentes |
+| 1.1 | 18/01/2026 | Versão inicial com estrutura base |
 
 ---
 
@@ -10,112 +19,48 @@
 
 ## Visão Geral
 - [1. Visão Técnica Geral do Sistema](#1-visão-técnica-geral-do-sistema)
-  - [1.1 Propósito Técnico](#11-propósito-técnico)
-  - [1.2 Características Principais](#12-características-principais)
 - [2. Objetivo do Produto sob a Ótica Técnica](#2-objetivo-do-produto-sob-a-ótica-técnica)
-  - [2.1 Problemas Técnicos Resolvidos](#21-problemas-técnicos-resolvidos)
-  - [2.2 Escopo Técnico](#22-escopo-técnico)
 
 ## Arquitetura e Stack
 - [3. Arquitetura Geral](#3-arquitetura-geral)
-  - [3.1 Arquitetura em Camadas](#31-arquitetura-em-camadas)
-  - [3.2 Componentes Principais](#32-componentes-principais)
-  - [3.3 Diagrama de Arquitetura (Mermaid)](#33-diagrama-de-arquitetura-mermaid)
 - [4. Stack Tecnológica](#4-stack-tecnológica)
-  - [4.1 Frontend](#41-frontend)
-  - [4.2 Backend](#42-backend)
-  - [4.3 Integrações](#43-integrações)
-  - [4.4 Infraestrutura](#44-infraestrutura)
 
 ## Usuários e Permissões
 - [5. Tipos de Usuário e Papéis do Sistema](#5-tipos-de-usuário-e-papéis-do-sistema)
-  - [5.1 Tipos de Usuário (user_type)](#51-tipos-de-usuário-user_type---imutável)
-  - [5.2 Papéis do Sistema (app_role)](#52-papéis-do-sistema-app_role)
-  - [5.3 Planos Comerciais](#53-planos-comerciais-commercialplan)
-  - [5.4 Matriz de Permissões](#54-matriz-de-permissões)
-  - [5.5 Restrições por Perfil](#55-restrições-por-perfil)
+- [6. Fluxos Completos por Perfil de Usuário](#6-fluxos-completos-por-perfil-de-usuário) *(NOVO)*
 
 ## Regras de Negócio
-- [6. Regras de Negócio Detalhadas](#6-regras-de-negócio-detalhadas)
-  - [6.1 Estrutura de Planos Alimentares](#61-estrutura-de-planos-alimentares)
-  - [6.2 Fluxo de Confirmação de Refeições](#62-fluxo-de-confirmação-de-refeições)
-  - [6.3 Cálculo de Adesão](#63-cálculo-de-adesão)
-  - [6.4 Alertas de Adesão](#64-alertas-de-adesão)
-  - [6.5 Geração de Planos via IA](#65-geração-de-planos-via-ia)
-  - [6.6 Limites de Uso](#66-limites-de-uso)
-  - [6.7 Solicitações de Alunos](#67-solicitações-de-alunos)
+- [7. Regras de Negócio Detalhadas](#7-regras-de-negócio-detalhadas)
+
+## Gestão de Alimentos
+- [8. Gestão de Alimentos](#8-gestão-de-alimentos) *(NOVO/EXPANDIDO)*
 
 ## Fluxos Técnicos
-- [7. Fluxos Técnicos do Sistema](#7-fluxos-técnicos-do-sistema)
-  - [7.1 Fluxo de Cadastro](#71-fluxo-de-cadastro)
-  - [7.2 Fluxo de Login](#72-fluxo-de-login)
-  - [7.3 Fluxo de Geração de Plano Alimentar](#73-fluxo-de-geração-de-plano-alimentar)
-  - [7.4 Fluxo de Atualização de Plano (MacroRebalancer)](#74-fluxo-de-atualização-de-plano-macrorebalancer)
-  - [7.5 Fluxo de Substituição de Alimentos](#75-fluxo-de-substituição-de-alimentos)
-  - [7.6 Fluxo de Histórico e Progresso](#76-fluxo-de-histórico-e-progresso)
-  - [7.7 Fluxo de Chat Nutricional](#77-fluxo-de-chat-nutricional)
-  - [7.8 Fluxo de Solicitações (Student Requests)](#78-fluxo-de-solicitações-student-requests)
+- [9. Fluxos Técnicos do Sistema](#9-fluxos-técnicos-do-sistema)
 
 ## Inteligência Artificial
-- [8. Funcionamento da IA](#8-funcionamento-da-ia)
-  - [8.1 Arquitetura da IA](#81-arquitetura-da-ia)
-  - [8.2 Governança da IA por Perfil](#82-governança-da-ia-por-perfil)
-  - [8.3 Limitações e Guardrails](#83-limitações-e-guardrails)
-  - [8.4 Serviços Internos](#84-serviços-internos)
+- [10. Funcionamento da IA](#10-funcionamento-da-ia) *(EXPANDIDO)*
 
 ## Banco de Dados
-- [9. Persistência de Dados](#9-persistência-de-dados)
-  - [9.1 O Que É Salvo no Banco](#91-o-que-é-salvo-no-banco)
-  - [9.2 O Que NÃO Deve Ser Salvo](#92-o-que-não-deve-ser-salvo)
-  - [9.3 Estratégia de Histórico](#93-estratégia-de-histórico)
-- [10. Estrutura Conceitual do Banco de Dados](#10-estrutura-conceitual-do-banco-de-dados)
-  - [10.1 Diagrama ER Simplificado](#101-diagrama-er-simplificado)
-  - [10.2 Tabelas Principais](#102-tabelas-principais)
-  - [10.3 Enums do Banco](#103-enums-do-banco)
-  - [10.4 Funções RPC Principais](#104-funções-rpc-principais)
+- [11. Estrutura Completa do Banco de Dados](#11-estrutura-completa-do-banco-de-dados) *(EXPANDIDO)*
+- [12. Persistência de Dados](#12-persistência-de-dados)
 
 ## Integrações
-- [11. Integrações Externas](#11-integrações-externas)
-  - [11.1 Stripe](#111-stripe)
-  - [11.2 Lovable AI Gateway](#112-lovable-ai-gateway)
+- [13. Integrações Externas](#13-integrações-externas)
 
 ## Requisitos
-- [12. Requisitos Funcionais](#12-requisitos-funcionais)
-  - [12.1 Autenticação e Autorização](#121-autenticação-e-autorização)
-  - [12.2 Onboarding](#122-onboarding)
-  - [12.3 Planos Alimentares](#123-planos-alimentares)
-  - [12.4 Confirmação de Refeições](#124-confirmação-de-refeições)
-  - [12.5 Adesão e Métricas](#125-adesão-e-métricas)
-  - [12.6 Chat Nutricional](#126-chat-nutricional)
-  - [12.7 Gerenciamento de Alunos](#127-gerenciamento-de-alunos-profissionais)
-  - [12.8 Solicitações de Alunos](#128-solicitações-de-alunos)
-  - [12.9 Progresso e Histórico](#129-progresso-e-histórico)
-  - [12.10 Assinaturas e Pagamentos](#1210-assinaturas-e-pagamentos)
-- [13. Requisitos Não Funcionais](#13-requisitos-não-funcionais)
-  - [13.1 Performance](#131-performance)
-  - [13.2 Segurança](#132-segurança)
-  - [13.3 Escalabilidade](#133-escalabilidade)
-  - [13.4 Disponibilidade](#134-disponibilidade)
-  - [13.5 Usabilidade](#135-usabilidade)
-  - [13.6 Manutenibilidade](#136-manutenibilidade)
+- [14. Requisitos Funcionais](#14-requisitos-funcionais)
+- [15. Requisitos Não Funcionais](#15-requisitos-não-funcionais)
+
+## Administração
+- [16. Painel Administrativo](#16-painel-administrativo) *(NOVO)*
 
 ## Diagnóstico e Evolução
-- [14. Erros Conhecidos e Pontos Críticos](#14-erros-conhecidos-e-pontos-críticos)
-  - [14.1 Erros Conhecidos](#141-erros-conhecidos)
-  - [14.2 Pontos Críticos](#142-pontos-críticos)
-- [15. Decisões Técnicas Já Tomadas](#15-decisões-técnicas-já-tomadas)
-  - [15.1 Arquiteturais](#151-arquiteturais)
-  - [15.2 Banco de Dados](#152-banco-de-dados)
-  - [15.3 Negócio](#153-negócio)
-  - [15.4 UX](#154-ux)
-- [16. Riscos Técnicos e Limitações Atuais](#16-riscos-técnicos-e-limitações-atuais)
-  - [16.1 Riscos Técnicos](#161-riscos-técnicos)
-  - [16.2 Limitações Atuais](#162-limitações-atuais)
-- [17. Boas Práticas e Padrões Adotados](#17-boas-práticas-e-padrões-adotados)
-- [18. Próximos Passos Técnicos Sugeridos](#18-próximos-passos-técnicos-sugeridos)
-  - [18.1 Curto Prazo (1-2 meses)](#181-curto-prazo-1-2-meses)
-  - [18.2 Médio Prazo (3-6 meses)](#182-médio-prazo-3-6-meses)
-  - [18.3 Longo Prazo (6-12 meses)](#183-longo-prazo-6-12-meses)
+- [17. Erros Conhecidos e Pontos Críticos](#17-erros-conhecidos-e-pontos-críticos)
+- [18. Decisões Técnicas Já Tomadas](#18-decisões-técnicas-já-tomadas)
+- [19. Riscos Técnicos e Limitações Atuais](#19-riscos-técnicos-e-limitações-atuais)
+- [20. Boas Práticas e Padrões Adotados](#20-boas-práticas-e-padrões-adotados)
+- [21. Próximos Passos Técnicos Sugeridos](#21-próximos-passos-técnicos-sugeridos)
 
 ## Apêndices
 - [A. Categorias de Alimentos](#a-categorias-de-alimentos)
@@ -123,6 +68,7 @@
 - [C. Tipos de Refeição](#c-tipos-de-refeição)
 - [D. Fórmula de Mifflin-St Jeor](#d-fórmula-de-mifflin-st-jeor)
 - [E. Ajuste Calórico por Objetivo](#e-ajuste-calórico-por-objetivo)
+- [F. Glossário Técnico](#f-glossário-técnico) *(NOVO)*
 
 ---
 
@@ -200,6 +146,47 @@ O sistema foi projetado para:
 └──────────────────────────────────────────────────────────────┘
 ```
 
+## 3.2 Componentes Principais
+
+### 3.2.1 Frontend (React SPA)
+- **Páginas**: Dashboard, MealDetail, Chat, DailyLog, Progress, Profile, Students, ProfessionalDashboard, Onboarding, Pricing, Subscription, Admin
+- **Componentes de UI**: shadcn/ui components (100% customizados)
+- **Hooks Customizados**: useAccountPermissions, useCachedUserData, useSubscription, useUserRole, useLinkedStudent, useProfessionalStudents, useAdminOperations
+
+### 3.2.2 Backend (Edge Functions)
+
+| Edge Function | Propósito |
+|---------------|-----------|
+| `generate-meal-plan` | Geração de planos alimentares via IA |
+| `generate-meal-plan-v2` | Versão avançada com opções equivalentes |
+| `nutritional-chat` | Chat conversacional com governança |
+| `confirm-meal` | Confirmação de consumo de refeições |
+| `create-checkout` | Criação de sessão Stripe Checkout |
+| `stripe-webhook` | Processamento de eventos Stripe |
+| `customer-portal` | Acesso ao portal do cliente Stripe |
+| `create-student` | Criação de alunos por profissionais |
+| `lookup-student` | Busca de alunos por email |
+| `adherence-report` | Geração de relatórios de adesão |
+| `generate-adherence-pdf` | Geração de PDF de relatório |
+| `ai-plan-suggestions` | Sugestões de ajuste via IA |
+| `review-suggestion` | Revisão de sugestões de IA |
+| `check-adherence-alerts` | Verificação de alertas de adesão |
+| `validate-usage` | Validação de limites de uso |
+| `explain-substitution` | Explicação de substituições alimentares |
+| `admin-operations` | Operações administrativas centralizadas |
+| `seed-test-data` | Geração de dados de teste |
+| `check-subscription` | Verificação de status de assinatura |
+| `reconcile-subscriptions` | Reconciliação periódica com Stripe |
+| `validate-email` | Validação de formato de email |
+| `validate-food-import` | Validação de importação de alimentos via IA |
+| `audit-foods` | Auditoria e normalização de alimentos via IA |
+
+### 3.2.3 Banco de Dados (PostgreSQL)
+- 27+ tabelas principais
+- Row Level Security (RLS) habilitado em todas as tabelas
+- Funções RPC para operações complexas
+- Triggers para automações e validações
+
 ## 3.3 Diagrama de Arquitetura (Mermaid)
 
 ```mermaid
@@ -221,6 +208,9 @@ flowchart TB
             SW["stripe-webhook"]
             AR["adherence-report"]
             APS["ai-plan-suggestions"]
+            AO["admin-operations"]
+            VFI["validate-food-import"]
+            AF["audit-foods"]
         end
         
         subgraph Database["PostgreSQL + RLS"]
@@ -232,6 +222,7 @@ flowchart TB
             DailyLogs["daily_logs"]
             Subscriptions["subscriptions"]
             ChatMessages["chat_messages"]
+            AdminAudit["admin_audit_log"]
         end
         
         SupaAuth["Supabase Auth"]
@@ -254,71 +245,24 @@ flowchart TB
     GMP -->|"API Call"| LovableAI
     NC -->|"API Call"| LovableAI
     APS -->|"API Call"| LovableAI
+    VFI -->|"API Call"| LovableAI
+    AF -->|"API Call"| LovableAI
     
     CC -->|"Checkout Session"| Stripe
     SW <-->|"Webhooks"| Stripe
     
     EdgeFunctions --> Database
     SupaAuth --> Profiles
-
-    style Cliente fill:#e0f2fe,stroke:#0284c7
-    style Backend fill:#dcfce7,stroke:#16a34a
-    style External fill:#fef3c7,stroke:#d97706
 ```
 
-## 3.4 Diagrama de Fluxo de Dados
-
-```mermaid
-flowchart LR
-    subgraph Entrada["📥 ENTRADA"]
-        User["Usuário"]
-        Stripe_WH["Stripe Webhook"]
-    end
-
-    subgraph Processamento["⚙️ PROCESSAMENTO"]
-        Auth["Autenticação"]
-        Permissions["Verificação de Permissões"]
-        AI["Processamento IA"]
-        Business["Lógica de Negócio"]
-    end
-
-    subgraph Persistencia["💾 PERSISTÊNCIA"]
-        DB[(PostgreSQL)]
-        Cache["Cache Local<br/>(60s)"]
-    end
-
-    subgraph Saida["📤 SAÍDA"]
-        UI_Response["Resposta UI"]
-        PDF["Relatório PDF"]
-        Email["Notificações"]
-    end
-
-    User --> Auth
-    Stripe_WH --> Business
-    Auth --> Permissions
-    Permissions --> AI
-    Permissions --> Business
-    AI --> Business
-    Business --> DB
-    DB --> Cache
-    Cache --> UI_Response
-    Business --> PDF
-    Business --> Email
-
-    style Entrada fill:#dbeafe,stroke:#2563eb
-    style Processamento fill:#fce7f3,stroke:#db2777
-    style Persistencia fill:#d1fae5,stroke:#059669
-    style Saida fill:#fef3c7,stroke:#d97706
-```
-
-## 3.5 Diagrama de Hierarquia de Planos Alimentares
+## 3.4 Diagrama de Hierarquia de Planos Alimentares
 
 ```mermaid
 erDiagram
-    DIET_PLANS ||--o{ MEALS : "contém"
-    MEALS ||--o{ MEAL_OPTIONS : "possui opções"
-    MEAL_OPTIONS ||--o{ MEAL_OPTION_FOODS : "inclui alimentos"
-    MEAL_OPTION_FOODS }o--|| FOODS : "referencia"
+    DIET_PLANS ||--o{ MEALS : "contém (1:N)"
+    MEALS ||--o{ MEAL_OPTIONS : "possui opções (1:N)"
+    MEAL_OPTIONS ||--o{ MEAL_OPTION_FOODS : "inclui alimentos (1:N)"
+    MEAL_OPTION_FOODS }o--|| FOODS : "referencia (N:1)"
     
     DIET_PLANS {
         uuid id PK
@@ -329,6 +273,7 @@ erDiagram
         int total_fat
         string status
         boolean released_to_student
+        boolean is_initial_plan
     }
     
     MEALS {
@@ -336,6 +281,9 @@ erDiagram
         uuid diet_plan_id FK
         string name
         int total_calories
+        int total_protein
+        int total_carbs
+        int total_fat
     }
     
     MEAL_OPTIONS {
@@ -344,6 +292,9 @@ erDiagram
         int option_number
         string name
         int total_calories
+        int total_protein
+        int total_carbs
+        int total_fat
     }
     
     MEAL_OPTION_FOODS {
@@ -361,80 +312,10 @@ erDiagram
         float carbs
         float fat
         string category
+        string processing_level
+        string serving_size
     }
 ```
-
-## 3.6 Fluxo de Governança da IA
-
-```mermaid
-stateDiagram-v2
-    [*] --> IdentificarPerfil
-    
-    IdentificarPerfil --> AlunoGratuito: user_type = aluno<br/>plan = gratuito
-    IdentificarPerfil --> AlunoPremium: user_type = aluno<br/>plan = premium
-    IdentificarPerfil --> UsuarioPago: user_type = usuario<br/>plan = pessoal_pago
-    IdentificarPerfil --> Profissional: user_type = profissional
-
-    state AlunoGratuito {
-        [*] --> SoExplicar
-        SoExplicar --> Responder: 2-4 frases
-        Responder --> BloquearAcoes
-        BloquearAcoes --> [*]
-    }
-
-    state AlunoPremium {
-        [*] --> ExplicarAnalisar
-        ExplicarAnalisar --> Simular: simulação apenas
-        Simular --> NaoPersistir
-        NaoPersistir --> [*]
-    }
-
-    state UsuarioPago {
-        [*] --> AcessoCompleto
-        AcessoCompleto --> Propor
-        Propor --> PedirConfirmacao
-        PedirConfirmacao --> Executar: usuário confirma
-        Executar --> [*]
-    }
-
-    state Profissional {
-        [*] --> AnalisarPropor
-        AnalisarPropor --> GerarSugestao
-        GerarSugestao --> AguardarAprovacao
-        AguardarAprovacao --> ExecutarAprovado: profissional aprova
-        ExecutarAprovado --> [*]
-    }
-```
-
-## 3.2 Componentes Principais
-
-### 3.2.1 Frontend (React SPA)
-- **Páginas**: Dashboard, MealDetail, Chat, DailyLog, Progress, Profile, Students, ProfessionalDashboard, Onboarding, Pricing, Subscription
-- **Componentes de UI**: shadcn/ui components (100% customizados)
-- **Hooks Customizados**: useAccountPermissions, useCachedUserData, useSubscription, useUserRole, useLinkedStudent, useProfessionalStudents
-
-### 3.2.2 Backend (Edge Functions)
-- **generate-meal-plan**: Geração de planos alimentares via IA
-- **generate-meal-plan-v2**: Versão avançada com opções equivalentes
-- **nutritional-chat**: Chat conversacional com governança
-- **confirm-meal**: Confirmação de consumo de refeições
-- **create-checkout**: Criação de sessão Stripe Checkout
-- **stripe-webhook**: Processamento de eventos Stripe
-- **customer-portal**: Acesso ao portal do cliente Stripe
-- **create-student**: Criação de alunos por profissionais
-- **adherence-report**: Geração de relatórios de adesão
-- **generate-adherence-pdf**: Geração de PDF de relatório
-- **ai-plan-suggestions**: Sugestões de ajuste via IA
-- **review-suggestion**: Revisão de sugestões de IA
-- **check-adherence-alerts**: Verificação de alertas de adesão
-- **validate-usage**: Validação de limites de uso
-- **explain-substitution**: Explicação de substituições alimentares
-
-### 3.2.3 Banco de Dados (PostgreSQL)
-- 25+ tabelas principais
-- Row Level Security (RLS) habilitado em todas as tabelas
-- Funções RPC para operações complexas
-- Triggers para automações
 
 ---
 
@@ -465,7 +346,7 @@ stateDiagram-v2
 | PostgreSQL | Banco de dados relacional |
 | Deno | Runtime para Edge Functions |
 | Supabase Auth | Autenticação |
-| Supabase Storage | Armazenamento de arquivos |
+| Supabase Storage | Armazenamento de arquivos (relatórios PDF) |
 | Supabase Realtime | (Preparado, não implementado) |
 
 ## 4.3 Integrações
@@ -501,11 +382,13 @@ O campo `user_type` na tabela `profiles` define o tipo imutável do usuário:
 
 A tabela `user_roles` armazena os papéis de forma segura:
 
-| Role | Descrição |
-|------|-----------|
-| `admin` | Administrador do sistema |
-| `professional` | Profissional de nutrição |
-| `student` | Aluno vinculado |
+| Role | Descrição | Pode ser atribuído a |
+|------|-----------|---------------------|
+| `admin` | Administrador do sistema | Qualquer user_type |
+| `professional` | Profissional de nutrição | user_type = profissional |
+| `student` | Aluno vinculado | user_type = aluno |
+
+**Regra de Segurança**: Roles são armazenados em tabela separada (`user_roles`) para prevenir escalação de privilégios via manipulação direta de `profiles`.
 
 ## 5.3 Planos Comerciais (CommercialPlan)
 
@@ -569,11 +452,232 @@ A tabela `user_roles` armazena os papéis de forma segura:
 
 ---
 
-# 6. REGRAS DE NEGÓCIO DETALHADAS
+# 6. FLUXOS COMPLETOS POR PERFIL DE USUÁRIO
 
-## 6.1 Estrutura de Planos Alimentares
+*[Definição Complementar / Inferida: Esta seção foi adicionada para detalhar completamente os fluxos por perfil]*
 
-### 6.1.1 Hierarquia Obrigatória
+## 6.1 Fluxo Completo do Administrador (Admin)
+
+### 6.1.1 Ações Permitidas
+
+| Ação | Descrição | Edge Function/RPC |
+|------|-----------|-------------------|
+| Gerenciar usuários | CRUD em profiles, alterar roles | admin-operations |
+| Gerenciar planos | CRUD na tabela plans | admin-operations |
+| Gerenciar alimentos | CRUD, importação em massa, auditoria | admin-operations, validate-food-import, audit-foods |
+| Configurações do sistema | CRUD em system_settings | admin-operations |
+| Visualizar audit logs | Leitura de admin_audit_log | admin-operations |
+| Criar dados de teste | Popular banco com dados simulados | seed-test-data |
+
+### 6.1.2 Ações Bloqueadas
+- Excluir própria conta de admin
+- Modificar assinaturas diretamente (gerenciadas via Stripe)
+
+### 6.1.3 Fluxo Passo a Passo - Importação de Alimentos
+
+```
+1. Admin acessa /admin → Aba "Alimentos"
+2. Clica em "Importar Alimentos"
+3. Faz upload de arquivo CSV
+4. Sistema valida formato via admin-operations.validate_food_csv
+5. Opcionalmente, clica "Validar com IA"
+   a. Edge Function validate-food-import é chamada
+   b. IA analisa duplicados, normaliza nomes, valida macros
+   c. Retorna lista com actions: use_existing, import_global, reject
+6. Admin revisa resultados e seleciona itens
+7. Confirma importação
+8. Sistema insere alimentos e registra em food_imports
+9. admin_audit_log registra a ação
+```
+
+### 6.1.4 Eventos e Gravações no Banco
+
+| Evento | Tabela Afetada | Campos Gravados |
+|--------|----------------|-----------------|
+| Login admin | - | Apenas sessão Auth |
+| Alteração de usuário | profiles, user_roles | Dados alterados |
+| Importação alimentos | foods, food_imports | Alimentos + registro de importação |
+| Auditoria alimentos | foods | Campos corrigidos (se aplicado) |
+| Qualquer ação admin | admin_audit_log | action, entity_type, old_value, new_value |
+
+### 6.1.5 Interações com IA
+
+| Funcionalidade | Edge Function | Modelo IA |
+|----------------|---------------|-----------|
+| Validação de importação | validate-food-import | gemini-3-flash-preview |
+| Auditoria de alimentos | audit-foods | gemini-3-flash-preview |
+
+---
+
+## 6.2 Fluxo Completo do Profissional
+
+### 6.2.1 Ações Permitidas
+
+| Ação | Descrição | Endpoint/RPC |
+|------|-----------|--------------|
+| Criar alunos | Cadastrar novos alunos vinculados | create-student |
+| Vincular alunos existentes | Buscar por email e vincular | lookup-student + insert professional_students |
+| Gerar planos para alunos | Criar plano alimentar para aluno | generate-meal-plan |
+| Editar planos de alunos | Ajustar macros, substituir alimentos | MacroRebalancer, explain-substitution |
+| Liberar plano | Tornar plano visível para aluno | update diet_plans.released_to_student |
+| Configurar alertas | Definir thresholds de adesão | insert/update adherence_alert_configs |
+| Visualizar adesão | Ver métricas de todos os alunos | read adherence_metrics |
+| Gerar relatórios | PDF de adesão | generate-adherence-pdf |
+| Aprovar sugestões IA | Revisar e aplicar sugestões | review-suggestion |
+| Responder solicitações | Aprovar/rejeitar pedidos de alunos | update student_requests |
+| Usar chat clínico | IA com capacidade analítica | nutritional-chat |
+
+### 6.2.2 Ações Bloqueadas
+- Criar plano próprio (profissional não tem plano pessoal)
+- Acessar alunos de outros profissionais
+- Modificar planos de usuários não-vinculados
+
+### 6.2.3 Fluxo Passo a Passo - Criar Aluno e Gerar Plano
+
+```
+1. Profissional acessa /students
+2. Clica "Adicionar Aluno"
+3. Preenche dados: nome, email, senha temporária
+4. Sistema chama create-student:
+   a. Valida limite de alunos (patients_limit)
+   b. Cria usuário no Supabase Auth
+   c. Cria profile com professional_id = profissional.id
+   d. Cria vínculo em professional_students
+   e. Cria assinatura gratuita
+5. Profissional clica "Completar Perfil do Aluno"
+6. Preenche dados biométricos (idade, peso, altura, objetivo)
+7. Sistema calcula targets via Mifflin-St Jeor
+8. Profissional clica "Gerar Plano"
+9. Sistema chama generate-meal-plan com studentId
+10. IA gera plano baseado nos targets
+11. Plano é criado com released_to_student = false
+12. Profissional revisa e ajusta se necessário
+13. Clica "Liberar para Aluno"
+14. diet_plans.released_to_student = true
+15. Aluno agora visualiza o plano em seu dashboard
+```
+
+### 6.2.4 Regras de Negócio Aplicadas
+
+1. **Limite de alunos**: Verificado via `get_student_count` antes de criar
+2. **Vínculo obrigatório**: Aluno criado tem `professional_id` preenchido
+3. **Senha temporária**: `must_change_password = true`
+4. **Liberação de plano**: Profissional controla quando aluno vê o plano
+
+### 6.2.5 Eventos e Gravações no Banco
+
+| Evento | Tabelas Afetadas |
+|--------|------------------|
+| Criar aluno | auth.users, profiles, professional_students, subscriptions, user_usage |
+| Gerar plano | diet_plans, meals, meal_options, meal_option_foods, plan_history |
+| Liberar plano | diet_plans |
+| Ajustar macros | plan_versions, meal_option_foods, meals, diet_plans, plan_history |
+| Configurar alertas | adherence_alert_configs |
+| Responder solicitação | student_requests |
+
+### 6.2.6 Interações com IA
+
+| Funcionalidade | Edge Function | Governança |
+|----------------|---------------|------------|
+| Gerar plano | generate-meal-plan | IA propõe, profissional revisa |
+| Sugestões de ajuste | ai-plan-suggestions | IA analisa adesão e propõe |
+| Chat clínico | nutritional-chat | Modo técnico, até 10 frases |
+| Explicar substituição | explain-substitution | Educacional |
+
+---
+
+## 6.3 Fluxo Completo do Aluno
+
+### 6.3.1 Ações Permitidas (Aluno Gratuito)
+
+| Ação | Descrição | Endpoint/RPC |
+|------|-----------|--------------|
+| Visualizar plano | Ver refeições e opções | read diet_plans, meals, meal_options |
+| Confirmar refeições | Registrar consumo | confirm-meal |
+| Registrar peso | Atualizar histórico | insert weight_logs |
+| Enviar solicitações | Pedir alterações ao profissional | insert student_requests |
+| Usar chat educacional | Dúvidas básicas | nutritional-chat (modo restrito) |
+| Ver progresso | Gráficos de peso e adesão | read weight_logs, adherence_metrics |
+
+### 6.3.2 Ações Permitidas (Aluno Premium - Adicional)
+
+| Ação | Descrição |
+|------|-----------|
+| Simulações | Ver impacto de mudanças (sem persistir) |
+| Chat ampliado | 10 mensagens/dia, mais detalhado |
+| Histórico estendido | 30 dias em vez de 7 |
+
+### 6.3.3 Ações Bloqueadas
+- Criar ou editar plano alimentar
+- Substituir alimentos
+- Ajustar macros
+- Gerenciar outros usuários
+
+### 6.3.4 Fluxo Passo a Passo - Confirmação de Refeição
+
+```
+1. Aluno acessa /daily-log
+2. Visualiza refeições do dia com opções disponíveis
+3. Para cada refeição, seleciona uma das ações:
+   a. "Comi esta opção" → status = CONFIRMADA
+   b. "Pulei esta refeição" → status = PULADA
+   c. "Comi fora do plano" → status = FORA_DO_PLANO
+4. Sistema chama RPC confirm_meal_consumption:
+   a. Verifica se refeição pertence ao usuário
+   b. Cria/atualiza daily_logs
+   c. Cria/atualiza meal_logs
+   d. Se confirmação retroativa: status = CONFIRMADA_TARDIA
+   e. Acumula macros consumidos no daily_logs
+5. Dashboard atualiza progresso diário
+6. Se dia completo: daily_logs.status = COMPLETO
+```
+
+### 6.3.5 Fluxo Passo a Passo - Enviar Solicitação
+
+```
+1. Aluno tenta ação bloqueada (ex: substituir alimento)
+2. Sistema mostra diálogo "Você não pode fazer isso. Deseja solicitar ao seu nutricionista?"
+3. Aluno clica "Fazer Solicitação"
+4. Preenche:
+   - Tipo: goal_change | meals_change | food_substitution
+   - Descrição: O que deseja
+   - Justificativa: Por que deseja
+5. Sistema insere em student_requests com status = pending
+6. Profissional recebe notificação visual no painel
+7. Profissional aprova/rejeita com feedback
+8. Aluno visualiza status atualizado
+```
+
+### 6.3.6 Regras de Negócio Aplicadas
+
+1. **Plano read-only**: Aluno não modifica diet_plans
+2. **Confirmação retroativa**: Permitida, mas marcada como TARDIA
+3. **Limite de chat**: Verificado antes de cada mensagem
+4. **Histórico limitado**: Queries filtram por history_days
+
+### 6.3.7 Eventos e Gravações no Banco
+
+| Evento | Tabelas Afetadas |
+|--------|------------------|
+| Confirmar refeição | daily_logs, meal_logs |
+| Registrar peso | weight_logs |
+| Enviar solicitação | student_requests |
+| Usar chat | chat_messages, user_usage |
+
+### 6.3.8 Interações com IA
+
+| Funcionalidade | Governança |
+|----------------|------------|
+| Chat (gratuito) | Apenas EXPLICAR, 2-4 frases, bloqueia ações |
+| Chat (premium) | EXPLICAR + SIMULAR (sem persistir), 4-6 frases |
+
+---
+
+# 7. REGRAS DE NEGÓCIO DETALHADAS
+
+## 7.1 Estrutura de Planos Alimentares
+
+### 7.1.1 Hierarquia Obrigatória
 
 ```
 diet_plans (plano)
@@ -583,7 +687,7 @@ diet_plans (plano)
                     └── foods (cadastro de alimentos)
 ```
 
-### 6.1.2 Equivalência Nutricional Entre Opções
+### 7.1.2 Equivalência Nutricional Entre Opções
 
 Todas as opções de uma mesma refeição DEVEM ser equivalentes dentro das margens:
 
@@ -594,74 +698,91 @@ Todas as opções de uma mesma refeição DEVEM ser equivalentes dentro das marg
 | Gordura | ±3g |
 | Calorias | ±10% |
 
-### 6.1.3 Validação de Equivalência
+**Validação**: A função `validate_meal_option_equivalence` (trigger) valida antes de INSERT/UPDATE em `meal_options`.
 
-A função `validateEquivalence` no Edge Function `generate-meal-plan-v2` valida que todas as opções respeitam as margens definidas.
+### 7.1.3 Limite de Opções por Refeição
 
-## 6.2 Fluxo de Confirmação de Refeições
+- Mínimo: 1 opção
+- Máximo: 3 opções
+- Constraint: `option_number BETWEEN 1 AND 3`
 
-### 6.2.1 Princípio Fundamental
+## 7.2 Fluxo de Confirmação de Refeições
+
+### 7.2.1 Princípio Fundamental
 
 O plano é SOMENTE LEITURA. O usuário NÃO ESCOLHE o que vai comer. O usuário CONFIRMA o que COMEU.
 
-### 6.2.2 Estados Válidos por Refeição (meal_logs.status)
+### 7.2.2 Estados Válidos por Refeição (meal_logs.status)
 
-| Estado | Descrição |
-|--------|-----------|
-| `PENDENTE` | Refeição ainda não registrada |
-| `CONFIRMADA` | Usuário confirmou que comeu uma das opções |
-| `PULADA` | Usuário pulou a refeição (não comeu nada) |
-| `FORA_DO_PLANO` | Usuário comeu algo diferente do plano |
-| `CONFIRMADA_TARDIA` | Confirmação feita em data retroativa |
+| Estado | Descrição | Conta para Adesão |
+|--------|-----------|-------------------|
+| `PENDENTE` | Refeição ainda não registrada | Não |
+| `CONFIRMADA` | Usuário confirmou que comeu uma das opções | Sim (+) |
+| `PULADA` | Usuário pulou a refeição (não comeu nada) | Sim (-) |
+| `FORA_DO_PLANO` | Usuário comeu algo diferente do plano | Sim (-) |
+| `CONFIRMADA_TARDIA` | Confirmação feita em data retroativa | Sim (+) |
 
-### 6.2.3 Regras de Confirmação
+### 7.2.3 Regras de Confirmação
 
 1. Confirmar para o dia atual = status `CONFIRMADA`
 2. Confirmar para dia passado = status `CONFIRMADA_TARDIA`
 3. Pular refeição = status `PULADA`
 4. Comer fora do plano = status `FORA_DO_PLANO` + notas opcionais
-5. Não é permitido confirmar para datas futuras
+5. **Não é permitido** confirmar para datas futuras
 
-## 6.3 Cálculo de Adesão
+## 7.3 Cálculo de Adesão
 
-### 6.3.1 Fórmula de Adesão Geral
+### 7.3.1 Fórmula de Adesão Geral
 
 ```
 overall_adherence_rate = (meals_confirmed + meals_late_confirmed) / total_meals_expected * 100
 ```
 
-### 6.3.2 Métricas Calculadas (adherence_metrics)
+### 7.3.2 Métricas Calculadas (adherence_metrics)
 
-- `meals_confirmed`: Refeições confirmadas no dia
-- `meals_late_confirmed`: Confirmações tardias
-- `meals_skipped`: Refeições puladas
-- `meals_out_of_plan`: Refeições fora do plano
-- `days_with_records`: Dias com pelo menos 1 registro
-- `adherence_by_meal`: Adesão por tipo de refeição (JSON)
-- `adherence_by_option`: Preferência por opções (JSON)
-- `exception_distribution`: Distribuição de exceções (JSON)
+| Métrica | Descrição |
+|---------|-----------|
+| `meals_confirmed` | Refeições confirmadas no dia |
+| `meals_late_confirmed` | Confirmações tardias |
+| `meals_skipped` | Refeições puladas |
+| `meals_out_of_plan` | Refeições fora do plano |
+| `days_with_records` | Dias com pelo menos 1 registro |
+| `adherence_by_meal` | Adesão por tipo de refeição (JSON) |
+| `adherence_by_option` | Preferência por opções (JSON) |
+| `exception_distribution` | Distribuição de exceções (JSON) |
 
-## 6.4 Alertas de Adesão
+### 7.3.3 Função de Cálculo
 
-### 6.4.1 Configuração (adherence_alert_configs)
+A função RPC `calculate_adherence_metrics` recebe:
+- `_user_id`: UUID do usuário
+- `_diet_plan_id`: UUID do plano
+- `_period_start`: Data inicial
+- `_period_end`: Data final
 
-Profissionais podem configurar:
-- `threshold_warning`: Limite para alerta amarelo (default: 70%)
-- `threshold_low`: Limite para alerta vermelho (default: 50%)
-- `check_period_days`: Período de verificação (default: 7 dias)
-- `notify_on_warning`: Notificar em alertas amarelos
-- `notify_on_low`: Notificar em alertas vermelhos
+E persiste resultado em `adherence_metrics` com chave única `(user_id, diet_plan_id, plan_version, period_start, period_end)`.
 
-### 6.4.2 Geração de Alertas
+## 7.4 Alertas de Adesão
 
-O Edge Function `check-adherence-alerts` (executado periodicamente) verifica todos os alunos de cada profissional e cria alertas na tabela `adherence_alerts`.
+### 7.4.1 Configuração (adherence_alert_configs)
 
-## 6.5 Geração de Planos via IA
+| Campo | Default | Descrição |
+|-------|---------|-----------|
+| `threshold_warning` | 70% | Limite para alerta amarelo |
+| `threshold_low` | 50% | Limite para alerta vermelho |
+| `check_period_days` | 7 | Período de verificação |
+| `notify_on_warning` | true | Notificar em alertas amarelos |
+| `notify_on_low` | true | Notificar em alertas vermelhos |
 
-### 6.5.1 Seleção Inteligente de Alimentos
+### 7.4.2 Geração de Alertas
 
-A função `selectFoodsIntelligently`:
-1. Filtra alimentos por nível de processamento (apenas `in_natura` e `minimamente_processado`)
+O Edge Function `check-adherence-alerts` pode ser executado periodicamente via cron job ou manualmente pelo profissional.
+
+## 7.5 Geração de Planos via IA
+
+### 7.5.1 Seleção Inteligente de Alimentos
+
+A função `selectFoodsIntelligently` (em generate-meal-plan):
+1. Filtra por nível de processamento (apenas `in_natura` e `minimamente_processado`)
 2. Remove suplementos
 3. Aplica restrições alimentares do usuário
 4. Pontua alimentos por:
@@ -670,7 +791,7 @@ A função `selectFoodsIntelligently`:
    - Diversidade de categorias
 5. Seleciona até 80 alimentos diversos
 
-### 6.5.2 Distribuição de Calorias por Refeição
+### 7.5.2 Distribuição de Calorias por Refeição
 
 | Refeições/dia | Café | Lanche AM | Almoço | Lanche PM | Jantar | Ceia |
 |---------------|------|-----------|--------|-----------|--------|------|
@@ -680,7 +801,7 @@ A função `selectFoodsIntelligently`:
 | 5 | 20% | 10% | 30% | 10% | 30% | - |
 | 6 | 20% | 8% | 28% | 10% | 26% | 8% |
 
-### 6.5.3 Prioridade de Categorias por Refeição
+### 7.5.3 Prioridade de Categorias por Refeição
 
 ```javascript
 breakfast: ['cereais_tubérculos', 'frutas', 'laticínios', 'óleos_oleaginosas']
@@ -691,11 +812,9 @@ dinner: ['proteínas_animais', 'hortaliças_folhosas', 'legumes', 'cereais_tubé
 supper: ['laticínios', 'frutas', 'óleos_oleaginosas']
 ```
 
-## 6.6 Limites de Uso
+## 7.6 Limites de Uso
 
-### 6.6.1 Função can_use_feature
-
-Verifica se o usuário pode usar determinada funcionalidade:
+### 7.6.1 Função can_use_feature
 
 ```sql
 can_use_feature(_user_id UUID, _feature TEXT) RETURNS BOOLEAN
@@ -707,22 +826,14 @@ Features suportadas:
 - `adjustment`: Ajustes de macros
 - `chat`: Mensagens do chat
 
-### 6.6.2 Função increment_usage
+### 7.6.2 Reset de Uso
 
-Incrementa o uso de uma feature após uso bem-sucedido:
-
-```sql
-increment_usage(_user_id UUID, _feature TEXT) RETURNS BOOLEAN
-```
-
-### 6.6.3 Reset de Uso
-
-- **Diário**: `chat_messages_today` reseta à meia-noite (last_chat_reset)
+- **Diário**: `chat_messages_today` reseta à meia-noite (via `last_chat_reset`)
 - **Mensal**: Outros contadores resetam no início de cada período de assinatura
 
-## 6.7 Solicitações de Alunos
+## 7.7 Solicitações de Alunos
 
-### 6.7.1 Tipos de Solicitação (student_requests)
+### 7.7.1 Tipos de Solicitação (student_requests)
 
 | Tipo | Descrição |
 |------|-----------|
@@ -730,7 +841,7 @@ increment_usage(_user_id UUID, _feature TEXT) RETURNS BOOLEAN
 | `meals_change` | Alteração no número de refeições |
 | `food_substitution` | Substituição de alimento específico |
 
-### 6.7.2 Status de Solicitação
+### 7.7.2 Status de Solicitação
 
 | Status | Descrição |
 |--------|-----------|
@@ -738,36 +849,217 @@ increment_usage(_user_id UUID, _feature TEXT) RETURNS BOOLEAN
 | `approved` | Aprovada pelo profissional |
 | `rejected` | Rejeitada pelo profissional |
 
-### 6.7.3 Campos Opcionais
+---
 
-- `professional_response`: Resposta/comentário do profissional
-- `professional_feedback`: Feedback adicional
+# 8. GESTÃO DE ALIMENTOS
+
+*[Definição Complementar / Inferida: Esta seção foi expandida significativamente]*
+
+## 8.1 Estrutura do Cadastro de Alimentos
+
+### 8.1.1 Tabela `foods`
+
+| Campo | Tipo | Obrigatório | Descrição |
+|-------|------|-------------|-----------|
+| `id` | UUID | Sim (PK) | Identificador único |
+| `name` | TEXT | Sim | Nome do alimento |
+| `calories` | INTEGER | Sim | Calorias por porção |
+| `protein` | NUMERIC | Sim | Proteína em gramas |
+| `carbs` | NUMERIC | Sim | Carboidratos em gramas |
+| `fat` | NUMERIC | Sim | Gordura em gramas |
+| `serving_size` | TEXT | Não | Descrição da porção (ex: "100g", "1 unidade") |
+| `category` | TEXT | Não | Categoria do alimento |
+| `processing_level` | TEXT | Não | Nível de processamento |
+| `created_at` | TIMESTAMP | Sim | Data de criação |
+
+### 8.1.2 Categorias de Alimentos
+
+| Categoria | Descrição | Exemplos |
+|-----------|-----------|----------|
+| `frutas` | Frutas frescas ou secas | Maçã, banana, uva passa |
+| `hortaliças_folhosas` | Folhas verdes | Alface, rúcula, espinafre |
+| `legumes` | Vegetais não folhosos | Cenoura, beterraba, abobrinha |
+| `cereais_tubérculos` | Grãos e tubérculos | Arroz, batata, mandioca |
+| `leguminosas` | Leguminosas | Feijão, lentilha, grão de bico |
+| `proteínas_animais` | Carnes, ovos, peixes | Frango, ovo, salmão |
+| `laticínios` | Derivados do leite | Leite, queijo, iogurte |
+| `óleos_oleaginosas` | Gorduras saudáveis | Azeite, castanha, abacate |
+| `suplementos` | Suplementos nutricionais | Whey protein, creatina |
+
+### 8.1.3 Níveis de Processamento
+
+| Nível | Descrição | Uso no Plano |
+|-------|-----------|--------------|
+| `in_natura` | Alimento natural | ✓ Preferencial |
+| `minimamente_processado` | Pouco processado | ✓ Permitido |
+| `processado` | Industrializado com moderação | ⚠ Com restrição |
+| `ultraprocessado` | Altamente processado | ✗ Evitado na geração |
+| `suplemento` | Suplementação | ⚠ Uso específico |
+
+## 8.2 Regras de Equivalência e Substituição
+
+### 8.2.1 Critérios para Substituição
+
+Um alimento A pode substituir um alimento B se:
+1. Mesma categoria OU categoria compatível
+2. Variação de proteína ≤ 5g por porção equivalente
+3. Variação de carboidratos ≤ 10g por porção equivalente
+4. Variação de gordura ≤ 3g por porção equivalente
+5. Variação de calorias ≤ 10%
+
+### 8.2.2 Categorias Compatíveis para Substituição
+
+| Categoria Original | Pode Substituir Por |
+|-------------------|---------------------|
+| `proteínas_animais` | `proteínas_animais`, `leguminosas` (vegetarianos) |
+| `cereais_tubérculos` | `cereais_tubérculos`, `leguminosas` |
+| `frutas` | `frutas` |
+| `laticínios` | `laticínios`, `óleos_oleaginosas` |
+| `hortaliças_folhosas` | `hortaliças_folhosas`, `legumes` |
+| `legumes` | `legumes`, `hortaliças_folhosas` |
+
+### 8.2.3 Fluxo de Substituição
+
+```
+1. Usuário seleciona alimento a substituir
+2. Sistema busca alimentos da mesma categoria
+3. Filtra por equivalência nutricional
+4. Ordena por preferências do usuário
+5. Usuário seleciona novo alimento
+6. Sistema ajusta quantidade para manter macros
+7. Opcionalmente: Edge Function explain-substitution explica a troca
+8. Sistema persiste em meal_option_foods
+9. Recalcula totais da opção e refeição
+```
+
+## 8.3 Relação Alimentos × Refeições × Planos
+
+### 8.3.1 Hierarquia Completa
+
+```
+foods (base global)
+   ↓
+meal_option_foods (quantidade específica)
+   ↓
+meal_options (opção equivalente)
+   ↓
+meals (refeição do dia)
+   ↓
+diet_plans (plano do usuário)
+```
+
+### 8.3.2 Quantidade de Alimentos
+
+O campo `quantity` em `meal_option_foods` representa o multiplicador da porção padrão:
+- `quantity = 1.0`: Uma porção padrão
+- `quantity = 0.5`: Meia porção
+- `quantity = 2.0`: Duas porções
+
+**Cálculo de Macros**:
+```
+calories_consumed = food.calories * quantity
+protein_consumed = food.protein * quantity
+carbs_consumed = food.carbs * quantity
+fat_consumed = food.fat * quantity
+```
+
+## 8.4 Importação em Massa de Alimentos
+
+### 8.4.1 Formato CSV Esperado
+
+```csv
+name,calories,protein,carbs,fat,serving_size,category,processing_level
+Arroz branco cozido,128,2.5,28,0.2,100g,cereais_tubérculos,minimamente_processado
+Frango grelhado,165,31,0,3.6,100g,proteínas_animais,minimamente_processado
+```
+
+### 8.4.2 Validação de Importação
+
+O Edge Function `validate-food-import` usa IA para:
+1. **Normalizar nomes**: Corrigir capitalização, acentos, remover ruído
+2. **Detectar duplicatas**: Comparar com base existente
+3. **Validar macros**: `calories ≈ protein*4 + carbs*4 + fat*9`
+4. **Classificar**: Atribuir categoria e processing_level
+
+### 8.4.3 Resultado da Validação
+
+```json
+{
+  "summary": {
+    "total": 100,
+    "use_existing": 15,
+    "import_global": 80,
+    "reject": 5
+  },
+  "items": [
+    {
+      "row_index": 1,
+      "original_name": "arroz branco",
+      "final_name": "Arroz Branco Cozido",
+      "action": "import_global",
+      "confidence": 0.95
+    }
+  ]
+}
+```
+
+## 8.5 Auditoria de Alimentos
+
+### 8.5.1 Propósito
+
+O Edge Function `audit-foods` analisa alimentos existentes para:
+- Sugerir correções de nomes
+- Identificar duplicatas potenciais
+- Flaggear dados nutricionais impossíveis
+- Sugerir categorização correta
+
+### 8.5.2 Resultado da Auditoria
+
+```json
+{
+  "summary": {
+    "total": 500,
+    "suggestable": 35
+  },
+  "suggestions": [
+    {
+      "food_id": "uuid",
+      "fields": ["name", "category"],
+      "current": { "name": "arroz BRANCO", "category": null },
+      "suggested": { "name": "Arroz Branco Cozido", "category": "cereais_tubérculos" },
+      "flags": ["review"],
+      "confidence": 0.88
+    }
+  ]
+}
+```
 
 ---
 
-# 7. FLUXOS TÉCNICOS DO SISTEMA
+# 9. FLUXOS TÉCNICOS DO SISTEMA
 
-## 7.1 Fluxo de Cadastro
+## 9.1 Fluxo de Cadastro
 
 ```
 1. Usuário acessa /signup
 2. Preenche email e senha
 3. Supabase Auth cria usuário
-4. Trigger cria registro em profiles (onboarding_completed = false)
-5. Redirect para /onboarding
-6. Usuário preenche dados pessoais (idade, sexo, altura, peso)
-7. Usuário seleciona objetivo (lose_weight, maintain, gain_muscle)
-8. Usuário seleciona nível de atividade
-9. Usuário seleciona número de refeições (2-6)
-10. Usuário seleciona preferências e restrições
-11. Sistema calcula targets via Mifflin-St Jeor
-12. Profile atualizado com targets
-13. Se não profissional: Edge Function generate-meal-plan gera plano inicial
-14. weight_logs recebe peso inicial
-15. Redirect para /dashboard
+4. Trigger handle_new_user cria registro em profiles (onboarding_completed = false)
+5. Trigger create_subscription_for_user cria assinatura gratuita + user_usage
+6. Redirect para /onboarding
+7. Usuário preenche dados pessoais (idade, sexo, altura, peso)
+8. Usuário seleciona objetivo (lose_weight, maintain, gain_muscle)
+9. Usuário seleciona nível de atividade
+10. Usuário seleciona número de refeições (2-6)
+11. Usuário seleciona preferências e restrições
+12. Sistema calcula targets via Mifflin-St Jeor
+13. Profile atualizado com targets
+14. Se não profissional: Edge Function generate-meal-plan gera plano inicial
+15. weight_logs recebe peso inicial
+16. Redirect para /dashboard
 ```
 
-## 7.2 Fluxo de Login
+## 9.2 Fluxo de Login
 
 ```
 1. Usuário acessa /login
@@ -780,7 +1072,7 @@ increment_usage(_user_id UUID, _feature TEXT) RETURNS BOOLEAN
 8. Caso contrário: redireciona para /dashboard
 ```
 
-## 7.3 Fluxo de Geração de Plano Alimentar
+## 9.3 Fluxo de Geração de Plano Alimentar
 
 ```
 1. Usuário clica "Gerar plano alimentar" ou "Gerar novo plano"
@@ -799,13 +1091,14 @@ increment_usage(_user_id UUID, _feature TEXT) RETURNS BOOLEAN
    h. Parseia resposta JSON
    i. Cria diet_plan
    j. Cria meals
-   k. Cria meal_foods
-   l. Registra em plan_history
-   m. Incrementa usage
+   k. Cria meal_options
+   l. Cria meal_option_foods
+   m. Registra em plan_history
+   n. Incrementa usage
 7. Frontend atualiza estado e exibe plano
 ```
 
-## 7.4 Fluxo de Atualização de Plano (MacroRebalancer)
+## 9.4 Fluxo de Atualização de Plano (MacroRebalancer)
 
 ```
 1. Usuário ajusta sliders de macros no MacroRebalancer
@@ -813,43 +1106,17 @@ increment_usage(_user_id UUID, _feature TEXT) RETURNS BOOLEAN
 3. MacroRebalancerService.rebalance():
    a. Cria snapshot do plano atual (plan_versions)
    b. Ajusta quantidades de alimentos proporcionalmente
-   c. Recalcula totais de cada meal
-   d. Atualiza meal_option_foods
-   e. Atualiza meal_options
-   f. Atualiza meals
-   g. Atualiza diet_plan
-   h. Registra em plan_history
+   c. Recalcula totais de cada meal_option
+   d. Recalcula totais de cada meal
+   e. Atualiza meal_option_foods
+   f. Atualiza meal_options
+   g. Atualiza meals
+   h. Atualiza diet_plan
+   i. Registra em plan_history
 4. Frontend recarrega plano
 ```
 
-## 7.5 Fluxo de Substituição de Alimentos
-
-```
-1. Usuário clica em alimento para substituir (MealDetail)
-2. Sistema busca alimentos da mesma categoria
-3. Filtra por equivalência nutricional
-4. Usuário seleciona substituto
-5. Chama Edge Function explain-substitution (opcional)
-6. Atualiza meal_option_foods
-7. Recalcula totais
-8. Registra em plan_history
-```
-
-## 7.6 Fluxo de Histórico e Progresso
-
-```
-1. Usuário acessa /progress
-2. Sistema busca get_user_plan para obter history_days
-3. Busca weight_logs dos últimos N dias
-4. Busca plan_history dos últimos N dias
-5. Calcula:
-   - Peso atual vs inicial
-   - Variação semanal
-   - Tendência
-6. Renderiza gráfico e histórico
-```
-
-## 7.7 Fluxo de Chat Nutricional
+## 9.5 Fluxo de Chat Nutricional
 
 ```
 1. Usuário acessa /chat
@@ -862,8 +1129,8 @@ increment_usage(_user_id UUID, _feature TEXT) RETURNS BOOLEAN
    a. Valida autenticação
    b. Verifica limite de mensagens
    c. Carrega histórico (sliding window de 20 mensagens)
-   d. Se histórico > 15: resume mensagens antigas
-   e. Monta system prompt baseado em perfil
+   d. Se histórico > 15: resume mensagens antigas via IA
+   e. Monta system prompt baseado em perfil (governança)
    f. Chama Lovable AI Gateway
    g. Persiste resposta
    h. Incrementa usage
@@ -872,42 +1139,55 @@ increment_usage(_user_id UUID, _feature TEXT) RETURNS BOOLEAN
 9. Se limite atingido: exibe banner de upgrade
 ```
 
-## 7.8 Fluxo de Solicitações (Student Requests)
+## 9.6 Fluxo de Checkout e Assinatura
 
 ```
-1. Aluno vinculado clica "Fazer solicitação"
-2. Diálogo abre com tipos de solicitação
-3. Aluno seleciona tipo, descreve e justifica
-4. Chama supabase insert em student_requests
-5. Profissional vê solicitações no painel
-6. Profissional pode aprovar/rejeitar com feedback
-7. Aluno pode ver status da solicitação
+1. Usuário seleciona plano em /pricing
+2. Frontend chama create-checkout com planId
+3. Edge Function:
+   a. Valida autenticação
+   b. Busca plano no banco
+   c. Verifica assinatura existente
+   d. Busca/cria customer no Stripe
+   e. Cria checkout session com metadata (user_id, plan_id)
+   f. Retorna URL
+4. Frontend redireciona para Stripe
+5. Usuário paga
+6. Webhook checkout.session.completed recebido
+7. stripe-webhook processa:
+   a. Valida signature
+   b. Verifica idempotência (webhook_events)
+   c. Extrai metadata
+   d. Ativa assinatura no banco
+   e. Reseta user_usage
+8. Redirect para /dashboard?checkout=success
 ```
 
 ---
 
-# 8. FUNCIONAMENTO DA IA
+# 10. FUNCIONAMENTO DA IA
 
-## 8.1 Arquitetura da IA
+## 10.1 Arquitetura da IA
 
-### 8.1.1 Gateway Utilizado
+### 10.1.1 Gateway Utilizado
 
 - **Endpoint**: https://ai.gateway.lovable.dev/v1/chat/completions
 - **Modelos Suportados**:
-  - google/gemini-3-flash-preview (padrão)
-  - google/gemini-2.5-flash
-  - google/gemini-2.5-pro
-  - openai/gpt-5
+  - google/gemini-3-flash-preview (padrão para geração)
+  - google/gemini-2.5-flash (chat, sugestões)
+  - google/gemini-2.5-flash-lite (sumarização)
+  - google/gemini-2.5-pro (análises complexas)
+  - openai/gpt-5 (backup)
 
-### 8.1.2 Autenticação
+### 10.1.2 Autenticação
 
 - API Key: `LOVABLE_API_KEY` (provisionada automaticamente)
 - Nunca exposta no cliente
 - Usada apenas em Edge Functions
 
-## 8.2 Governança da IA por Perfil
+## 10.2 Governança da IA por Perfil
 
-### 8.2.1 Princípios de Governança
+### 10.2.1 Princípios de Governança
 
 ```
 A IA NÃO é autônoma.
@@ -916,35 +1196,16 @@ Toda alteração real passa pelo backend.
 A IA pode PROPOR, mas não EXECUTAR sem autorização.
 ```
 
-### 8.2.2 Perfis de Governança
+### 10.2.2 Matriz de Governança
 
-#### ALUNO + GRATUITO
-- **Verbos Permitidos**: EXPLICAR, ORIENTAR
-- **Verbos Proibidos**: ANALISAR macros, SIMULAR, PROPOR, EXECUTAR
-- **Limite de Frases**: 2-4 frases padrão
-- **Bloqueio**: "Não posso alterar seu plano alimentar. Posso ajudar a criar uma solicitação ao seu profissional."
+| Perfil | Verbos Permitidos | Verbos Proibidos | Limite Frases |
+|--------|-------------------|------------------|---------------|
+| Aluno Gratuito | EXPLICAR, ORIENTAR | ANALISAR, SIMULAR, PROPOR, EXECUTAR | 2-4 |
+| Aluno Premium | EXPLICAR, ANALISAR (leitura), SIMULAR | EXECUTAR | 4-6 |
+| Usuário Pessoal | EXPLICAR, ANALISAR, SIMULAR, PROPOR, EXECUTAR | - | 5-8 |
+| Profissional | EXPLICAR, ANALISAR, SIMULAR, PROPOR | EXECUTAR sem aprovação | 6-10 |
 
-#### ALUNO + PREMIUM
-- **Verbos Permitidos**: EXPLICAR, ANALISAR (leitura), SIMULAR
-- **Verbos Proibidos**: EXECUTAR, alterar plano oficial
-- **Limite de Frases**: 4-6 frases padrão
-- **Simulações**: Rotuladas como simulação, sem impacto real
-- **Bloqueio**: "Para alterações no seu plano, converse com seu nutricionista."
-
-#### USUÁRIO + PLANO_PESSOAL_PAGO
-- **Verbos Permitidos**: EXPLICAR, ANALISAR, SIMULAR, PROPOR, EXECUTAR
-- **Limite de Frases**: 5-8 frases padrão
-- **Execução**: Requer confirmação explícita do usuário
-- **Capacidades**: Criar/editar planos, ajustar macros, sugerir substituições
-
-#### PROFISSIONAL
-- **Verbos Permitidos**: EXPLICAR, ANALISAR, SIMULAR, PROPOR
-- **Execução**: Somente após aprovação explícita do profissional
-- **Fluxo Obrigatório**: IA PROPÕE → Profissional aprova → Sistema executa
-- **Limite de Frases**: 6-10 frases padrão
-- **Estilo**: Técnico, analítico, conciso
-
-### 8.2.3 Gatilhos de Expansão
+### 10.2.3 Gatilhos de Expansão
 
 A IA só pode ultrapassar limites de frases se detectar:
 - "explique melhor"
@@ -955,23 +1216,54 @@ A IA só pode ultrapassar limites de frases se detectar:
 
 Após gatilho: pode dobrar limite, máximo 20 frases.
 
-## 8.3 Limitações e Guardrails
+## 10.3 Serviços Internos de IA
 
-### 8.3.1 Limitações Técnicas
+### 10.3.1 Geração de Planos (generate-meal-plan)
 
-1. **Rate Limit**: Limite de requisições por minuto por workspace
-2. **Token Limit**: Contexto máximo por requisição
-3. **Créditos**: Consumo baseado em uso, com limites mensais
+- **Modelo**: gemini-3-flash-preview
+- **Input**: Dados do perfil, alimentos selecionados, targets
+- **Output**: JSON com estrutura de refeições e opções
+- **Validação**: Equivalência nutricional entre opções
 
-### 8.3.2 Guardrails de Segurança
+### 10.3.2 Chat Nutricional (nutritional-chat)
 
-1. **Nunca persistir dados diretamente**: Toda persistência via backend validado
-2. **Nunca ignorar vínculo profissional**: Verificação obrigatória em todas as operações
-3. **Nunca fechar calorias/macros autonomamente**: Sempre requer confirmação
-4. **Sempre verificar permissões**: Baseado em user_type e plan_name
-5. **Bloquear em caso de dúvida**: Explicar motivo e oferecer próximo passo
+- **Modelo**: gemini-3-flash-preview
+- **Context Window**: Últimas 20 mensagens
+- **Sumarização**: Se > 15 mensagens, resume antigas
+- **System Prompt**: Dinâmico baseado em perfil
 
-### 8.3.3 Formato de Proposta de Ajuste
+### 10.3.3 Sugestões de Ajuste (ai-plan-suggestions)
+
+- **Modelo**: gemini-2.5-flash
+- **Input**: Métricas de adesão, padrões de comportamento
+- **Output**: Sugestões tipadas (ADD_OPTION, SIMPLIFY_OPTION, etc.)
+- **Status**: PENDING → APPROVED/REJECTED/EDITED
+
+### 10.3.4 Validação de Importação (validate-food-import)
+
+- **Modelo**: gemini-3-flash-preview
+- **Input**: Lista de alimentos a importar + existentes similares
+- **Output**: Classificação por item (use_existing, import_global, reject)
+
+### 10.3.5 Auditoria de Alimentos (audit-foods)
+
+- **Modelo**: gemini-3-flash-preview
+- **Input**: Lista de alimentos existentes
+- **Output**: Sugestões de correção por campo
+
+### 10.3.6 Explicação de Substituição (explain-substitution)
+
+- **Modelo**: gemini-2.5-flash
+- **Input**: Alimento original, substituto, contexto
+- **Output**: Explicação educacional da troca
+
+### 10.3.7 Sumarização de Histórico
+
+- **Modelo**: gemini-2.5-flash-lite (mais rápido)
+- **Threshold**: Histórico > 15 mensagens
+- **Output**: Resumo máximo de 500 caracteres
+
+## 10.4 Formato de Proposta de Ajuste
 
 ```json
 {
@@ -984,39 +1276,319 @@ Após gatilho: pode dobrar limite, máximo 20 frases.
 }
 ```
 
-## 8.4 Serviços Internos
+## 10.5 Limitações e Guardrails
 
-### 8.4.1 MacroRebalancerService
+### 10.5.1 Limitações Técnicas
 
-- **Propósito**: Rebalancear macros de um plano existente
-- **Entrada**: planId, targets atuais, novos targets
-- **Processo**:
-  1. Snapshot do estado atual
-  2. Cálculo de proporções de ajuste
-  3. Aplicação proporcional em todos os alimentos
-  4. Validação de limites mínimos
-  5. Persistência
+1. **Rate Limit**: Limite de requisições por minuto por workspace
+2. **Token Limit**: Contexto máximo por requisição (~128k tokens)
+3. **Créditos**: Consumo baseado em uso, com limites mensais
 
-### 8.4.2 Summarization Service
+### 10.5.2 Guardrails de Segurança
 
-- **Propósito**: Resumir histórico de conversas longas
-- **Threshold**: Histórico > 15 mensagens
-- **Modelo**: gemini-2.5-flash-lite (mais rápido)
-- **Limite**: Resumo máximo de 500 caracteres
-
-### 8.4.3 Equivalence Validation
-
-- **Propósito**: Validar equivalência nutricional entre opções
-- **Margens**: Proteína ±5g, Carbs ±10g, Fat ±3g, Cal ±10%
-- **Retorno**: { valid: boolean, errors: string[] }
+1. **Nunca persistir dados diretamente**: Toda persistência via backend validado
+2. **Nunca ignorar vínculo profissional**: Verificação obrigatória
+3. **Nunca fechar calorias/macros autonomamente**: Sempre requer confirmação
+4. **Sempre verificar permissões**: Baseado em user_type e plan_name
+5. **Bloquear em caso de dúvida**: Explicar motivo e oferecer próximo passo
 
 ---
 
-# 9. PERSISTÊNCIA DE DADOS
+# 11. ESTRUTURA COMPLETA DO BANCO DE DADOS
 
-## 9.1 O Que É Salvo no Banco
+*[Definição Complementar / Inferida: Esta seção foi significativamente expandida]*
 
-### 9.1.1 Dados Persistidos
+## 11.1 Diagrama ER Completo
+
+```mermaid
+erDiagram
+    %% Núcleo de Usuários
+    AUTH_USERS ||--|| PROFILES : "1:1"
+    PROFILES ||--o{ USER_ROLES : "1:N"
+    PROFILES ||--o{ PROFESSIONAL_STUDENTS : "profissional 1:N"
+    PROFILES ||--o{ PROFESSIONAL_STUDENTS : "aluno 1:1"
+    PROFILES ||--o{ SUBSCRIPTIONS : "1:N"
+    PROFILES ||--o{ USER_USAGE : "1:1"
+    PROFILES ||--o{ WEIGHT_LOGS : "1:N"
+    PROFILES ||--o{ CHAT_MESSAGES : "1:N"
+    
+    %% Planos Alimentares
+    PROFILES ||--o{ DIET_PLANS : "1:N"
+    DIET_PLANS ||--o{ MEALS : "1:N"
+    DIET_PLANS ||--o{ PLAN_HISTORY : "1:N"
+    DIET_PLANS ||--o{ PLAN_VERSIONS : "1:N"
+    DIET_PLANS ||--o{ AI_SUGGESTIONS : "1:N"
+    DIET_PLANS ||--o{ ADHERENCE_METRICS : "1:N"
+    
+    MEALS ||--o{ MEAL_OPTIONS : "1:N"
+    MEALS ||--o{ MEAL_FOODS : "1:N (legacy)"
+    MEAL_OPTIONS ||--o{ MEAL_OPTION_FOODS : "1:N"
+    MEAL_OPTION_FOODS }o--|| FOODS : "N:1"
+    MEAL_FOODS }o--|| FOODS : "N:1 (legacy)"
+    
+    %% Logs e Adesão
+    PROFILES ||--o{ DAILY_LOGS : "1:N"
+    DAILY_LOGS ||--o{ MEAL_LOGS : "1:N"
+    MEAL_LOGS }o--|| MEALS : "N:1"
+    MEAL_LOGS }o--o| MEAL_OPTIONS : "N:0-1"
+    
+    %% Alertas e Relatórios
+    PROFILES ||--o{ ADHERENCE_ALERT_CONFIGS : "profissional 1:1"
+    PROFILES ||--o{ ADHERENCE_ALERTS : "profissional 1:N"
+    PROFILES ||--o{ ADHERENCE_REPORT_FILES : "1:N"
+    
+    %% Solicitações
+    PROFILES ||--o{ STUDENT_REQUESTS : "aluno 1:N"
+    PROFILES ||--o{ STUDENT_REQUESTS : "profissional 1:N"
+    
+    %% Comercial
+    SUBSCRIPTIONS }o--|| PLANS : "N:1"
+    PROFILES ||--o{ PROFESSIONAL_LICENSES : "1:N"
+    
+    %% Administração
+    PROFILES ||--o{ ADMIN_AUDIT_LOG : "1:N"
+    PROFILES ||--o{ FOOD_IMPORTS : "1:N"
+```
+
+## 11.2 Tabelas Detalhadas
+
+### 11.2.1 profiles
+
+| Coluna | Tipo | Nullable | Default | FK | Descrição |
+|--------|------|----------|---------|-----|-----------|
+| id | UUID | NOT NULL | gen_random_uuid() | PK | |
+| user_id | UUID | NOT NULL | | auth.users | Referência ao usuário Auth |
+| name | TEXT | NULL | | | Nome completo |
+| email | TEXT | NULL | | | Email (sincronizado com Auth) |
+| age | INTEGER | NULL | | | Idade |
+| sex | TEXT | NULL | | | male/female/other |
+| height | NUMERIC(5,2) | NULL | | | Altura em cm |
+| weight | NUMERIC(5,2) | NULL | | | Peso em kg |
+| goal | TEXT | NULL | | | lose_weight/maintain/gain_muscle |
+| activity_level | TEXT | NULL | | | sedentary/light/moderate/active/very_active |
+| preferences | TEXT[] | NULL | {} | | Preferências alimentares |
+| restrictions | TEXT[] | NULL | {} | | Restrições alimentares |
+| daily_calories | INTEGER | NULL | | | Meta calórica diária |
+| protein_target | INTEGER | NULL | | | Meta de proteína (g) |
+| carbs_target | INTEGER | NULL | | | Meta de carboidratos (g) |
+| fat_target | INTEGER | NULL | | | Meta de gordura (g) |
+| meals_per_day | INTEGER | NULL | | | Número de refeições (2-6) |
+| account_type | ENUM | NOT NULL | 'aluno' | | aluno/plano_pessoal/premium/profissional |
+| user_type | ENUM | NULL | | | aluno/usuario/profissional |
+| onboarding_completed | BOOLEAN | NULL | false | | Onboarding concluído |
+| professional_onboarding_completed | BOOLEAN | NULL | | | Onboarding profissional concluído |
+| professional_id | UUID | NULL | | profiles.user_id | Profissional vinculado |
+| created_by | UUID | NULL | | | Criador (para alunos) |
+| must_change_password | BOOLEAN | NULL | | | Forçar troca de senha |
+| is_test | BOOLEAN | NULL | false | | Conta de teste |
+| created_at | TIMESTAMPTZ | NULL | now() | | |
+| updated_at | TIMESTAMPTZ | NULL | now() | | |
+
+**Cardinalidades**:
+- `profiles` → `auth.users`: 1:1 (obrigatório)
+- `profiles` → `professional_id`: N:1 (opcional, apenas alunos)
+
+### 11.2.2 diet_plans
+
+| Coluna | Tipo | Nullable | Default | FK | Descrição |
+|--------|------|----------|---------|-----|-----------|
+| id | UUID | NOT NULL | gen_random_uuid() | PK | |
+| user_id | UUID | NOT NULL | | auth.users | Dono do plano |
+| total_calories | INTEGER | NOT NULL | | | Total de calorias |
+| total_protein | NUMERIC | NOT NULL | | | Total de proteína |
+| total_carbs | NUMERIC | NOT NULL | | | Total de carboidratos |
+| total_fat | NUMERIC | NOT NULL | | | Total de gordura |
+| status | TEXT | NOT NULL | 'active' | | active/inactive/archived |
+| released_to_student | BOOLEAN | NOT NULL | false | | Liberado para aluno ver |
+| is_initial_plan | BOOLEAN | NOT NULL | false | | É plano inicial |
+| created_at | TIMESTAMPTZ | NULL | now() | | |
+
+**Cardinalidades**:
+- `profiles` → `diet_plans`: 1:N (um usuário pode ter múltiplos planos)
+- `diet_plans` → `meals`: 1:N (um plano tem 2-6 refeições)
+
+### 11.2.3 meals
+
+| Coluna | Tipo | Nullable | Default | FK | Descrição |
+|--------|------|----------|---------|-----|-----------|
+| id | UUID | NOT NULL | gen_random_uuid() | PK | |
+| diet_plan_id | UUID | NOT NULL | | diet_plans | Plano pai |
+| name | TEXT | NOT NULL | | | Nome da refeição |
+| total_calories | INTEGER | NULL | 0 | | Total de calorias |
+| total_protein | NUMERIC | NULL | 0 | | |
+| total_carbs | NUMERIC | NULL | 0 | | |
+| total_fat | NUMERIC | NULL | 0 | | |
+| created_at | TIMESTAMPTZ | NULL | now() | | |
+
+**Valores de name**: breakfast, morning_snack, lunch, afternoon_snack, dinner, supper
+
+### 11.2.4 meal_options
+
+| Coluna | Tipo | Nullable | Default | FK | Descrição |
+|--------|------|----------|---------|-----|-----------|
+| id | UUID | NOT NULL | gen_random_uuid() | PK | |
+| meal_id | UUID | NOT NULL | | meals | Refeição pai |
+| option_number | INTEGER | NOT NULL | | | 1, 2 ou 3 |
+| name | TEXT | NULL | | | Ex: "Opção 1" |
+| total_calories | NUMERIC | NOT NULL | 0 | | |
+| total_protein | NUMERIC | NOT NULL | 0 | | |
+| total_carbs | NUMERIC | NOT NULL | 0 | | |
+| total_fat | NUMERIC | NOT NULL | 0 | | |
+| created_at | TIMESTAMPTZ | NOT NULL | now() | | |
+
+**Constraint**: UNIQUE(meal_id, option_number), option_number BETWEEN 1 AND 3
+
+**Trigger**: `validate_meal_option_equivalence` valida equivalência com opção 1
+
+### 11.2.5 meal_option_foods
+
+| Coluna | Tipo | Nullable | Default | FK | Descrição |
+|--------|------|----------|---------|-----|-----------|
+| id | UUID | NOT NULL | gen_random_uuid() | PK | |
+| meal_option_id | UUID | NOT NULL | | meal_options | Opção pai |
+| food_id | UUID | NOT NULL | | foods | Alimento |
+| quantity | NUMERIC | NOT NULL | 1 | | Multiplicador da porção |
+| created_at | TIMESTAMPTZ | NOT NULL | now() | | |
+
+### 11.2.6 subscriptions
+
+| Coluna | Tipo | Nullable | Default | FK | Descrição |
+|--------|------|----------|---------|-----|-----------|
+| id | UUID | NOT NULL | gen_random_uuid() | PK | |
+| user_id | UUID | NOT NULL | | auth.users | Usuário |
+| plan_id | UUID | NOT NULL | | plans | Plano comercial |
+| status | ENUM | NOT NULL | 'trial' | | trial/active/past_due/canceled/expired |
+| billing_cycle | ENUM | NULL | | | monthly/quarterly/semiannual/annual |
+| provider | TEXT | NULL | | | 'stripe' |
+| provider_subscription_id | TEXT | NULL | | | ID no Stripe |
+| provider_customer_id | TEXT | NULL | | | Customer ID no Stripe |
+| stripe_price_id | TEXT | NULL | | | Price ID usado |
+| current_period_start | TIMESTAMPTZ | NULL | | | Início do período |
+| current_period_end | TIMESTAMPTZ | NULL | | | Fim do período |
+| grace_period_end | TIMESTAMPTZ | NULL | | | Fim do grace period |
+| cancel_at_period_end | BOOLEAN | NULL | false | | Cancelar no fim |
+| last_reconciled | TIMESTAMPTZ | NULL | | | Última reconciliação |
+| created_at | TIMESTAMPTZ | NULL | now() | | |
+| updated_at | TIMESTAMPTZ | NULL | now() | | |
+
+### 11.2.7 plans
+
+| Coluna | Tipo | Nullable | Default | FK | Descrição |
+|--------|------|----------|---------|-----|-----------|
+| id | UUID | NOT NULL | gen_random_uuid() | PK | |
+| name | TEXT | NOT NULL | | | Nome do plano |
+| type | ENUM | NOT NULL | | | personal/professional |
+| description | TEXT | NULL | | | Descrição |
+| diet_limit | INTEGER | NOT NULL | 0 | | Limite de dietas/mês |
+| substitution_limit | INTEGER | NOT NULL | 0 | | Limite de substituições/mês |
+| adjustment_limit | INTEGER | NOT NULL | 0 | | Limite de ajustes/mês |
+| chat_messages_per_day | INTEGER | NOT NULL | 0 | | Limite de mensagens/dia |
+| patients_limit | INTEGER | NOT NULL | 0 | | Limite de alunos |
+| has_chat | BOOLEAN | NOT NULL | false | | Tem acesso ao chat |
+| history_days | INTEGER | NOT NULL | 7 | | Dias de histórico |
+| price_monthly | NUMERIC(10,2) | NULL | 0 | | Preço mensal |
+| stripe_price_monthly | TEXT | NULL | | | Price ID Stripe |
+| stripe_product_id | TEXT | NULL | | | Product ID Stripe |
+| is_active | BOOLEAN | NOT NULL | true | | Plano ativo |
+| created_at | TIMESTAMPTZ | NULL | now() | | |
+
+## 11.3 Enums do Banco
+
+```sql
+account_type: 'aluno' | 'plano_pessoal' | 'premium' | 'profissional'
+app_role: 'admin' | 'professional' | 'student'
+billing_cycle: 'monthly' | 'quarterly' | 'semiannual' | 'annual'
+plan_type: 'personal' | 'professional'
+plan_type_commercial: 'gratuito' | 'plano_pessoal_pago' | 'premium' | 'profissional'
+subscription_status: 'trial' | 'active' | 'past_due' | 'canceled' | 'expired'
+user_type: 'aluno' | 'usuario' | 'profissional'
+```
+
+## 11.4 Funções RPC Principais
+
+| Função | Propósito | Retorno |
+|--------|-----------|---------|
+| `get_user_permissions` | Retorna todas as permissões do usuário | TABLE |
+| `get_user_plan` | Retorna informações do plano e limites | TABLE |
+| `can_use_feature` | Verifica se pode usar feature | BOOLEAN |
+| `can_create_plan` | Verifica se pode criar plano | BOOLEAN |
+| `can_edit_plan` | Verifica se pode editar plano | BOOLEAN |
+| `check_feature_limit` | Retorna limite e uso atual | TABLE |
+| `increment_usage` | Incrementa contador de uso | BOOLEAN |
+| `reset_monthly_usage` | Reseta contadores mensais | VOID |
+| `has_role` | Verifica se usuário tem determinado role | BOOLEAN |
+| `has_active_license` | Verifica licença profissional ativa | BOOLEAN |
+| `get_student_access_level` | Retorna nível de acesso do aluno | TABLE |
+| `get_professional_subscription_state` | Estado da assinatura do profissional | TABLE |
+| `get_student_count` | Conta alunos de um profissional | INTEGER |
+| `calculate_adherence_metrics` | Calcula métricas de adesão | JSONB |
+| `confirm_meal_consumption` | Confirma consumo de refeição | JSONB |
+| `user_owns_meal` | Verifica propriedade de refeição | BOOLEAN |
+| `user_owns_meal_option` | Verifica propriedade de opção | BOOLEAN |
+| `professional_manages_meal` | Verifica se profissional gerencia refeição | BOOLEAN |
+| `professional_manages_meal_option` | Verifica se profissional gerencia opção | BOOLEAN |
+
+## 11.5 Triggers
+
+| Trigger | Tabela | Evento | Função |
+|---------|--------|--------|--------|
+| on_auth_user_created | auth.users | AFTER INSERT | handle_new_user |
+| create_subscription_trigger | profiles | AFTER INSERT | create_subscription_for_user |
+| validate_option_equivalence | meal_options | BEFORE INSERT/UPDATE | validate_meal_option_equivalence |
+| update_*_updated_at | várias | BEFORE UPDATE | update_updated_at_column |
+
+## 11.6 Estratégia de Versionamento de Planos
+
+### 11.6.1 Tabela plan_versions
+
+Armazena snapshots completos do plano para:
+- Rollback de alterações
+- Auditoria de mudanças
+- Comparação de versões
+
+| Campo | Descrição |
+|-------|-----------|
+| diet_plan_id | Plano versionado |
+| version_number | Número sequencial |
+| snapshot | JSONB com estado completo |
+| notes | Observações da alteração |
+| approved_by | Quem aprovou (se profissional) |
+| approved_at | Quando aprovou |
+
+### 11.6.2 Quando Versionar
+
+- Antes de qualquer ajuste de macros
+- Antes de substituição de alimentos
+- Após aprovação de sugestão de IA
+- Manual pelo profissional
+
+## 11.7 Estratégia de Limpeza e Prevenção de Lixo
+
+### 11.7.1 Dados Mantidos Permanentemente
+- profiles (essencial)
+- diet_plans com status = 'active'
+- foods (base global)
+- plans (comercial)
+- subscriptions ativas
+- admin_audit_log (compliance)
+
+### 11.7.2 Dados Limitados por history_days
+- weight_logs
+- plan_history
+- daily_logs / meal_logs (potencialmente no futuro)
+
+### 11.7.3 Limpeza Atual
+**Status**: Não implementada automaticamente
+
+Os dados antigos permanecem no banco, mas são filtrados nas queries baseado em `history_days` do plano do usuário.
+
+*[Definição Complementar / Inferida: Recomenda-se implementar job de limpeza periódica para dados além do history_days, mantendo sumarização em adherence_metrics]*
+
+---
+
+# 12. PERSISTÊNCIA DE DADOS
+
+## 12.1 O Que É Salvo no Banco
 
 | Dado | Tabela | Observação |
 |------|--------|------------|
@@ -1044,15 +1616,9 @@ Após gatilho: pode dobrar limite, máximo 20 frases.
 | Eventos de webhook | webhook_events | Idempotência Stripe |
 | Audit log | admin_audit_log | Ações administrativas |
 | Configurações | system_settings | Parâmetros do sistema |
+| Importações de alimentos | food_imports | Registro de importações |
 
-### 9.1.2 Dados de Sessão (NÃO persistidos)
-
-- Estado de UI (modais abertos, abas selecionadas)
-- Cache local de permissões (60 segundos)
-- Mensagem sendo digitada no chat
-- Opção selecionada temporariamente
-
-## 9.2 O Que NÃO Deve Ser Salvo
+## 12.2 O Que NÃO Deve Ser Salvo
 
 1. **Senhas em texto plano**: Gerenciadas pelo Supabase Auth
 2. **Tokens de sessão**: Gerenciados pelo Supabase Auth
@@ -1060,9 +1626,9 @@ Após gatilho: pode dobrar limite, máximo 20 frases.
 4. **Dados de cartão de crédito**: Gerenciados pelo Stripe
 5. **Respostas temporárias da IA**: Antes de confirmação
 
-## 9.3 Estratégia de Histórico
+## 12.3 Estratégia de Histórico
 
-### 9.3.1 Histórico por Plano
+### 12.3.1 Histórico por Plano
 
 | Plano | Histórico (dias) |
 |-------|------------------|
@@ -1071,190 +1637,19 @@ Após gatilho: pode dobrar limite, máximo 20 frases.
 | Pessoal Pago | 90 |
 | Profissional | 9999 (ilimitado) |
 
-### 9.3.2 Dados Sujeitos a Limite de Histórico
-
-- weight_logs
-- plan_history
-- (Potencialmente daily_logs, meal_logs em versões futuras)
-
-### 9.3.3 Limpeza de Dados
-
-Atualmente NÃO há limpeza automática. Dados antigos permanecem no banco, mas são filtrados nas queries baseado em history_days.
-
-**Inferência**: Uma rotina de limpeza pode ser implementada futuramente para otimização.
-
 ---
 
-# 10. ESTRUTURA CONCEITUAL DO BANCO DE DADOS
+# 13. INTEGRAÇÕES EXTERNAS
 
-## 10.1 Diagrama ER Simplificado
+## 13.1 Stripe
 
-```
-┌──────────────┐     ┌──────────────┐     ┌──────────────┐
-│   profiles   │────<│ diet_plans   │────<│    meals     │
-└──────────────┘     └──────────────┘     └──────────────┘
-       │                    │                    │
-       │                    │                    ├────<┌──────────────┐
-       │                    │                    │     │ meal_options │
-       │                    │                    │     └──────────────┘
-       │                    │                    │            │
-       │                    │                    │            ├────<┌──────────────────┐
-       │                    │                    │            │     │ meal_option_foods│
-       │                    │                    │            │     └──────────────────┘
-       │                    │                    │            │            │
-       │                    │                    │            │            v
-       │                    │                    │            │     ┌──────────────┐
-       │                    │                    │            │     │    foods     │
-       │                    │                    │            │     └──────────────┘
-       │                    │                    │
-       │              ┌─────┴──────┐            │
-       │              │            │            │
-       │              v            v            v
-       │     ┌──────────────┐ ┌──────────────┐ ┌──────────────┐
-       │     │ plan_history │ │plan_versions │ │  meal_foods  │
-       │     └──────────────┘ └──────────────┘ └──────────────┘
-       │
-       ├────<┌──────────────┐
-       │     │ daily_logs   │────<┌──────────────┐
-       │     └──────────────┘     │  meal_logs   │
-       │                          └──────────────┘
-       │
-       ├────<┌──────────────┐
-       │     │ weight_logs  │
-       │     └──────────────┘
-       │
-       ├────<┌──────────────────┐
-       │     │ chat_messages    │
-       │     └──────────────────┘
-       │
-       ├────<┌──────────────────┐
-       │     │ subscriptions    │────>┌──────────────┐
-       │     └──────────────────┘     │    plans     │
-       │                              └──────────────┘
-       │
-       ├────<┌──────────────────┐
-       │     │   user_usage     │
-       │     └──────────────────┘
-       │
-       ├────<┌──────────────────┐
-       │     │   user_roles     │
-       │     └──────────────────┘
-       │
-       ├────<┌────────────────────────┐
-       │     │ professional_students  │
-       │     └────────────────────────┘
-       │              │
-       │              v
-       │     ┌──────────────────┐
-       └────>│  (outro profile) │
-             └──────────────────┘
-```
-
-## 10.2 Tabelas Principais
-
-### 10.2.1 profiles
-- **PK**: id (UUID)
-- **FK**: user_id → auth.users
-- **FK**: professional_id → profiles (self-reference)
-- **Campos principais**: name, email, age, sex, height, weight, goal, activity_level, preferences, restrictions, daily_calories, protein_target, carbs_target, fat_target, meals_per_day, account_type, user_type, onboarding_completed
-
-### 10.2.2 diet_plans
-- **PK**: id (UUID)
-- **FK**: user_id → auth.users
-- **Campos principais**: total_calories, total_protein, total_carbs, total_fat, status, released_to_student, is_initial_plan
-
-### 10.2.3 meals
-- **PK**: id (UUID)
-- **FK**: diet_plan_id → diet_plans
-- **Campos principais**: name, total_calories, total_protein, total_carbs, total_fat
-
-### 10.2.4 meal_options
-- **PK**: id (UUID)
-- **FK**: meal_id → meals
-- **Campos principais**: option_number, name, total_calories, total_protein, total_carbs, total_fat
-
-### 10.2.5 meal_option_foods
-- **PK**: id (UUID)
-- **FK**: meal_option_id → meal_options
-- **FK**: food_id → foods
-- **Campos principais**: quantity
-
-### 10.2.6 foods
-- **PK**: id (UUID)
-- **Campos principais**: name, calories, protein, carbs, fat, serving_size, category, processing_level
-
-### 10.2.7 daily_logs
-- **PK**: id (UUID)
-- **FK**: user_id → auth.users
-- **FK**: diet_plan_id → diet_plans
-- **Campos principais**: log_date, status, plan_version, total_*_consumed
-
-### 10.2.8 meal_logs
-- **PK**: id (UUID)
-- **FK**: daily_log_id → daily_logs
-- **FK**: meal_id → meals
-- **FK**: confirmed_option_id → meal_options
-- **Campos principais**: status, confirmed_at, notes, *_consumed
-
-## 10.3 Enums do Banco
-
-```sql
-account_type: 'aluno' | 'plano_pessoal' | 'premium' | 'profissional'
-app_role: 'admin' | 'professional' | 'student'
-billing_cycle: 'monthly' | 'quarterly' | 'semiannual' | 'annual'
-plan_type: 'personal' | 'professional'
-plan_type_commercial: 'gratuito' | 'plano_pessoal_pago' | 'premium' | 'profissional'
-subscription_status: 'trial' | 'active' | 'past_due' | 'canceled' | 'expired'
-user_type: 'aluno' | 'usuario' | 'profissional'
-```
-
-## 10.4 Funções RPC Principais
-
-| Função | Propósito |
-|--------|-----------|
-| `get_user_permissions` | Retorna todas as permissões do usuário |
-| `get_user_plan` | Retorna informações do plano e limites |
-| `can_use_feature` | Verifica se pode usar feature |
-| `can_create_plan` | Verifica se pode criar plano |
-| `can_edit_plan` | Verifica se pode editar plano |
-| `check_feature_limit` | Retorna limite e uso atual |
-| `increment_usage` | Incrementa contador de uso |
-| `reset_monthly_usage` | Reseta contadores mensais |
-| `has_role` | Verifica se usuário tem determinado role |
-| `has_active_license` | Verifica licença profissional ativa |
-| `get_student_access_level` | Retorna nível de acesso do aluno |
-| `get_professional_subscription_state` | Estado da assinatura do profissional |
-| `get_student_count` | Conta alunos de um profissional |
-| `calculate_adherence_metrics` | Calcula métricas de adesão |
-| `confirm_meal_consumption` | Confirma consumo de refeição |
-| `user_owns_meal` | Verifica propriedade de refeição |
-| `user_owns_meal_option` | Verifica propriedade de opção |
-| `professional_manages_meal` | Verifica se profissional gerencia refeição |
-| `professional_manages_meal_option` | Verifica se profissional gerencia opção |
-
----
-
-# 11. INTEGRAÇÕES EXTERNAS
-
-## 11.1 Stripe
-
-### 11.1.1 Configuração
+### 13.1.1 Configuração
 
 - **Secrets necessários**:
   - `STRIPE_SECRET_KEY`: Chave secreta do Stripe
   - `STRIPE_WEBHOOK_SECRET`: Secret para validação de webhooks
 
-### 11.1.2 Endpoints Utilizados
-
-| Endpoint | Propósito |
-|----------|-----------|
-| POST /v1/checkout/sessions | Criar sessão de checkout |
-| POST /v1/billing_portal/sessions | Criar sessão do portal |
-| GET /v1/customers | Buscar cliente por email |
-| POST /v1/customers | Criar cliente |
-| Webhook events | Processar eventos assíncronos |
-
-### 11.1.3 Eventos de Webhook Processados
+### 13.1.2 Eventos de Webhook Processados
 
 | Evento | Ação |
 |--------|------|
@@ -1264,44 +1659,16 @@ user_type: 'aluno' | 'usuario' | 'profissional'
 | `invoice.payment_failed` | Entrar em grace period |
 | `invoice.payment_succeeded` | Reativar assinatura |
 
-### 11.1.4 Grace Period
+### 13.1.3 Grace Period
 
 - Duração: 7 dias
 - Status durante grace: `past_due`
 - Após expiração: `canceled`
-- Profissionais: `suspended` (mantém vínculo com alunos)
+- Profissionais: Alunos entram em modo `read_only`
 
-### 11.1.5 Ciclo de Cobrança
+## 13.2 Lovable AI Gateway
 
-Atualmente **apenas mensal** (`monthly`). Outros ciclos (quarterly, semiannual, annual) estão definidos no banco mas não implementados na UI.
-
-### 11.1.6 Fluxo de Checkout
-
-```
-1. Usuário seleciona plano em /pricing
-2. Frontend chama create-checkout com planId
-3. Edge Function:
-   a. Valida autenticação
-   b. Busca plano no banco
-   c. Verifica assinatura existente
-   d. Busca/cria customer no Stripe
-   e. Cria checkout session com metadata (user_id, plan_id)
-   f. Retorna URL
-4. Frontend redireciona para Stripe
-5. Usuário paga
-6. Webhook checkout.session.completed recebido
-7. Assinatura ativada no banco
-8. Redirect para /dashboard?checkout=success
-```
-
-## 11.2 Lovable AI Gateway
-
-### 11.2.1 Configuração
-
-- **Endpoint**: https://ai.gateway.lovable.dev/v1/chat/completions
-- **Secret**: `LOVABLE_API_KEY` (auto-provisionado)
-
-### 11.2.2 Uso no Sistema
+### 13.2.1 Uso no Sistema
 
 | Edge Function | Modelo Usado | Propósito |
 |---------------|--------------|-----------|
@@ -1309,306 +1676,270 @@ Atualmente **apenas mensal** (`monthly`). Outros ciclos (quarterly, semiannual, 
 | nutritional-chat | gemini-3-flash-preview | Chat conversacional |
 | explain-substitution | gemini-2.5-flash | Explicar substituições |
 | ai-plan-suggestions | gemini-2.5-flash | Sugerir ajustes |
+| validate-food-import | gemini-3-flash-preview | Validar importação |
+| audit-foods | gemini-3-flash-preview | Auditar alimentos |
 | (summarization) | gemini-2.5-flash-lite | Resumir histórico |
 
-### 11.2.3 Rate Limits e Erros
+---
 
-| Status | Significado | Ação |
-|--------|-------------|------|
-| 429 | Rate limit exceeded | Aguardar e retry |
-| 402 | Payment required (créditos) | Adicionar créditos |
-| 500 | Erro interno | Retry com backoff |
+# 14. REQUISITOS FUNCIONAIS
+
+## 14.1 Autenticação e Autorização
+- RF01-RF05: Cadastro, login, recuperação, permissões diferenciadas
+
+## 14.2 Onboarding
+- RF06-RF13: Coleta de dados, cálculo de targets, geração inicial
+
+## 14.3 Planos Alimentares
+- RF14-RF20: Geração, equivalência, visualização, ajustes, histórico
+
+## 14.4 Confirmação de Refeições
+- RF21-RF25: Confirmação, retroativa, pulada, fora do plano, progresso
+
+## 14.5 Adesão e Métricas
+- RF26-RF31: Cálculos, alertas, relatórios
+
+## 14.6 Chat Nutricional
+- RF32-RF36: IA conversacional, governança, limites, histórico
+
+## 14.7 Gerenciamento de Alunos (Profissionais)
+- RF37-RF42: Criação, vinculação, planos, alertas
+
+## 14.8 Solicitações de Alunos
+- RF43-RF45: Envio, visualização, resposta
+
+## 14.9 Progresso e Histórico
+- RF46-RF49: Peso, gráficos, histórico limitado
+
+## 14.10 Assinaturas e Pagamentos
+- RF50-RF55: Planos, checkout, ativação, portal
+
+## 14.11 Administração
+- RF56: Gerenciamento de usuários
+- RF57: Gerenciamento de planos comerciais
+- RF58: Importação e auditoria de alimentos
+- RF59: Configurações do sistema
+- RF60: Visualização de audit logs
 
 ---
 
-# 12. REQUISITOS FUNCIONAIS
+# 15. REQUISITOS NÃO FUNCIONAIS
 
-## 12.1 Autenticação e Autorização
+## 15.1 Performance
+- RNF01: Tempo de resposta da API < 2 segundos
+- RNF02: Geração de plano < 30 segundos
+- RNF03: Resposta do chat < 10 segundos
+- RNF04: Cache de permissões por 60 segundos
+- RNF05: Limite de 1000 rows por query
 
-- **RF01**: O sistema deve permitir cadastro com email e senha
-- **RF02**: O sistema deve permitir login com email e senha
-- **RF03**: O sistema deve suportar recuperação de senha por email
-- **RF04**: O sistema deve verificar permissões em todas as operações
-- **RF05**: O sistema deve diferenciar acesso por tipo de usuário e plano
+## 15.2 Segurança
+- RNF06: RLS habilitado em todas as tabelas
+- RNF07: Funções SECURITY DEFINER para operações privilegiadas
+- RNF08: Validação de webhook signature do Stripe
+- RNF09: Secrets nunca expostos no cliente
+- RNF10: Rate limiting em Edge Functions
 
-## 12.2 Onboarding
+## 15.3 Escalabilidade
+- RNF14: Arquitetura serverless
+- RNF15: Banco de dados gerenciado
+- RNF16: Stateless
 
-- **RF06**: O sistema deve coletar dados pessoais (idade, sexo, altura, peso)
-- **RF07**: O sistema deve coletar objetivo nutricional
-- **RF08**: O sistema deve coletar nível de atividade física
-- **RF09**: O sistema deve permitir seleção de número de refeições (2-6)
-- **RF10**: O sistema deve permitir seleção de preferências alimentares
-- **RF11**: O sistema deve permitir seleção de restrições alimentares
-- **RF12**: O sistema deve calcular metas calóricas e de macros automaticamente
-- **RF13**: O sistema deve gerar plano inicial automaticamente (exceto profissionais)
+## 15.4 Disponibilidade
+- RNF18: Uptime dependente de Lovable Cloud e Supabase
+- RNF19: Retry automático em falhas de pagamento
 
-## 12.3 Planos Alimentares
+## 15.5 Usabilidade
+- RNF21: Design responsivo (mobile-first)
+- RNF22: Suporte a tema dark/light
 
-- **RF14**: O sistema deve gerar planos com múltiplas opções por refeição
-- **RF15**: O sistema deve garantir equivalência nutricional entre opções
-- **RF16**: O sistema deve respeitar preferências e restrições do usuário
-- **RF17**: O sistema deve permitir visualização detalhada de refeições
-- **RF18**: O sistema deve permitir ajuste de macros (usuários autorizados)
-- **RF19**: O sistema deve permitir substituição de alimentos (usuários autorizados)
-- **RF20**: O sistema deve manter histórico de alterações
-
-## 12.4 Confirmação de Refeições
-
-- **RF21**: O sistema deve permitir confirmação de refeições do dia
-- **RF22**: O sistema deve permitir confirmação retroativa (marcada como tardia)
-- **RF23**: O sistema deve permitir registro de refeições puladas
-- **RF24**: O sistema deve permitir registro de refeições fora do plano
-- **RF25**: O sistema deve exibir progresso diário
-
-## 12.5 Adesão e Métricas
-
-- **RF26**: O sistema deve calcular taxa de adesão geral
-- **RF27**: O sistema deve calcular adesão por tipo de refeição
-- **RF28**: O sistema deve calcular distribuição de exceções
-- **RF29**: O sistema deve gerar alertas para profissionais
-- **RF30**: O sistema deve permitir configuração de thresholds de alerta
-- **RF31**: O sistema deve gerar relatórios PDF de adesão
-
-## 12.6 Chat Nutricional
-
-- **RF32**: O sistema deve fornecer assistente de IA conversacional
-- **RF33**: O sistema deve diferenciar capacidades por perfil de usuário
-- **RF34**: O sistema deve limitar mensagens diárias por plano
-- **RF35**: O sistema deve manter histórico de conversas
-- **RF36**: O sistema deve resumir histórico longo automaticamente
-
-## 12.7 Gerenciamento de Alunos (Profissionais)
-
-- **RF37**: O sistema deve permitir criação de alunos
-- **RF38**: O sistema deve permitir vinculação de alunos existentes
-- **RF39**: O sistema deve permitir visualização de planos de alunos
-- **RF40**: O sistema deve permitir criação de planos para alunos
-- **RF41**: O sistema deve exibir alertas de adesão de alunos
-- **RF42**: O sistema deve permitir liberação de plano para aluno
-
-## 12.8 Solicitações de Alunos
-
-- **RF43**: O sistema deve permitir que alunos enviem solicitações
-- **RF44**: O sistema deve exibir solicitações para profissionais
-- **RF45**: O sistema deve permitir aprovação/rejeição com feedback
-
-## 12.9 Progresso e Histórico
-
-- **RF46**: O sistema deve permitir registro de peso
-- **RF47**: O sistema deve exibir gráfico de evolução de peso
-- **RF48**: O sistema deve exibir histórico de alterações no plano
-- **RF49**: O sistema deve limitar histórico por plano comercial
-
-## 12.10 Assinaturas e Pagamentos
-
-- **RF50**: O sistema deve exibir planos disponíveis com preços
-- **RF51**: O sistema deve processar pagamentos via Stripe
-- **RF52**: O sistema deve ativar assinatura após pagamento
-- **RF53**: O sistema deve gerenciar ciclo de vida da assinatura
-- **RF54**: O sistema deve fornecer portal do cliente Stripe
-- **RF55**: O sistema deve aplicar grace period em falhas de pagamento
+## 15.6 Manutenibilidade
+- RNF26: Código TypeScript tipado
+- RNF27: Componentes reutilizáveis
+- RNF28: Hooks customizados
+- RNF29: Migrations versionadas
 
 ---
 
-# 13. REQUISITOS NÃO FUNCIONAIS
+# 16. PAINEL ADMINISTRATIVO
 
-## 13.1 Performance
+*[Definição Complementar / Inferida: Esta seção foi adicionada]*
 
-- **RNF01**: Tempo de resposta da API < 2 segundos para operações comuns
-- **RNF02**: Geração de plano alimentar < 30 segundos
-- **RNF03**: Resposta do chat < 10 segundos
-- **RNF04**: Cache de permissões por 60 segundos para reduzir queries
-- **RNF05**: Limite de 1000 rows por query no Supabase
+## 16.1 Acesso
 
-## 13.2 Segurança
+- **Rota**: /admin
+- **Requisito**: `has_role(user_id, 'admin') = true`
+- **Componente**: `src/pages/Admin.tsx`
+- **Hook**: `useAdminOperations`
 
-- **RNF06**: RLS habilitado em todas as tabelas
-- **RNF07**: Funções SECURITY DEFINER para operações privilegiadas
-- **RNF08**: Validação de webhook signature do Stripe
-- **RNF09**: Secrets nunca expostos no cliente
-- **RNF10**: Rate limiting em Edge Functions (2 segundos entre mensagens de chat)
-- **RNF11**: Validação de input em todas as Edge Functions
-- **RNF12**: Roles armazenados em tabela separada (prevenção de escalação)
-- **RNF13**: Verificação de idempotência em webhooks
+## 16.2 Funcionalidades
 
-## 13.3 Escalabilidade
+### 16.2.1 Aba Configurações
+- Visualizar/editar system_settings
+- Organizado por categoria
+- Campos sensíveis mascarados
 
-- **RNF14**: Arquitetura serverless (Edge Functions escalam automaticamente)
-- **RNF15**: Banco de dados gerenciado (Supabase/PostgreSQL)
-- **RNF16**: Sem estado no servidor (stateless)
-- **RNF17**: Suporte a múltiplos profissionais com múltiplos alunos
+### 16.2.2 Aba Usuários
+- Listar todos os usuários
+- Filtrar por account_type, is_test
+- Buscar por nome/email
+- Editar: name, account_type, user_type, is_test
+- Gerenciar roles (admin, professional, student)
+- Preview de exclusão (registros afetados)
 
-## 13.4 Disponibilidade
+### 16.2.3 Aba Planos
+- Listar planos comerciais
+- Editar limites e preços
+- Vincular IDs do Stripe
+- Ativar/desativar planos
 
-- **RNF18**: Uptime dependente de Lovable Cloud e Supabase
-- **RNF19**: Retry automático em falhas de pagamento (Stripe)
-- **RNF20**: Grace period de 7 dias para manter acesso
+### 16.2.4 Aba Alimentos
+- Listar alimentos cadastrados
+- Buscar por nome
+- Editar alimentos individuais
+- Importação em massa via CSV
+- Validação com IA antes de importar
+- Auditoria de alimentos existentes
+- Aplicar correções sugeridas
 
-## 13.5 Usabilidade
+### 16.2.5 Aba Audit Log
+- Visualizar histórico de ações administrativas
+- Paginação
+- Detalhes de old_value/new_value
 
-- **RNF21**: Design responsivo (mobile-first)
-- **RNF22**: Suporte a tema dark/light
-- **RNF23**: Animações suaves (Framer Motion)
-- **RNF24**: Feedback visual em todas as ações
-- **RNF25**: Mensagens de erro claras
+### 16.2.6 Aba Teste
+- Botão para seed de dados de teste
+- Cria usuários, planos, alimentos fictícios
 
-## 13.6 Manutenibilidade
+## 16.3 Auditoria
 
-- **RNF26**: Código TypeScript tipado
-- **RNF27**: Componentes reutilizáveis (shadcn/ui)
-- **RNF28**: Hooks customizados para lógica compartilhada
-- **RNF29**: Migrations versionadas
-- **RNF30**: Logs estruturados em Edge Functions
+Todas as ações administrativas são registradas em `admin_audit_log`:
+- `action`: Tipo de ação (update_setting, import_foods, etc.)
+- `entity_type`: Tipo de entidade afetada
+- `entity_id`: ID da entidade
+- `old_value`: Valor anterior (JSONB)
+- `new_value`: Novo valor (JSONB)
+- `ip_address`: IP do usuário (se disponível)
+- `user_agent`: User agent do navegador
 
 ---
 
-# 14. ERROS CONHECIDOS E PONTOS CRÍTICOS
+# 17. ERROS CONHECIDOS E PONTOS CRÍTICOS
 
-## 14.1 Erros Conhecidos
+## 17.1 Erros Conhecidos
 
-### 14.1.1 Timeouts de Conexão
+### 17.1.1 Timeouts de Conexão
 - **Descrição**: Queries complexas podem causar timeout no tier Pico
-- **Causa**: Limite de 60 conexões no pool do tier Pico
 - **Mitigação**: Cache de 60s, otimização de queries, índices
-- **Solução definitiva**: Upgrade de instância
 
-### 14.1.2 RLS Recursivo
+### 17.1.2 RLS Recursivo
 - **Descrição**: Políticas RLS que referenciam outras tabelas podem causar recursão
 - **Mitigação**: Uso de SECURITY DEFINER em funções helper
-- **Status**: Parcialmente resolvido com funções como `has_role`, `user_owns_meal`
 
-## 14.2 Pontos Críticos
+## 17.2 Pontos Críticos
 
-### 14.2.1 Dependência de IA Externa
+### 17.2.1 Dependência de IA Externa
 - **Risco**: Indisponibilidade do Lovable AI Gateway
-- **Impacto**: Geração de planos e chat não funcionam
-- **Mitigação**: Tratamento de erros adequado, fallbacks amigáveis
+- **Mitigação**: Tratamento de erros, fallbacks amigáveis
 
-### 14.2.2 Limites de Créditos de IA
-- **Risco**: Usuários esgotam créditos do workspace
-- **Impacto**: Erro 402 nas funcionalidades de IA
-- **Mitigação**: Mensagens claras, monitoramento de uso
-
-### 14.2.3 Webhook Reliability
+### 17.2.2 Webhook Reliability
 - **Risco**: Webhooks Stripe podem falhar ou atrasar
-- **Impacto**: Assinaturas não ativadas/atualizadas corretamente
 - **Mitigação**: Idempotência, reconciliação periódica
 
 ---
 
-# 15. DECISÕES TÉCNICAS JÁ TOMADAS
+# 18. DECISÕES TÉCNICAS JÁ TOMADAS
 
-## 15.1 Arquiteturais
+## 18.1 Arquiteturais
+1. Lovable Cloud pela facilidade de integração
+2. Edge Functions para serverless puro
+3. Lovable AI pela API key auto-provisionada
 
-1. **Lovable Cloud vs Supabase Direto**: Escolhido Lovable Cloud pela facilidade de integração
-2. **Edge Functions vs API Própria**: Escolhido Edge Functions para serverless puro
-3. **Lovable AI vs OpenAI Direto**: Escolhido Lovable AI pelo LOVABLE_API_KEY auto-provisionado
+## 18.2 Banco de Dados
+1. Roles em tabela separada (prevenção de escalação)
+2. RLS em todas as tabelas
+3. Funções SECURITY DEFINER
+4. Índices compostos para RLS
 
-## 15.2 Banco de Dados
+## 18.3 Negócio
+1. Ciclo mensal apenas (outros preparados)
+2. Grace period de 7 dias
+3. Plano Premium exclusivo para alunos
+4. Chat governado por perfil
 
-1. **Roles em tabela separada**: Prevenção de escalação de privilégios
-2. **RLS em todas as tabelas**: Segurança por design
-3. **Funções SECURITY DEFINER**: Evitar recursão em RLS
-4. **Índices compostos**: Otimização de queries com RLS
-
-## 15.3 Negócio
-
-1. **Ciclo mensal apenas**: Simplificação inicial (outros ciclos preparados mas não ativados)
-2. **Grace period de 7 dias**: Balanceamento entre retenção e inadimplência
-3. **Plano Premium exclusivo para alunos vinculados**: Diferenciação de ofertas
-4. **Chat governado por perfil**: Segurança e adequação clínica
-
-## 15.4 UX
-
-1. **Confirmação vs Escolha**: Plano é read-only, usuário confirma o que comeu
-2. **Equivalência nutricional**: Liberdade de escolha sem comprometer resultados
-3. **Bloqueio com sugestão**: Quando bloqueado, sempre oferecer próximo passo
+## 18.4 UX
+1. Confirmação vs Escolha (plano read-only)
+2. Equivalência nutricional
+3. Bloqueio com sugestão de próximo passo
 
 ---
 
-# 16. RISCOS TÉCNICOS E LIMITAÇÕES ATUAIS
+# 19. RISCOS TÉCNICOS E LIMITAÇÕES ATUAIS
 
-## 16.1 Riscos Técnicos
+## 19.1 Riscos Técnicos
 
 | Risco | Probabilidade | Impacto | Mitigação |
 |-------|---------------|---------|-----------|
 | Timeout de banco | Alta | Médio | Cache, índices, upgrade |
 | Rate limit IA | Média | Médio | Rate limiting no chat |
 | Falha webhook Stripe | Baixa | Alto | Idempotência, reconciliação |
-| Esgotamento de créditos IA | Média | Alto | Monitoramento, limites por usuário |
+| Esgotamento de créditos IA | Média | Alto | Monitoramento |
 
-## 16.2 Limitações Atuais
+## 19.2 Limitações Atuais
 
-1. **Sem realtime**: Atualizações não são em tempo real
-2. **Sem PWA/Offline**: Requer conexão para funcionar
-3. **Sem push notifications**: Alertas apenas no sistema
-4. **Sem integração com wearables**: Dados manuais apenas
-5. **Sem multi-idioma**: Apenas português brasileiro
-6. **Sem histórico ilimitado para todos**: Limitado por plano
-7. **Sem API pública**: Sem integrações externas
+1. Sem realtime (atualizações não são em tempo real)
+2. Sem PWA/Offline
+3. Sem push notifications
+4. Sem integração com wearables
+5. Sem multi-idioma
+6. Sem API pública
 
 ---
 
-# 17. BOAS PRÁTICAS E PADRÕES ADOTADOS
+# 20. BOAS PRÁTICAS E PADRÕES ADOTADOS
 
-## 17.1 Código
-
+## 20.1 Código
 - TypeScript strict mode
 - ESLint configurado
 - Componentes funcionais com hooks
 - Custom hooks para lógica reutilizável
 - Separação de concerns (pages, components, hooks, lib)
 
-## 17.2 Banco de Dados
-
+## 20.2 Banco de Dados
 - Migrations versionadas
 - RLS em todas as tabelas
 - Índices para queries frequentes
 - Funções RPC para lógica complexa
 - Triggers para automações
 
-## 17.3 Segurança
-
+## 20.3 Segurança
 - Secrets gerenciados fora do código
 - Validação de input em Edge Functions
 - Rate limiting em endpoints sensíveis
-- Verificação de permissões em todas as operações
 - Auditoria de ações administrativas
-
-## 17.4 UX/UI
-
-- Design responsivo (mobile-first)
-- Feedback visual em ações
-- Estados de loading
-- Tratamento de erros amigável
-- Animações suaves
 
 ---
 
-# 18. PRÓXIMOS PASSOS TÉCNICOS SUGERIDOS
+# 21. PRÓXIMOS PASSOS TÉCNICOS SUGERIDOS
 
-## 18.1 Curto Prazo (1-2 meses)
+## 21.1 Curto Prazo (1-2 meses)
+1. Upgrade de instância Supabase
+2. Implementar reconciliação periódica de assinaturas
+3. Adicionar testes automatizados
+4. Otimizar queries de adesão
 
-1. **Upgrade de instância Supabase**: Resolver timeouts
-2. **Implementar reconciliação de assinaturas**: Edge Function periódica
-3. **Adicionar testes automatizados**: Jest/Vitest para componentes críticos
-4. **Otimizar queries de adesão**: Índices e views materializadas
+## 21.2 Médio Prazo (3-6 meses)
+1. PWA/Offline
+2. Push Notifications
+3. Realtime para profissionais
+4. Multi-idioma
+5. Job de limpeza de dados antigos
 
-## 18.2 Médio Prazo (3-6 meses)
-
-1. **PWA/Offline**: Service worker para funcionalidade offline básica
-2. **Push Notifications**: Alertas de adesão via push
-3. **Realtime**: Atualizações em tempo real para profissionais
-4. **Multi-idioma**: i18n para expansão internacional
-5. **API Pública**: Integrações com terceiros
-
-## 18.3 Longo Prazo (6-12 meses)
-
-1. **App Nativo**: React Native para iOS/Android
-2. **Integração Wearables**: Apple Health, Google Fit
-3. **IA mais avançada**: Análise preditiva de adesão
-4. **White-label**: Versão para clínicas personalizarem
-5. **Marketplace de planos**: Profissionais vendem planos prontos
+## 21.3 Longo Prazo (6-12 meses)
+1. App Nativo (React Native)
+2. Integração Wearables
+3. IA preditiva
+4. White-label
+5. API Pública
 
 ---
 
@@ -1679,7 +2010,20 @@ TMB = 10 × peso(kg) + 6.25 × altura(cm) - 5 × idade - 161
 | Manter peso | 0 kcal |
 | Ganhar massa | +300 kcal |
 
+## F. Glossário Técnico
+
+| Termo | Definição |
+|-------|-----------|
+| **RLS** | Row Level Security - políticas de segurança por linha no PostgreSQL |
+| **Edge Function** | Função serverless executada próxima ao usuário |
+| **TMB** | Taxa Metabólica Basal |
+| **TDEE** | Total Daily Energy Expenditure |
+| **Macros** | Macronutrientes (proteína, carboidratos, gordura) |
+| **Adesão** | Taxa de conformidade com o plano alimentar |
+| **Grace Period** | Período de carência após falha de pagamento |
+| **Idempotência** | Garantia de que operação pode ser executada múltiplas vezes com mesmo resultado |
+
 ---
 
-*Documento gerado automaticamente em 18 de Janeiro de 2026*
-*Versão 1.0 - NutriaPlan*
+*Documento consolidado em 18 de Janeiro de 2026*
+*Versão 2.0 - NutriaPlan*
