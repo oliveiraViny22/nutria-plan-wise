@@ -149,6 +149,10 @@ serve(async (req) => {
         result = await updateFood(supabaseAdmin, userId, params.foodId, params.updates, req.headers);
         break;
 
+      case 'batch_update_foods':
+        result = await batchUpdateFoods(supabaseAdmin, userId, params.updates, req.headers);
+        break;
+
       case 'delete_food':
         result = await deleteFood(supabaseAdmin, userId, params.foodId, req.headers);
         break;
@@ -1163,6 +1167,102 @@ async function updateFood(
 
   logStep('Food updated successfully', { foodId });
   return { food: data };
+}
+
+// Batch update foods for migration
+// deno-lint-ignore no-explicit-any
+async function batchUpdateFoods(
+  supabase: any,
+  adminId: string,
+  updates: Array<{ foodId: string; updates: { category?: string; processing_level?: string } }>,
+  headers: Headers
+) {
+  if (!updates || !Array.isArray(updates) || updates.length === 0) {
+    throw new Error('Lista de atualizações é obrigatória');
+  }
+
+  logStep('Batch updating foods', { count: updates.length });
+
+  const results = {
+    success: 0,
+    failed: 0,
+    errors: [] as Array<{ foodId: string; error: string }>,
+  };
+
+  for (const item of updates) {
+    try {
+      const { foodId, updates: foodUpdates } = item;
+      
+      if (!foodId) {
+        results.failed++;
+        results.errors.push({ foodId: 'unknown', error: 'ID do alimento não fornecido' });
+        continue;
+      }
+
+      // Validate updates
+      const filteredUpdates: Record<string, unknown> = {};
+
+      if (foodUpdates.category !== undefined) {
+        if (foodUpdates.category && !VALID_CATEGORIES.includes(foodUpdates.category)) {
+          results.failed++;
+          results.errors.push({ foodId, error: `Categoria inválida: ${foodUpdates.category}` });
+          continue;
+        }
+        filteredUpdates.category = foodUpdates.category || null;
+      }
+
+      if (foodUpdates.processing_level !== undefined) {
+        if (foodUpdates.processing_level && !VALID_PROCESSING_LEVELS.includes(foodUpdates.processing_level)) {
+          results.failed++;
+          results.errors.push({ foodId, error: `Nível de processamento inválido: ${foodUpdates.processing_level}` });
+          continue;
+        }
+        filteredUpdates.processing_level = foodUpdates.processing_level || 'in_natura';
+      }
+
+      if (Object.keys(filteredUpdates).length === 0) {
+        results.failed++;
+        results.errors.push({ foodId, error: 'Nenhum campo válido para atualizar' });
+        continue;
+      }
+
+      // Update the food
+      const { error } = await supabase
+        .from('foods')
+        .update(filteredUpdates)
+        .eq('id', foodId);
+
+      if (error) {
+        results.failed++;
+        results.errors.push({ foodId, error: error.message });
+      } else {
+        results.success++;
+      }
+    } catch (err) {
+      results.failed++;
+      results.errors.push({ 
+        foodId: item.foodId || 'unknown', 
+        error: err instanceof Error ? err.message : 'Erro desconhecido' 
+      });
+    }
+  }
+
+  // Single audit log entry for the batch operation
+  await supabase.from('admin_audit_log').insert({
+    user_id: adminId,
+    action: 'batch_update_foods',
+    entity_type: 'food',
+    entity_id: null,
+    new_value: { 
+      total: updates.length, 
+      success: results.success, 
+      failed: results.failed 
+    },
+    user_agent: headers.get('user-agent'),
+  });
+
+  logStep('Batch update completed', results);
+  return results;
 }
 
 // deno-lint-ignore no-explicit-any

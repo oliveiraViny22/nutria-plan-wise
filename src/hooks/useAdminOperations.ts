@@ -695,6 +695,30 @@ export function useAdminOperations() {
     }
   }, [invokeAdmin, toast]);
 
+  const batchUpdateFoods = useCallback(async (
+    updates: Array<{ foodId: string; updates: { category?: string; processing_level?: string } }>
+  ) => {
+    setLoading(true);
+    try {
+      const result = await invokeAdmin('batch_update_foods', { updates });
+      
+      if (result.success > 0) {
+        toast({ 
+          title: 'Migração aplicada', 
+          description: `${result.success} alimentos atualizados${result.failed > 0 ? `, ${result.failed} falharam` : ''}.` 
+        });
+      }
+      
+      return result as { success: number; failed: number; errors: Array<{ foodId: string; error: string }> };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erro ao atualizar alimentos em lote';
+      toast({ title: 'Erro', description: message, variant: 'destructive' });
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  }, [invokeAdmin, toast]);
+
   return {
     loading,
     settingsLoading,
@@ -730,5 +754,6 @@ export function useAdminOperations() {
     searchFoods,
     updateFood,
     deleteFood,
+    batchUpdateFoods,
   };
 }

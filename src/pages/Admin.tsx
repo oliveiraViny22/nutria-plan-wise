@@ -191,6 +191,7 @@ export default function Admin() {
     searchFoods,
     updateFood,
     deleteFood,
+    batchUpdateFoods,
   } = useAdminOperations();
 
   const [activeTab, setActiveTab] = useState('metrics');
@@ -2287,9 +2288,10 @@ export default function Admin() {
                   await updateFood(foodId, updates as any);
                 }}
                 onApplyBatch={async (batchUpdates) => {
-                  for (const { foodId, updates } of batchUpdates) {
-                    await updateFood(foodId, updates as any);
-                  }
+                  return await batchUpdateFoods(batchUpdates);
+                }}
+                onApplyAll={async (allUpdates) => {
+                  return await batchUpdateFoods(allUpdates);
                 }}
               />
             </div>
