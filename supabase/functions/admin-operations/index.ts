@@ -116,6 +116,22 @@ serve(async (req) => {
         result = getFoodTemplate();
         break;
 
+      case 'change_user_password':
+        result = await changeUserPassword(supabaseAdmin, userId, params.targetUserId, params.newPassword, req.headers);
+        break;
+
+      case 'delete_user':
+        result = await deleteUser(supabaseAdmin, userId, params.targetUserId, req.headers);
+        break;
+
+      case 'get_plans':
+        result = await getPlans(supabaseAdmin);
+        break;
+
+      case 'update_plan':
+        result = await updatePlan(supabaseAdmin, userId, params.planId, params.updates, req.headers);
+        break;
+
       default:
         throw new Error(`Ação desconhecida: ${action}`);
     }
@@ -406,4 +422,159 @@ function getFoodTemplate() {
     validProcessingLevels: VALID_PROCESSING_LEVELS,
     csvContent: [headers.join(','), exampleRow.join(',')].join('\n')
   };
+}
+
+// deno-lint-ignore no-explicit-any
+async function changeUserPassword(
+  supabase: any,
+  adminId: string,
+  targetUserId: string,
+  newPassword: string,
+  headers: Headers
+) {
+  if (!targetUserId || !newPassword) {
+    throw new Error('ID do usuário e nova senha são obrigatórios');
+  }
+
+  if (newPassword.length < 8) {
+    throw new Error('A senha deve ter pelo menos 8 caracteres');
+  }
+
+  logStep('Changing password for user', { targetUserId });
+
+  const { error } = await supabase.auth.admin.updateUserById(
+    targetUserId,
+    { password: newPassword }
+  );
+
+  if (error) {
+    logStep('Error changing password', { error: error.message });
+    throw new Error(`Erro ao alterar senha: ${error.message}`);
+  }
+
+  // Also reset must_change_password flag
+  await supabase
+    .from('profiles')
+    .update({ must_change_password: false })
+    .eq('user_id', targetUserId);
+
+  // Audit log
+  await supabase.from('admin_audit_log').insert({
+    user_id: adminId,
+    action: 'change_user_password',
+    entity_type: 'user',
+    entity_id: targetUserId,
+    user_agent: headers.get('user-agent'),
+  });
+
+  logStep('Password changed successfully', { targetUserId });
+  return { success: true };
+}
+
+// deno-lint-ignore no-explicit-any
+async function deleteUser(
+  supabase: any,
+  adminId: string,
+  targetUserId: string,
+  headers: Headers
+) {
+  if (!targetUserId) {
+    throw new Error('ID do usuário é obrigatório');
+  }
+
+  // Prevent deleting yourself
+  if (targetUserId === adminId) {
+    throw new Error('Você não pode excluir sua própria conta');
+  }
+
+  logStep('Deleting user', { targetUserId });
+
+  // Get user info for audit before deletion
+  const { data: userProfile } = await supabase
+    .from('profiles')
+    .select('name, email')
+    .eq('user_id', targetUserId)
+    .single();
+
+  // Delete from auth (this will cascade delete from profiles due to FK)
+  const { error } = await supabase.auth.admin.deleteUser(targetUserId);
+
+  if (error) {
+    logStep('Error deleting user', { error: error.message });
+    throw new Error(`Erro ao excluir usuário: ${error.message}`);
+  }
+
+  // Audit log
+  await supabase.from('admin_audit_log').insert({
+    user_id: adminId,
+    action: 'delete_user',
+    entity_type: 'user',
+    entity_id: targetUserId,
+    old_value: userProfile,
+    user_agent: headers.get('user-agent'),
+  });
+
+  logStep('User deleted successfully', { targetUserId });
+  return { success: true };
+}
+
+// deno-lint-ignore no-explicit-any
+async function getPlans(supabase: any) {
+  const { data, error } = await supabase
+    .from('plans')
+    .select('*')
+    .order('type')
+    .order('name');
+
+  if (error) throw error;
+  return { plans: data };
+}
+
+// deno-lint-ignore no-explicit-any
+async function updatePlan(
+  supabase: any,
+  adminId: string,
+  planId: string,
+  updates: Record<string, unknown>,
+  headers: Headers
+) {
+  if (!planId) {
+    throw new Error('ID do plano é obrigatório');
+  }
+
+  logStep('Updating plan', { planId, updates });
+
+  // Get old values for audit
+  const { data: oldPlan } = await supabase
+    .from('plans')
+    .select('*')
+    .eq('id', planId)
+    .single();
+
+  // Update plan
+  const { data, error } = await supabase
+    .from('plans')
+    .update(updates)
+    .eq('id', planId)
+    .select()
+    .single();
+
+  if (error) {
+    logStep('Error updating plan', { error: error.message });
+    throw new Error(`Erro ao atualizar plano: ${error.message}`);
+  }
+
+  // Audit log
+  await supabase.from('admin_audit_log').insert({
+    user_id: adminId,
+    action: 'update_plan',
+    entity_type: 'plan',
+    entity_id: planId,
+    old_value: oldPlan,
+    new_value: updates,
+    user_agent: headers.get('user-agent'),
+  });
+
+  logStep('Plan updated successfully', { planId });
+  return { plan: data };
 }

@@ -93,6 +93,30 @@ interface UserProfileUpdate {
   is_test?: boolean | null;
 }
 
+export interface Plan {
+  id: string;
+  name: string;
+  type: 'personal' | 'professional';
+  description: string | null;
+  is_active: boolean;
+  price_monthly: number | null;
+  price_quarterly: number | null;
+  price_semiannual: number | null;
+  price_annual: number | null;
+  stripe_price_monthly: string | null;
+  stripe_price_quarterly: string | null;
+  stripe_price_semiannual: string | null;
+  stripe_price_annual: string | null;
+  stripe_product_id: string | null;
+  diet_limit: number;
+  substitution_limit: number;
+  adjustment_limit: number;
+  patients_limit: number;
+  history_days: number;
+  has_chat: boolean;
+  chat_messages_per_day: number;
+}
+
 export function useAdminOperations() {
   const [loading, setLoading] = useState(false);
   const [settingsLoading, setSettingsLoading] = useState(false);
@@ -472,6 +496,110 @@ export function useAdminOperations() {
     }
   }, [toast]);
 
+  const [plans, setPlans] = useState<Plan[]>([]);
+  const [plansLoading, setPlansLoading] = useState(false);
+
+  const changeUserPassword = useCallback(async (targetUserId: string, newPassword: string) => {
+    setSavingKeys(prev => new Set(prev).add(`password_${targetUserId}`));
+    try {
+      const data = await invokeAdmin('change_user_password', { targetUserId, newPassword });
+      
+      setSavedKeys(prev => new Set(prev).add(`password_${targetUserId}`));
+      setTimeout(() => {
+        setSavedKeys(prev => {
+          const next = new Set(prev);
+          next.delete(`password_${targetUserId}`);
+          return next;
+        });
+      }, 2000);
+      
+      toast({ title: 'Sucesso', description: 'Senha alterada com sucesso.' });
+      return data;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erro ao alterar senha';
+      toast({ title: 'Erro', description: message, variant: 'destructive' });
+      throw error;
+    } finally {
+      setSavingKeys(prev => {
+        const next = new Set(prev);
+        next.delete(`password_${targetUserId}`);
+        return next;
+      });
+    }
+  }, [invokeAdmin, toast]);
+
+  const deleteUser = useCallback(async (targetUserId: string) => {
+    setSavingKeys(prev => new Set(prev).add(`delete_${targetUserId}`));
+    try {
+      await invokeAdmin('delete_user', { targetUserId });
+      
+      // Remove from local state
+      setUsers(prev => prev.filter(u => u.user_id !== targetUserId));
+      setUsersTotal(prev => prev - 1);
+      
+      toast({ title: 'Sucesso', description: 'Usuário excluído com sucesso.' });
+      return true;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erro ao excluir usuário';
+      toast({ title: 'Erro', description: message, variant: 'destructive' });
+      throw error;
+    } finally {
+      setSavingKeys(prev => {
+        const next = new Set(prev);
+        next.delete(`delete_${targetUserId}`);
+        return next;
+      });
+    }
+  }, [invokeAdmin, toast]);
+
+  const fetchPlans = useCallback(async () => {
+    setPlansLoading(true);
+    try {
+      const data = await invokeAdmin('get_plans');
+      setPlans(data.plans || []);
+      return data.plans;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erro ao carregar planos';
+      toast({ title: 'Erro', description: message, variant: 'destructive' });
+      return [];
+    } finally {
+      setPlansLoading(false);
+    }
+  }, [invokeAdmin, toast]);
+
+  const updatePlan = useCallback(async (planId: string, updates: Partial<Plan>) => {
+    setSavingKeys(prev => new Set(prev).add(`plan_${planId}`));
+    try {
+      const data = await invokeAdmin('update_plan', { planId, updates });
+      
+      // Update local state
+      setPlans(prev => prev.map(p => p.id === planId ? { ...p, ...updates } : p));
+      
+      setSavedKeys(prev => new Set(prev).add(`plan_${planId}`));
+      setTimeout(() => {
+        setSavedKeys(prev => {
+          const next = new Set(prev);
+          next.delete(`plan_${planId}`);
+          return next;
+        });
+      }, 2000);
+      
+      toast({ title: 'Sucesso', description: 'Plano atualizado com sucesso.' });
+      return data.plan;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erro ao atualizar plano';
+      toast({ title: 'Erro', description: message, variant: 'destructive' });
+      setErrorKeys(prev => new Set(prev).add(`plan_${planId}`));
+      throw error;
+    } finally {
+      setSavingKeys(prev => {
+        const next = new Set(prev);
+        next.delete(`plan_${planId}`);
+        return next;
+      });
+    }
+  }, [invokeAdmin, toast]);
+
   return {
     loading,
     settingsLoading,
@@ -485,6 +613,8 @@ export function useAdminOperations() {
     users,
     usersLoading,
     usersTotal,
+    plans,
+    plansLoading,
     fetchSettings,
     updateSetting,
     fetchFoodImports,
@@ -497,5 +627,9 @@ export function useAdminOperations() {
     fetchUsers,
     updateUser,
     toggleUserRole,
+    changeUserPassword,
+    deleteUser,
+    fetchPlans,
+    updatePlan,
   };
 }
