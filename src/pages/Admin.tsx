@@ -52,18 +52,40 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Progress } from '@/components/ui/progress';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar } from 'recharts';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useAdminOperations, UserProfile, Plan, DeleteUserPreview } from '@/hooks/useAdminOperations';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 
+// Chart colors
+const CHART_COLORS = [
+  'hsl(var(--primary))',
+  'hsl(142, 71%, 45%)', // green
+  'hsl(262, 83%, 58%)', // purple
+  'hsl(24, 95%, 53%)',  // orange
+  'hsl(199, 89%, 48%)', // blue
+  'hsl(350, 89%, 60%)', // red/pink
+];
+
 // Types for metrics and subscriptions
 interface TimeSeriesDataPoint {
   date: string;
   users: number;
   subscriptions: number;
+}
+
+interface RevenueByPeriodData {
+  period: string;
+  revenue: number;
+  count: number;
+}
+
+interface PlanDistributionData {
+  name: string;
+  value: number;
+  percentage: number;
 }
 
 // Types for metrics and subscriptions
@@ -77,6 +99,8 @@ interface DashboardMetrics {
   activeDietPlans: number;
   dailyLogsLast7Days: number;
   mrrEstimate: number;
+  planDistribution: PlanDistributionData[];
+  revenueByPeriod: RevenueByPeriodData[];
 }
 
 interface SubscriptionData {
@@ -231,6 +255,7 @@ export default function Admin() {
         { data: activePlans },
         { count: logsCount },
         { data: activeSubsForMRR },
+        { data: plansData },
       ] = await Promise.all([
         supabase.from('profiles').select('*', { count: 'exact', head: true }),
         supabase.from('profiles').select('account_type'),
@@ -240,7 +265,8 @@ export default function Admin() {
         supabase.from('diet_plans').select('*', { count: 'exact', head: true }),
         supabase.from('diet_plans').select('id').eq('status', 'active'),
         supabase.from('daily_logs').select('*', { count: 'exact', head: true }).gte('created_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()),
-        supabase.from('subscriptions').select('plan_id, billing_cycle, plans(price_monthly, price_annual)').eq('status', 'active'),
+        supabase.from('subscriptions').select('plan_id, billing_cycle, plans(name, price_monthly, price_quarterly, price_semiannual, price_annual)').eq('status', 'active'),
+        supabase.from('plans').select('id, name, price_monthly'),
       ]);
 
       // Group counts
@@ -261,18 +287,83 @@ export default function Admin() {
         }
       });
 
-      // Estimate MRR (Monthly Recurring Revenue)
+      // Estimate MRR (Monthly Recurring Revenue) and calculate revenue by billing cycle
       let mrrEstimate = 0;
+      const revenueByBillingCycle: Record<string, { revenue: number; count: number }> = {
+        monthly: { revenue: 0, count: 0 },
+        quarterly: { revenue: 0, count: 0 },
+        semiannual: { revenue: 0, count: 0 },
+        annual: { revenue: 0, count: 0 },
+      };
+
       activeSubsForMRR?.forEach((sub) => {
-        const plan = sub.plans as { price_monthly: number | null; price_annual: number | null } | null;
+        const plan = sub.plans as { 
+          name: string;
+          price_monthly: number | null; 
+          price_quarterly: number | null;
+          price_semiannual: number | null;
+          price_annual: number | null;
+        } | null;
+        
         if (plan) {
-          if (sub.billing_cycle === 'annual' && plan.price_annual) {
-            mrrEstimate += plan.price_annual / 12;
-          } else if (plan.price_monthly) {
-            mrrEstimate += plan.price_monthly;
+          const cycle = sub.billing_cycle || 'monthly';
+          let price = 0;
+          
+          switch (cycle) {
+            case 'annual':
+              price = plan.price_annual || 0;
+              mrrEstimate += price / 12;
+              break;
+            case 'semiannual':
+              price = plan.price_semiannual || 0;
+              mrrEstimate += price / 6;
+              break;
+            case 'quarterly':
+              price = plan.price_quarterly || 0;
+              mrrEstimate += price / 3;
+              break;
+            default:
+              price = plan.price_monthly || 0;
+              mrrEstimate += price;
+          }
+          
+          if (revenueByBillingCycle[cycle]) {
+            revenueByBillingCycle[cycle].revenue += price / 100;
+            revenueByBillingCycle[cycle].count += 1;
           }
         }
       });
+
+      // Format revenue by period for chart
+      const billingCycleLabels: Record<string, string> = {
+        monthly: 'Mensal',
+        quarterly: 'Trimestral',
+        semiannual: 'Semestral',
+        annual: 'Anual',
+      };
+      
+      const revenueByPeriod: RevenueByPeriodData[] = Object.entries(revenueByBillingCycle)
+        .filter(([_, data]) => data.count > 0)
+        .map(([period, data]) => ({
+          period: billingCycleLabels[period] || period,
+          revenue: data.revenue,
+          count: data.count,
+        }));
+
+      // Plan distribution for pie chart
+      const planCounts: Record<string, number> = {};
+      activeSubsForMRR?.forEach((sub) => {
+        const plan = sub.plans as { name: string } | null;
+        const planName = plan?.name || 'Desconhecido';
+        planCounts[planName] = (planCounts[planName] || 0) + 1;
+      });
+
+      const totalActiveSubs = activeSubsForMRR?.length || 0;
+      const planDistribution: PlanDistributionData[] = Object.entries(planCounts).map(([name, value]) => ({
+        name,
+        value,
+        percentage: totalActiveSubs > 0 ? Math.round((value / totalActiveSubs) * 100) : 0,
+      }));
 
       setMetrics({
         totalUsers: usersCount || 0,
@@ -284,6 +375,8 @@ export default function Admin() {
         activeDietPlans: activePlans?.length || 0,
         dailyLogsLast7Days: logsCount || 0,
         mrrEstimate: mrrEstimate / 100, // Convert from cents
+        planDistribution,
+        revenueByPeriod,
       });
     } catch (error) {
       console.error('Error fetching metrics:', error);
@@ -1060,6 +1153,124 @@ export default function Admin() {
                       )}
                     </CardContent>
                   </Card>
+
+                  {/* New Charts Row: Pie + Bar */}
+                  <div className="grid gap-6 md:grid-cols-2 mt-6">
+                    {/* Pie Chart - Plan Distribution */}
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-base flex items-center gap-2">
+                          <Crown className="h-4 w-4 text-primary" />
+                          Distribuição de Planos
+                        </CardTitle>
+                        <CardDescription>Assinaturas ativas por plano</CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        {metrics.planDistribution.length > 0 ? (
+                          <div className="h-[280px]">
+                            <ResponsiveContainer width="100%" height="100%">
+                              <PieChart>
+                                <Pie
+                                  data={metrics.planDistribution}
+                                  cx="50%"
+                                  cy="50%"
+                                  labelLine={false}
+                                  label={({ name, percentage }) => `${name}: ${percentage}%`}
+                                  outerRadius={100}
+                                  fill="#8884d8"
+                                  dataKey="value"
+                                >
+                                  {metrics.planDistribution.map((_, index) => (
+                                    <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                                  ))}
+                                </Pie>
+                                <Tooltip 
+                                  contentStyle={{ 
+                                    backgroundColor: 'hsl(var(--card))',
+                                    border: '1px solid hsl(var(--border))',
+                                    borderRadius: '8px',
+                                  }}
+                                  formatter={(value: number, name: string) => [`${value} assinaturas`, name]}
+                                />
+                                <Legend />
+                              </PieChart>
+                            </ResponsiveContainer>
+                          </div>
+                        ) : (
+                          <div className="h-[280px] flex flex-col items-center justify-center text-muted-foreground">
+                            <Crown className="h-12 w-12 mb-4 opacity-50" />
+                            <p>Nenhuma assinatura ativa</p>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+
+                    {/* Bar Chart - Revenue by Billing Cycle */}
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-base flex items-center gap-2">
+                          <DollarSign className="h-4 w-4 text-primary" />
+                          Receita por Período
+                        </CardTitle>
+                        <CardDescription>Valor por ciclo de cobrança</CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        {metrics.revenueByPeriod.length > 0 ? (
+                          <div className="h-[280px]">
+                            <ResponsiveContainer width="100%" height="100%">
+                              <BarChart
+                                data={metrics.revenueByPeriod}
+                                margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+                              >
+                                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                                <XAxis 
+                                  dataKey="period" 
+                                  fontSize={12}
+                                  tickLine={false}
+                                  axisLine={false}
+                                />
+                                <YAxis 
+                                  fontSize={12}
+                                  tickLine={false}
+                                  axisLine={false}
+                                  tickFormatter={(value) => `R$ ${value}`}
+                                />
+                                <Tooltip 
+                                  contentStyle={{ 
+                                    backgroundColor: 'hsl(var(--card))',
+                                    border: '1px solid hsl(var(--border))',
+                                    borderRadius: '8px',
+                                  }}
+                                  formatter={(value: number, name: string) => {
+                                    if (name === 'revenue') return [`R$ ${value.toFixed(2)}`, 'Receita'];
+                                    return [`${value}`, 'Assinaturas'];
+                                  }}
+                                />
+                                <Legend formatter={(value) => value === 'revenue' ? 'Receita (R$)' : 'Assinaturas'} />
+                                <Bar 
+                                  dataKey="revenue" 
+                                  name="revenue"
+                                  fill="hsl(var(--primary))" 
+                                  radius={[4, 4, 0, 0]}
+                                />
+                                <Bar 
+                                  dataKey="count" 
+                                  name="count"
+                                  fill="hsl(142, 71%, 45%)" 
+                                  radius={[4, 4, 0, 0]}
+                                />
+                              </BarChart>
+                            </ResponsiveContainer>
+                          </div>
+                        ) : (
+                          <div className="h-[280px] flex flex-col items-center justify-center text-muted-foreground">
+                            <DollarSign className="h-12 w-12 mb-4 opacity-50" />
+                            <p>Nenhuma receita registrada</p>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </div>
                 </>
               ) : (
                 <Card>
