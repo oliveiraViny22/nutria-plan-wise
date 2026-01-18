@@ -82,6 +82,48 @@ export type Database = {
           },
         ]
       }
+      adherence_report_files: {
+        Row: {
+          diet_plan_id: string
+          file_path: string
+          generated_at: string
+          id: string
+          metrics_snapshot: Json
+          period_end: string
+          period_start: string
+          plan_type: string
+          plan_version: number
+          student_id: string | null
+          user_id: string
+        }
+        Insert: {
+          diet_plan_id: string
+          file_path: string
+          generated_at?: string
+          id?: string
+          metrics_snapshot: Json
+          period_end: string
+          period_start: string
+          plan_type: string
+          plan_version?: number
+          student_id?: string | null
+          user_id: string
+        }
+        Update: {
+          diet_plan_id?: string
+          file_path?: string
+          generated_at?: string
+          id?: string
+          metrics_snapshot?: Json
+          period_end?: string
+          period_start?: string
+          plan_type?: string
+          plan_version?: number
+          student_id?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       ai_suggestions: {
         Row: {
           adherence_data_used: Json

@@ -41,9 +41,12 @@ import {
   Legend,
 } from 'recharts';
 
+import { AdherenceReportPdf } from '@/components/AdherenceReportPdf';
+
 interface AdherenceDashboardProps {
   studentId: string;
   dietPlanId: string;
+  studentName?: string;
 }
 
 interface AdherenceReport {
@@ -97,7 +100,7 @@ const exceptionChartConfig: ChartConfig = {
   },
 };
 
-export function AdherenceDashboard({ studentId, dietPlanId }: AdherenceDashboardProps) {
+export function AdherenceDashboard({ studentId, dietPlanId, studentName }: AdherenceDashboardProps) {
   const [loading, setLoading] = useState(false);
   const [report, setReport] = useState<AdherenceReport | null>(null);
   const [period, setPeriod] = useState('7'); // days
@@ -200,6 +203,11 @@ export function AdherenceDashboard({ studentId, dietPlanId }: AdherenceDashboard
                 Dashboard de Adesão
               </CardTitle>
               <div className="flex items-center gap-2">
+                <AdherenceReportPdf 
+                  studentId={studentId} 
+                  dietPlanId={dietPlanId}
+                  studentName={studentName}
+                />
                 <Select value={period} onValueChange={setPeriod}>
                   <SelectTrigger className="w-[100px] h-8 text-xs">
                     <SelectValue />
