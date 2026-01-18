@@ -1,25 +1,70 @@
 import { z } from 'zod';
 
-// Common weak passwords to block
+// Common weak passwords to block (expanded list)
 const WEAK_PASSWORDS = [
   '123456',
   '12345678',
   '123456789',
+  '1234567890',
   'password',
+  'password1',
+  'password123',
   'senha123',
   'senha1234',
   'qwerty',
+  'qwerty123',
   'abc123',
-  'password1',
+  'abcd1234',
   'admin123',
   '111111',
   '000000',
   'iloveyou',
   'letmein',
   'welcome',
+  'monkey',
+  'dragon',
+  'master',
+  'login',
+  'admin',
+  'passw0rd',
+  'sunshine',
+  'princess',
+  'football',
+  'baseball',
+  'trustno1',
+  'batman',
+  'superman',
+  '123abc',
+  'qwertyuiop',
+  'asdfghjkl',
+  'zxcvbnm',
+  '1q2w3e4r',
+  '1qaz2wsx',
+  'senha',
+  'mudar123',
+  'teste123',
+  'usuario1',
 ];
 
-// Password validation schema
+// Check for sequential patterns
+function hasSequentialPattern(password: string): boolean {
+  const sequences = ['123', '234', '345', '456', '567', '678', '789', '890', 
+                     'abc', 'bcd', 'cde', 'def', 'efg', 'fgh', 'ghi', 'hij',
+                     'ijk', 'jkl', 'klm', 'lmn', 'mno', 'nop', 'opq', 'pqr',
+                     'qrs', 'rst', 'stu', 'tuv', 'uvw', 'vwx', 'wxy', 'xyz',
+                     'qwe', 'wer', 'ert', 'rty', 'tyu', 'yui', 'uio', 'iop',
+                     'asd', 'sdf', 'dfg', 'fgh', 'ghj', 'hjk', 'jkl',
+                     'zxc', 'xcv', 'cvb', 'vbn', 'bnm'];
+  const lowerPass = password.toLowerCase();
+  return sequences.some(seq => lowerPass.includes(seq));
+}
+
+// Check for repeated characters
+function hasRepeatedChars(password: string): boolean {
+  return /(.)\1{2,}/.test(password);
+}
+
+// Password validation schema with enhanced rules
 export const passwordSchema = z
   .string()
   .min(8, 'A senha deve ter pelo menos 8 caracteres')
@@ -28,6 +73,14 @@ export const passwordSchema = z
   .refine(
     (password) => !WEAK_PASSWORDS.includes(password.toLowerCase()),
     'Esta senha é muito comum. Escolha uma senha mais forte.'
+  )
+  .refine(
+    (password) => !hasSequentialPattern(password),
+    'A senha não pode conter sequências óbvias (123, abc, qwerty).'
+  )
+  .refine(
+    (password) => !hasRepeatedChars(password),
+    'A senha não pode conter caracteres repetidos em sequência (aaa, 111).'
   );
 
 // Validate password and return error message if invalid

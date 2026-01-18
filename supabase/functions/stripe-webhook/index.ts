@@ -192,15 +192,16 @@ serve(async (req) => {
                   .single();
 
                 if (currentSub?.status === 'active') {
-                  newStatus = 'grace_period';
+                  // Use past_due instead of grace_period (which isn't in the enum)
+                  newStatus = 'past_due';
                   gracePeriodEnd = calculateGracePeriodEnd();
                   log.info("Entering grace period", { gracePeriodEnd });
-                } else if (currentSub?.status === 'grace_period') {
+                } else if (currentSub?.status === 'past_due') {
                   if (currentSub.grace_period_end && new Date(currentSub.grace_period_end) < new Date()) {
-                    newStatus = 'suspended';
-                    log.info("Grace period expired, suspending");
+                    newStatus = 'canceled';
+                    log.info("Grace period expired, canceling");
                   } else {
-                    newStatus = 'grace_period';
+                    newStatus = 'past_due';
                     gracePeriodEnd = currentSub.grace_period_end;
                   }
                 } else {
@@ -211,7 +212,7 @@ serve(async (req) => {
                 newStatus = 'canceled';
                 break;
               case 'unpaid':
-                newStatus = 'suspended';
+                newStatus = 'expired';
                 break;
               default:
                 newStatus = 'expired';
@@ -331,15 +332,16 @@ serve(async (req) => {
             let gracePeriodEnd: string | null = null;
 
             if (currentSub?.status === 'active') {
-              newStatus = 'grace_period';
+              // Use past_due with grace_period_end instead of non-existent grace_period status
+              newStatus = 'past_due';
               gracePeriodEnd = calculateGracePeriodEnd();
               log.info("Entering grace period due to payment failure");
-            } else if (currentSub?.status === 'grace_period') {
+            } else if (currentSub?.status === 'past_due') {
               if (currentSub.grace_period_end && new Date(currentSub.grace_period_end) < new Date()) {
-                newStatus = 'suspended';
-                log.info("Grace period expired, suspending");
+                newStatus = 'canceled';
+                log.info("Grace period expired, canceling");
               } else {
-                newStatus = 'grace_period';
+                newStatus = 'past_due';
                 gracePeriodEnd = currentSub.grace_period_end;
               }
             }

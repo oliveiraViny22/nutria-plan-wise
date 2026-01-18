@@ -69,13 +69,17 @@ export default function Signup() {
       // Handle specific Supabase auth errors
       const message = error.message || 'Erro ao criar conta';
       
-      if (message.includes('weak_password') || message.includes('Password')) {
-        toast.error('Senha muito fraca. Use uma combinação mais forte.');
-      } else if (message.includes('already registered') || message.includes('already exists')) {
+      if (message.includes('weak_password') || message.includes('Password') || message.includes('password')) {
+        toast.error('Senha muito fraca. Use uma combinação mais forte com letras, números e símbolos.');
+        setFieldErrors({ password: 'Senha muito fraca' });
+      } else if (message.includes('already registered') || message.includes('already exists') || message.includes('User already registered')) {
         toast.error('Este e-mail já está cadastrado.');
         setFieldErrors({ email: 'E-mail já cadastrado' });
-      } else if (message.includes('leaked') || message.includes('compromised')) {
-        toast.error('Esta senha foi encontrada em vazamentos de dados. Escolha outra.');
+      } else if (message.includes('leaked') || message.includes('compromised') || message.includes('HIBP')) {
+        toast.error('Esta senha foi encontrada em vazamentos de dados conhecidos. Por segurança, escolha outra senha.');
+        setFieldErrors({ password: 'Senha comprometida - escolha outra' });
+      } else if (message.includes('invalid') || message.includes('Invalid')) {
+        toast.error('Dados inválidos. Verifique o e-mail e senha.');
       } else {
         toast.error(message);
       }
