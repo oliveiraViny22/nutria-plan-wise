@@ -335,11 +335,11 @@ export default function ProfessionalDashboard() {
               <CardContent className="pt-4 sm:pt-6 px-3 sm:px-6">
                 <div className="flex items-center gap-2 sm:gap-3">
                   <div className="p-1.5 sm:p-2 rounded-lg bg-orange-500/10">
-                    <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5 text-orange-500" />
+                    <CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5 text-orange-500" />
                   </div>
                   <div>
-                    <p className="text-xl sm:text-2xl font-bold">{metrics.averageCalories}</p>
-                    <p className="text-[10px] sm:text-sm text-muted-foreground">Média kcal</p>
+                    <p className="text-xl sm:text-2xl font-bold">{metrics.studentsWithActiveDiets}</p>
+                    <p className="text-[10px] sm:text-sm text-muted-foreground">Planos Ativos</p>
                   </div>
                 </div>
               </CardContent>
