@@ -604,14 +604,14 @@ export default function Admin() {
         throw new Error(response.error.message);
       }
 
-      // Handle PDF response
-      const blob = new Blob([response.data], { type: 'application/pdf' });
+      // Handle TXT response
+      const blob = new Blob([response.data], { type: 'text/plain; charset=utf-8' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
       a.download = docType === 'technical' 
-        ? 'DOCUMENTACAO_TECNICA_NUTRIAPLAN.pdf' 
-        : 'DOCUMENTACAO_COMERCIAL_NUTRIAPLAN.pdf';
+        ? 'DOCUMENTACAO_TECNICA_NUTRIAPLAN.txt' 
+        : 'DOCUMENTACAO_COMERCIAL_NUTRIAPLAN.txt';
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -1479,7 +1479,7 @@ export default function Admin() {
                       ) : (
                         <Download className="h-4 w-4 mr-2" />
                       )}
-                      Baixar PDF Técnico
+                      Baixar TXT Técnico
                     </Button>
                   </CardContent>
                 </Card>
@@ -1533,7 +1533,7 @@ export default function Admin() {
                       ) : (
                         <Download className="h-4 w-4 mr-2" />
                       )}
-                      Baixar PDF Comercial
+                      Baixar TXT Comercial
                     </Button>
                   </CardContent>
                 </Card>

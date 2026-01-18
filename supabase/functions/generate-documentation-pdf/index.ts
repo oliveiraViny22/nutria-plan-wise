@@ -1,152 +1,45 @@
 import "https://deno.land/x/xhr@0.3.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { PDFDocument, rgb, StandardFonts } from "https://esm.sh/pdf-lib@1.17.1";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// PDF Generation helpers
-async function generatePDF(title: string, sections: { title: string; content: string[] }[]) {
-  const pdfDoc = await PDFDocument.create();
-  const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-  const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+// Generate TXT documentation
+function generateTXT(title: string, sections: { title: string; content: string[] }[]): string {
+  const lines: string[] = [];
+  const separator = '='.repeat(80);
+  const subSeparator = '-'.repeat(60);
   
-  const pageWidth = 595.28; // A4
-  const pageHeight = 841.89;
-  const margin = 50;
-  const lineHeight = 14;
-  const titleSize = 24;
-  const sectionTitleSize = 14;
-  const bodySize = 10;
+  // Header
+  lines.push(separator);
+  lines.push(title);
+  lines.push(separator);
+  lines.push(`Gerado em: ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}`);
+  lines.push('');
   
-  let currentPage = pdfDoc.addPage([pageWidth, pageHeight]);
-  let yPosition = pageHeight - margin;
-  
-  // Helper to add new page
-  const addNewPage = () => {
-    currentPage = pdfDoc.addPage([pageWidth, pageHeight]);
-    yPosition = pageHeight - margin;
-  };
-  
-  // Helper to check if we need a new page
-  const checkNewPage = (neededHeight: number) => {
-    if (yPosition - neededHeight < margin) {
-      addNewPage();
-    }
-  };
-  
-  // Draw main title
-  currentPage.drawText(title, {
-    x: margin,
-    y: yPosition,
-    size: titleSize,
-    font: boldFont,
-    color: rgb(0.13, 0.55, 0.13), // Green color
-  });
-  yPosition -= titleSize + 10;
-  
-  // Draw date
-  const dateStr = `Gerado em: ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}`;
-  currentPage.drawText(dateStr, {
-    x: margin,
-    y: yPosition,
-    size: 9,
-    font: font,
-    color: rgb(0.5, 0.5, 0.5),
-  });
-  yPosition -= 30;
-  
-  // Draw separator line
-  currentPage.drawLine({
-    start: { x: margin, y: yPosition },
-    end: { x: pageWidth - margin, y: yPosition },
-    thickness: 1,
-    color: rgb(0.8, 0.8, 0.8),
-  });
-  yPosition -= 20;
-  
-  // Process sections
+  // Sections
   for (const section of sections) {
-    checkNewPage(sectionTitleSize + 30);
+    lines.push(subSeparator);
+    lines.push(section.title.toUpperCase());
+    lines.push(subSeparator);
+    lines.push('');
     
-    // Section title
-    currentPage.drawText(section.title.toUpperCase(), {
-      x: margin,
-      y: yPosition,
-      size: sectionTitleSize,
-      font: boldFont,
-      color: rgb(0.2, 0.2, 0.2),
-    });
-    yPosition -= sectionTitleSize + 10;
-    
-    // Section content
     for (const line of section.content) {
-      // Word wrap
-      const maxWidth = pageWidth - (margin * 2);
-      const words = line.split(' ');
-      let currentLine = '';
-      
-      for (const word of words) {
-        const testLine = currentLine ? `${currentLine} ${word}` : word;
-        const textWidth = font.widthOfTextAtSize(testLine, bodySize);
-        
-        if (textWidth > maxWidth && currentLine) {
-          checkNewPage(lineHeight);
-          currentPage.drawText(currentLine, {
-            x: margin,
-            y: yPosition,
-            size: bodySize,
-            font: line.startsWith('•') || line.startsWith('-') ? font : font,
-            color: rgb(0.1, 0.1, 0.1),
-          });
-          yPosition -= lineHeight;
-          currentLine = word;
-        } else {
-          currentLine = testLine;
-        }
-      }
-      
-      if (currentLine) {
-        checkNewPage(lineHeight);
-        currentPage.drawText(currentLine, {
-          x: margin,
-          y: yPosition,
-          size: bodySize,
-          font: font,
-          color: rgb(0.1, 0.1, 0.1),
-        });
-        yPosition -= lineHeight;
-      }
+      lines.push(line);
     }
     
-    yPosition -= 15; // Space between sections
+    lines.push('');
   }
   
-  // Add page numbers
-  const pages = pdfDoc.getPages();
-  for (let i = 0; i < pages.length; i++) {
-    const page = pages[i];
-    page.drawText(`Página ${i + 1} de ${pages.length}`, {
-      x: pageWidth - margin - 70,
-      y: 30,
-      size: 8,
-      font: font,
-      color: rgb(0.5, 0.5, 0.5),
-    });
-    
-    page.drawText('NutriaPlan - Documentação Oficial', {
-      x: margin,
-      y: 30,
-      size: 8,
-      font: font,
-      color: rgb(0.5, 0.5, 0.5),
-    });
-  }
+  // Footer
+  lines.push(separator);
+  lines.push('NutriaPlan - Documentação Oficial');
+  lines.push(separator);
   
-  return await pdfDoc.save();
+  return lines.join('\n');
 }
 
 // Technical documentation content
@@ -473,15 +366,15 @@ const COMMERCIAL_SECTIONS = [
     content: [
       "PARA PROFISSIONAIS:",
       "- ANTES: 2-4 horas para criar plano | DEPOIS: 30 segundos com IA",
-      "- ANTES: Sem dados de adesao | DEPOIS: Metricas em tempo real",
-      "- ANTES: Ajustes apenas na consulta | DEPOIS: Alertas automaticos",
-      "- ANTES: Escala limitada | DEPOIS: Ate 50 pacientes ativos",
+      "- ANTES: Sem dados de adesão | DEPOIS: Métricas em tempo real",
+      "- ANTES: Ajustes apenas na consulta | DEPOIS: Alertas automáticos",
+      "- ANTES: Escala limitada | DEPOIS: Até 50 pacientes ativos",
       "",
       "PARA PACIENTES:",
-      "- ANTES: Plano unico e monotono | DEPOIS: Multiplas opcoes",
+      "- ANTES: Plano único e monótono | DEPOIS: Múltiplas opções",
       "- ANTES: Sem acompanhamento | DEPOIS: Chat 24/7",
-      "- ANTES: Registro dificil | DEPOIS: Confirmacao com um toque",
-      "- ANTES: Sem progresso visivel | DEPOIS: Dashboard de evolucao",
+      "- ANTES: Registro difícil | DEPOIS: Confirmação com um toque",
+      "- ANTES: Sem progresso visível | DEPOIS: Dashboard de evolução",
     ]
   },
   {
@@ -565,15 +458,15 @@ serve(async (req) => {
     // Parse request
     const { docType } = await req.json();
     
-    let pdfBytes: Uint8Array;
+    let content: string;
     let filename: string;
 
     if (docType === 'technical') {
-      pdfBytes = await generatePDF('DOCUMENTAÇÃO TÉCNICA - NUTRIAPLAN', TECHNICAL_SECTIONS);
-      filename = 'DOCUMENTACAO_TECNICA_NUTRIAPLAN.pdf';
+      content = generateTXT('DOCUMENTAÇÃO TÉCNICA - NUTRIAPLAN', TECHNICAL_SECTIONS);
+      filename = 'DOCUMENTACAO_TECNICA_NUTRIAPLAN.txt';
     } else if (docType === 'commercial') {
-      pdfBytes = await generatePDF('DOCUMENTAÇÃO COMERCIAL - NUTRIAPLAN', COMMERCIAL_SECTIONS);
-      filename = 'DOCUMENTACAO_COMERCIAL_NUTRIAPLAN.pdf';
+      content = generateTXT('DOCUMENTAÇÃO COMERCIAL - NUTRIAPLAN', COMMERCIAL_SECTIONS);
+      filename = 'DOCUMENTACAO_COMERCIAL_NUTRIAPLAN.txt';
     } else {
       return new Response(
         JSON.stringify({ error: 'Invalid docType. Use "technical" or "commercial"' }),
@@ -581,12 +474,12 @@ serve(async (req) => {
       );
     }
 
-    console.log(`[generate-documentation-pdf] Generated ${docType} PDF for admin ${user.email}`);
+    console.log(`[generate-documentation-pdf] Generated ${docType} TXT for admin ${user.email}`);
 
-    return new Response(new Uint8Array(pdfBytes), {
+    return new Response(content, {
       headers: {
         ...corsHeaders,
-        'Content-Type': 'application/pdf',
+        'Content-Type': 'text/plain; charset=utf-8',
         'Content-Disposition': `attachment; filename="${filename}"`,
       },
     });
