@@ -20,6 +20,7 @@ import {
   Eye,
   ClipboardCheck,
   Bell,
+  Shield,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Logo } from '@/components/Logo';
@@ -44,7 +45,7 @@ import { toast } from 'sonner';
 
 export default function Dashboard() {
   const { profile, signOut } = useAuth();
-  const { isProfessional, hasActiveLicense } = useUserRole();
+  const { isProfessional, hasActiveLicense, isAdmin } = useUserRole();
   const { isLinkedStudent } = useLinkedStudent();
   const permissions = useAccountPermissions();
   const {
@@ -224,6 +225,13 @@ export default function Dashboard() {
                 <MessageCircle className="w-5 h-5" />
               </Button>
             </Link>
+            {isAdmin && (
+              <Link to="/admin">
+                <Button variant="ghost" size="icon" className="w-10 h-10" title="Painel Admin">
+                  <Shield className="w-5 h-5 text-primary" />
+                </Button>
+              </Link>
+            )}
             <Button variant="ghost" size="icon" className="w-10 h-10" onClick={handleSignOut}>
               <LogOut className="w-5 h-5" />
             </Button>
