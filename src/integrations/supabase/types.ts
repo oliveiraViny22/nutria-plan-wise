@@ -14,6 +14,130 @@ export type Database = {
   }
   public: {
     Tables: {
+      adherence_metrics: {
+        Row: {
+          adherence_by_meal: Json | null
+          adherence_by_option: Json | null
+          calculated_at: string
+          days_with_records: number
+          diet_plan_id: string
+          exception_distribution: Json | null
+          id: string
+          meals_confirmed: number | null
+          meals_late_confirmed: number | null
+          meals_out_of_plan: number | null
+          meals_skipped: number | null
+          overall_adherence_rate: number | null
+          period_end: string
+          period_start: string
+          plan_version: number
+          total_days: number
+          user_id: string
+        }
+        Insert: {
+          adherence_by_meal?: Json | null
+          adherence_by_option?: Json | null
+          calculated_at?: string
+          days_with_records?: number
+          diet_plan_id: string
+          exception_distribution?: Json | null
+          id?: string
+          meals_confirmed?: number | null
+          meals_late_confirmed?: number | null
+          meals_out_of_plan?: number | null
+          meals_skipped?: number | null
+          overall_adherence_rate?: number | null
+          period_end: string
+          period_start: string
+          plan_version?: number
+          total_days?: number
+          user_id: string
+        }
+        Update: {
+          adherence_by_meal?: Json | null
+          adherence_by_option?: Json | null
+          calculated_at?: string
+          days_with_records?: number
+          diet_plan_id?: string
+          exception_distribution?: Json | null
+          id?: string
+          meals_confirmed?: number | null
+          meals_late_confirmed?: number | null
+          meals_out_of_plan?: number | null
+          meals_skipped?: number | null
+          overall_adherence_rate?: number | null
+          period_end?: string
+          period_start?: string
+          plan_version?: number
+          total_days?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "adherence_metrics_diet_plan_id_fkey"
+            columns: ["diet_plan_id"]
+            isOneToOne: false
+            referencedRelation: "diet_plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_suggestions: {
+        Row: {
+          adherence_data_used: Json
+          created_at: string
+          diet_plan_id: string
+          hypothesis: string
+          id: string
+          proposed_changes: Json
+          rationale: string
+          review_notes: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          suggestion_type: string
+          user_id: string
+        }
+        Insert: {
+          adherence_data_used: Json
+          created_at?: string
+          diet_plan_id: string
+          hypothesis: string
+          id?: string
+          proposed_changes: Json
+          rationale: string
+          review_notes?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          suggestion_type: string
+          user_id: string
+        }
+        Update: {
+          adherence_data_used?: Json
+          created_at?: string
+          diet_plan_id?: string
+          hypothesis?: string
+          id?: string
+          proposed_changes?: Json
+          rationale?: string
+          review_notes?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          suggestion_type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_suggestions_diet_plan_id_fkey"
+            columns: ["diet_plan_id"]
+            isOneToOne: false
+            referencedRelation: "diet_plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       chat_messages: {
         Row: {
           content: string
@@ -37,6 +161,59 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      daily_logs: {
+        Row: {
+          created_at: string
+          diet_plan_id: string
+          id: string
+          log_date: string
+          plan_version: number
+          status: string
+          total_calories_consumed: number | null
+          total_carbs_consumed: number | null
+          total_fat_consumed: number | null
+          total_protein_consumed: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          diet_plan_id: string
+          id?: string
+          log_date: string
+          plan_version?: number
+          status?: string
+          total_calories_consumed?: number | null
+          total_carbs_consumed?: number | null
+          total_fat_consumed?: number | null
+          total_protein_consumed?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          diet_plan_id?: string
+          id?: string
+          log_date?: string
+          plan_version?: number
+          status?: string
+          total_calories_consumed?: number | null
+          total_carbs_consumed?: number | null
+          total_fat_consumed?: number | null
+          total_protein_consumed?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "daily_logs_diet_plan_id_fkey"
+            columns: ["diet_plan_id"]
+            isOneToOne: false
+            referencedRelation: "diet_plans"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       diet_plans: {
         Row: {
@@ -155,6 +332,156 @@ export type Database = {
           },
         ]
       }
+      meal_logs: {
+        Row: {
+          calories_consumed: number | null
+          carbs_consumed: number | null
+          confirmed_at: string | null
+          confirmed_option_id: string | null
+          created_at: string
+          daily_log_id: string
+          fat_consumed: number | null
+          id: string
+          meal_id: string
+          notes: string | null
+          protein_consumed: number | null
+          status: string
+        }
+        Insert: {
+          calories_consumed?: number | null
+          carbs_consumed?: number | null
+          confirmed_at?: string | null
+          confirmed_option_id?: string | null
+          created_at?: string
+          daily_log_id: string
+          fat_consumed?: number | null
+          id?: string
+          meal_id: string
+          notes?: string | null
+          protein_consumed?: number | null
+          status?: string
+        }
+        Update: {
+          calories_consumed?: number | null
+          carbs_consumed?: number | null
+          confirmed_at?: string | null
+          confirmed_option_id?: string | null
+          created_at?: string
+          daily_log_id?: string
+          fat_consumed?: number | null
+          id?: string
+          meal_id?: string
+          notes?: string | null
+          protein_consumed?: number | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meal_logs_confirmed_option_id_fkey"
+            columns: ["confirmed_option_id"]
+            isOneToOne: false
+            referencedRelation: "meal_options"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meal_logs_daily_log_id_fkey"
+            columns: ["daily_log_id"]
+            isOneToOne: false
+            referencedRelation: "daily_logs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meal_logs_meal_id_fkey"
+            columns: ["meal_id"]
+            isOneToOne: false
+            referencedRelation: "meals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      meal_option_foods: {
+        Row: {
+          created_at: string
+          food_id: string
+          id: string
+          meal_option_id: string
+          quantity: number
+        }
+        Insert: {
+          created_at?: string
+          food_id: string
+          id?: string
+          meal_option_id: string
+          quantity?: number
+        }
+        Update: {
+          created_at?: string
+          food_id?: string
+          id?: string
+          meal_option_id?: string
+          quantity?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meal_option_foods_food_id_fkey"
+            columns: ["food_id"]
+            isOneToOne: false
+            referencedRelation: "foods"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meal_option_foods_meal_option_id_fkey"
+            columns: ["meal_option_id"]
+            isOneToOne: false
+            referencedRelation: "meal_options"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      meal_options: {
+        Row: {
+          created_at: string
+          id: string
+          meal_id: string
+          name: string | null
+          option_number: number
+          total_calories: number
+          total_carbs: number
+          total_fat: number
+          total_protein: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          meal_id: string
+          name?: string | null
+          option_number: number
+          total_calories?: number
+          total_carbs?: number
+          total_fat?: number
+          total_protein?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          meal_id?: string
+          name?: string | null
+          option_number?: number
+          total_calories?: number
+          total_carbs?: number
+          total_fat?: number
+          total_protein?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meal_options_meal_id_fkey"
+            columns: ["meal_id"]
+            isOneToOne: false
+            referencedRelation: "meals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       meals: {
         Row: {
           created_at: string | null
@@ -230,6 +557,47 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "plan_history_diet_plan_id_fkey"
+            columns: ["diet_plan_id"]
+            isOneToOne: false
+            referencedRelation: "diet_plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      plan_versions: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          created_at: string
+          diet_plan_id: string
+          id: string
+          notes: string | null
+          snapshot: Json
+          version_number: number
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          diet_plan_id: string
+          id?: string
+          notes?: string | null
+          snapshot: Json
+          version_number?: number
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          diet_plan_id?: string
+          id?: string
+          notes?: string | null
+          snapshot?: Json
+          version_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "plan_versions_diet_plan_id_fkey"
             columns: ["diet_plan_id"]
             isOneToOne: false
             referencedRelation: "diet_plans"
@@ -655,6 +1023,15 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      calculate_adherence_metrics: {
+        Args: {
+          _diet_plan_id: string
+          _period_end: string
+          _period_start: string
+          _user_id: string
+        }
+        Returns: Json
+      }
       can_create_plan: { Args: { _user_id: string }; Returns: boolean }
       can_edit_plan: { Args: { _user_id: string }; Returns: boolean }
       can_use_feature: {
@@ -669,6 +1046,16 @@ export type Database = {
           max_limit: number
           upgrade_required: boolean
         }[]
+      }
+      confirm_meal_consumption: {
+        Args: {
+          _log_date?: string
+          _meal_id: string
+          _option_id: string
+          _status: string
+          _user_id: string
+        }
+        Returns: Json
       }
       get_professional_subscription_state: {
         Args: { _professional_id: string }
