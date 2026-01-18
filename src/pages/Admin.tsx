@@ -22,6 +22,11 @@ import {
   ChevronRight,
   Edit2,
   UserCog,
+  Trash2,
+  Key,
+  CreditCard,
+  DollarSign,
+  AlertTriangle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -34,10 +39,11 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { useUserRole } from '@/hooks/useUserRole';
-import { useAdminOperations, UserProfile } from '@/hooks/useAdminOperations';
+import { useAdminOperations, UserProfile, Plan } from '@/hooks/useAdminOperations';
 import { useToast } from '@/hooks/use-toast';
 
 // CSV parsing helper
@@ -77,6 +83,8 @@ export default function Admin() {
     users,
     usersLoading,
     usersTotal,
+    plans,
+    plansLoading,
     fetchSettings, 
     updateSetting,
     fetchFoodImports,
@@ -88,6 +96,10 @@ export default function Admin() {
     fetchUsers,
     updateUser,
     toggleUserRole,
+    changeUserPassword,
+    deleteUser,
+    fetchPlans,
+    updatePlan,
   } = useAdminOperations();
 
   const [activeTab, setActiveTab] = useState('settings');
@@ -105,6 +117,14 @@ export default function Admin() {
   const [userFilter, setUserFilter] = useState<{ account_type?: 'aluno' | 'plano_pessoal' | 'premium' | 'profissional'; is_test?: boolean }>({});
   const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
   const [editedUserData, setEditedUserData] = useState<Partial<UserProfile>>({});
+  const [showPasswordDialog, setShowPasswordDialog] = useState<UserProfile | null>(null);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [deleteConfirmUser, setDeleteConfirmUser] = useState<UserProfile | null>(null);
+  
+  // Plans management state
+  const [editingPlan, setEditingPlan] = useState<Plan | null>(null);
+  const [editedPlanData, setEditedPlanData] = useState<Partial<Plan>>({});
 
   // Redirect if not admin
   useEffect(() => {
@@ -400,7 +420,7 @@ export default function Admin() {
 
       <main className="container mx-auto px-4 py-6">
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full max-w-3xl grid-cols-6 mb-6">
+          <TabsList className="grid w-full max-w-4xl grid-cols-7 mb-6">
             <TabsTrigger value="settings" className="flex items-center gap-1">
               <Settings className="h-4 w-4" />
               <span className="hidden sm:inline">Config</span>
@@ -408,6 +428,10 @@ export default function Admin() {
             <TabsTrigger value="users" className="flex items-center gap-1">
               <UserCog className="h-4 w-4" />
               <span className="hidden sm:inline">Usuários</span>
+            </TabsTrigger>
+            <TabsTrigger value="plans" className="flex items-center gap-1">
+              <CreditCard className="h-4 w-4" />
+              <span className="hidden sm:inline">Planos</span>
             </TabsTrigger>
             <TabsTrigger value="foods" className="flex items-center gap-1">
               <Upload className="h-4 w-4" />
@@ -657,21 +681,45 @@ export default function Admin() {
                               )}
                             </TableCell>
                             <TableCell className="text-right">
-                              <Button 
-                                variant="ghost" 
-                                size="sm"
-                                onClick={() => {
-                                  setEditingUser(user);
-                                  setEditedUserData({
-                                    name: user.name,
-                                    account_type: user.account_type,
-                                    user_type: user.user_type,
-                                    is_test: user.is_test,
-                                  });
-                                }}
-                              >
-                                <Edit2 className="h-4 w-4" />
-                              </Button>
+                              <div className="flex items-center justify-end gap-1">
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm"
+                                  onClick={() => {
+                                    setEditingUser(user);
+                                    setEditedUserData({
+                                      name: user.name,
+                                      account_type: user.account_type,
+                                      user_type: user.user_type,
+                                      is_test: user.is_test,
+                                    });
+                                  }}
+                                  title="Editar"
+                                >
+                                  <Edit2 className="h-4 w-4" />
+                                </Button>
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm"
+                                  onClick={() => {
+                                    setShowPasswordDialog(user);
+                                    setNewPassword('');
+                                    setConfirmPassword('');
+                                  }}
+                                  title="Alterar senha"
+                                >
+                                  <Key className="h-4 w-4" />
+                                </Button>
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm"
+                                  onClick={() => setDeleteConfirmUser(user)}
+                                  className="text-destructive hover:text-destructive"
+                                  title="Excluir usuário"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
                             </TableCell>
                           </TableRow>
                         ))}
@@ -714,6 +762,128 @@ export default function Admin() {
                         <ChevronRight className="h-4 w-4 ml-1" />
                       </Button>
                     </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Plans Management Tab */}
+          <TabsContent value="plans">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <CreditCard className="h-5 w-5 text-primary" />
+                    Gestão de Planos
+                  </CardTitle>
+                  <CardDescription>
+                    Configure os valores e limites dos planos de assinatura.
+                  </CardDescription>
+                </div>
+                <Button onClick={() => fetchPlans()} variant="outline" size="sm">
+                  <Loader2 className={`h-4 w-4 mr-2 ${plansLoading ? 'animate-spin' : ''}`} />
+                  Carregar Planos
+                </Button>
+              </CardHeader>
+              <CardContent>
+                {plansLoading ? (
+                  <div className="flex items-center justify-center py-12">
+                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                  </div>
+                ) : plans.length === 0 ? (
+                  <div className="py-12 text-center text-muted-foreground">
+                    <CreditCard className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                    <p>Clique em "Carregar Planos" para visualizar os planos.</p>
+                  </div>
+                ) : (
+                  <div className="grid gap-4 md:grid-cols-2">
+                    {plans.map((plan) => (
+                      <Card key={plan.id} className={`relative ${!plan.is_active ? 'opacity-60' : ''}`}>
+                        <CardHeader className="pb-2">
+                          <div className="flex items-center justify-between">
+                            <CardTitle className="text-lg flex items-center gap-2">
+                              {plan.name}
+                              {!plan.is_active && (
+                                <Badge variant="secondary">Inativo</Badge>
+                              )}
+                            </CardTitle>
+                            <Badge variant={plan.type === 'professional' ? 'default' : 'outline'}>
+                              {plan.type}
+                            </Badge>
+                          </div>
+                          {plan.description && (
+                            <CardDescription className="text-xs">{plan.description}</CardDescription>
+                          )}
+                        </CardHeader>
+                        <CardContent className="space-y-3">
+                          <div className="grid grid-cols-2 gap-2 text-sm">
+                            <div className="flex items-center gap-1">
+                              <DollarSign className="h-3 w-3 text-muted-foreground" />
+                              <span className="text-muted-foreground">Mensal:</span>
+                              <span className="font-medium">
+                                {plan.price_monthly ? `R$ ${(plan.price_monthly / 100).toFixed(2)}` : '-'}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <DollarSign className="h-3 w-3 text-muted-foreground" />
+                              <span className="text-muted-foreground">Trimestral:</span>
+                              <span className="font-medium">
+                                {plan.price_quarterly ? `R$ ${(plan.price_quarterly / 100).toFixed(2)}` : '-'}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <DollarSign className="h-3 w-3 text-muted-foreground" />
+                              <span className="text-muted-foreground">Semestral:</span>
+                              <span className="font-medium">
+                                {plan.price_semiannual ? `R$ ${(plan.price_semiannual / 100).toFixed(2)}` : '-'}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <DollarSign className="h-3 w-3 text-muted-foreground" />
+                              <span className="text-muted-foreground">Anual:</span>
+                              <span className="font-medium">
+                                {plan.price_annual ? `R$ ${(plan.price_annual / 100).toFixed(2)}` : '-'}
+                              </span>
+                            </div>
+                          </div>
+                          
+                          <div className="text-xs text-muted-foreground border-t pt-2 space-y-1">
+                            <p>Dietas: {plan.diet_limit} | Substituições: {plan.substitution_limit} | Ajustes: {plan.adjustment_limit}</p>
+                            <p>Histórico: {plan.history_days} dias | Chat: {plan.has_chat ? `${plan.chat_messages_per_day}/dia` : 'Não'}</p>
+                            {plan.type === 'professional' && (
+                              <p>Pacientes: {plan.patients_limit}</p>
+                            )}
+                          </div>
+
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="w-full mt-2"
+                            onClick={() => {
+                              setEditingPlan(plan);
+                              setEditedPlanData({
+                                price_monthly: plan.price_monthly,
+                                price_quarterly: plan.price_quarterly,
+                                price_semiannual: plan.price_semiannual,
+                                price_annual: plan.price_annual,
+                                diet_limit: plan.diet_limit,
+                                substitution_limit: plan.substitution_limit,
+                                adjustment_limit: plan.adjustment_limit,
+                                patients_limit: plan.patients_limit,
+                                history_days: plan.history_days,
+                                has_chat: plan.has_chat,
+                                chat_messages_per_day: plan.chat_messages_per_day,
+                                is_active: plan.is_active,
+                              });
+                            }}
+                          >
+                            <Edit2 className="h-4 w-4 mr-1" />
+                            Editar Plano
+                          </Button>
+                        </CardContent>
+                      </Card>
+                    ))}
                   </div>
                 )}
               </CardContent>
@@ -1208,6 +1378,307 @@ export default function Admin() {
               </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Change Password Dialog */}
+      <Dialog open={!!showPasswordDialog} onOpenChange={(open) => !open && setShowPasswordDialog(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Key className="h-5 w-5" />
+              Alterar Senha
+            </DialogTitle>
+            <DialogDescription>
+              {showPasswordDialog?.email}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <Alert>
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                A nova senha deve ter pelo menos 8 caracteres. O usuário será deslogado de todas as sessões.
+              </AlertDescription>
+            </Alert>
+
+            <div className="space-y-2">
+              <Label>Nova Senha</Label>
+              <Input
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="Digite a nova senha"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Confirmar Senha</Label>
+              <Input
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="Confirme a nova senha"
+              />
+              {newPassword && confirmPassword && newPassword !== confirmPassword && (
+                <p className="text-xs text-destructive">As senhas não coincidem</p>
+              )}
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowPasswordDialog(null)}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={async () => {
+                if (!showPasswordDialog || newPassword !== confirmPassword || newPassword.length < 8) return;
+                try {
+                  await changeUserPassword(showPasswordDialog.user_id, newPassword);
+                  setShowPasswordDialog(null);
+                } catch {
+                  // Error handled in hook
+                }
+              }}
+              disabled={
+                !newPassword || 
+                newPassword !== confirmPassword || 
+                newPassword.length < 8 || 
+                savingKeys.has(`password_${showPasswordDialog?.user_id}`)
+              }
+            >
+              {savingKeys.has(`password_${showPasswordDialog?.user_id}`) ? (
+                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+              ) : (
+                <Key className="h-4 w-4 mr-1" />
+              )}
+              Alterar Senha
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete User Confirmation */}
+      <AlertDialog open={!!deleteConfirmUser} onOpenChange={(open) => !open && setDeleteConfirmUser(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-destructive" />
+              Confirmar Exclusão
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir permanentemente o usuário <strong>{deleteConfirmUser?.name || deleteConfirmUser?.email}</strong>?
+              <br /><br />
+              Esta ação é <strong>irreversível</strong> e irá:
+              <ul className="list-disc list-inside mt-2 space-y-1">
+                <li>Remover a conta de autenticação</li>
+                <li>Deletar todos os dados do perfil</li>
+                <li>Remover planos dietéticos e logs</li>
+                <li>Cancelar assinaturas ativas</li>
+              </ul>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async () => {
+                if (!deleteConfirmUser) return;
+                try {
+                  await deleteUser(deleteConfirmUser.user_id);
+                  setDeleteConfirmUser(null);
+                } catch {
+                  // Error handled in hook
+                }
+              }}
+              disabled={savingKeys.has(`delete_${deleteConfirmUser?.user_id}`)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {savingKeys.has(`delete_${deleteConfirmUser?.user_id}`) ? (
+                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+              ) : (
+                <Trash2 className="h-4 w-4 mr-1" />
+              )}
+              Excluir Permanentemente
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Edit Plan Dialog */}
+      <Dialog open={!!editingPlan} onOpenChange={(open) => !open && setEditingPlan(null)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CreditCard className="h-5 w-5" />
+              Editar Plano: {editingPlan?.name}
+            </DialogTitle>
+            <DialogDescription>
+              Ajuste os valores e limites do plano. Os valores são em centavos (ex: R$ 29,90 = 2990).
+            </DialogDescription>
+          </DialogHeader>
+
+          {editingPlan && (
+            <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto">
+              <div className="flex items-center gap-3">
+                <Switch
+                  checked={!!editedPlanData.is_active}
+                  onCheckedChange={(checked) => setEditedPlanData(prev => ({ ...prev, is_active: checked }))}
+                />
+                <Label>Plano ativo</Label>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Preço Mensal (centavos)</Label>
+                  <Input
+                    type="number"
+                    value={editedPlanData.price_monthly || ''}
+                    onChange={(e) => setEditedPlanData(prev => ({ ...prev, price_monthly: e.target.value ? parseInt(e.target.value) : null }))}
+                    placeholder="2990"
+                  />
+                  {editedPlanData.price_monthly && (
+                    <p className="text-xs text-muted-foreground">
+                      = R$ {(editedPlanData.price_monthly / 100).toFixed(2)}
+                    </p>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <Label>Preço Trimestral (centavos)</Label>
+                  <Input
+                    type="number"
+                    value={editedPlanData.price_quarterly || ''}
+                    onChange={(e) => setEditedPlanData(prev => ({ ...prev, price_quarterly: e.target.value ? parseInt(e.target.value) : null }))}
+                    placeholder="7990"
+                  />
+                  {editedPlanData.price_quarterly && (
+                    <p className="text-xs text-muted-foreground">
+                      = R$ {(editedPlanData.price_quarterly / 100).toFixed(2)}
+                    </p>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <Label>Preço Semestral (centavos)</Label>
+                  <Input
+                    type="number"
+                    value={editedPlanData.price_semiannual || ''}
+                    onChange={(e) => setEditedPlanData(prev => ({ ...prev, price_semiannual: e.target.value ? parseInt(e.target.value) : null }))}
+                    placeholder="14990"
+                  />
+                  {editedPlanData.price_semiannual && (
+                    <p className="text-xs text-muted-foreground">
+                      = R$ {(editedPlanData.price_semiannual / 100).toFixed(2)}
+                    </p>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <Label>Preço Anual (centavos)</Label>
+                  <Input
+                    type="number"
+                    value={editedPlanData.price_annual || ''}
+                    onChange={(e) => setEditedPlanData(prev => ({ ...prev, price_annual: e.target.value ? parseInt(e.target.value) : null }))}
+                    placeholder="24990"
+                  />
+                  {editedPlanData.price_annual && (
+                    <p className="text-xs text-muted-foreground">
+                      = R$ {(editedPlanData.price_annual / 100).toFixed(2)}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <div className="border-t pt-4 space-y-4">
+                <h4 className="font-medium text-sm">Limites do Plano</h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Limite de Dietas</Label>
+                    <Input
+                      type="number"
+                      value={editedPlanData.diet_limit || ''}
+                      onChange={(e) => setEditedPlanData(prev => ({ ...prev, diet_limit: parseInt(e.target.value) || 0 }))}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Limite de Substituições</Label>
+                    <Input
+                      type="number"
+                      value={editedPlanData.substitution_limit || ''}
+                      onChange={(e) => setEditedPlanData(prev => ({ ...prev, substitution_limit: parseInt(e.target.value) || 0 }))}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Limite de Ajustes</Label>
+                    <Input
+                      type="number"
+                      value={editedPlanData.adjustment_limit || ''}
+                      onChange={(e) => setEditedPlanData(prev => ({ ...prev, adjustment_limit: parseInt(e.target.value) || 0 }))}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Dias de Histórico</Label>
+                    <Input
+                      type="number"
+                      value={editedPlanData.history_days || ''}
+                      onChange={(e) => setEditedPlanData(prev => ({ ...prev, history_days: parseInt(e.target.value) || 0 }))}
+                    />
+                  </div>
+                  {editingPlan.type === 'professional' && (
+                    <div className="space-y-2">
+                      <Label>Limite de Pacientes</Label>
+                      <Input
+                        type="number"
+                        value={editedPlanData.patients_limit || ''}
+                        onChange={(e) => setEditedPlanData(prev => ({ ...prev, patients_limit: parseInt(e.target.value) || 0 }))}
+                      />
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <Switch
+                    checked={!!editedPlanData.has_chat}
+                    onCheckedChange={(checked) => setEditedPlanData(prev => ({ ...prev, has_chat: checked }))}
+                  />
+                  <Label>Chat habilitado</Label>
+                </div>
+
+                {editedPlanData.has_chat && (
+                  <div className="space-y-2">
+                    <Label>Mensagens de Chat por Dia</Label>
+                    <Input
+                      type="number"
+                      value={editedPlanData.chat_messages_per_day || ''}
+                      onChange={(e) => setEditedPlanData(prev => ({ ...prev, chat_messages_per_day: parseInt(e.target.value) || 0 }))}
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditingPlan(null)}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={async () => {
+                if (!editingPlan) return;
+                try {
+                  await updatePlan(editingPlan.id, editedPlanData);
+                  setEditingPlan(null);
+                } catch {
+                  // Error handled in hook
+                }
+              }}
+              disabled={savingKeys.has(`plan_${editingPlan?.id}`)}
+            >
+              {savingKeys.has(`plan_${editingPlan?.id}`) ? (
+                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+              ) : (
+                <Save className="h-4 w-4 mr-1" />
+              )}
+              Salvar Plano
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
