@@ -48,14 +48,14 @@ export function MobileNav() {
   const { signOut } = useAuth();
   const { isProfessional, hasActiveLicense, loading: roleLoading } = useUserRole();
   const { accountType, isSubscribed } = useSubscription();
-  const { unreadCount } = useUnreadAlerts();
+  const { unreadCount, canSeeAlerts } = useUnreadAlerts();
 
   const showProfessionalLinks = 
     (isSubscribed && accountType === 'professional') || 
     (isProfessional && hasActiveLicense);
   
-  // Only show notification badge for professionals
-  const showNotificationBadge = !roleLoading && isProfessional && unreadCount > 0;
+  // Show notification badge for professionals and plano_pessoal_pago users
+  const showNotificationBadge = !roleLoading && canSeeAlerts && unreadCount > 0;
 
   const handleSignOut = async () => {
     setOpen(false);
