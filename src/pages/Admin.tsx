@@ -52,10 +52,19 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Progress } from '@/components/ui/progress';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useAdminOperations, UserProfile, Plan, DeleteUserPreview } from '@/hooks/useAdminOperations';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+
+// Types for metrics and subscriptions
+interface TimeSeriesDataPoint {
+  date: string;
+  users: number;
+  subscriptions: number;
+}
 
 // Types for metrics and subscriptions
 interface DashboardMetrics {
@@ -175,6 +184,8 @@ export default function Admin() {
   // Metrics state
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
   const [metricsLoading, setMetricsLoading] = useState(false);
+  const [timeSeriesData, setTimeSeriesData] = useState<TimeSeriesDataPoint[]>([]);
+  const [timeSeriesLoading, setTimeSeriesLoading] = useState(false);
 
   // Subscriptions management state
   const [subscriptions, setSubscriptions] = useState<SubscriptionData[]>([]);
@@ -201,6 +212,7 @@ export default function Admin() {
       fetchFoodImports();
       fetchAuditLogs();
       fetchMetrics();
+      fetchTimeSeriesData();
     }
   }, [isAdmin, fetchSettings, fetchFoodImports, fetchAuditLogs]);
 
@@ -282,6 +294,58 @@ export default function Admin() {
       });
     } finally {
       setMetricsLoading(false);
+    }
+  };
+
+  // Fetch time series data for the chart
+  const fetchTimeSeriesData = async () => {
+    setTimeSeriesLoading(true);
+    try {
+      // Get last 30 days of data
+      const last30Days: string[] = [];
+      for (let i = 29; i >= 0; i--) {
+        const date = new Date();
+        date.setDate(date.getDate() - i);
+        last30Days.push(date.toISOString().split('T')[0]);
+      }
+
+      // Fetch profiles with created_at
+      const { data: profilesData } = await supabase
+        .from('profiles')
+        .select('created_at')
+        .order('created_at', { ascending: true });
+
+      // Fetch subscriptions with created_at
+      const { data: subsData } = await supabase
+        .from('subscriptions')
+        .select('created_at')
+        .order('created_at', { ascending: true });
+
+      // Calculate cumulative counts by date
+      const chartData: TimeSeriesDataPoint[] = last30Days.map((dateStr) => {
+        const dateEnd = new Date(dateStr);
+        dateEnd.setHours(23, 59, 59, 999);
+
+        const usersCount = profilesData?.filter(p => 
+          new Date(p.created_at || '') <= dateEnd
+        ).length || 0;
+
+        const subsCount = subsData?.filter(s => 
+          new Date(s.created_at || '') <= dateEnd
+        ).length || 0;
+
+        return {
+          date: new Date(dateStr).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
+          users: usersCount,
+          subscriptions: subsCount,
+        };
+      });
+
+      setTimeSeriesData(chartData);
+    } catch (error) {
+      console.error('Error fetching time series data:', error);
+    } finally {
+      setTimeSeriesLoading(false);
     }
   };
 
@@ -906,6 +970,96 @@ export default function Admin() {
                       </CardContent>
                     </Card>
                   </div>
+
+                  {/* Time Series Chart */}
+                  <Card className="mt-6">
+                    <CardHeader>
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <CardTitle className="text-base flex items-center gap-2">
+                            <TrendingUp className="h-4 w-4 text-primary" />
+                            Evolução ao Longo do Tempo
+                          </CardTitle>
+                          <CardDescription>Últimos 30 dias - Usuários e Assinaturas</CardDescription>
+                        </div>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          onClick={fetchTimeSeriesData}
+                          disabled={timeSeriesLoading}
+                        >
+                          {timeSeriesLoading ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <RefreshCw className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      {timeSeriesLoading && timeSeriesData.length === 0 ? (
+                        <div className="h-[300px] flex items-center justify-center">
+                          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                        </div>
+                      ) : timeSeriesData.length > 0 ? (
+                        <div className="h-[300px]">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <LineChart
+                              data={timeSeriesData}
+                              margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                            >
+                              <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                              <XAxis 
+                                dataKey="date" 
+                                fontSize={12}
+                                tickLine={false}
+                                axisLine={false}
+                                className="text-muted-foreground"
+                              />
+                              <YAxis 
+                                fontSize={12}
+                                tickLine={false}
+                                axisLine={false}
+                                className="text-muted-foreground"
+                              />
+                              <Tooltip 
+                                contentStyle={{ 
+                                  backgroundColor: 'hsl(var(--card))',
+                                  border: '1px solid hsl(var(--border))',
+                                  borderRadius: '8px',
+                                }}
+                                labelStyle={{ color: 'hsl(var(--foreground))' }}
+                              />
+                              <Legend />
+                              <Line 
+                                type="monotone" 
+                                dataKey="users" 
+                                name="Usuários" 
+                                stroke="hsl(var(--primary))"
+                                strokeWidth={2}
+                                dot={{ r: 3 }}
+                                activeDot={{ r: 5 }}
+                              />
+                              <Line 
+                                type="monotone" 
+                                dataKey="subscriptions" 
+                                name="Assinaturas" 
+                                stroke="hsl(142, 71%, 45%)"
+                                strokeWidth={2}
+                                dot={{ r: 3 }}
+                                activeDot={{ r: 5 }}
+                              />
+                            </LineChart>
+                          </ResponsiveContainer>
+                        </div>
+                      ) : (
+                        <div className="h-[300px] flex flex-col items-center justify-center text-muted-foreground">
+                          <BarChart3 className="h-12 w-12 mb-4 opacity-50" />
+                          <p>Dados do gráfico sendo carregados...</p>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
                 </>
               ) : (
                 <Card>
