@@ -365,30 +365,30 @@ export default function MealDetail() {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-md border-b border-border">
-        <div className="container mx-auto px-4 py-4 flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
-            <ArrowLeft className="w-5 h-5" />
+      <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-md border-b border-border pt-safe">
+        <div className="container mx-auto px-3 sm:px-4 py-3 sm:py-4 flex items-center gap-3 sm:gap-4">
+          <Button variant="ghost" size="icon" className="h-9 w-9 sm:h-10 sm:w-10" onClick={() => navigate(-1)}>
+            <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5" />
           </Button>
-          <div>
-            <h1 className="font-semibold text-foreground">
+          <div className="min-w-0 flex-1">
+            <h1 className="font-semibold text-foreground text-sm sm:text-base truncate">
               {MEAL_NAMES[meal.name as MealType] || meal.name}
             </h1>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-xs sm:text-sm text-muted-foreground">
               {meal.total_calories} kcal
             </p>
           </div>
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-6 space-y-6">
+      <main className="container mx-auto px-3 sm:px-4 py-4 sm:py-6 space-y-4 sm:space-y-6 pb-safe">
         {/* Macros Overview */}
         <motion.section
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="card-elevated rounded-2xl p-6"
+          className="card-elevated rounded-xl sm:rounded-2xl p-4 sm:p-6"
         >
-          <h2 className="font-semibold text-foreground mb-4">
+          <h2 className="font-semibold text-foreground mb-3 sm:mb-4 text-sm sm:text-base">
             Macros da Refeição
           </h2>
           <MacroChart
@@ -408,21 +408,21 @@ export default function MealDetail() {
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: 'auto' }}
               exit={{ opacity: 0, height: 0 }}
-              className="card-elevated rounded-2xl p-6 border-l-4 border-l-primary"
+              className="card-elevated rounded-xl sm:rounded-2xl p-4 sm:p-6 border-l-4 border-l-primary"
             >
-              <div className="flex items-start gap-3">
-                <Sparkles className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
-                <div>
-                  <h3 className="font-semibold text-foreground mb-2">
+              <div className="flex items-start gap-2 sm:gap-3">
+                <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-primary flex-shrink-0 mt-0.5" />
+                <div className="min-w-0 flex-1">
+                  <h3 className="font-semibold text-foreground mb-1 sm:mb-2 text-sm sm:text-base">
                     Impacto nutricional da substituição
                   </h3>
-                  <p className="text-muted-foreground text-sm leading-relaxed">
+                  <p className="text-muted-foreground text-xs sm:text-sm leading-relaxed">
                     {impactExplanation}
                   </p>
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="mt-2"
+                    className="mt-2 text-xs sm:text-sm"
                     onClick={() => setShowImpact(false)}
                   >
                     Fechar
@@ -438,9 +438,9 @@ export default function MealDetail() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          className="space-y-3"
+          className="space-y-2 sm:space-y-3"
         >
-          <h2 className="font-semibold text-foreground">Alimentos</h2>
+          <h2 className="font-semibold text-foreground text-sm sm:text-base">Alimentos</h2>
           {mealFoods.map((mealFood, index) => {
             const food = mealFood.food as Food;
             const totalGrams = getTotalGrams(food, mealFood.quantity);
@@ -453,17 +453,17 @@ export default function MealDetail() {
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: 0.2 + index * 0.1 }}
-                className="card-elevated rounded-xl p-4"
+                className="card-elevated rounded-lg sm:rounded-xl p-3 sm:p-4"
               >
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <h3 className="font-medium text-foreground">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-medium text-foreground text-sm sm:text-base truncate">
                       {food?.name}
                     </h3>
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-xs sm:text-sm text-muted-foreground">
                       {totalGrams}{unit}
                     </p>
-                    <div className="flex gap-3 mt-2 text-xs">
+                    <div className="flex flex-wrap gap-2 sm:gap-3 mt-1.5 sm:mt-2 text-[10px] sm:text-xs">
                       <span className="text-protein font-medium">
                         P: {nutrients.protein}g
                       </span>
@@ -475,8 +475,8 @@ export default function MealDetail() {
                       </span>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <p className="font-semibold text-foreground">
+                  <div className="text-right flex-shrink-0">
+                    <p className="font-semibold text-foreground text-sm sm:text-base">
                       {nutrients.calories} kcal
                     </p>
                     {/* Show substitute button for users who can edit */}
@@ -484,11 +484,12 @@ export default function MealDetail() {
                       <Button
                         variant="outline"
                         size="sm"
-                        className="mt-2"
+                        className="mt-1.5 sm:mt-2 text-xs h-7 sm:h-8 px-2 sm:px-3"
                         onClick={() => openSubstituteModal(mealFood)}
                       >
                         <RefreshCw className="w-3 h-3 mr-1" />
-                        Substituir
+                        <span className="hidden xs:inline">Substituir</span>
+                        <span className="xs:hidden">Sub.</span>
                       </Button>
                     )}
                   </div>
@@ -501,22 +502,22 @@ export default function MealDetail() {
 
       {/* Substitute Modal */}
       <Dialog open={showSubstituteModal} onOpenChange={setShowSubstituteModal}>
-        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-[95vw] sm:max-w-lg max-h-[85vh] sm:max-h-[90vh] overflow-y-auto scrollbar-hide mx-2 sm:mx-auto p-4 sm:p-6">
           <DialogHeader>
-            <DialogTitle>Substituir Alimento</DialogTitle>
+            <DialogTitle className="text-base sm:text-lg">Substituir Alimento</DialogTitle>
           </DialogHeader>
 
-          <div className="space-y-4">
+          <div className="space-y-3 sm:space-y-4">
             {/* Current Food */}
-            <div className="p-4 bg-muted rounded-xl">
-              <p className="text-xs text-muted-foreground mb-1">
+            <div className="p-3 sm:p-4 bg-muted rounded-lg sm:rounded-xl">
+              <p className="text-[10px] sm:text-xs text-muted-foreground mb-1">
                 Alimento atual
               </p>
-              <p className="font-medium text-foreground">
+              <p className="font-medium text-foreground text-sm sm:text-base">
                 {(selectedMealFood?.food as Food)?.name}
               </p>
               {selectedMealFood?.food && (
-                <div className="flex gap-3 mt-1 text-xs text-muted-foreground">
+                <div className="flex flex-wrap gap-2 sm:gap-3 mt-1 text-[10px] sm:text-xs text-muted-foreground">
                   {(() => {
                     const food = selectedMealFood.food as Food;
                     const qty = getTotalGrams(food, selectedMealFood.quantity);
@@ -537,15 +538,15 @@ export default function MealDetail() {
 
             {/* Category Info */}
             {selectedMealFood?.food && (
-              <div className="p-3 bg-primary/10 rounded-lg">
-                <p className="text-xs text-primary font-medium">
+              <div className="p-2.5 sm:p-3 bg-primary/10 rounded-lg">
+                <p className="text-[10px] sm:text-xs text-primary font-medium">
                   📌 Categoria: {(selectedMealFood.food as Food).category}
                 </p>
-                <p className="text-xs text-muted-foreground mt-1">
+                <p className="text-[10px] sm:text-xs text-muted-foreground mt-1">
                   Substituições permitidas apenas entre alimentos naturais ou minimamente processados da mesma categoria.
                 </p>
                 {(selectedMealFood.food as Food).category === 'suplementos' && (
-                  <p className="text-xs text-destructive mt-1">
+                  <p className="text-[10px] sm:text-xs text-destructive mt-1">
                     ⚠️ Suplementos não podem ser substituídos automaticamente.
                   </p>
                 )}
@@ -554,29 +555,29 @@ export default function MealDetail() {
 
             {/* New Food Selection */}
             <div className="space-y-2">
-              <p className="text-sm font-medium text-foreground">
+              <p className="text-xs sm:text-sm font-medium text-foreground">
                 Escolha o novo alimento ({filteredFoodsForSubstitution.length} opções)
               </p>
               {filteredFoodsForSubstitution.length === 0 ? (
-                <p className="text-sm text-muted-foreground p-4 text-center">
+                <p className="text-xs sm:text-sm text-muted-foreground p-3 sm:p-4 text-center">
                   Não há outros alimentos disponíveis nesta categoria.
                 </p>
               ) : (
-                <div className="max-h-48 overflow-y-auto space-y-1 border rounded-lg p-2">
+                <div className="max-h-40 sm:max-h-48 overflow-y-auto scrollbar-hide space-y-1 border rounded-lg p-1.5 sm:p-2">
                   {filteredFoodsForSubstitution.map((food) => (
                     <button
                       key={food.id}
                       onClick={() => handleSelectNewFood(food)}
-                      className={`w-full text-left p-3 rounded-lg transition-colors ${
+                      className={`w-full text-left p-2.5 sm:p-3 rounded-lg transition-colors ${
                         selectedNewFood?.id === food.id
                           ? 'bg-primary/10 border border-primary'
                           : 'hover:bg-muted'
                       }`}
                     >
-                      <p className="font-medium text-foreground text-sm">
+                      <p className="font-medium text-foreground text-xs sm:text-sm">
                         {food.name}
                       </p>
-                      <div className="flex gap-2 text-xs text-muted-foreground">
+                      <div className="flex flex-wrap gap-1.5 sm:gap-2 text-[10px] sm:text-xs text-muted-foreground">
                         <span>{food.calories} kcal/{food.serving_size}</span>
                         <span>P: {food.protein}g</span>
                         <span>C: {food.carbs}g</span>
@@ -590,23 +591,23 @@ export default function MealDetail() {
 
             {/* Impact Explanation */}
             {selectedNewFood && (
-              <div className="p-4 bg-secondary/50 rounded-xl border-l-4 border-l-primary">
+              <div className="p-3 sm:p-4 bg-secondary/50 rounded-lg sm:rounded-xl border-l-4 border-l-primary">
                 {loadingImpact ? (
                   <div className="flex items-center gap-2">
-                    <Loader2 className="w-4 h-4 animate-spin text-primary" />
-                    <span className="text-sm text-muted-foreground">
+                    <Loader2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 animate-spin text-primary" />
+                    <span className="text-xs sm:text-sm text-muted-foreground">
                       Analisando impacto nutricional...
                     </span>
                   </div>
                 ) : (
                   <>
-                    <div className="flex items-center gap-2 mb-2">
-                      <Sparkles className="w-4 h-4 text-primary" />
-                      <span className="text-sm font-medium text-foreground">
+                    <div className="flex items-center gap-2 mb-1.5 sm:mb-2">
+                      <Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-primary" />
+                      <span className="text-xs sm:text-sm font-medium text-foreground">
                         Impacto da substituição
                       </span>
                     </div>
-                    <p className="text-sm text-muted-foreground leading-relaxed">
+                    <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
                       {impactExplanation}
                     </p>
                   </>
@@ -616,35 +617,35 @@ export default function MealDetail() {
 
             {/* Comparison */}
             {selectedNewFood && selectedMealFood?.food && (
-              <div className="grid grid-cols-2 gap-4">
-                <div className="p-3 bg-muted rounded-lg text-center">
-                  <p className="text-xs text-muted-foreground mb-1">Antes</p>
+              <div className="grid grid-cols-2 gap-2 sm:gap-4">
+                <div className="p-2.5 sm:p-3 bg-muted rounded-lg text-center">
+                  <p className="text-[10px] sm:text-xs text-muted-foreground mb-0.5 sm:mb-1">Antes</p>
                   {(() => {
                     const food = selectedMealFood.food as Food;
                     const qty = getTotalGrams(food, selectedMealFood.quantity);
                     const nutrients = calcNutrients(food, qty);
                     return (
                       <>
-                        <p className="text-lg font-bold text-foreground">
+                        <p className="text-base sm:text-lg font-bold text-foreground">
                           {nutrients.calories} kcal
                         </p>
-                        <p className="text-xs text-muted-foreground">
+                        <p className="text-[10px] sm:text-xs text-muted-foreground">
                           {qty}{getUnit(food.serving_size)}
                         </p>
                       </>
                     );
                   })()}
                 </div>
-                <div className="p-3 bg-primary/10 rounded-lg text-center">
-                  <p className="text-xs text-muted-foreground mb-1">Depois</p>
+                <div className="p-2.5 sm:p-3 bg-primary/10 rounded-lg text-center">
+                  <p className="text-[10px] sm:text-xs text-muted-foreground mb-0.5 sm:mb-1">Depois</p>
                   {(() => {
                     const nutrients = calcNutrients(selectedNewFood, adjustedQuantity);
                     return (
                       <>
-                        <p className="text-lg font-bold text-primary">
+                        <p className="text-base sm:text-lg font-bold text-primary">
                           {nutrients.calories} kcal
                         </p>
-                        <p className="text-xs text-muted-foreground">
+                        <p className="text-[10px] sm:text-xs text-muted-foreground">
                           {adjustedQuantity}{getUnit(selectedNewFood.serving_size)}
                         </p>
                       </>
@@ -655,27 +656,27 @@ export default function MealDetail() {
             )}
 
             {/* Actions */}
-            <div className="flex gap-3 pt-2">
+            <div className="flex gap-2 sm:gap-3 pt-2">
               <Button
                 variant="outline"
-                className="flex-1"
+                className="flex-1 text-xs sm:text-sm h-9 sm:h-10"
                 onClick={() => setShowSubstituteModal(false)}
               >
                 Cancelar
               </Button>
               <Button
                 variant="hero"
-                className="flex-1"
+                className="flex-1 text-xs sm:text-sm h-9 sm:h-10"
                 onClick={confirmSubstitution}
                 disabled={!selectedNewFood || substituting}
               >
                 {substituting ? (
                   <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Substituindo...
+                    <Loader2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 animate-spin" />
+                    <span className="hidden xs:inline ml-1">Substituindo...</span>
                   </>
                 ) : (
-                  'Confirmar substituição'
+                  <span className="truncate">Confirmar</span>
                 )}
               </Button>
             </div>
