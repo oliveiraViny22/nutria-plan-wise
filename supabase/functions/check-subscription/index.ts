@@ -34,7 +34,6 @@ serve(async (req) => {
 
     const authHeader = req.headers.get("Authorization");
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      // Pricing page is public; treat unauthenticated requests as “not subscribed”
       return createSuccessResponse(
         {
           subscribed: false,
@@ -61,26 +60,20 @@ serve(async (req) => {
       );
     }
 
-    // Auth client bound to this request's JWT (signing-keys compatible)
     const supabaseAuth = createClient(supabaseUrl, supabaseAnonKey, {
       global: { headers: { Authorization: authHeader } },
       auth: { persistSession: false },
     });
 
-    // Validate JWT using signing keys compatible method
     const { data: claimsData, error: claimsError } = await supabaseAuth.auth.getClaims(token);
 
-    // Fallback for older GoTrue behavior / edge-runtime quirks
     const userId =
       !claimsError && claimsData?.claims?.sub
         ? claimsData.claims.sub
         : (await supabaseAuth.auth.getUser()).data.user?.id;
 
     if (!userId) {
-      logStep("Auth failed", {
-        claimsError: claimsError?.message,
-      });
-      // Same as above: return a safe “not subscribed” response instead of 401
+      log.warn("Auth failed", { claimsError: claimsError?.message });
       return createSuccessResponse(
         {
           subscribed: false,
@@ -94,9 +87,8 @@ serve(async (req) => {
     }
 
     const user = { id: userId };
-    logStep("User authenticated", { userId: user.id });
+    log.info("User authenticated", { userId: user.id });
 
-    // Check if user is linked to a professional (student)
     const { data: profileData } = await supabaseAdmin
       .from('profiles')
       .select('professional_id')
@@ -106,7 +98,6 @@ serve(async (req) => {
     const isLinkedToProfessional = Boolean(profileData?.professional_id);
     log.info("Checked professional link", { isLinkedToProfessional });
 
-    // Get student access level if linked to professional
     let studentAccess = null;
     if (isLinkedToProfessional) {
       const { data: accessData } = await supabaseAdmin
@@ -127,7 +118,6 @@ serve(async (req) => {
       }
     }
 
-    // Get user's subscription with plan details
     const { data: subscription, error: subError } = await supabaseAdmin
       .from('subscriptions')
       .select(`
@@ -143,7 +133,6 @@ serve(async (req) => {
     if (subError || !subscription) {
       log.info("No active subscription found");
       
-      // Check if user has roles to determine account type
       const { data: roles } = await supabaseAdmin
         .from('user_roles')
         .select('role')
@@ -171,10 +160,8 @@ serve(async (req) => {
     const shouldSyncProfessional =
       planType === 'professional' && ['active', 'trial', 'past_due'].includes(subscription.status);
 
-    // Keep entitlements (role + license) in sync for professional accounts
     if (shouldSyncProfessional) {
       try {
-        // Ensure professional role exists
         const { error: roleUpsertError } = await supabaseAdmin
           .from('user_roles')
           .upsert({ user_id: user.id, role: 'professional' }, { onConflict: 'user_id,role' });
@@ -185,7 +172,6 @@ serve(async (req) => {
           log.info('Professional role ensured');
         }
 
-        // Ensure professional license exists/updated - always monthly
         const licenseType = 'monthly';
         const startsAt = subscription.current_period_start || new Date().toISOString().split('T')[0];
         const expiresAt = subscription.current_period_end || new Date().toISOString().split('T')[0];
@@ -243,14 +229,12 @@ serve(async (req) => {
       }
     }
 
-    // Get usage data
     const { data: usage } = await supabaseAdmin
       .from('user_usage')
       .select('*')
       .eq('user_id', user.id)
       .single();
 
-    // Reset chat if new day
     if (usage && new Date(usage.last_chat_reset) < new Date(new Date().toDateString())) {
       await supabaseAdmin
         .from('user_usage')
