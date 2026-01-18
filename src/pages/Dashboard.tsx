@@ -30,6 +30,7 @@ import { UsageLimits } from '@/components/UsageLimits';
 import { UpgradeDialog } from '@/components/UpgradeDialog';
 import { BlockedActionCTA } from '@/components/BlockedActionCTA';
 import { StudentRequestDialog } from '@/components/StudentRequestDialog';
+import { AdherenceWidget } from '@/components/AdherenceWidget';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useSubscription } from '@/hooks/useSubscription';
@@ -292,7 +293,16 @@ export default function Dashboard() {
           </div>
         </motion.section>
 
-        {/* Action Buttons - com verificação de permissões */}
+        {/* Adherence Widget */}
+        {currentDietPlan && (
+          <motion.section
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.15 }}
+          >
+            <AdherenceWidget />
+          </motion.section>
+        )}
         {permissions.can_create_plan && !isLinkedStudent && (
           <motion.section
             initial={{ opacity: 0, y: 20 }}
