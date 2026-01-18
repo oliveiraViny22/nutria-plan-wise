@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Eye, EyeOff, Loader2, Mail, Lock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -14,8 +14,18 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const { signIn } = useAuth();
+  const { signIn, user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // If already authenticated, leave /login immediately
+  useEffect(() => {
+    if (authLoading) return;
+    if (!user) return;
+
+    const from = (location.state as any)?.from?.pathname as string | undefined;
+    navigate(from ?? '/dashboard', { replace: true });
+  }, [authLoading, user, navigate, location.state]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -24,13 +34,10 @@ export default function Login() {
     try {
       await signIn(email, password);
       toast.success('Login realizado com sucesso!');
-      // Navigation is handled by ProtectedRoute/AuthContext, just wait a moment
-      setTimeout(() => {
-        navigate('/dashboard');
-      }, 100);
+      // Navigation happens via the effect above once the auth state updates.
     } catch (error: any) {
       console.error('Login error:', error);
-      // Handle specific Supabase auth errors
+      // Handle specific auth errors
       if (error.message?.includes('Invalid login credentials')) {
         toast.error('Email ou senha incorretos');
       } else if (error.message?.includes('Email not confirmed')) {

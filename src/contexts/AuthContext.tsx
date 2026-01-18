@@ -47,30 +47,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     // Set up auth state listener BEFORE checking session
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, currentSession) => {
-        setSession(currentSession);
-        setUser(currentSession?.user ?? null);
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, currentSession) => {
+      // Keep this callback synchronous to avoid auth deadlocks
+      setSession(currentSession);
+      setUser(currentSession?.user ?? null);
 
-        if (currentSession?.user) {
-          // Defer profile fetch to avoid blocking
-          setTimeout(async () => {
-            const profileData = await fetchProfile(currentSession.user.id);
-            setProfile(profileData);
-          }, 0);
-        } else {
-          setProfile(null);
-        }
-        
-        setLoading(false);
+      if (currentSession?.user) {
+        // Defer profile fetch to avoid blocking auth
+        setTimeout(async () => {
+          const profileData = await fetchProfile(currentSession.user.id);
+          setProfile(profileData);
+        }, 0);
+      } else {
+        setProfile(null);
       }
-    );
 
-    // Check for existing session
+      setLoading(false);
+    });
+
+    // Check for existing session (and always unblock loading)
     supabase.auth.getSession().then(({ data: { session: existingSession } }) => {
-      if (!existingSession) {
-        setLoading(false);
+      setSession(existingSession);
+      setUser(existingSession?.user ?? null);
+
+      if (existingSession?.user) {
+        setTimeout(async () => {
+          const profileData = await fetchProfile(existingSession.user.id);
+          setProfile(profileData);
+        }, 0);
+      } else {
+        setProfile(null);
       }
+
+      setLoading(false);
     });
 
     return () => {
@@ -100,10 +111,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // Update profile with name
     if (data.user) {
-      await supabase
-        .from('profiles')
-        .update({ name })
-        .eq('user_id', data.user.id);
+      await supabase.from('profiles').update({ name }).eq('user_id', data.user.id);
     }
   };
 
