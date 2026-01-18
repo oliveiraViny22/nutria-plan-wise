@@ -103,8 +103,16 @@ export const PLAN_DISPLAY_NAMES: Record<CommercialPlan, string> = {
   profissional: 'Profissional',
 };
 
-// Descrições dos planos
+// Descrições completas dos planos para exibição no Pricing
 export const PLAN_DESCRIPTIONS: Record<CommercialPlan, string> = {
+  gratuito: 'Acompanhe seu plano alimentar e tire dúvidas com nossa IA educacional. Ideal para quem está começando.',
+  premium: 'Para alunos vinculados a nutricionistas. Acesso ampliado ao chat com IA e histórico estendido de 30 dias.',
+  plano_pessoal_pago: 'Autonomia total para criar e gerenciar seus próprios planos alimentares com suporte completo de IA.',
+  profissional: 'Gerencie até 50 pacientes com ferramentas avançadas de IA para criação e acompanhamento de dietas.',
+};
+
+// Descrições curtas para cards e badges
+export const PLAN_SHORT_DESCRIPTIONS: Record<CommercialPlan, string> = {
   gratuito: 'IA educacional básica',
   premium: 'IA educacional ampliada',
   plano_pessoal_pago: 'IA completa com autonomia',
@@ -125,4 +133,11 @@ export const PLAN_CHAT_LIMITS: Record<CommercialPlan, number> = {
   premium: 10,
   plano_pessoal_pago: 30,
   profissional: 100,
+};
+
+// Mapeamento legacy: plano_pessoal -> plano_pessoal_pago
+// Usado para compatibilidade com profiles.account_type
+export const LEGACY_PLAN_MAPPING: Record<string, CommercialPlan> = {
+  'plano_pessoal': 'plano_pessoal_pago',
+  'aluno': 'gratuito',
 };

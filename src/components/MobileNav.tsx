@@ -46,13 +46,16 @@ export function MobileNav() {
   const location = useLocation();
   const navigate = useNavigate();
   const { signOut } = useAuth();
-  const { isProfessional, hasActiveLicense } = useUserRole();
+  const { isProfessional, hasActiveLicense, loading: roleLoading } = useUserRole();
   const { accountType, isSubscribed } = useSubscription();
   const { unreadCount } = useUnreadAlerts();
 
   const showProfessionalLinks = 
     (isSubscribed && accountType === 'professional') || 
     (isProfessional && hasActiveLicense);
+  
+  // Only show notification badge for professionals
+  const showNotificationBadge = !roleLoading && isProfessional && unreadCount > 0;
 
   const handleSignOut = async () => {
     setOpen(false);
@@ -78,7 +81,7 @@ export function MobileNav() {
       href: '/professional',
       icon: <LayoutDashboard className="h-5 w-5" />,
       show: showProfessionalLinks,
-      badge: unreadCount > 0 ? unreadCount : undefined,
+      badge: showNotificationBadge ? unreadCount : undefined,
     },
     {
       label: 'Gerenciar Alunos',
@@ -130,7 +133,7 @@ export function MobileNav() {
           aria-label="Abrir menu"
         >
           <Menu className="h-5 w-5" />
-          {unreadCount > 0 && (
+          {showNotificationBadge && (
             <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-[10px] font-medium text-destructive-foreground">
               {unreadCount > 9 ? '9+' : unreadCount}
             </span>
