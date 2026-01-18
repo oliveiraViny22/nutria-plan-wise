@@ -719,6 +719,38 @@ export function useAdminOperations() {
     }
   }, [invokeAdmin, toast]);
 
+  const normalizeFoodNames = useCallback(async () => {
+    setLoading(true);
+    try {
+      const result = await invokeAdmin('normalize_food_names', {});
+      
+      if (result.updated > 0) {
+        toast({ 
+          title: 'Nomes normalizados', 
+          description: `${result.updated} alimentos atualizados de ${result.total}.` 
+        });
+      } else {
+        toast({ 
+          title: 'Nenhuma alteração', 
+          description: 'Todos os nomes já estão normalizados.' 
+        });
+      }
+      
+      return result as { 
+        updated: number; 
+        unchanged: number; 
+        total: number; 
+        examples: Array<{ id: string; old_name: string; new_name: string }> 
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erro ao normalizar nomes';
+      toast({ title: 'Erro', description: message, variant: 'destructive' });
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  }, [invokeAdmin, toast]);
+
   return {
     loading,
     settingsLoading,
@@ -755,5 +787,6 @@ export function useAdminOperations() {
     updateFood,
     deleteFood,
     batchUpdateFoods,
+    normalizeFoodNames,
   };
 }

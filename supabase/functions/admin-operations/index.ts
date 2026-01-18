@@ -157,6 +157,10 @@ serve(async (req) => {
         result = await deleteFood(supabaseAdmin, userId, params.foodId, req.headers);
         break;
 
+      case 'normalize_food_names':
+        result = await normalizeFoodNames(supabaseAdmin, userId, req.headers);
+        break;
+
       default:
         throw new Error(`Ação desconhecida: ${action}`);
     }
@@ -1326,4 +1330,114 @@ async function deleteFood(
 
   logStep('Food deleted successfully', { foodId });
   return { success: true };
+}
+
+// Normalize food names helper
+function normalizeText(text: string): string {
+  // Trim and remove extra spaces
+  let normalized = text.trim().replace(/\s+/g, ' ');
+  
+  // Title case with exceptions for common prepositions/articles in Portuguese
+  const lowerWords = new Set(['de', 'da', 'do', 'das', 'dos', 'e', 'em', 'com', 'sem', 'ao', 'à', 'a', 'o', 'para']);
+  
+  normalized = normalized
+    .toLowerCase()
+    .split(' ')
+    .map((word, index) => {
+      // Always capitalize first word
+      if (index === 0) {
+        return word.charAt(0).toUpperCase() + word.slice(1);
+      }
+      // Keep prepositions/articles lowercase
+      if (lowerWords.has(word)) {
+        return word;
+      }
+      // Capitalize first letter
+      return word.charAt(0).toUpperCase() + word.slice(1);
+    })
+    .join(' ');
+  
+  // Fix common patterns
+  normalized = normalized
+    // Percentages
+    .replace(/(\d)\s*%/g, '$1%')
+    // Units
+    .replace(/(\d)\s*(g|kg|ml|l|mg)\b/gi, '$1$2')
+    // Parentheses spacing
+    .replace(/\(\s+/g, '(')
+    .replace(/\s+\)/g, ')');
+  
+  return normalized;
+}
+
+// deno-lint-ignore no-explicit-any
+async function normalizeFoodNames(
+  supabase: any,
+  adminId: string,
+  headers: Headers
+) {
+  logStep('Starting food names normalization');
+
+  // Fetch all foods
+  const { data: foods, error: fetchError } = await supabase
+    .from('foods')
+    .select('id, name')
+    .order('name');
+
+  if (fetchError) {
+    throw new Error(`Erro ao buscar alimentos: ${fetchError.message}`);
+  }
+
+  if (!foods || foods.length === 0) {
+    return { updated: 0, unchanged: 0, total: 0, examples: [] };
+  }
+
+  const results = {
+    updated: 0,
+    unchanged: 0,
+    total: foods.length,
+    examples: [] as Array<{ id: string; old_name: string; new_name: string }>,
+  };
+
+  for (const food of foods) {
+    const normalizedName = normalizeText(food.name);
+    
+    if (normalizedName !== food.name) {
+      const { error: updateError } = await supabase
+        .from('foods')
+        .update({ name: normalizedName })
+        .eq('id', food.id);
+
+      if (!updateError) {
+        results.updated++;
+        // Keep first 10 examples
+        if (results.examples.length < 10) {
+          results.examples.push({
+            id: food.id,
+            old_name: food.name,
+            new_name: normalizedName,
+          });
+        }
+      }
+    } else {
+      results.unchanged++;
+    }
+  }
+
+  // Audit log
+  await supabase.from('admin_audit_log').insert({
+    user_id: adminId,
+    action: 'normalize_food_names',
+    entity_type: 'food',
+    entity_id: null,
+    new_value: { 
+      total: results.total, 
+      updated: results.updated, 
+      unchanged: results.unchanged 
+    },
+    user_agent: headers.get('user-agent'),
+  });
+
+  logStep('Food names normalization completed', results);
+  return results;
 }
