@@ -120,6 +120,10 @@ serve(async (req) => {
         result = await changeUserPassword(supabaseAdmin, userId, params.targetUserId, params.newPassword, req.headers);
         break;
 
+      case 'preview_delete_user':
+        result = await previewDeleteUser(supabaseAdmin, params.targetUserId);
+        break;
+
       case 'delete_user':
         result = await deleteUser(supabaseAdmin, userId, params.targetUserId, req.headers);
         break;
@@ -836,4 +840,159 @@ async function updatePlan(
 
   logStep('Plan updated successfully', { planId });
   return { plan: data };
+}
+
+// deno-lint-ignore no-explicit-any
+async function previewDeleteUser(
+  supabase: any,
+  targetUserId: string
+) {
+  if (!targetUserId) {
+    throw new Error('ID do usuário é obrigatório');
+  }
+
+  logStep('Previewing user deletion', { targetUserId });
+
+  // Get user profile info
+  const { data: userProfile } = await supabase
+    .from('profiles')
+    .select('name, email, account_type, user_type, professional_id, created_at')
+    .eq('user_id', targetUserId)
+    .single();
+
+  if (!userProfile) {
+    throw new Error('Usuário não encontrado');
+  }
+
+  // Prevent preview for system admin
+  if (userProfile.email === 'admin@nutriai.app') {
+    throw new Error('Não é possível excluir a conta de administrador do sistema');
+  }
+
+  const preview: Record<string, number> = {};
+
+  // Get diet_plan IDs
+  const { data: dietPlans, count: dietPlansCount } = await supabase
+    .from('diet_plans')
+    .select('id', { count: 'exact', head: false })
+    .eq('user_id', targetUserId);
+  
+  preview['diet_plans'] = dietPlansCount || 0;
+  const dietPlanIds = dietPlans?.map((dp: { id: string }) => dp.id) || [];
+
+  // Get daily_logs count
+  const { count: dailyLogsCount } = await supabase
+    .from('daily_logs')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', targetUserId);
+  preview['daily_logs'] = dailyLogsCount || 0;
+
+  // Get meal_logs count (via daily_logs)
+  if (dailyLogsCount && dailyLogsCount > 0) {
+    const { data: dailyLogs } = await supabase
+      .from('daily_logs')
+      .select('id')
+      .eq('user_id', targetUserId);
+    const dailyLogIds = dailyLogs?.map((dl: { id: string }) => dl.id) || [];
+    
+    if (dailyLogIds.length > 0) {
+      const { count: mealLogsCount } = await supabase
+        .from('meal_logs')
+        .select('id', { count: 'exact', head: true })
+        .in('daily_log_id', dailyLogIds);
+      preview['meal_logs'] = mealLogsCount || 0;
+    }
+  }
+
+  // Get meals and related counts
+  if (dietPlanIds.length > 0) {
+    const { data: meals, count: mealsCount } = await supabase
+      .from('meals')
+      .select('id', { count: 'exact', head: false })
+      .in('diet_plan_id', dietPlanIds);
+    preview['meals'] = mealsCount || 0;
+    
+    const mealIds = meals?.map((m: { id: string }) => m.id) || [];
+    
+    if (mealIds.length > 0) {
+      const { count: mealOptionsCount } = await supabase
+        .from('meal_options')
+        .select('id', { count: 'exact', head: true })
+        .in('meal_id', mealIds);
+      preview['meal_options'] = mealOptionsCount || 0;
+
+      const { count: mealFoodsCount } = await supabase
+        .from('meal_foods')
+        .select('id', { count: 'exact', head: true })
+        .in('meal_id', mealIds);
+      preview['meal_foods'] = mealFoodsCount || 0;
+    }
+
+    const { count: aiSuggestionsCount } = await supabase
+      .from('ai_suggestions')
+      .select('id', { count: 'exact', head: true })
+      .in('diet_plan_id', dietPlanIds);
+    preview['ai_suggestions'] = aiSuggestionsCount || 0;
+
+    const { count: planVersionsCount } = await supabase
+      .from('plan_versions')
+      .select('id', { count: 'exact', head: true })
+      .in('diet_plan_id', dietPlanIds);
+    preview['plan_versions'] = planVersionsCount || 0;
+  }
+
+  // Other tables with user_id
+  const { count: chatMessagesCount } = await supabase
+    .from('chat_messages')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', targetUserId);
+  preview['chat_messages'] = chatMessagesCount || 0;
+
+  const { count: weightLogsCount } = await supabase
+    .from('weight_logs')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', targetUserId);
+  preview['weight_logs'] = weightLogsCount || 0;
+
+  const { count: adherenceMetricsCount } = await supabase
+    .from('adherence_metrics')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', targetUserId);
+  preview['adherence_metrics'] = adherenceMetricsCount || 0;
+
+  const { count: subscriptionsCount } = await supabase
+    .from('subscriptions')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', targetUserId);
+  preview['subscriptions'] = subscriptionsCount || 0;
+
+  const { count: userRolesCount } = await supabase
+    .from('user_roles')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', targetUserId);
+  preview['user_roles'] = userRolesCount || 0;
+
+  // Professional-related (as professional or student)
+  const { count: professionalStudentsCount } = await supabase
+    .from('professional_students')
+    .select('id', { count: 'exact', head: true })
+    .or(`student_id.eq.${targetUserId},professional_id.eq.${targetUserId}`);
+  preview['professional_students'] = professionalStudentsCount || 0;
+
+  const { count: studentRequestsCount } = await supabase
+    .from('student_requests')
+    .select('id', { count: 'exact', head: true })
+    .or(`student_id.eq.${targetUserId},professional_id.eq.${targetUserId}`);
+  preview['student_requests'] = studentRequestsCount || 0;
+
+  // Calculate totals
+  const totalRecords = Object.values(preview).reduce((sum, count) => sum + count, 0);
+
+  logStep('Delete preview generated', { targetUserId, totalRecords });
+
+  return {
+    user: userProfile,
+    records: preview,
+    totalRecords,
+  };
 }

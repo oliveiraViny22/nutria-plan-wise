@@ -117,6 +117,19 @@ export interface Plan {
   chat_messages_per_day: number;
 }
 
+export interface DeleteUserPreview {
+  user: {
+    name: string | null;
+    email: string | null;
+    account_type: string;
+    user_type: string | null;
+    professional_id: string | null;
+    created_at: string;
+  };
+  records: Record<string, number>;
+  totalRecords: number;
+}
+
 export function useAdminOperations() {
   const [loading, setLoading] = useState(false);
   const [settingsLoading, setSettingsLoading] = useState(false);
@@ -529,6 +542,17 @@ export function useAdminOperations() {
     }
   }, [invokeAdmin, toast]);
 
+  const previewDeleteUser = useCallback(async (targetUserId: string): Promise<DeleteUserPreview> => {
+    try {
+      const data = await invokeAdmin('preview_delete_user', { targetUserId });
+      return data as DeleteUserPreview;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erro ao carregar preview';
+      toast({ title: 'Erro', description: message, variant: 'destructive' });
+      throw error;
+    }
+  }, [invokeAdmin, toast]);
+
   const deleteUser = useCallback(async (targetUserId: string) => {
     setSavingKeys(prev => new Set(prev).add(`delete_${targetUserId}`));
     try {
@@ -629,6 +653,7 @@ export function useAdminOperations() {
     updateUser,
     toggleUserRole,
     changeUserPassword,
+    previewDeleteUser,
     deleteUser,
     fetchPlans,
     updatePlan,

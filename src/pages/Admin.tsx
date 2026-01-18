@@ -43,7 +43,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { useUserRole } from '@/hooks/useUserRole';
-import { useAdminOperations, UserProfile, Plan } from '@/hooks/useAdminOperations';
+import { useAdminOperations, UserProfile, Plan, DeleteUserPreview } from '@/hooks/useAdminOperations';
 import { useToast } from '@/hooks/use-toast';
 
 // CSV parsing helper
@@ -97,6 +97,7 @@ export default function Admin() {
     updateUser,
     toggleUserRole,
     changeUserPassword,
+    previewDeleteUser,
     deleteUser,
     fetchPlans,
     updatePlan,
@@ -121,6 +122,8 @@ export default function Admin() {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [deleteConfirmUser, setDeleteConfirmUser] = useState<UserProfile | null>(null);
+  const [deletePreview, setDeletePreview] = useState<{ records: Record<string, number>; totalRecords: number } | null>(null);
+  const [loadingDeletePreview, setLoadingDeletePreview] = useState(false);
   
   // Plans management state
   const [editingPlan, setEditingPlan] = useState<Plan | null>(null);
@@ -713,7 +716,19 @@ export default function Admin() {
                                 <Button 
                                   variant="ghost" 
                                   size="sm"
-                                  onClick={() => setDeleteConfirmUser(user)}
+                                  onClick={async () => {
+                                    setDeleteConfirmUser(user);
+                                    setDeletePreview(null);
+                                    setLoadingDeletePreview(true);
+                                    try {
+                                      const preview = await previewDeleteUser(user.user_id);
+                                      setDeletePreview({ records: preview.records, totalRecords: preview.totalRecords });
+                                    } catch {
+                                      // Error handled in hook
+                                    } finally {
+                                      setLoadingDeletePreview(false);
+                                    }
+                                  }}
                                   className="text-destructive hover:text-destructive"
                                   title="Excluir usuário"
                                 >
@@ -1459,23 +1474,62 @@ export default function Admin() {
       </Dialog>
 
       {/* Delete User Confirmation */}
-      <AlertDialog open={!!deleteConfirmUser} onOpenChange={(open) => !open && setDeleteConfirmUser(null)}>
-        <AlertDialogContent>
+      <AlertDialog open={!!deleteConfirmUser} onOpenChange={(open) => {
+        if (!open) {
+          setDeleteConfirmUser(null);
+          setDeletePreview(null);
+        }
+      }}>
+        <AlertDialogContent className="max-w-lg">
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
               <AlertTriangle className="h-5 w-5 text-destructive" />
               Confirmar Exclusão
             </AlertDialogTitle>
-            <AlertDialogDescription>
-              Tem certeza que deseja excluir permanentemente o usuário <strong>{deleteConfirmUser?.name || deleteConfirmUser?.email}</strong>?
-              <br /><br />
-              Esta ação é <strong>irreversível</strong> e irá:
-              <ul className="list-disc list-inside mt-2 space-y-1">
-                <li>Remover a conta de autenticação</li>
-                <li>Deletar todos os dados do perfil</li>
-                <li>Remover planos dietéticos e logs</li>
-                <li>Cancelar assinaturas ativas</li>
-              </ul>
+            <AlertDialogDescription asChild>
+              <div>
+                <p className="mb-3">
+                  Tem certeza que deseja excluir permanentemente o usuário <strong>{deleteConfirmUser?.name || deleteConfirmUser?.email}</strong>?
+                </p>
+                
+                {loadingDeletePreview ? (
+                  <div className="flex items-center justify-center py-6">
+                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                    <span className="ml-2 text-sm text-muted-foreground">Carregando registros...</span>
+                  </div>
+                ) : deletePreview ? (
+                  <div className="bg-destructive/5 border border-destructive/20 rounded-lg p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium text-destructive">Total de registros a serem excluídos:</span>
+                      <Badge variant="destructive" className="text-lg px-3">
+                        {deletePreview.totalRecords}
+                      </Badge>
+                    </div>
+                    
+                    {deletePreview.totalRecords > 0 && (
+                      <div className="grid grid-cols-2 gap-2 pt-2 border-t border-destructive/20">
+                        {Object.entries(deletePreview.records)
+                          .filter(([_, count]) => count > 0)
+                          .sort((a, b) => b[1] - a[1])
+                          .map(([table, count]) => (
+                            <div key={table} className="flex items-center justify-between text-sm">
+                              <span className="text-muted-foreground">
+                                {table.replace(/_/g, ' ')}:
+                              </span>
+                              <Badge variant="outline" className="font-mono">
+                                {count}
+                              </Badge>
+                            </div>
+                          ))}
+                      </div>
+                    )}
+                  </div>
+                ) : null}
+
+                <p className="mt-4 text-sm font-medium text-destructive">
+                  Esta ação é <strong>irreversível</strong>.
+                </p>
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -1486,11 +1540,12 @@ export default function Admin() {
                 try {
                   await deleteUser(deleteConfirmUser.user_id);
                   setDeleteConfirmUser(null);
+                  setDeletePreview(null);
                 } catch {
                   // Error handled in hook
                 }
               }}
-              disabled={savingKeys.has(`delete_${deleteConfirmUser?.user_id}`)}
+              disabled={savingKeys.has(`delete_${deleteConfirmUser?.user_id}`) || loadingDeletePreview}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               {savingKeys.has(`delete_${deleteConfirmUser?.user_id}`) ? (
@@ -1498,7 +1553,7 @@ export default function Admin() {
               ) : (
                 <Trash2 className="h-4 w-4 mr-1" />
               )}
-              Excluir Permanentemente
+              Excluir {deletePreview?.totalRecords ? `${deletePreview.totalRecords} registros` : 'Permanentemente'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
