@@ -26,6 +26,7 @@ import { CalorieRing } from '@/components/CalorieRing';
 import { MacroChart } from '@/components/MacroChart';
 import { MacroRebalancer } from '@/components/MacroRebalancer';
 import { AISuggestionsReview } from '@/components/AISuggestionsReview';
+import { AdherenceDashboard } from '@/components/AdherenceDashboard';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserRole } from '@/hooks/useUserRole';
@@ -493,12 +494,20 @@ export default function StudentView() {
           </motion.div>
         )}
 
+        {/* Adherence Dashboard */}
+        {dietPlan && studentId && (
+          <AdherenceDashboard
+            studentId={studentId}
+            dietPlanId={dietPlan.id}
+          />
+        )}
+
         {/* AI Suggestions Review */}
         {dietPlan && studentId && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            transition={{ delay: 0.15 }}
+            transition={{ delay: 0.2 }}
           >
             <AISuggestionsReview
               studentId={studentId}
