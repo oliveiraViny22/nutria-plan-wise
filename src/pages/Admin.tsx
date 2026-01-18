@@ -28,6 +28,14 @@ import {
   DollarSign,
   AlertTriangle,
   BookOpen,
+  BarChart3,
+  TrendingUp,
+  TrendingDown,
+  Activity,
+  Calendar,
+  RefreshCw,
+  Wallet,
+  Crown,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -43,10 +51,40 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { Progress } from '@/components/ui/progress';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useAdminOperations, UserProfile, Plan, DeleteUserPreview } from '@/hooks/useAdminOperations';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+
+// Types for metrics and subscriptions
+interface DashboardMetrics {
+  totalUsers: number;
+  usersByType: Record<string, number>;
+  totalSubscriptions: number;
+  subscriptionsByStatus: Record<string, number>;
+  subscriptionsByBillingCycle: Record<string, number>;
+  totalDietPlans: number;
+  activeDietPlans: number;
+  dailyLogsLast7Days: number;
+  mrrEstimate: number;
+}
+
+interface SubscriptionData {
+  id: string;
+  user_id: string;
+  plan_id: string;
+  status: string;
+  billing_cycle: string;
+  current_period_start: string | null;
+  current_period_end: string | null;
+  cancel_at_period_end: boolean;
+  provider_subscription_id: string | null;
+  created_at: string;
+  user_name?: string;
+  user_email?: string;
+  plan_name?: string;
+}
 
 // CSV parsing helper
 function parseCSV(text: string): Record<string, unknown>[] {
@@ -105,7 +143,7 @@ export default function Admin() {
     updatePlan,
   } = useAdminOperations();
 
-  const [activeTab, setActiveTab] = useState('settings');
+  const [activeTab, setActiveTab] = useState('metrics');
   const [editedSettings, setEditedSettings] = useState<Record<string, unknown>>({});
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [csvPreview, setCsvPreview] = useState<{ rows: Record<string, unknown>[]; validation: { valid: boolean; errors: string[]; validRows: unknown[] } | null }>({ rows: [], validation: null });
@@ -134,6 +172,16 @@ export default function Admin() {
   // Documentation download state
   const [downloadingDoc, setDownloadingDoc] = useState<string | null>(null);
 
+  // Metrics state
+  const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
+  const [metricsLoading, setMetricsLoading] = useState(false);
+
+  // Subscriptions management state
+  const [subscriptions, setSubscriptions] = useState<SubscriptionData[]>([]);
+  const [subscriptionsLoading, setSubscriptionsLoading] = useState(false);
+  const [subscriptionFilter, setSubscriptionFilter] = useState<string>('all');
+  const [subscriptionsTotal, setSubscriptionsTotal] = useState(0);
+
   // Redirect if not admin
   useEffect(() => {
     if (!roleLoading && !isAdmin) {
@@ -152,8 +200,163 @@ export default function Admin() {
       fetchSettings();
       fetchFoodImports();
       fetchAuditLogs();
+      fetchMetrics();
     }
   }, [isAdmin, fetchSettings, fetchFoodImports, fetchAuditLogs]);
+
+  // Fetch dashboard metrics
+  const fetchMetrics = async () => {
+    setMetricsLoading(true);
+    try {
+      // Fetch all counts in parallel
+      const [
+        { count: usersCount },
+        { data: usersByType },
+        { count: subsCount },
+        { data: subsByStatus },
+        { data: subsByBilling },
+        { count: dietPlansCount },
+        { data: activePlans },
+        { count: logsCount },
+        { data: activeSubsForMRR },
+      ] = await Promise.all([
+        supabase.from('profiles').select('*', { count: 'exact', head: true }),
+        supabase.from('profiles').select('account_type'),
+        supabase.from('subscriptions').select('*', { count: 'exact', head: true }),
+        supabase.from('subscriptions').select('status'),
+        supabase.from('subscriptions').select('billing_cycle'),
+        supabase.from('diet_plans').select('*', { count: 'exact', head: true }),
+        supabase.from('diet_plans').select('id').eq('status', 'active'),
+        supabase.from('daily_logs').select('*', { count: 'exact', head: true }).gte('created_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()),
+        supabase.from('subscriptions').select('plan_id, billing_cycle, plans(price_monthly, price_annual)').eq('status', 'active'),
+      ]);
+
+      // Group counts
+      const usersByTypeMap: Record<string, number> = {};
+      usersByType?.forEach((u) => {
+        usersByTypeMap[u.account_type] = (usersByTypeMap[u.account_type] || 0) + 1;
+      });
+
+      const subsByStatusMap: Record<string, number> = {};
+      subsByStatus?.forEach((s) => {
+        subsByStatusMap[s.status] = (subsByStatusMap[s.status] || 0) + 1;
+      });
+
+      const subsByBillingMap: Record<string, number> = {};
+      subsByBilling?.forEach((s) => {
+        if (s.billing_cycle) {
+          subsByBillingMap[s.billing_cycle] = (subsByBillingMap[s.billing_cycle] || 0) + 1;
+        }
+      });
+
+      // Estimate MRR (Monthly Recurring Revenue)
+      let mrrEstimate = 0;
+      activeSubsForMRR?.forEach((sub) => {
+        const plan = sub.plans as { price_monthly: number | null; price_annual: number | null } | null;
+        if (plan) {
+          if (sub.billing_cycle === 'annual' && plan.price_annual) {
+            mrrEstimate += plan.price_annual / 12;
+          } else if (plan.price_monthly) {
+            mrrEstimate += plan.price_monthly;
+          }
+        }
+      });
+
+      setMetrics({
+        totalUsers: usersCount || 0,
+        usersByType: usersByTypeMap,
+        totalSubscriptions: subsCount || 0,
+        subscriptionsByStatus: subsByStatusMap,
+        subscriptionsByBillingCycle: subsByBillingMap,
+        totalDietPlans: dietPlansCount || 0,
+        activeDietPlans: activePlans?.length || 0,
+        dailyLogsLast7Days: logsCount || 0,
+        mrrEstimate: mrrEstimate / 100, // Convert from cents
+      });
+    } catch (error) {
+      console.error('Error fetching metrics:', error);
+      toast({
+        title: 'Erro ao carregar métricas',
+        description: 'Não foi possível obter os dados do dashboard.',
+        variant: 'destructive',
+      });
+    } finally {
+      setMetricsLoading(false);
+    }
+  };
+
+  // Fetch subscriptions
+  const fetchSubscriptions = async (statusFilter?: string) => {
+    setSubscriptionsLoading(true);
+    try {
+      // First fetch subscriptions
+      let subsQuery = supabase
+        .from('subscriptions')
+        .select(`
+          id,
+          user_id,
+          plan_id,
+          status,
+          billing_cycle,
+          current_period_start,
+          current_period_end,
+          cancel_at_period_end,
+          provider_subscription_id,
+          created_at,
+          plans(name)
+        `, { count: 'exact' })
+        .order('created_at', { ascending: false })
+        .limit(100);
+
+      if (statusFilter && statusFilter !== 'all') {
+        subsQuery = subsQuery.eq('status', statusFilter as 'trial' | 'active' | 'past_due' | 'canceled' | 'expired');
+      }
+
+      const { data: subsData, error: subsError, count } = await subsQuery;
+
+      if (subsError) throw subsError;
+
+      // Fetch profiles separately for user info
+      const userIds = (subsData || []).map(s => s.user_id);
+      const { data: profilesData } = await supabase
+        .from('profiles')
+        .select('user_id, name, email')
+        .in('user_id', userIds);
+
+      const profilesMap = new Map(profilesData?.map(p => [p.user_id, p]) || []);
+
+      const mappedData: SubscriptionData[] = (subsData || []).map((sub) => {
+        const profile = profilesMap.get(sub.user_id);
+        return {
+          id: sub.id,
+          user_id: sub.user_id,
+          plan_id: sub.plan_id,
+          status: sub.status,
+          billing_cycle: sub.billing_cycle || 'monthly',
+          current_period_start: sub.current_period_start,
+          current_period_end: sub.current_period_end,
+          cancel_at_period_end: sub.cancel_at_period_end || false,
+          provider_subscription_id: sub.provider_subscription_id,
+          created_at: sub.created_at,
+          user_name: profile?.name || undefined,
+          user_email: profile?.email || undefined,
+          plan_name: (sub.plans as { name: string } | null)?.name || undefined,
+        };
+      });
+
+      setSubscriptions(mappedData);
+      setSubscriptionsTotal(count || 0);
+    } catch (error) {
+      console.error('Error fetching subscriptions:', error);
+      toast({
+        title: 'Erro ao carregar assinaturas',
+        description: error instanceof Error ? error.message : 'Erro desconhecido',
+        variant: 'destructive',
+      });
+    } finally {
+      setSubscriptionsLoading(false);
+    }
+  };
 
   const handleSettingChange = (key: string, value: unknown) => {
     setEditedSettings(prev => ({ ...prev, [key]: value }));
@@ -473,36 +676,380 @@ export default function Admin() {
 
       <main className="container mx-auto px-4 py-6">
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full max-w-5xl grid-cols-7 mb-6">
-            <TabsTrigger value="users" className="flex items-center gap-1">
-              <UserCog className="h-4 w-4" />
-              <span className="hidden sm:inline">Usuários</span>
-            </TabsTrigger>
-            <TabsTrigger value="foods" className="flex items-center gap-1">
-              <Upload className="h-4 w-4" />
-              <span className="hidden sm:inline">Alimentos</span>
-            </TabsTrigger>
-            <TabsTrigger value="plans" className="flex items-center gap-1">
-              <CreditCard className="h-4 w-4" />
-              <span className="hidden sm:inline">Planos</span>
-            </TabsTrigger>
-            <TabsTrigger value="audit" className="flex items-center gap-1">
-              <History className="h-4 w-4" />
-              <span className="hidden sm:inline">Histórico</span>
-            </TabsTrigger>
-            <TabsTrigger value="seed" className="flex items-center gap-1">
-              <Database className="h-4 w-4" />
-              <span className="hidden sm:inline">Seed</span>
-            </TabsTrigger>
-            <TabsTrigger value="docs" className="flex items-center gap-1">
-              <BookOpen className="h-4 w-4" />
-              <span className="hidden sm:inline">Docs</span>
-            </TabsTrigger>
-            <TabsTrigger value="settings" className="flex items-center gap-1">
-              <Settings className="h-4 w-4" />
-              <span className="hidden sm:inline">Config</span>
-            </TabsTrigger>
-          </TabsList>
+          <ScrollArea className="w-full pb-2">
+            <TabsList className="flex w-max gap-1 mb-6">
+              <TabsTrigger value="metrics" className="flex items-center gap-1.5 px-3">
+                <BarChart3 className="h-4 w-4" />
+                <span className="hidden sm:inline">Métricas</span>
+              </TabsTrigger>
+              <TabsTrigger value="users" className="flex items-center gap-1.5 px-3">
+                <UserCog className="h-4 w-4" />
+                <span className="hidden sm:inline">Usuários</span>
+              </TabsTrigger>
+              <TabsTrigger value="subscriptions" className="flex items-center gap-1.5 px-3">
+                <Wallet className="h-4 w-4" />
+                <span className="hidden sm:inline">Assinaturas</span>
+              </TabsTrigger>
+              <TabsTrigger value="foods" className="flex items-center gap-1.5 px-3">
+                <Upload className="h-4 w-4" />
+                <span className="hidden sm:inline">Alimentos</span>
+              </TabsTrigger>
+              <TabsTrigger value="plans" className="flex items-center gap-1.5 px-3">
+                <CreditCard className="h-4 w-4" />
+                <span className="hidden sm:inline">Planos</span>
+              </TabsTrigger>
+              <TabsTrigger value="audit" className="flex items-center gap-1.5 px-3">
+                <History className="h-4 w-4" />
+                <span className="hidden sm:inline">Histórico</span>
+              </TabsTrigger>
+              <TabsTrigger value="seed" className="flex items-center gap-1.5 px-3">
+                <Database className="h-4 w-4" />
+                <span className="hidden sm:inline">Seed</span>
+              </TabsTrigger>
+              <TabsTrigger value="docs" className="flex items-center gap-1.5 px-3">
+                <BookOpen className="h-4 w-4" />
+                <span className="hidden sm:inline">Docs</span>
+              </TabsTrigger>
+              <TabsTrigger value="settings" className="flex items-center gap-1.5 px-3">
+                <Settings className="h-4 w-4" />
+                <span className="hidden sm:inline">Config</span>
+              </TabsTrigger>
+            </TabsList>
+          </ScrollArea>
+
+          {/* Metrics Dashboard Tab */}
+          <TabsContent value="metrics">
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="space-y-6"
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-2xl font-bold">Dashboard de Métricas</h2>
+                  <p className="text-muted-foreground">Visão geral do sistema e indicadores principais</p>
+                </div>
+                <Button 
+                  variant="outline" 
+                  onClick={fetchMetrics}
+                  disabled={metricsLoading}
+                >
+                  {metricsLoading ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                  )}
+                  Atualizar
+                </Button>
+              </div>
+              
+              {metricsLoading && !metrics ? (
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                  {[1, 2, 3, 4].map((i) => (
+                    <Card key={i}>
+                      <CardHeader className="pb-2">
+                        <div className="h-4 w-24 bg-muted animate-pulse rounded" />
+                      </CardHeader>
+                      <CardContent>
+                        <div className="h-8 w-16 bg-muted animate-pulse rounded" />
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              ) : metrics ? (
+                <>
+                  {/* Key Metrics Cards */}
+                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                    <Card className="border-l-4 border-l-blue-500">
+                      <CardHeader className="pb-2">
+                        <CardDescription className="flex items-center gap-2">
+                          <Users className="h-4 w-4" />
+                          Total de Usuários
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="flex items-baseline gap-2">
+                          <span className="text-3xl font-bold">{metrics.totalUsers}</span>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <Card className="border-l-4 border-l-green-500">
+                      <CardHeader className="pb-2">
+                        <CardDescription className="flex items-center gap-2">
+                          <Wallet className="h-4 w-4" />
+                          Assinaturas Ativas
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="flex items-baseline gap-2">
+                          <span className="text-3xl font-bold">{metrics.subscriptionsByStatus['active'] || 0}</span>
+                          <span className="text-sm text-muted-foreground">
+                            / {metrics.totalSubscriptions} total
+                          </span>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <Card className="border-l-4 border-l-purple-500">
+                      <CardHeader className="pb-2">
+                        <CardDescription className="flex items-center gap-2">
+                          <DollarSign className="h-4 w-4" />
+                          MRR Estimado
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="flex items-baseline gap-2">
+                          <span className="text-3xl font-bold">
+                            R$ {metrics.mrrEstimate.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <Card className="border-l-4 border-l-orange-500">
+                      <CardHeader className="pb-2">
+                        <CardDescription className="flex items-center gap-2">
+                          <Activity className="h-4 w-4" />
+                          Logs (7 dias)
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="flex items-baseline gap-2">
+                          <span className="text-3xl font-bold">{metrics.dailyLogsLast7Days}</span>
+                          <span className="text-sm text-muted-foreground">registros</span>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  {/* Detailed Cards */}
+                  <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                    {/* Users by Type */}
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-base flex items-center gap-2">
+                          <Users className="h-4 w-4 text-primary" />
+                          Usuários por Tipo
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-3">
+                        {Object.entries(metrics.usersByType).map(([type, count]) => (
+                          <div key={type} className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <Badge variant="outline" className="capitalize">{type.replace(/_/g, ' ')}</Badge>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Progress value={(count / metrics.totalUsers) * 100} className="w-20 h-2" />
+                              <span className="text-sm font-medium w-8 text-right">{count}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </CardContent>
+                    </Card>
+
+                    {/* Subscriptions by Status */}
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-base flex items-center gap-2">
+                          <Wallet className="h-4 w-4 text-primary" />
+                          Assinaturas por Status
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-3">
+                        {Object.entries(metrics.subscriptionsByStatus).map(([status, count]) => (
+                          <div key={status} className="flex items-center justify-between">
+                            <Badge 
+                              variant={status === 'active' ? 'default' : status === 'trial' ? 'secondary' : 'outline'}
+                              className="capitalize"
+                            >
+                              {status === 'active' ? 'Ativa' : status === 'trial' ? 'Trial' : status === 'past_due' ? 'Vencida' : status === 'canceled' ? 'Cancelada' : status}
+                            </Badge>
+                            <div className="flex items-center gap-2">
+                              <Progress 
+                                value={(count / Math.max(metrics.totalSubscriptions, 1)) * 100} 
+                                className="w-20 h-2" 
+                              />
+                              <span className="text-sm font-medium w-8 text-right">{count}</span>
+                            </div>
+                          </div>
+                        ))}
+                        {Object.keys(metrics.subscriptionsByStatus).length === 0 && (
+                          <p className="text-sm text-muted-foreground text-center py-4">Nenhuma assinatura</p>
+                        )}
+                      </CardContent>
+                    </Card>
+
+                    {/* Diet Plans Stats */}
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-base flex items-center gap-2">
+                          <FileText className="h-4 w-4 text-primary" />
+                          Planos Alimentares
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <span className="text-muted-foreground">Total de Planos</span>
+                          <span className="text-2xl font-bold">{metrics.totalDietPlans}</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-muted-foreground">Planos Ativos</span>
+                          <span className="text-2xl font-bold text-green-600">{metrics.activeDietPlans}</span>
+                        </div>
+                        <div className="border-t pt-3">
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <TrendingUp className="h-4 w-4 text-green-500" />
+                            <span>Taxa de ativação: {metrics.totalDietPlans > 0 ? ((metrics.activeDietPlans / metrics.totalDietPlans) * 100).toFixed(1) : 0}%</span>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+                </>
+              ) : (
+                <Card>
+                  <CardContent className="py-12 text-center">
+                    <BarChart3 className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                    <p className="text-muted-foreground">Clique em "Atualizar" para carregar as métricas</p>
+                  </CardContent>
+                </Card>
+              )}
+            </motion.div>
+          </TabsContent>
+
+          {/* Subscriptions Tab */}
+          <TabsContent value="subscriptions">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Wallet className="h-5 w-5 text-primary" />
+                  Gestão de Assinaturas
+                </CardTitle>
+                <CardDescription>
+                  Visualize e gerencie as assinaturas dos usuários ({subscriptionsTotal} total).
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex flex-col sm:flex-row gap-4">
+                  <Select 
+                    value={subscriptionFilter} 
+                    onValueChange={(val) => {
+                      setSubscriptionFilter(val);
+                      fetchSubscriptions(val);
+                    }}
+                  >
+                    <SelectTrigger className="w-[180px]">
+                      <SelectValue placeholder="Status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos</SelectItem>
+                      <SelectItem value="active">Ativas</SelectItem>
+                      <SelectItem value="trial">Trial</SelectItem>
+                      <SelectItem value="past_due">Vencidas</SelectItem>
+                      <SelectItem value="canceled">Canceladas</SelectItem>
+                      <SelectItem value="expired">Expiradas</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Button 
+                    onClick={() => fetchSubscriptions(subscriptionFilter)}
+                    disabled={subscriptionsLoading}
+                  >
+                    {subscriptionsLoading ? (
+                      <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                    ) : (
+                      <Search className="h-4 w-4 mr-1" />
+                    )}
+                    Buscar
+                  </Button>
+                </div>
+
+                <ScrollArea className="h-[500px] border rounded-lg">
+                  {subscriptionsLoading ? (
+                    <div className="flex items-center justify-center py-12">
+                      <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                    </div>
+                  ) : subscriptions.length === 0 ? (
+                    <div className="py-12 text-center text-muted-foreground">
+                      <Wallet className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                      <p>Clique em "Buscar" para carregar as assinaturas</p>
+                    </div>
+                  ) : (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Usuário</TableHead>
+                          <TableHead>Plano</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Ciclo</TableHead>
+                          <TableHead>Período Atual</TableHead>
+                          <TableHead className="text-center">Cancelar?</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {subscriptions.map((sub) => (
+                          <TableRow key={sub.id}>
+                            <TableCell>
+                              <div className="flex flex-col">
+                                <span className="font-medium">{sub.user_name || 'Sem nome'}</span>
+                                <span className="text-xs text-muted-foreground">{sub.user_email}</span>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="outline">{sub.plan_name || '-'}</Badge>
+                            </TableCell>
+                            <TableCell>
+                              <Badge 
+                                variant={
+                                  sub.status === 'active' ? 'default' : 
+                                  sub.status === 'trial' ? 'secondary' : 
+                                  sub.status === 'past_due' ? 'destructive' : 
+                                  'outline'
+                                }
+                              >
+                                {sub.status === 'active' ? 'Ativa' : 
+                                 sub.status === 'trial' ? 'Trial' : 
+                                 sub.status === 'past_due' ? 'Vencida' : 
+                                 sub.status === 'canceled' ? 'Cancelada' : 
+                                 sub.status}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <span className="capitalize text-sm">{sub.billing_cycle}</span>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex flex-col text-xs">
+                                {sub.current_period_start && (
+                                  <span>
+                                    {new Date(sub.current_period_start).toLocaleDateString('pt-BR')}
+                                  </span>
+                                )}
+                                {sub.current_period_end && (
+                                  <span className="text-muted-foreground">
+                                    até {new Date(sub.current_period_end).toLocaleDateString('pt-BR')}
+                                  </span>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-center">
+                              {sub.cancel_at_period_end ? (
+                                <Badge variant="destructive" className="text-xs">
+                                  <AlertTriangle className="h-3 w-3 mr-1" />
+                                  Sim
+                                </Badge>
+                              ) : (
+                                <span className="text-muted-foreground">-</span>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  )}
+                </ScrollArea>
+              </CardContent>
+            </Card>
+          </TabsContent>
 
           {/* Documentation Tab */}
           <TabsContent value="docs">
