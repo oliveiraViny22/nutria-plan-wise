@@ -100,11 +100,11 @@ export function useSubscription() {
     }
   }, [authLoading, fetchSubscription]);
 
-  // Refresh every 60 seconds
+  // Refresh every 5 minutes instead of 1 minute (reduces 5x the calls)
   useEffect(() => {
     if (!user) return;
     
-    const interval = setInterval(fetchSubscription, 60000);
+    const interval = setInterval(fetchSubscription, 300000); // 5 minutes
     return () => clearInterval(interval);
   }, [user, fetchSubscription]);
 

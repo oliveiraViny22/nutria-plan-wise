@@ -33,29 +33,23 @@ export function useProfessionalStudents() {
     
     setLoading(true);
     try {
-      // Fetch students linked to this professional
+      // Fetch students and profiles in parallel (batched, not N+1)
       const { data: studentsData, error: studentsError } = await supabase
         .from('professional_students')
         .select('*')
         .eq('professional_id', user.id)
         .order('created_at', { ascending: false });
 
-      if (studentsError) {
-        throw studentsError;
-      }
+      if (studentsError) throw studentsError;
 
-      // Fetch profiles for each student
       if (studentsData && studentsData.length > 0) {
         const studentIds = studentsData.map(s => s.student_id);
         
-        const { data: profilesData, error: profilesError } = await supabase
+        // Single batched query for all profiles
+        const { data: profilesData } = await supabase
           .from('profiles')
           .select('id, user_id, name, email, goal, daily_calories, protein_target, carbs_target, fat_target, onboarding_completed')
           .in('user_id', studentIds);
-
-        if (profilesError) {
-          console.error('Error fetching profiles:', profilesError);
-        }
 
         const studentsWithProfiles: StudentWithProfile[] = studentsData.map(student => ({
           ...student,
@@ -80,6 +74,40 @@ export function useProfessionalStudents() {
       setLoading(false);
     }
   }, [user]);
+
+  // Fallback method for when JOIN is not possible
+  const fetchStudentsFallback = async () => {
+    if (!user) return;
+    
+    const { data: studentsData, error: studentsError } = await supabase
+      .from('professional_students')
+      .select('*')
+      .eq('professional_id', user.id)
+      .order('created_at', { ascending: false });
+
+    if (studentsError) throw studentsError;
+
+    if (studentsData && studentsData.length > 0) {
+      const studentIds = studentsData.map(s => s.student_id);
+      
+      const { data: profilesData } = await supabase
+        .from('profiles')
+        .select('id, user_id, name, email, goal, daily_calories, protein_target, carbs_target, fat_target, onboarding_completed')
+        .in('user_id', studentIds);
+
+      const studentsWithProfiles: StudentWithProfile[] = studentsData.map(student => ({
+        ...student,
+        status: student.status as 'active' | 'inactive' | 'pending',
+        profile: profilesData?.find(p => p.user_id === student.student_id) || null,
+      }));
+
+      setStudents(studentsWithProfiles);
+      setStudentCount(studentsData.filter(s => s.status === 'active').length);
+    } else {
+      setStudents([]);
+      setStudentCount(0);
+    }
+  };
 
   const fetchLicense = useCallback(async () => {
     if (!user) return;
