@@ -170,6 +170,28 @@ export interface MealFood {
   food?: Food;
 }
 
+export interface MealOption {
+  id: string;
+  meal_id: string;
+  option_number: number;
+  name: string | null;
+  total_calories: number;
+  total_protein: number;
+  total_carbs: number;
+  total_fat: number;
+  created_at: string;
+  foods?: MealOptionFood[];
+}
+
+export interface MealOptionFood {
+  id: string;
+  meal_option_id: string;
+  food_id: string;
+  quantity: number;
+  created_at: string;
+  food?: Food;
+}
+
 export interface ChatMessage {
   id: string;
   user_id: string;
