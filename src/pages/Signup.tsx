@@ -1,13 +1,14 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Eye, EyeOff, Loader2, Mail, Lock, User } from 'lucide-react';
+import { Eye, EyeOff, Loader2, Mail, Lock, User, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Logo } from '@/components/Logo';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
+import { signupSchema, validatePassword } from '@/lib/password-validation';
 
 export default function Signup() {
   const [name, setName] = useState('');
@@ -16,19 +17,36 @@ export default function Signup() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const { signUp } = useAuth();
   const navigate = useNavigate();
 
+  // Real-time password validation
+  const passwordValidation = validatePassword(password);
+  const hasMinLength = password.length >= 8;
+  const hasLetter = /[a-zA-Z]/.test(password);
+  const hasNumber = /[0-9]/.test(password);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setFieldErrors({});
 
-    if (password !== confirmPassword) {
-      toast.error('As senhas não coincidem');
-      return;
-    }
-
-    if (password.length < 6) {
-      toast.error('A senha deve ter pelo menos 6 caracteres');
+    // Validate all fields with zod schema
+    const result = signupSchema.safeParse({ name, email, password, confirmPassword });
+    
+    if (!result.success) {
+      const errors: Record<string, string> = {};
+      result.error.errors.forEach((err) => {
+        const field = err.path[0] as string;
+        if (!errors[field]) {
+          errors[field] = err.message;
+        }
+      });
+      setFieldErrors(errors);
+      
+      // Show first error as toast
+      const firstError = result.error.errors[0];
+      toast.error(firstError.message);
       return;
     }
 
@@ -39,7 +57,19 @@ export default function Signup() {
       toast.success('Conta criada com sucesso!');
       navigate('/onboarding');
     } catch (error: any) {
-      toast.error(error.message || 'Erro ao criar conta');
+      // Handle specific Supabase auth errors
+      const message = error.message || 'Erro ao criar conta';
+      
+      if (message.includes('weak_password') || message.includes('Password')) {
+        toast.error('Senha muito fraca. Use uma combinação mais forte.');
+      } else if (message.includes('already registered') || message.includes('already exists')) {
+        toast.error('Este e-mail já está cadastrado.');
+        setFieldErrors({ email: 'E-mail já cadastrado' });
+      } else if (message.includes('leaked') || message.includes('compromised')) {
+        toast.error('Esta senha foi encontrada em vazamentos de dados. Escolha outra.');
+      } else {
+        toast.error(message);
+      }
     } finally {
       setLoading(false);
     }
@@ -77,10 +107,16 @@ export default function Signup() {
                   placeholder="Seu nome"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="pl-9 sm:pl-10 h-10 sm:h-12"
+                  className={`pl-9 sm:pl-10 h-10 sm:h-12 ${fieldErrors.name ? 'border-destructive' : ''}`}
                   required
                 />
               </div>
+              {fieldErrors.name && (
+                <p className="text-xs text-destructive flex items-center gap-1">
+                  <AlertCircle className="w-3 h-3" />
+                  {fieldErrors.name}
+                </p>
+              )}
             </div>
 
             <div className="space-y-1.5 sm:space-y-2">
@@ -93,10 +129,16 @@ export default function Signup() {
                   placeholder="seu@email.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="pl-9 sm:pl-10 h-10 sm:h-12"
+                  className={`pl-9 sm:pl-10 h-10 sm:h-12 ${fieldErrors.email ? 'border-destructive' : ''}`}
                   required
                 />
               </div>
+              {fieldErrors.email && (
+                <p className="text-xs text-destructive flex items-center gap-1">
+                  <AlertCircle className="w-3 h-3" />
+                  {fieldErrors.email}
+                </p>
+              )}
             </div>
 
             <div className="space-y-1.5 sm:space-y-2">
@@ -106,10 +148,10 @@ export default function Signup() {
                 <Input
                   id="password"
                   type={showPassword ? 'text' : 'password'}
-                  placeholder="Mínimo 6 caracteres"
+                  placeholder="Mínimo 8 caracteres com letras e números"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="pl-9 sm:pl-10 pr-10 h-10 sm:h-12"
+                  className={`pl-9 sm:pl-10 pr-10 h-10 sm:h-12 ${fieldErrors.password ? 'border-destructive' : ''}`}
                   required
                 />
                 <button
@@ -120,6 +162,49 @@ export default function Signup() {
                   {showPassword ? <EyeOff className="w-4 h-4 sm:w-5 sm:h-5" /> : <Eye className="w-4 h-4 sm:w-5 sm:h-5" />}
                 </button>
               </div>
+              
+              {/* Password strength indicators */}
+              {password.length > 0 && (
+                <div className="space-y-1 pt-1">
+                  <div className="flex items-center gap-1.5 text-xs">
+                    {hasMinLength ? (
+                      <CheckCircle2 className="w-3 h-3 text-green-500" />
+                    ) : (
+                      <AlertCircle className="w-3 h-3 text-muted-foreground" />
+                    )}
+                    <span className={hasMinLength ? 'text-green-600' : 'text-muted-foreground'}>
+                      Mínimo 8 caracteres
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-xs">
+                    {hasLetter ? (
+                      <CheckCircle2 className="w-3 h-3 text-green-500" />
+                    ) : (
+                      <AlertCircle className="w-3 h-3 text-muted-foreground" />
+                    )}
+                    <span className={hasLetter ? 'text-green-600' : 'text-muted-foreground'}>
+                      Pelo menos uma letra
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-xs">
+                    {hasNumber ? (
+                      <CheckCircle2 className="w-3 h-3 text-green-500" />
+                    ) : (
+                      <AlertCircle className="w-3 h-3 text-muted-foreground" />
+                    )}
+                    <span className={hasNumber ? 'text-green-600' : 'text-muted-foreground'}>
+                      Pelo menos um número
+                    </span>
+                  </div>
+                </div>
+              )}
+              
+              {fieldErrors.password && (
+                <p className="text-xs text-destructive flex items-center gap-1">
+                  <AlertCircle className="w-3 h-3" />
+                  {fieldErrors.password}
+                </p>
+              )}
             </div>
 
             <div className="space-y-1.5 sm:space-y-2">
@@ -132,10 +217,16 @@ export default function Signup() {
                   placeholder="Repita a senha"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="pl-9 sm:pl-10 h-10 sm:h-12"
+                  className={`pl-9 sm:pl-10 h-10 sm:h-12 ${fieldErrors.confirmPassword ? 'border-destructive' : ''}`}
                   required
                 />
               </div>
+              {fieldErrors.confirmPassword && (
+                <p className="text-xs text-destructive flex items-center gap-1">
+                  <AlertCircle className="w-3 h-3" />
+                  {fieldErrors.confirmPassword}
+                </p>
+              )}
             </div>
 
             <Button
