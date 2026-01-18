@@ -99,7 +99,11 @@ export default function MealDetail() {
   }, [mealId]);
 
   const fetchMealData = async () => {
-    if (!mealId) return;
+    if (!mealId) {
+      toast.error('ID da refeição não informado');
+      setLoading(false);
+      return;
+    }
 
     try {
       // Fetch meal
@@ -109,7 +113,19 @@ export default function MealDetail() {
         .eq('id', mealId)
         .single();
 
-      if (mealError) throw mealError;
+      if (mealError) {
+        console.error('Error fetching meal:', mealError);
+        if (mealError.code === 'PGRST116') {
+          toast.error('Refeição não encontrada. Verifique se ela ainda existe.');
+        } else if (mealError.code === '42501') {
+          toast.error('Sem permissão para acessar esta refeição.');
+        } else {
+          toast.error(`Erro ao buscar dados da refeição: ${mealError.message}`);
+        }
+        setLoading(false);
+        return;
+      }
+      
       setMeal(mealData as Meal);
 
       // Fetch meal options with their foods
@@ -125,7 +141,16 @@ export default function MealDetail() {
         .eq('meal_id', mealId)
         .order('option_number');
 
-      if (optionsError) throw optionsError;
+      if (optionsError) {
+        console.error('Error fetching meal options:', optionsError);
+        if (optionsError.code === '42501') {
+          toast.error('Sem permissão para acessar as opções desta refeição.');
+        } else {
+          toast.error(`Erro ao carregar opções da refeição: ${optionsError.message}`);
+        }
+        setLoading(false);
+        return;
+      }
       
       const options = (optionsData || []).map(opt => ({
         ...opt,
@@ -139,8 +164,8 @@ export default function MealDetail() {
         setSelectedOption(options[0].option_number.toString());
       }
     } catch (error: any) {
-      console.error('Error fetching meal:', error);
-      toast.error('Erro ao carregar refeição');
+      console.error('Unexpected error fetching meal:', error);
+      toast.error('Erro inesperado ao carregar refeição. Tente novamente.');
     } finally {
       setLoading(false);
     }
@@ -148,7 +173,12 @@ export default function MealDetail() {
 
   const fetchAllFoods = async () => {
     const { data, error } = await supabase.from('foods').select('*').order('name');
-    if (!error && data) {
+    if (error) {
+      console.error('Error fetching foods list:', error);
+      toast.error('Não foi possível carregar a lista de alimentos para substituição.');
+      return;
+    }
+    if (data) {
       setAllFoods(data as Food[]);
     }
   };
@@ -327,7 +357,13 @@ export default function MealDetail() {
       await fetchMealData();
     } catch (error: any) {
       console.error('Error substituting:', error);
-      toast.error('Erro ao substituir alimento');
+      if (error.code === '42501') {
+        toast.error('Sem permissão para modificar esta refeição.');
+      } else if (error.code === '23503') {
+        toast.error('Alimento selecionado não está mais disponível.');
+      } else {
+        toast.error(`Erro ao substituir alimento: ${error.message || 'Tente novamente'}`);
+      }
     } finally {
       setSubstituting(false);
     }
