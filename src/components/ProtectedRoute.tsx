@@ -4,6 +4,7 @@ import { useUserRole } from '@/hooks/useUserRole';
 import { useStudentAccess } from '@/hooks/useStudentAccess';
 import { Loader2, AlertTriangle } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { PasswordChangeRequired } from '@/components/PasswordChangeRequired';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -37,7 +38,7 @@ export function ProtectedRoute({
   requireOnboarding = true,
   allowedRoles 
 }: ProtectedRouteProps) {
-  const { user, profile, loading } = useAuth();
+  const { user, profile, loading, refreshProfile } = useAuth();
   const { isStudent, isProfessional, isAdmin, loading: roleLoading } = useUserRole();
   const { 
     hasAccess, 
@@ -57,6 +58,17 @@ export function ProtectedRoute({
 
   if (!user) {
     return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+
+  // Check if password change is required (admin first login)
+  if (profile?.must_change_password) {
+    return (
+      <PasswordChangeRequired 
+        onPasswordChanged={() => {
+          refreshProfile();
+        }} 
+      />
+    );
   }
 
   // Check role-based access if specified
