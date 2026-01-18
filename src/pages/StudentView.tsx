@@ -499,6 +499,7 @@ export default function StudentView() {
           <AdherenceDashboard
             studentId={studentId}
             dietPlanId={dietPlan.id}
+            studentName={studentProfile.name || undefined}
           />
         )}
 
