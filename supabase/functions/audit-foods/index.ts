@@ -34,8 +34,26 @@ interface MigrationResult {
     total: number;
     to_update: number;
     unchanged: number;
+    already_migrated: number;
   };
   suggestions: MigrationSuggestion[];
+}
+
+// New categories that indicate food is already migrated
+const NEW_CATEGORIES = new Set([
+  'Carboidratos', 'Proteínas', 'Gorduras', 'Frutas', 'Vegetais',
+  'Leguminosas', 'Laticínios', 'Suplementos', 'Mistos'
+]);
+
+const NEW_PROCESSING_LEVELS = new Set([
+  'In natura', 'Minimamente processado', 'Processado', 'Ultraprocessado', 'Suplemento'
+]);
+
+// Check if food is already migrated to new format
+function isAlreadyMigrated(food: Food): boolean {
+  const hasMigratedCategory = food.category && NEW_CATEGORIES.has(food.category);
+  const hasMigratedProcessing = food.processing_level && NEW_PROCESSING_LEVELS.has(food.processing_level);
+  return hasMigratedCategory === true && hasMigratedProcessing === true;
 }
 
 const SYSTEM_PROMPT = `Você é um módulo especialista em nutrição clínica e classificação de alimentos,
@@ -205,7 +223,8 @@ serve(async (req) => {
 
     const { foods, offset = 0, limit = 100, mode = 'migration' } = await req.json();
 
-    let foodsToAudit: Food[] = foods;
+    let allFoods: Food[] = foods;
+    let alreadyMigratedCount = 0;
 
     // If no foods provided, fetch from database
     if (!foods || foods.length === 0) {
@@ -219,13 +238,24 @@ serve(async (req) => {
         throw new Error(`Failed to fetch foods: ${fetchError.message}`);
       }
 
-      foodsToAudit = dbFoods || [];
+      allFoods = dbFoods || [];
     }
+
+    // Filter out already migrated foods
+    const foodsToAudit = allFoods.filter(food => !isAlreadyMigrated(food));
+    alreadyMigratedCount = allFoods.length - foodsToAudit.length;
+
+    console.log(`[Migration] ${allFoods.length} total, ${alreadyMigratedCount} already migrated, ${foodsToAudit.length} to process`);
 
     if (foodsToAudit.length === 0) {
       return new Response(
         JSON.stringify({
-          summary: { total: 0, to_update: 0, unchanged: 0 },
+          summary: { 
+            total: allFoods.length, 
+            to_update: 0, 
+            unchanged: 0,
+            already_migrated: alreadyMigratedCount
+          },
           suggestions: []
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -345,14 +375,15 @@ Retorne APENAS um array JSON com a reclassificação de TODOS os alimentos, incl
 
     const result: MigrationResult = {
       summary: {
-        total: suggestions.length,
+        total: allFoods.length,
         to_update: toUpdate,
-        unchanged: suggestions.length - toUpdate
+        unchanged: suggestions.length - toUpdate,
+        already_migrated: alreadyMigratedCount
       },
       suggestions
     };
 
-    console.log(`[Migration] Complete: ${result.summary.to_update} to update, ${result.summary.unchanged} unchanged`);
+    console.log(`[Migration] Complete: ${result.summary.to_update} to update, ${result.summary.unchanged} unchanged, ${result.summary.already_migrated} already migrated`);
 
     return new Response(
       JSON.stringify(result),

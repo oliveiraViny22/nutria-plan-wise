@@ -48,6 +48,7 @@ interface MigrationResult {
     total: number;
     to_update: number;
     unchanged: number;
+    already_migrated: number;
   };
   suggestions: MigrationSuggestion[];
 }
@@ -413,20 +414,71 @@ export function FoodAudit({ onApplySuggestion, onApplyBatch, onApplyAll }: FoodA
               className="space-y-4"
             >
               {/* Summary */}
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <Card className="p-4">
                   <div className="text-2xl font-bold">{auditResult.summary.total}</div>
-                  <div className="text-sm text-muted-foreground">Alimentos analisados</div>
+                  <div className="text-sm text-muted-foreground">Total de alimentos</div>
                 </Card>
-                <Card className="p-4">
-                  <div className="text-2xl font-bold text-primary">{auditResult.summary.to_update}</div>
+                <Card className="p-4 border-green-500/30 bg-green-500/5">
+                  <div className="text-2xl font-bold text-green-600">
+                    {auditResult.summary.already_migrated || 0}
+                    <span className="text-sm font-normal text-muted-foreground ml-2">
+                      ({auditResult.summary.total > 0 
+                        ? Math.round(((auditResult.summary.already_migrated || 0) / auditResult.summary.total) * 100) 
+                        : 0}%)
+                    </span>
+                  </div>
+                  <div className="text-sm text-muted-foreground">Já migrados</div>
+                </Card>
+                <Card className="p-4 border-primary/30 bg-primary/5">
+                  <div className="text-2xl font-bold text-primary">
+                    {auditResult.summary.to_update}
+                    <span className="text-sm font-normal text-muted-foreground ml-2">
+                      ({auditResult.summary.total > 0 
+                        ? Math.round((auditResult.summary.to_update / auditResult.summary.total) * 100) 
+                        : 0}%)
+                    </span>
+                  </div>
                   <div className="text-sm text-muted-foreground">Para reclassificar</div>
                 </Card>
                 <Card className="p-4">
-                  <div className="text-2xl font-bold text-green-600">{auditResult.summary.unchanged}</div>
-                  <div className="text-sm text-muted-foreground">Sem alteração</div>
+                  <div className="text-2xl font-bold">
+                    {auditResult.summary.unchanged}
+                    <span className="text-sm font-normal text-muted-foreground ml-2">
+                      ({auditResult.summary.total > 0 
+                        ? Math.round((auditResult.summary.unchanged / auditResult.summary.total) * 100) 
+                        : 0}%)
+                    </span>
+                  </div>
+                  <div className="text-sm text-muted-foreground">Corretos (sem alteração)</div>
                 </Card>
               </div>
+
+              {/* Progress bar */}
+              {auditResult.summary.total > 0 && (
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Progresso da migração</span>
+                    <span className="font-medium">
+                      {Math.round((((auditResult.summary.already_migrated || 0) + auditResult.summary.unchanged) / auditResult.summary.total) * 100)}%
+                    </span>
+                  </div>
+                  <Progress 
+                    value={(((auditResult.summary.already_migrated || 0) + auditResult.summary.unchanged) / auditResult.summary.total) * 100} 
+                    className="h-2"
+                  />
+                  <div className="flex gap-4 text-xs text-muted-foreground">
+                    <div className="flex items-center gap-1">
+                      <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                      Migrados: {auditResult.summary.already_migrated || 0}
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <div className="w-2 h-2 rounded-full bg-primary"></div>
+                      Pendentes: {auditResult.summary.to_update}
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {suggestionsToUpdate.length > 0 && (
                 <>
