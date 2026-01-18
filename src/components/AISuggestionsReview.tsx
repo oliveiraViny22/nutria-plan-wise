@@ -54,60 +54,63 @@ interface AISuggestionsReviewProps {
 const SUGGESTION_TYPE_LABELS: Record<string, { label: string; icon: React.ReactNode; color: string }> = {
   ADD_OPTION: { label: 'Adicionar Opção', icon: <Sparkles className="h-4 w-4" />, color: 'bg-green-500/10 text-green-600' },
   REMOVE_OPTION: { label: 'Remover Opção', icon: <X className="h-4 w-4" />, color: 'bg-red-500/10 text-red-600' },
-  SIMPLIFY_OPTION: { label: 'Simplificar', icon: <Edit2 className="h-4 w-4" />, color: 'bg-blue-500/10 text-blue-600' },
-  ADJUST_SCHEDULE: { label: 'Ajustar Horários', icon: <Clock className="h-4 w-4" />, color: 'bg-orange-500/10 text-orange-600' },
-  REDUCE_MEALS: { label: 'Reduzir Refeições', icon: <AlertCircle className="h-4 w-4" />, color: 'bg-yellow-500/10 text-yellow-600' },
-  REORGANIZE_MEALS: { label: 'Reorganizar', icon: <RefreshCw className="h-4 w-4" />, color: 'bg-purple-500/10 text-purple-600' },
-  CONTEXTUAL_OPTION: { label: 'Opção Contextual', icon: <Lightbulb className="h-4 w-4" />, color: 'bg-cyan-500/10 text-cyan-600' },
+  SIMPLIFY_OPTION: { label: 'Simplificar Plano', icon: <Edit2 className="h-4 w-4" />, color: 'bg-blue-500/10 text-blue-600' },
+  ADJUST_SCHEDULE: { label: 'Revisar Horários', icon: <Clock className="h-4 w-4" />, color: 'bg-orange-500/10 text-orange-600' },
+  REDUCE_MEALS: { label: 'Avaliar Refeição', icon: <AlertCircle className="h-4 w-4" />, color: 'bg-yellow-500/10 text-yellow-600' },
+  REORGANIZE_MEALS: { label: 'Reorganizar Plano', icon: <RefreshCw className="h-4 w-4" />, color: 'bg-purple-500/10 text-purple-600' },
+  CONTEXTUAL_OPTION: { label: 'Adicionar Alternativa', icon: <Lightbulb className="h-4 w-4" />, color: 'bg-cyan-500/10 text-cyan-600' },
 };
 
-// Mapeamento de ações para textos amigáveis
-const ACTION_LABELS: Record<string, string> = {
-  remove_meal: 'Remover refeição',
-  remove_option: 'Remover opção',
-  add_option: 'Adicionar nova opção',
-  add_contextual_option: 'Adicionar opção prática',
-  simplify_all: 'Simplificar plano completo',
-  review_schedule: 'Revisar horários',
-  ai_insights: 'Insights adicionais',
-};
-
-// Função para formatar mudanças propostas de forma amigável
+// Função para formatar mudanças propostas de forma amigável e orientada à ação
 const formatProposedChanges = (changes: any): string => {
   if (!changes) return '';
   
   const lines: string[] = [];
   
-  if (changes.action) {
-    lines.push(`**Ação:** ${ACTION_LABELS[changes.action] || changes.action}`);
+  // Prioriza a recomendação se existir
+  if (changes.recommendation) {
+    lines.push(`**Recomendação:** ${changes.recommendation}`);
   }
   
   if (changes.meal_name) {
     lines.push(`**Refeição:** ${changes.meal_name}`);
   }
   
-  if (changes.option_number) {
-    lines.push(`**Opção:** ${changes.option_number}`);
+  // Lista opções não utilizadas explicitamente
+  if (changes.unused_options && Array.isArray(changes.unused_options)) {
+    if (changes.unused_options.length === 1) {
+      lines.push(`**Opção não utilizada:** ${changes.unused_options[0]}`);
+    } else {
+      lines.push(`**Opções não utilizadas:**`);
+      changes.unused_options.forEach((opt: string) => {
+        lines.push(`  • ${opt}`);
+      });
+    }
+  }
+  
+  // Opção preferida pelo paciente
+  if (changes.preferred_option) {
+    lines.push(`**Opção preferida:** ${changes.preferred_option}`);
   }
   
   if (changes.redistribute_calories) {
-    lines.push('• Redistribuir calorias entre outras refeições');
+    lines.push('• As calorias serão redistribuídas entre as demais refeições');
   }
   
   if (changes.target_meals) {
-    lines.push(`• Reduzir para ${changes.target_meals} refeições`);
+    lines.push(`• Sugestão: ${changes.target_meals} refeições principais`);
   }
   
   if (changes.target_options_per_meal) {
-    lines.push(`• ${changes.target_options_per_meal} opção por refeição`);
+    lines.push(`• Sugestão: ${changes.target_options_per_meal} opção por refeição`);
   }
   
   if (changes.late_confirmation_rate) {
-    lines.push(`• Taxa de confirmação tardia: ${changes.late_confirmation_rate}%`);
+    lines.push(`• ${changes.late_confirmation_rate}% das confirmações foram tardias`);
   }
   
   if (changes.context === 'practical_alternative') {
-    lines.push('• Criar alternativa prática para situações do dia-a-dia');
+    lines.push('• Adicionar opção mais prática para o dia a dia');
   }
   
   if (changes.details && typeof changes.details === 'string') {

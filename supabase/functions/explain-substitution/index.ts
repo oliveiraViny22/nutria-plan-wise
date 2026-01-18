@@ -117,14 +117,48 @@ serve(async (req) => {
     
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
 
+    // Calculate nutritional differences for context
+    const calDiff = newFood.calories - originalFood.calories;
+    const protDiff = newFood.protein - originalFood.protein;
+    const carbsDiff = newFood.carbs - originalFood.carbs;
+    const fatDiff = newFood.fat - originalFood.fat;
+    
+    const goalText = safeUserGoal === 'lose_weight' ? 'perda de peso' : 
+                     safeUserGoal === 'gain_muscle' ? 'ganho de massa muscular' : 'manutenção do peso';
+
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
       body: JSON.stringify({
         model: "google/gemini-3-flash-preview",
         messages: [
-          { role: "system", content: "Você é um nutricionista educador. Explique de forma clara e simples o impacto nutricional de substituições alimentares. Seja objetivo, use linguagem acessível e limite a 3 frases." },
-          { role: "user", content: `O usuário está trocando "${originalFood.name}" (${originalFood.calories}kcal, P:${originalFood.protein}g, C:${originalFood.carbs}g, G:${originalFood.fat}g) por "${newFood.name}" (${newFood.calories}kcal, P:${newFood.protein}g, C:${newFood.carbs}g, G:${newFood.fat}g). Objetivo: ${safeUserGoal === 'lose_weight' ? 'perder peso' : safeUserGoal === 'gain_muscle' ? 'ganhar massa' : 'manter peso'}. Meta diária: ${safeDailyCalories}kcal. Explique o impacto dessa troca.` }
+          { 
+            role: "system", 
+            content: `Você é um nutricionista que explica substituições alimentares de forma clara e profissional.
+
+REGRAS OBRIGATÓRIAS:
+- NÃO mencione categorias de alimentos (ex: "proteína animal", "carboidrato complexo")
+- NÃO use termos técnicos nutricionais
+- Foque APENAS no impacto nutricional direto: calorias, proteína, carboidratos e gordura
+- Use linguagem simples e direta
+- Limite a resposta a 2-3 frases curtas
+- Seja objetivo e orientado à decisão do usuário` 
+          },
+          { 
+            role: "user", 
+            content: `Substituição: "${originalFood.name}" por "${newFood.name}".
+
+Impacto nutricional:
+- Calorias: ${calDiff > 0 ? '+' : ''}${calDiff}kcal
+- Proteína: ${protDiff > 0 ? '+' : ''}${protDiff}g
+- Carboidratos: ${carbsDiff > 0 ? '+' : ''}${carbsDiff}g
+- Gordura: ${fatDiff > 0 ? '+' : ''}${fatDiff}g
+
+Objetivo do paciente: ${goalText}
+Meta diária: ${safeDailyCalories}kcal
+
+Explique brevemente se essa troca é adequada para o objetivo, focando nos números.` 
+          }
         ],
       }),
     });

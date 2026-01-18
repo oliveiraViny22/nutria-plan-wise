@@ -16,11 +16,11 @@ interface AISuggestion {
 const SUGGESTION_TYPES = {
   ADD_OPTION: "Adicionar nova opção equivalente",
   REMOVE_OPTION: "Remover opção não utilizada",
-  SIMPLIFY_OPTION: "Simplificar opção complexa",
-  ADJUST_SCHEDULE: "Ajustar horários das refeições",
-  REDUCE_MEALS: "Reduzir número de refeições",
-  REORGANIZE_MEALS: "Reorganizar distribuição calórica",
-  CONTEXTUAL_OPTION: "Criar opção contextual",
+  SIMPLIFY_OPTION: "Simplificar plano",
+  ADJUST_SCHEDULE: "Ajustar horários",
+  REDUCE_MEALS: "Avaliar necessidade da refeição",
+  REORGANIZE_MEALS: "Reorganizar distribuição",
+  CONTEXTUAL_OPTION: "Adicionar alternativa prática",
 };
 
 // Mapeamento de nomes técnicos para nomes legíveis em português
@@ -31,11 +31,33 @@ const MEAL_NAMES_PT: Record<string, string> = {
   afternoon_snack: "Lanche da Tarde",
   dinner: "Jantar",
   supper: "Ceia",
+  // Variações comuns
+  cafe_da_manha: "Café da Manhã",
+  lanche_manha: "Lanche da Manhã",
+  almoco: "Almoço",
+  lanche_tarde: "Lanche da Tarde",
+  jantar: "Jantar",
+  ceia: "Ceia",
 };
 
 // Função para traduzir nome da refeição
 function translateMealName(mealName: string): string {
-  return MEAL_NAMES_PT[mealName] || mealName;
+  // Primeiro tenta encontrar no mapeamento
+  const translated = MEAL_NAMES_PT[mealName.toLowerCase().replace(/\s+/g, '_')];
+  if (translated) return translated;
+  
+  // Se não encontrou, formata o nome original de forma legível
+  return mealName
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, c => c.toUpperCase());
+}
+
+// Função para obter nome legível da opção
+function getOptionDisplayName(option: { name?: string | null; option_number: number }, mealName: string): string {
+  if (option.name && option.name.trim()) {
+    return option.name;
+  }
+  return `Opção ${option.option_number} do ${mealName}`;
 }
 
 serve(async (req) => {
@@ -173,15 +195,18 @@ serve(async (req) => {
         const mealNamePt = translateMealName(meal.name);
         
         if (skippedLogs.length > mealLogEntries.length * 0.5) {
+          const skipRate = Math.round((skippedLogs.length / mealLogEntries.length) * 100);
           suggestions.push({
             suggestion_type: "REDUCE_MEALS",
-            hypothesis: `${mealNamePt} é pulada em mais de 50% dos dias`,
-            rationale: `A refeição ${mealNamePt} foi pulada ${skippedLogs.length} vezes em ${mealLogEntries.length} registros. ` +
-              `Isso pode indicar que o horário não é conveniente ou que a refeição não se encaixa na rotina do paciente.`,
+            hypothesis: `${mealNamePt} apresenta baixa adesão`,
+            rationale: `Esta refeição foi pulada em ${skipRate}% dos dias registrados (${skippedLogs.length} de ${mealLogEntries.length}). ` +
+              `Isso pode indicar incompatibilidade com a rotina atual. ` +
+              `Recomendação: avaliar se esta refeição é necessária ou redistribuir suas calorias para outras refeições.`,
             proposed_changes: {
               action: "remove_meal",
               meal_name: mealNamePt,
               redistribute_calories: true,
+              recommendation: "Remover ou redistribuir calorias",
             },
           });
         }
@@ -195,34 +220,50 @@ serve(async (req) => {
             }
           }
 
+          // Collect unused options to list them explicitly
+          const unusedOptions: string[] = [];
           for (const option of meal.meal_options) {
             if (!optionUsage[option.id] && confirmedLogs.length > 5) {
-              suggestions.push({
-                suggestion_type: "REMOVE_OPTION",
-                hypothesis: `Opção ${option.option_number} de ${mealNamePt} nunca é selecionada`,
-                rationale: `Após ${confirmedLogs.length} confirmações, a ${option.name || `Opção ${option.option_number}`} nunca foi escolhida. ` +
-                  `Isso sugere que essa opção não atende às preferências ou rotina do paciente.`,
-                proposed_changes: {
-                  action: "remove_option",
-                  meal_name: mealNamePt,
-                  option_number: option.option_number,
-                },
-              });
+              const optionDisplayName = getOptionDisplayName(option, mealNamePt);
+              unusedOptions.push(optionDisplayName);
             }
+          }
+
+          if (unusedOptions.length > 0) {
+            suggestions.push({
+              suggestion_type: "REMOVE_OPTION",
+              hypothesis: `${mealNamePt}: ${unusedOptions.length === 1 ? 'opção não utilizada' : 'opções não utilizadas'}`,
+              rationale: `Após ${confirmedLogs.length} confirmações, ${unusedOptions.length === 1 ? 'a seguinte opção nunca foi selecionada' : 'as seguintes opções nunca foram selecionadas'}: ` +
+                `${unusedOptions.join(', ')}. ` +
+                `Recomendação: remover para simplificar o plano ou substituir por alternativas mais adequadas ao paciente.`,
+              proposed_changes: {
+                action: "remove_option",
+                meal_name: mealNamePt,
+                unused_options: unusedOptions,
+                recommendation: "Remover ou substituir",
+              },
+            });
           }
 
           // Check if only one option is used (need more variety?)
           const usedOptions = Object.keys(optionUsage).length;
           if (usedOptions === 1 && meal.meal_options.length < 3 && confirmedLogs.length > 10) {
+            const usedOptionId = Object.keys(optionUsage)[0];
+            const usedOption = meal.meal_options.find(o => o.id === usedOptionId);
+            const usedOptionName = usedOption ? getOptionDisplayName(usedOption, mealNamePt) : 'a opção atual';
+            
             suggestions.push({
               suggestion_type: "ADD_OPTION",
-              hypothesis: `Apenas uma opção é usada para ${mealNamePt}`,
-              rationale: `O paciente sempre escolhe a mesma opção. Adicionar uma nova alternativa pode ` +
-                `aumentar a flexibilidade sem comprometer a adesão.`,
+              hypothesis: `${mealNamePt}: apenas uma opção é utilizada`,
+              rationale: `O paciente consistentemente escolhe ${usedOptionName}. ` +
+                `Adicionar uma nova alternativa equivalente pode aumentar a flexibilidade do plano. ` +
+                `Recomendação: manter a opção preferida e adicionar uma alternativa similar.`,
               proposed_changes: {
                 action: "add_option",
                 meal_name: mealNamePt,
-                base_option: Object.keys(optionUsage)[0],
+                base_option: usedOptionId,
+                preferred_option: usedOptionName,
+                recommendation: "Adicionar alternativa",
               },
             });
           }
@@ -230,15 +271,18 @@ serve(async (req) => {
 
         // Check for high out-of-plan rate
         if (outOfPlanLogs.length > mealLogEntries.length * 0.3 && mealLogEntries.length > 5) {
+          const outOfPlanRate = Math.round((outOfPlanLogs.length / mealLogEntries.length) * 100);
           suggestions.push({
             suggestion_type: "CONTEXTUAL_OPTION",
-            hypothesis: `${mealNamePt} frequentemente substituída por alimentos fora do plano`,
-            rationale: `Em ${Math.round(outOfPlanLogs.length / mealLogEntries.length * 100)}% das vezes, ` +
-              `o paciente opta por alimentos fora do plano. Considere adicionar uma opção mais flexível ou prática.`,
+            hypothesis: `${mealNamePt}: alta frequência de alimentos fora do plano`,
+            rationale: `Em ${outOfPlanRate}% das vezes, o paciente optou por alimentos fora do plano. ` +
+              `Isso pode indicar que as opções atuais não atendem situações práticas do dia a dia. ` +
+              `Recomendação: adicionar uma opção mais flexível ou prática para essas situações.`,
             proposed_changes: {
               action: "add_contextual_option",
               meal_name: mealNamePt,
               context: "practical_alternative",
+              recommendation: "Adicionar opção prática",
             },
           });
         }
@@ -252,27 +296,31 @@ serve(async (req) => {
       if (adherenceRate < 40) {
         suggestions.push({
           suggestion_type: "SIMPLIFY_OPTION",
-          hypothesis: "Adesão geral muito baixa sugere plano complexo demais",
-          rationale: `Com taxa de adesão de apenas ${Math.round(adherenceRate)}%, ` +
-            `o plano pode estar muito distante da realidade do paciente. ` +
-            `Considere simplificar drasticamente, começando com menos refeições e opções mais simples.`,
+          hypothesis: "Plano atual apresenta baixa adesão geral",
+          rationale: `A taxa de adesão está em ${Math.round(adherenceRate)}%, indicando que o plano pode estar complexo demais para a rotina atual do paciente. ` +
+            `Recomendação: simplificar o plano, reduzindo o número de refeições ou oferecendo opções mais práticas. ` +
+            `Sugestão inicial: começar com 3 refeições principais e 1 opção por refeição.`,
           proposed_changes: {
             action: "simplify_all",
             target_meals: 3,
             target_options_per_meal: 1,
+            recommendation: "Simplificar plano",
           },
         });
       }
 
       if (metrics.meals_late > metrics.meals_confirmed * 0.3) {
+        const lateRate = Math.round(metrics.meals_late / (metrics.meals_confirmed + metrics.meals_late) * 100);
         suggestions.push({
           suggestion_type: "ADJUST_SCHEDULE",
-          hypothesis: "Muitas confirmações tardias indicam horários inadequados",
-          rationale: `${metrics.meals_late} refeições foram confirmadas tardiamente. ` +
-            `Isso pode indicar que os horários das refeições não estão alinhados com a rotina do paciente.`,
+          hypothesis: "Horários das refeições podem estar inadequados",
+          rationale: `${lateRate}% das confirmações foram feitas com atraso (${metrics.meals_late} refeições). ` +
+            `Isso sugere que os horários planejados não estão alinhados com a rotina do paciente. ` +
+            `Recomendação: revisar os horários ou flexibilizar os intervalos entre refeições.`,
           proposed_changes: {
             action: "review_schedule",
-            late_confirmation_rate: Math.round(metrics.meals_late / (metrics.meals_confirmed + metrics.meals_late) * 100),
+            late_confirmation_rate: lateRate,
+            recommendation: "Revisar horários",
           },
         });
       }
