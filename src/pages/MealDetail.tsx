@@ -117,7 +117,7 @@ export default function MealDetail() {
         .from('meal_options')
         .select(`
           *,
-          foods:meal_option_foods(
+          meal_option_foods(
             *,
             food:foods(*)
           )
@@ -129,7 +129,7 @@ export default function MealDetail() {
       
       const options = (optionsData || []).map(opt => ({
         ...opt,
-        foods: opt.foods || []
+        foods: opt.meal_option_foods || []
       })) as MealOption[];
       
       setMealOptions(options);
