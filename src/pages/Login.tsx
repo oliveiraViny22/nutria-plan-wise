@@ -24,9 +24,22 @@ export default function Login() {
     try {
       await signIn(email, password);
       toast.success('Login realizado com sucesso!');
-      navigate('/dashboard');
+      // Navigation is handled by ProtectedRoute/AuthContext, just wait a moment
+      setTimeout(() => {
+        navigate('/dashboard');
+      }, 100);
     } catch (error: any) {
-      toast.error(error.message || 'Erro ao fazer login');
+      console.error('Login error:', error);
+      // Handle specific Supabase auth errors
+      if (error.message?.includes('Invalid login credentials')) {
+        toast.error('Email ou senha incorretos');
+      } else if (error.message?.includes('Email not confirmed')) {
+        toast.error('Por favor, confirme seu email antes de fazer login');
+      } else if (error.message?.includes('Too many requests')) {
+        toast.error('Muitas tentativas. Aguarde alguns minutos.');
+      } else {
+        toast.error(error.message || 'Erro ao fazer login');
+      }
     } finally {
       setLoading(false);
     }
