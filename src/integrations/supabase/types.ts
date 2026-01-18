@@ -390,6 +390,7 @@ export type Database = {
           onboarding_completed: boolean | null
           preferences: string[] | null
           professional_id: string | null
+          professional_onboarding_completed: boolean | null
           protein_target: number | null
           restrictions: string[] | null
           sex: string | null
@@ -415,6 +416,7 @@ export type Database = {
           onboarding_completed?: boolean | null
           preferences?: string[] | null
           professional_id?: string | null
+          professional_onboarding_completed?: boolean | null
           protein_target?: number | null
           restrictions?: string[] | null
           sex?: string | null
@@ -440,6 +442,7 @@ export type Database = {
           onboarding_completed?: boolean | null
           preferences?: string[] | null
           professional_id?: string | null
+          professional_onboarding_completed?: boolean | null
           protein_target?: number | null
           restrictions?: string[] | null
           sex?: string | null

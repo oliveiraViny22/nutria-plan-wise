@@ -40,6 +40,7 @@ export interface Profile {
   account_type: AccountType; // Legacy
   user_type: UserType; // Novo campo imutável
   onboarding_completed: boolean;
+  professional_onboarding_completed: boolean;
   created_at: string;
   updated_at: string;
 }
