@@ -3317,14 +3317,14 @@ export default function Admin() {
                 <div className="space-y-2">
                   <Label>Categoria</Label>
                   <Select
-                    value={editedFoodData.category ?? editingFood.category ?? ''}
-                    onValueChange={(value) => setEditedFoodData(prev => ({ ...prev, category: value || null }))}
+                    value={editedFoodData.category ?? editingFood.category ?? 'none'}
+                    onValueChange={(value) => setEditedFoodData(prev => ({ ...prev, category: value === 'none' ? null : value }))}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Selecione..." />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Nenhuma</SelectItem>
+                      <SelectItem value="none">Nenhuma</SelectItem>
                       <SelectItem value="frutas">Frutas</SelectItem>
                       <SelectItem value="hortaliças_folhosas">Hortaliças Folhosas</SelectItem>
                       <SelectItem value="legumes">Legumes</SelectItem>
