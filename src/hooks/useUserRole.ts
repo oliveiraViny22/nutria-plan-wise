@@ -16,12 +16,17 @@ interface UserRoleData {
 }
 
 export function useUserRole(): UserRoleData {
-  const { user, profile } = useAuth();
+  const { user, profile, loading: authLoading } = useAuth();
   const [roles, setRoles] = useState<AppRole[]>([]);
   const [hasActiveLicense, setHasActiveLicense] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Wait for auth to finish loading
+    if (authLoading) {
+      return;
+    }
+    
     if (!user) {
       setRoles([]);
       setHasActiveLicense(false);
@@ -72,7 +77,7 @@ export function useUserRole(): UserRoleData {
     };
 
     fetchRolesAndLicense();
-  }, [user]);
+  }, [user, authLoading]);
 
   // Derive account type from profile
   const accountType: AccountType = (profile?.account_type as AccountType) || 'plano_pessoal';

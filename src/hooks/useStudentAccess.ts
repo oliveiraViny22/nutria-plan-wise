@@ -27,12 +27,17 @@ const DEFAULT_ACCESS: StudentAccessLevel = {
 };
 
 export function useStudentAccess() {
-  const { user, profile } = useAuth();
+  const { user, profile, loading: authLoading } = useAuth();
   const [access, setAccess] = useState<StudentAccessLevel>(DEFAULT_ACCESS);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function fetchAccessLevel() {
+      // Wait for auth to finish loading first
+      if (authLoading) {
+        return;
+      }
+      
       if (!user) {
         setAccess(DEFAULT_ACCESS);
         setLoading(false);
@@ -114,7 +119,7 @@ export function useStudentAccess() {
     }
 
     fetchAccessLevel();
-  }, [user, profile?.professional_id]);
+  }, [user, profile?.professional_id, authLoading]);
 
   return { ...access, loading };
 }
