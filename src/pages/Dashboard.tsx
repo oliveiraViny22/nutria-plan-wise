@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Logo } from '@/components/Logo';
+import { MobileNav } from '@/components/MobileNav';
 import { CalorieRing } from '@/components/CalorieRing';
 import { MacroChart } from '@/components/MacroChart';
 import { MacroRebalancer } from '@/components/MacroRebalancer';
@@ -167,51 +168,54 @@ export default function Dashboard() {
       {/* Header - Mobile responsive with hamburger concept via scrollable icons */}
       <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-md border-b border-border">
         <div className="container mx-auto px-3 sm:px-4 py-3 sm:py-4 flex items-center justify-between gap-2">
-          <Logo />
-          {/* Mobile: horizontal scroll for icons, Desktop: flex wrap */}
-          <div className="flex items-center gap-0.5 sm:gap-1 overflow-x-auto max-w-[60vw] sm:max-w-none scrollbar-hide">
+          <div className="flex items-center gap-2">
+            <MobileNav />
+            <Logo />
+          </div>
+          {/* Desktop navigation - hidden on mobile */}
+          <div className="hidden md:flex items-center gap-1">
             {(isSubscribed && accountType === 'professional') || (isProfessional && hasActiveLicense) ? (
               <>
                 <Link to="/professional">
-                  <Button variant="ghost" size="icon" className="shrink-0 w-9 h-9 sm:w-10 sm:h-10" title="Painel Profissional">
-                    <LayoutDashboard className="w-4 h-4 sm:w-5 sm:h-5" />
+                  <Button variant="ghost" size="icon" className="w-10 h-10" title="Painel Profissional">
+                    <LayoutDashboard className="w-5 h-5" />
                   </Button>
                 </Link>
                 <Link to="/students">
-                  <Button variant="ghost" size="icon" className="shrink-0 w-9 h-9 sm:w-10 sm:h-10" title="Gerenciar Alunos">
-                    <Users className="w-4 h-4 sm:w-5 sm:h-5" />
+                  <Button variant="ghost" size="icon" className="w-10 h-10" title="Gerenciar Alunos">
+                    <Users className="w-5 h-5" />
                   </Button>
                 </Link>
               </>
             ) : (
-              <Link to="/become-professional" className="hidden sm:block">
-                <Button variant="ghost" size="icon" className="shrink-0 w-9 h-9 sm:w-10 sm:h-10" title="Seja Profissional">
-                  <Crown className="w-4 h-4 sm:w-5 sm:h-5" />
+              <Link to="/become-professional">
+                <Button variant="ghost" size="icon" className="w-10 h-10" title="Seja Profissional">
+                  <Crown className="w-5 h-5" />
                 </Button>
               </Link>
             )}
-            <Link to="/subscription" className="hidden xs:block">
-              <Button variant="ghost" size="icon" className="shrink-0 w-9 h-9 sm:w-10 sm:h-10">
-                <CreditCard className="w-4 h-4 sm:w-5 sm:h-5" />
+            <Link to="/subscription">
+              <Button variant="ghost" size="icon" className="w-10 h-10">
+                <CreditCard className="w-5 h-5" />
               </Button>
             </Link>
             <Link to="/progress">
-              <Button variant="ghost" size="icon" className="shrink-0 w-9 h-9 sm:w-10 sm:h-10">
-                <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5" />
+              <Button variant="ghost" size="icon" className="w-10 h-10">
+                <TrendingUp className="w-5 h-5" />
               </Button>
             </Link>
             <Link to="/profile">
-              <Button variant="ghost" size="icon" className="shrink-0 w-9 h-9 sm:w-10 sm:h-10">
-                <User className="w-4 h-4 sm:w-5 sm:h-5" />
+              <Button variant="ghost" size="icon" className="w-10 h-10">
+                <User className="w-5 h-5" />
               </Button>
             </Link>
             <Link to="/chat">
-              <Button variant="ghost" size="icon" className="shrink-0 w-9 h-9 sm:w-10 sm:h-10">
-                <MessageCircle className="w-4 h-4 sm:w-5 sm:h-5" />
+              <Button variant="ghost" size="icon" className="w-10 h-10">
+                <MessageCircle className="w-5 h-5" />
               </Button>
             </Link>
-            <Button variant="ghost" size="icon" className="shrink-0 w-9 h-9 sm:w-10 sm:h-10" onClick={handleSignOut}>
-              <LogOut className="w-4 h-4 sm:w-5 sm:h-5" />
+            <Button variant="ghost" size="icon" className="w-10 h-10" onClick={handleSignOut}>
+              <LogOut className="w-5 h-5" />
             </Button>
           </div>
         </div>

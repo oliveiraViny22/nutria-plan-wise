@@ -49,6 +49,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Logo } from '@/components/Logo';
+import { MobileNav } from '@/components/MobileNav';
 import { CreateStudentForm } from '@/components/CreateStudentForm';
 import { useProfessionalStudents } from '@/hooks/useProfessionalStudents';
 import { useUserRole } from '@/hooks/useUserRole';
@@ -122,7 +123,8 @@ export default function Students() {
       <header className="sticky top-0 z-50 glass border-b">
         <div className="container mx-auto px-3 sm:px-4 py-2 sm:py-3 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 sm:gap-3">
-            <Button variant="ghost" size="icon" className="w-9 h-9 sm:w-10 sm:h-10" onClick={() => navigate('/dashboard')}>
+            <MobileNav />
+            <Button variant="ghost" size="icon" className="hidden md:flex w-9 h-9 sm:w-10 sm:h-10" onClick={() => navigate('/dashboard')}>
               <ArrowLeft className="h-4 w-4 sm:h-5 sm:w-5" />
             </Button>
             <Logo size="sm" />
