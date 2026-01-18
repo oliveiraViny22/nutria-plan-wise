@@ -73,6 +73,23 @@ export default function Index() {
           ))}
         </motion.div>
       </main>
+
+      {/* Footer */}
+      <footer className="container mx-auto px-4 py-8 mt-8 border-t border-border">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+          <p className="text-sm text-muted-foreground">
+            © 2026 NutriPlan. Todos os direitos reservados.
+          </p>
+          <div className="flex items-center gap-4">
+            <Link to="/terms" className="text-sm text-muted-foreground hover:text-primary transition-colors">
+              Termos de Uso
+            </Link>
+            <Link to="/privacy" className="text-sm text-muted-foreground hover:text-primary transition-colors">
+              Política de Privacidade
+            </Link>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }
