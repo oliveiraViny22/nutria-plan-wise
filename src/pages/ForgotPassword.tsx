@@ -108,6 +108,16 @@ export default function ForgotPassword() {
             <ArrowLeft className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             Voltar para login
           </Link>
+
+          {/* Footer links */}
+          <div className="flex items-center justify-center gap-4 mt-4">
+            <Link to="/terms" className="text-xs text-muted-foreground hover:text-primary transition-colors">
+              Termos de Uso
+            </Link>
+            <Link to="/privacy" className="text-xs text-muted-foreground hover:text-primary transition-colors">
+              Política de Privacidade
+            </Link>
+          </div>
         </div>
       </motion.div>
     </div>
