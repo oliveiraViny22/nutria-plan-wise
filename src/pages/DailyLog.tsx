@@ -537,15 +537,48 @@ export default function DailyLog() {
                     {/* Show confirmed option details if confirmed */}
                     {meal.log?.status && ['CONFIRMADA', 'CONFIRMADA_TARDIA'].includes(meal.log.status) && meal.log.confirmed_option_id && (
                       <div className="p-3 bg-green-50 dark:bg-green-950/30 rounded-lg border border-green-200 dark:border-green-800">
-                        <p className="text-sm font-medium text-green-700 dark:text-green-400 mb-1">
-                          Opção escolhida: {meal.options.find(o => o.id === meal.log?.confirmed_option_id)?.name || `Opção ${meal.options.find(o => o.id === meal.log?.confirmed_option_id)?.option_number}`}
-                        </p>
+                        <div className="flex items-center gap-2 mb-1">
+                          <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
+                          <p className="text-sm font-medium text-green-700 dark:text-green-400">
+                            {meal.options.find(o => o.id === meal.log?.confirmed_option_id)?.name || `Opção ${meal.options.find(o => o.id === meal.log?.confirmed_option_id)?.option_number}`}
+                          </p>
+                          {meal.log.status === 'CONFIRMADA_TARDIA' && (
+                            <Badge variant="outline" className="text-[10px] h-5 border-amber-400 text-amber-600">
+                              <Clock className="h-3 w-3 mr-0.5" />
+                              Tardia
+                            </Badge>
+                          )}
+                        </div>
                         <div className="text-xs text-green-600 dark:text-green-500">
                           {(() => {
                             const opt = meal.options.find(o => o.id === meal.log?.confirmed_option_id);
                             return opt ? `${opt.total_calories} kcal • P: ${opt.total_protein}g • C: ${opt.total_carbs}g • G: ${opt.total_fat}g` : '';
                           })()}
                         </div>
+                        {/* Show foods in the confirmed option */}
+                        {(() => {
+                          const opt = meal.options.find(o => o.id === meal.log?.confirmed_option_id);
+                          if (opt?.foods && opt.foods.length > 0) {
+                            return (
+                              <div className="mt-2 pt-2 border-t border-green-200 dark:border-green-800">
+                                <p className="text-[10px] text-green-600 dark:text-green-500 mb-1">Alimentos:</p>
+                                <div className="flex flex-wrap gap-1">
+                                  {opt.foods.map((food, idx) => (
+                                    <Badge key={idx} variant="secondary" className="text-[10px] bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-300">
+                                      {food.name} ({food.quantity}g)
+                                    </Badge>
+                                  ))}
+                                </div>
+                              </div>
+                            );
+                          }
+                          return null;
+                        })()}
+                        {meal.log.confirmed_at && (
+                          <p className="text-[10px] text-green-500 dark:text-green-600 mt-2">
+                            Confirmada às {format(new Date(meal.log.confirmed_at), 'HH:mm')}
+                          </p>
+                        )}
                       </div>
                     )}
 
