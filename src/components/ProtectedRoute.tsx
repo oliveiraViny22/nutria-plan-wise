@@ -17,6 +17,7 @@ const STUDENT_READ_ONLY_ROUTES = [
   '/meal',
   '/progress',
   '/profile',
+  '/daily-log', // Added for grace period access
 ];
 
 // Routes that require full access (blocked during grace period)

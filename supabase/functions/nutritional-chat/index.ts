@@ -517,12 +517,45 @@ serve(async (req) => {
 
     // Get user permissions and plan info
     const { data: permissionsData } = await supabase.rpc('get_user_permissions', { _user_id: user.id });
-    const permissions = permissionsData?.[0] || { plan_name: 'gratuito', is_linked_to_professional: false, user_type: 'usuario' };
+    const permissions = permissionsData?.[0] || { plan_name: 'gratuito', is_linked_to_professional: false, user_type: 'usuario', can_use_ai: false };
     const planName = permissions.plan_name || 'gratuito';
     const userType = permissions.user_type || 'usuario';
     const isLinkedToProfessional = permissions.is_linked_to_professional || false;
+    const canUseAI = permissions.can_use_ai || false;
 
-    logStep("User permissions fetched", { planName, userType, isLinkedToProfessional });
+    logStep("User permissions fetched", { planName, userType, isLinkedToProfessional, canUseAI });
+
+    // Block AI access if user doesn't have permission (includes checking grace period for linked students)
+    if (!canUseAI) {
+      return createErrorResponse(
+        "Você não tem acesso à IA neste momento. Verifique seu plano ou entre em contato com seu nutricionista.",
+        403,
+        corsHeaders,
+        { upgradeRequired: true, planName }
+      );
+    }
+
+    // For linked students, also check student access level (handles grace period/suspended states)
+    if (isLinkedToProfessional) {
+      const { data: accessData } = await supabase.rpc('get_student_access_level', { _student_id: user.id });
+      const access = accessData?.[0];
+      
+      if (access && !access.can_use_chat) {
+        const message = access.access_level === 'suspended'
+          ? "Seu acesso está suspenso. Entre em contato com seu nutricionista."
+          : "O chat está temporariamente indisponível. Você pode continuar visualizando seu plano alimentar.";
+        
+        return createErrorResponse(
+          message,
+          403,
+          corsHeaders,
+          { 
+            accessLevel: access.access_level,
+            professionalStatus: access.professional_status
+          }
+        );
+      }
+    }
 
     // Validate chat usage limit
     const { data: limitData } = await supabase.rpc('check_feature_limit', {

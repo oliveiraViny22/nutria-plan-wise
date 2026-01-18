@@ -80,24 +80,28 @@ export default function Progress() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      // Fetch weight logs
+      // Get user's plan history_days limit
+      const { data: planData } = await supabase.rpc('get_user_plan', { _user_id: user?.id });
+      const historyDaysLimit = planData?.[0]?.history_days || 7; // Default to 7 if no plan
+      
+      // Fetch weight logs based on plan's history_days
       const { data: weights, error: weightsError } = await supabase
         .from('weight_logs')
         .select('*')
         .eq('user_id', user?.id)
         .order('logged_at', { ascending: true })
-        .limit(90); // Last 90 days
+        .gte('logged_at', new Date(Date.now() - historyDaysLimit * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
 
       if (weightsError) throw weightsError;
       setWeightLogs(weights || []);
 
-      // Fetch plan history
+      // Fetch plan history based on plan's history_days
       const { data: history, error: historyError } = await supabase
         .from('plan_history')
         .select('*')
         .eq('user_id', user?.id)
         .order('created_at', { ascending: false })
-        .limit(50);
+        .gte('created_at', new Date(Date.now() - historyDaysLimit * 24 * 60 * 60 * 1000).toISOString());
 
       if (historyError) throw historyError;
       setPlanHistory(history || []);
