@@ -244,14 +244,14 @@ export default function Admin() {
         throw new Error(response.error.message);
       }
 
-      // Create download link
-      const blob = new Blob([response.data], { type: 'text/plain;charset=utf-8' });
+      // Handle PDF response
+      const blob = new Blob([response.data], { type: 'application/pdf' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
       a.download = docType === 'technical' 
-        ? 'DOCUMENTACAO_TECNICA_NUTRIAPLAN.txt' 
-        : 'DOCUMENTACAO_COMERCIAL_NUTRIAPLAN.txt';
+        ? 'DOCUMENTACAO_TECNICA_NUTRIAPLAN.pdf' 
+        : 'DOCUMENTACAO_COMERCIAL_NUTRIAPLAN.pdf';
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -473,30 +473,22 @@ export default function Admin() {
 
       <main className="container mx-auto px-4 py-6">
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full max-w-5xl grid-cols-8 mb-6">
-            <TabsTrigger value="settings" className="flex items-center gap-1">
-              <Settings className="h-4 w-4" />
-              <span className="hidden sm:inline">Config</span>
-            </TabsTrigger>
+          <TabsList className="grid w-full max-w-5xl grid-cols-7 mb-6">
             <TabsTrigger value="users" className="flex items-center gap-1">
               <UserCog className="h-4 w-4" />
               <span className="hidden sm:inline">Usuários</span>
-            </TabsTrigger>
-            <TabsTrigger value="plans" className="flex items-center gap-1">
-              <CreditCard className="h-4 w-4" />
-              <span className="hidden sm:inline">Planos</span>
             </TabsTrigger>
             <TabsTrigger value="foods" className="flex items-center gap-1">
               <Upload className="h-4 w-4" />
               <span className="hidden sm:inline">Alimentos</span>
             </TabsTrigger>
-            <TabsTrigger value="imports" className="flex items-center gap-1">
-              <FileText className="h-4 w-4" />
-              <span className="hidden sm:inline">Histórico</span>
+            <TabsTrigger value="plans" className="flex items-center gap-1">
+              <CreditCard className="h-4 w-4" />
+              <span className="hidden sm:inline">Planos</span>
             </TabsTrigger>
             <TabsTrigger value="audit" className="flex items-center gap-1">
               <History className="h-4 w-4" />
-              <span className="hidden sm:inline">Auditoria</span>
+              <span className="hidden sm:inline">Histórico</span>
             </TabsTrigger>
             <TabsTrigger value="seed" className="flex items-center gap-1">
               <Database className="h-4 w-4" />
@@ -506,6 +498,10 @@ export default function Admin() {
               <BookOpen className="h-4 w-4" />
               <span className="hidden sm:inline">Docs</span>
             </TabsTrigger>
+            <TabsTrigger value="settings" className="flex items-center gap-1">
+              <Settings className="h-4 w-4" />
+              <span className="hidden sm:inline">Config</span>
+            </TabsTrigger>
           </TabsList>
 
           {/* Documentation Tab */}
@@ -513,74 +509,131 @@ export default function Admin() {
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              className="grid gap-6 md:grid-cols-2"
+              className="space-y-6"
             >
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <FileText className="h-5 w-5 text-primary" />
-                    Documentação Técnica
-                  </CardTitle>
-                  <CardDescription>
-                    Documentação completa para desenvolvedores, arquitetos de software e times técnicos.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <ul className="text-sm text-muted-foreground space-y-1">
-                    <li>• Arquitetura do sistema e stack tecnológica</li>
-                    <li>• Regras de negócio e fluxos técnicos</li>
-                    <li>• Funcionamento da IA e governança</li>
-                    <li>• Banco de dados e integrações</li>
-                    <li>• Requisitos funcionais e não funcionais</li>
-                  </ul>
-                  <Button 
-                    onClick={() => handleDownloadDocumentation('technical')}
-                    disabled={downloadingDoc !== null}
-                    className="w-full"
-                  >
-                    {downloadingDoc === 'technical' ? (
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    ) : (
-                      <Download className="h-4 w-4 mr-2" />
-                    )}
-                    Baixar Documentação Técnica
-                  </Button>
-                </CardContent>
-              </Card>
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-2xl font-bold">Documentação do Sistema</h2>
+                  <p className="text-muted-foreground">Baixe a documentação oficial do NutriaPlan em PDF</p>
+                </div>
+              </div>
+              
+              <div className="grid gap-6 md:grid-cols-2">
+                <Card className="border-2 hover:border-primary/50 transition-colors">
+                  <CardHeader className="pb-4">
+                    <div className="flex items-center gap-3">
+                      <div className="p-3 rounded-lg bg-blue-500/10">
+                        <FileText className="h-6 w-6 text-blue-500" />
+                      </div>
+                      <div>
+                        <CardTitle className="text-lg">Documentação Técnica</CardTitle>
+                        <CardDescription className="text-xs">
+                          Para desenvolvedores e times técnicos
+                        </CardDescription>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <ul className="text-sm text-muted-foreground space-y-2">
+                      <li className="flex items-start gap-2">
+                        <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+                        <span>Arquitetura do sistema e stack tecnológica</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+                        <span>Regras de negócio e fluxos técnicos</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+                        <span>Funcionamento e governança da IA</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+                        <span>Banco de dados e integrações externas</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+                        <span>Requisitos funcionais e não funcionais</span>
+                      </li>
+                    </ul>
+                    <Button 
+                      onClick={() => handleDownloadDocumentation('technical')}
+                      disabled={downloadingDoc !== null}
+                      className="w-full"
+                      size="lg"
+                    >
+                      {downloadingDoc === 'technical' ? (
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <Download className="h-4 w-4 mr-2" />
+                      )}
+                      Baixar PDF Técnico
+                    </Button>
+                  </CardContent>
+                </Card>
 
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <BookOpen className="h-5 w-5 text-primary" />
-                    Documentação Comercial
-                  </CardTitle>
-                  <CardDescription>
-                    Documentação para investidores, parceiros, clientes e área comercial.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <ul className="text-sm text-muted-foreground space-y-1">
-                    <li>• Apresentação e proposta de valor</li>
-                    <li>• Público-alvo e diferenciais</li>
-                    <li>• Planos, preços e monetização</li>
-                    <li>• Benefícios e casos de uso</li>
-                    <li>• Visão de futuro do produto</li>
-                  </ul>
-                  <Button 
-                    onClick={() => handleDownloadDocumentation('commercial')}
-                    disabled={downloadingDoc !== null}
-                    className="w-full"
-                    variant="secondary"
-                  >
-                    {downloadingDoc === 'commercial' ? (
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    ) : (
-                      <Download className="h-4 w-4 mr-2" />
-                    )}
-                    Baixar Documentação Comercial
-                  </Button>
-                </CardContent>
-              </Card>
+                <Card className="border-2 hover:border-primary/50 transition-colors">
+                  <CardHeader className="pb-4">
+                    <div className="flex items-center gap-3">
+                      <div className="p-3 rounded-lg bg-green-500/10">
+                        <BookOpen className="h-6 w-6 text-green-500" />
+                      </div>
+                      <div>
+                        <CardTitle className="text-lg">Documentação Comercial</CardTitle>
+                        <CardDescription className="text-xs">
+                          Para investidores e área comercial
+                        </CardDescription>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <ul className="text-sm text-muted-foreground space-y-2">
+                      <li className="flex items-start gap-2">
+                        <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+                        <span>Apresentação e proposta de valor</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+                        <span>Público-alvo e diferenciais competitivos</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+                        <span>Planos, preços e modelo de monetização</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+                        <span>Benefícios e casos de uso</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+                        <span>Visão de futuro e roadmap do produto</span>
+                      </li>
+                    </ul>
+                    <Button 
+                      onClick={() => handleDownloadDocumentation('commercial')}
+                      disabled={downloadingDoc !== null}
+                      className="w-full"
+                      size="lg"
+                      variant="secondary"
+                    >
+                      {downloadingDoc === 'commercial' ? (
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <Download className="h-4 w-4 mr-2" />
+                      )}
+                      Baixar PDF Comercial
+                    </Button>
+                  </CardContent>
+                </Card>
+              </div>
+              
+              <Alert>
+                <FileText className="h-4 w-4" />
+                <AlertTitle>Formato PDF</AlertTitle>
+                <AlertDescription>
+                  Os documentos são gerados em PDF com formatação profissional, prontos para impressão ou compartilhamento.
+                </AlertDescription>
+              </Alert>
             </motion.div>
           </TabsContent>
 
