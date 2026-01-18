@@ -957,13 +957,16 @@ export type Database = {
           age: number | null
           carbs_target: number | null
           created_at: string | null
+          created_by: string | null
           daily_calories: number | null
           email: string | null
           fat_target: number | null
           goal: string | null
           height: number | null
           id: string
+          is_test: boolean | null
           meals_per_day: number | null
+          must_change_password: boolean | null
           name: string | null
           onboarding_completed: boolean | null
           preferences: string[] | null
@@ -983,13 +986,16 @@ export type Database = {
           age?: number | null
           carbs_target?: number | null
           created_at?: string | null
+          created_by?: string | null
           daily_calories?: number | null
           email?: string | null
           fat_target?: number | null
           goal?: string | null
           height?: number | null
           id?: string
+          is_test?: boolean | null
           meals_per_day?: number | null
+          must_change_password?: boolean | null
           name?: string | null
           onboarding_completed?: boolean | null
           preferences?: string[] | null
@@ -1009,13 +1015,16 @@ export type Database = {
           age?: number | null
           carbs_target?: number | null
           created_at?: string | null
+          created_by?: string | null
           daily_calories?: number | null
           email?: string | null
           fat_target?: number | null
           goal?: string | null
           height?: number | null
           id?: string
+          is_test?: boolean | null
           meals_per_day?: number | null
+          must_change_password?: boolean | null
           name?: string | null
           onboarding_completed?: boolean | null
           preferences?: string[] | null

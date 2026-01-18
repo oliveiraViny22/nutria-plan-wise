@@ -218,6 +218,24 @@ export function useAdminOperations() {
     URL.revokeObjectURL(link.href);
   }, [getFoodTemplate]);
 
+  const seedTestData = useCallback(async (): Promise<Record<string, unknown>> => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('seed-test-data');
+      
+      if (error) throw new Error(error.message);
+      if (data?.error) throw new Error(data.error);
+      
+      return data.results || {};
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erro ao criar dados de teste';
+      toast({ title: 'Erro', description: message, variant: 'destructive' });
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  }, [toast]);
+
   return {
     loading,
     settings,
@@ -232,5 +250,6 @@ export function useAdminOperations() {
     fetchAuditLogs,
     getFoodTemplate,
     downloadTemplate,
+    seedTestData,
   };
 }

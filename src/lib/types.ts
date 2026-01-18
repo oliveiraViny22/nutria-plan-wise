@@ -42,6 +42,9 @@ export interface Profile {
   user_type: UserType; // Novo campo imutável
   onboarding_completed: boolean;
   professional_onboarding_completed: boolean;
+  is_test: boolean;
+  must_change_password: boolean;
+  created_by: string | null;
   created_at: string;
   updated_at: string;
 }

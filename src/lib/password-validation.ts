@@ -83,18 +83,74 @@ export const passwordSchema = z
     'A senha não pode conter caracteres repetidos em sequência (aaa, 111).'
   );
 
-// Validate password and return error message if invalid
-export function validatePassword(password: string): { valid: boolean; error?: string } {
-  const result = passwordSchema.safeParse(password);
-  
-  if (result.success) {
-    return { valid: true };
+// Validate password and return detailed validation result
+export interface PasswordValidationResult {
+  isValid: boolean;
+  errors: string[];
+  strength: number; // 1-4
+}
+
+export function validatePassword(password: string): PasswordValidationResult {
+  const errors: string[] = [];
+  let strength = 0;
+
+  // Check minimum length
+  if (password.length < 8) {
+    errors.push('A senha deve ter pelo menos 8 caracteres');
+  } else {
+    strength++;
   }
-  
+
+  // Check for letters
+  if (!/[a-zA-Z]/.test(password)) {
+    errors.push('A senha deve conter pelo menos uma letra');
+  } else {
+    strength++;
+  }
+
+  // Check for numbers
+  if (!/[0-9]/.test(password)) {
+    errors.push('A senha deve conter pelo menos um número');
+  } else {
+    strength++;
+  }
+
+  // Check for special characters (bonus)
+  if (/[!@#$%^&*(),.?":{}|<>]/.test(password)) {
+    strength++;
+  }
+
+  // Check weak passwords
+  if (WEAK_PASSWORDS.includes(password.toLowerCase())) {
+    errors.push('Esta senha é muito comum. Escolha uma senha mais forte.');
+  }
+
+  // Check sequential patterns
+  if (hasSequentialPattern(password)) {
+    errors.push('A senha não pode conter sequências óbvias (123, abc, qwerty).');
+  }
+
+  // Check repeated characters
+  if (hasRepeatedChars(password)) {
+    errors.push('A senha não pode conter caracteres repetidos em sequência.');
+  }
+
   return {
-    valid: false,
-    error: result.error.errors[0]?.message || 'Senha inválida',
+    isValid: errors.length === 0,
+    errors,
+    strength: Math.min(4, strength)
   };
+}
+
+// Get color for password strength indicator
+export function getPasswordStrengthColor(strength: number): string {
+  switch (strength) {
+    case 1: return 'bg-red-500';
+    case 2: return 'bg-yellow-500';
+    case 3: return 'bg-blue-500';
+    case 4: return 'bg-green-500';
+    default: return 'bg-muted';
+  }
 }
 
 // Email validation schema

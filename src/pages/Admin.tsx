@@ -14,7 +14,9 @@ import {
   CheckCircle,
   Loader2,
   Eye,
-  X
+  X,
+  Database,
+  Users
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -68,7 +70,8 @@ export default function Admin() {
     validateFoodCSV,
     importFoods,
     fetchAuditLogs,
-    downloadTemplate
+    downloadTemplate,
+    seedTestData
   } = useAdminOperations();
 
   const [activeTab, setActiveTab] = useState('settings');
@@ -77,6 +80,8 @@ export default function Admin() {
   const [csvPreview, setCsvPreview] = useState<{ rows: Record<string, unknown>[]; validation: { valid: boolean; errors: string[]; validRows: unknown[] } | null }>({ rows: [], validation: null });
   const [showPreview, setShowPreview] = useState(false);
   const [auditPage, setAuditPage] = useState(0);
+  const [seedingData, setSeedingData] = useState(false);
+  const [seedResults, setSeedResults] = useState<Record<string, unknown> | null>(null);
 
   // Redirect if not admin
   useEffect(() => {
@@ -148,6 +153,26 @@ export default function Admin() {
       setCsvPreview({ rows: [], validation: null });
     } catch {
       // Error handled in hook
+    }
+  };
+
+  const handleSeedTestData = async () => {
+    setSeedingData(true);
+    try {
+      const results = await seedTestData();
+      setSeedResults(results);
+      toast({
+        title: 'Dados de teste criados',
+        description: 'Contas e dados de teste foram gerados com sucesso.',
+      });
+    } catch (error) {
+      toast({
+        title: 'Erro ao criar dados de teste',
+        description: error instanceof Error ? error.message : 'Erro desconhecido',
+        variant: 'destructive'
+      });
+    } finally {
+      setSeedingData(false);
     }
   };
 
@@ -249,7 +274,7 @@ export default function Admin() {
 
       <main className="container mx-auto px-4 py-6">
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full max-w-lg grid-cols-4 mb-6">
+          <TabsList className="grid w-full max-w-2xl grid-cols-5 mb-6">
             <TabsTrigger value="settings" className="flex items-center gap-1">
               <Settings className="h-4 w-4" />
               <span className="hidden sm:inline">Configurações</span>
@@ -265,6 +290,10 @@ export default function Admin() {
             <TabsTrigger value="audit" className="flex items-center gap-1">
               <History className="h-4 w-4" />
               <span className="hidden sm:inline">Auditoria</span>
+            </TabsTrigger>
+            <TabsTrigger value="seed" className="flex items-center gap-1">
+              <Users className="h-4 w-4" />
+              <span className="hidden sm:inline">Seed</span>
             </TabsTrigger>
           </TabsList>
 
@@ -477,6 +506,100 @@ export default function Admin() {
                       Próximo
                     </Button>
                   </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Seed Test Data Tab */}
+          <TabsContent value="seed">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Database className="h-5 w-5" />
+                  Dados de Teste
+                </CardTitle>
+                <CardDescription>
+                  Crie contas de teste para validação funcional do sistema. 
+                  Também cria a conta administrativa inicial.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <Alert>
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertTitle>Importante</AlertTitle>
+                  <AlertDescription>
+                    <ul className="list-disc list-inside text-sm mt-2 space-y-1">
+                      <li>Todas as contas de teste são marcadas com <code className="bg-muted px-1 rounded">is_test = true</code></li>
+                      <li>A conta admin <strong>admin@nutriai.app</strong> é criada como conta real (não teste)</li>
+                      <li>A senha inicial do admin é <code className="bg-muted px-1 rounded">AdmInit-2026!</code> e deve ser alterada no primeiro login</li>
+                      <li>Dados de teste não afetam métricas de produção ou faturamento</li>
+                    </ul>
+                  </AlertDescription>
+                </Alert>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <Card className="border-dashed">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-base">Contas de Teste</CardTitle>
+                    </CardHeader>
+                    <CardContent className="text-sm space-y-1">
+                      <p><Badge variant="outline">Gratuito</Badge> test+gratuito@nutriai.dev</p>
+                      <p><Badge variant="outline">Premium</Badge> test+premium@nutriai.dev</p>
+                      <p><Badge variant="outline">Pessoal Pago</Badge> test+pessoal_pago@nutriai.dev</p>
+                      <p><Badge variant="outline">Profissional</Badge> test+profissional@nutriai.dev</p>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="border-dashed">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-base">Alunos de Teste</CardTitle>
+                    </CardHeader>
+                    <CardContent className="text-sm space-y-1">
+                      <p><Badge variant="secondary">Aluno 1</Badge> test+aluno1@nutriai.dev</p>
+                      <p><Badge variant="secondary">Aluno 2</Badge> test+aluno2@nutriai.dev</p>
+                      <p><Badge variant="secondary">Aluno 3</Badge> test+aluno3@nutriai.dev</p>
+                      <p className="text-xs text-muted-foreground mt-2">Vinculados ao profissional de teste</p>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                <div className="flex items-center gap-4">
+                  <Button 
+                    onClick={handleSeedTestData} 
+                    disabled={seedingData}
+                    size="lg"
+                  >
+                    {seedingData ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Criando dados...
+                      </>
+                    ) : (
+                      <>
+                        <Users className="h-4 w-4 mr-2" />
+                        Criar Dados de Teste
+                      </>
+                    )}
+                  </Button>
+                </div>
+
+                {seedResults && (
+                  <Card className="bg-muted/50">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <CheckCircle className="h-4 w-4 text-green-600" />
+                        Resultados do Seed
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <ScrollArea className="h-[200px]">
+                        <pre className="text-xs font-mono whitespace-pre-wrap">
+                          {JSON.stringify(seedResults, null, 2)}
+                        </pre>
+                      </ScrollArea>
+                    </CardContent>
+                  </Card>
                 )}
               </CardContent>
             </Card>
