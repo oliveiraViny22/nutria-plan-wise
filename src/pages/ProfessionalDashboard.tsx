@@ -24,6 +24,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Progress } from '@/components/ui/progress';
 import { Logo } from '@/components/Logo';
 import { MobileNav } from '@/components/MobileNav';
+import { ProfessionalOnboarding } from '@/components/ProfessionalOnboarding';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useProfessionalStudents } from '@/hooks/useProfessionalStudents';
 import { supabase } from '@/integrations/supabase/client';
@@ -42,11 +43,12 @@ interface StudentDietInfo {
 
 export default function ProfessionalDashboard() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, profile, refreshProfile } = useAuth();
   const { isProfessional, loading: roleLoading } = useUserRole();
   const { students, license, loading: studentsLoading, studentCount, isLicenseActive } = useProfessionalStudents();
   
   const [studentDiets, setStudentDiets] = useState<StudentDietInfo[]>([]);
+  const [showOnboarding, setShowOnboarding] = useState(false);
   const [metrics, setMetrics] = useState({
     totalDiets: 0,
     dietsThisMonth: 0,
@@ -54,6 +56,17 @@ export default function ProfessionalDashboard() {
     studentsWithActiveDiets: 0,
   });
   const [loading, setLoading] = useState(true);
+
+  // Check if professional onboarding is needed
+  useEffect(() => {
+    if (profile && isProfessional && !roleLoading) {
+      // Show onboarding if not completed
+      const onboardingCompleted = (profile as any).professional_onboarding_completed;
+      if (!onboardingCompleted) {
+        setShowOnboarding(true);
+      }
+    }
+  }, [profile, isProfessional, roleLoading]);
 
   useEffect(() => {
     if (!user || !isProfessional) return;
@@ -191,11 +204,20 @@ export default function ProfessionalDashboard() {
     );
   }
 
+  const handleOnboardingComplete = async () => {
+    setShowOnboarding(false);
+    await refreshProfile();
+  };
+
   const activeStudents = students?.filter(s => s.status === 'active').length || 0;
   const licenseUsage = license?.max_students ? (studentCount / license.max_students) * 100 : 0;
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Professional Onboarding */}
+      {showOnboarding && (
+        <ProfessionalOnboarding onComplete={handleOnboardingComplete} />
+      )}
       {/* Header */}
       <header className="sticky top-0 z-50 glass border-b pt-safe">
         <div className="container mx-auto px-3 sm:px-4 py-2.5 sm:py-3 flex items-center justify-between gap-2">
