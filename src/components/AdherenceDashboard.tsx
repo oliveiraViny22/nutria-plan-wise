@@ -451,8 +451,8 @@ export function AdherenceDashboard({ studentId, dietPlanId, studentName }: Adher
                       </CardHeader>
                       <CardContent>
                         <div className="space-y-3">
-                          {Object.entries(
-                            Object.values(report.optionComparison).reduce((acc, opt) => {
+                  {Object.entries(
+                            Object.values(report.optionComparison || {}).reduce((acc, opt) => {
                               if (!acc[opt.meal]) acc[opt.meal] = [];
                               acc[opt.meal].push(opt);
                               return acc;
