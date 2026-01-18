@@ -1,9 +1,15 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders, CLIENT_ERRORS, validate, getErrorForLogging, createErrorResponse, createSuccessResponse } from "../_shared/security.ts";
 
 const MAX_MESSAGE_LENGTH = 2000;
-const MAX_CHAT_HISTORY_LENGTH = 50;
+const MAX_CONTEXT_MESSAGES = 20; // Sliding window size
+const SUMMARIZE_THRESHOLD = 15; // Summarize when history exceeds this
+const RATE_LIMIT_WINDOW_MS = 2000; // 2 seconds between messages
+const MAX_SUMMARY_LENGTH = 500;
+
+// deno-lint-ignore no-explicit-any
+type AnySupabaseClient = SupabaseClient<any, any, any>;
 
 const logStep = (step: string, details?: unknown) => {
   const detailsStr = details ? ` - ${JSON.stringify(details)}` : '';
@@ -31,7 +37,8 @@ const getSystemPrompt = (
     fatTarget: number;
     preferences: string;
     restrictions: string;
-  }
+  },
+  conversationSummary?: string
 ): string => {
   const baseContext = `
 ## CONTEXTO DO USUÁRIO
@@ -42,7 +49,8 @@ const getSystemPrompt = (
 - Restrições: ${userContext.restrictions}
 - user_type: ${userType}
 - plan_type: ${planName}
-- Vínculo profissional: ${isLinkedToProfessional ? 'Sim' : 'Não'}`;
+- Vínculo profissional: ${isLinkedToProfessional ? 'Sim' : 'Não'}
+${conversationSummary ? `\n## RESUMO DA CONVERSA ANTERIOR\n${conversationSummary}` : ''}`;
 
   const governanceRules = `
 ## CONTEXTO GERAL (OBRIGATÓRIO)
@@ -304,6 +312,137 @@ Responda de forma educacional e objetiva.
 ${baseContext}`;
 };
 
+// Summarize conversation for context compression
+async function summarizeConversation(
+  messages: Array<{ role: string; content: string }>,
+  apiKey: string
+): Promise<string> {
+  if (messages.length < 5) return '';
+  
+  const conversationText = messages
+    .map(m => `${m.role}: ${m.content.substring(0, 200)}`)
+    .join('\n');
+  
+  try {
+    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-flash-lite",
+        messages: [
+          { 
+            role: "system", 
+            content: "Resuma esta conversa nutricional em no máximo 3 frases, destacando: tópicos discutidos, decisões tomadas, e contexto importante para continuidade. Seja objetivo."
+          },
+          { role: "user", content: conversationText }
+        ],
+      }),
+    });
+    
+    if (response.ok) {
+      const data = await response.json();
+      const summary = data.choices?.[0]?.message?.content || '';
+      return summary.substring(0, MAX_SUMMARY_LENGTH);
+    }
+  } catch (error) {
+    logStep("Summarization failed", { error: getErrorForLogging(error) });
+  }
+  
+  return '';
+}
+
+// Rate limit check using database
+async function checkRateLimit(
+  supabase: AnySupabaseClient,
+  userId: string
+): Promise<{ allowed: boolean; retryAfterMs?: number }> {
+  const now = Date.now();
+  
+  // Check last message timestamp from chat_messages
+  const { data: lastMessage } = await supabase
+    .from('chat_messages')
+    .select('created_at')
+    .eq('user_id', userId)
+    .eq('role', 'user')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .single();
+  
+  if (lastMessage?.created_at) {
+    const lastMessageTime = new Date(lastMessage.created_at as string).getTime();
+    const timeSinceLastMessage = now - lastMessageTime;
+    
+    if (timeSinceLastMessage < RATE_LIMIT_WINDOW_MS) {
+      return { 
+        allowed: false, 
+        retryAfterMs: RATE_LIMIT_WINDOW_MS - timeSinceLastMessage 
+      };
+    }
+  }
+  
+  return { allowed: true };
+}
+
+// Persist chat message
+async function persistMessage(
+  supabase: AnySupabaseClient,
+  userId: string,
+  role: 'user' | 'assistant',
+  content: string
+): Promise<void> {
+  await supabase.from('chat_messages').insert({
+    user_id: userId,
+    role,
+    content: content.substring(0, MAX_MESSAGE_LENGTH * 2),
+  } as Record<string, unknown>);
+}
+
+// Load conversation history with sliding window
+async function loadConversationHistory(
+  supabase: AnySupabaseClient,
+  userId: string,
+  apiKey: string
+): Promise<{ messages: Array<{ role: string; content: string }>; summary?: string }> {
+  const { data: allMessages } = await supabase
+    .from('chat_messages')
+    .select('role, content, created_at')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: true });
+  
+  if (!allMessages || allMessages.length === 0) {
+    return { messages: [] };
+  }
+  
+  // Type assertion for messages
+  const typedMessages = allMessages as Array<{ role: string; content: string; created_at: string }>;
+  
+  // If within window, return all
+  if (typedMessages.length <= MAX_CONTEXT_MESSAGES) {
+    return { 
+      messages: typedMessages.map(m => ({ role: m.role, content: m.content }))
+    };
+  }
+  
+  // Need to summarize older messages
+  const oldMessages = typedMessages.slice(0, -MAX_CONTEXT_MESSAGES);
+  const recentMessages = typedMessages.slice(-MAX_CONTEXT_MESSAGES);
+  
+  // Summarize old messages if threshold exceeded
+  let summary: string | undefined;
+  if (oldMessages.length >= SUMMARIZE_THRESHOLD) {
+    summary = await summarizeConversation(
+      oldMessages.map(m => ({ role: m.role, content: m.content })),
+      apiKey
+    );
+    logStep("Conversation summarized", { oldCount: oldMessages.length, summaryLength: summary.length });
+  }
+  
+  return {
+    messages: recentMessages.map(m => ({ role: m.role, content: m.content })),
+    summary,
+  };
+}
+
 serve(async (req) => {
   const corsHeaders = getCorsHeaders(req);
   
@@ -326,10 +465,9 @@ serve(async (req) => {
       return createErrorResponse(CLIENT_ERRORS.INVALID_REQUEST, 400, corsHeaders);
     }
     
-    const { message, profile, chatHistory } = body as { 
+    const { message, profile } = body as { 
       message: unknown; 
       profile: unknown; 
-      chatHistory: unknown;
     };
     
     // Validate message
@@ -343,29 +481,7 @@ serve(async (req) => {
       return createErrorResponse(CLIENT_ERRORS.INVALID_REQUEST, 400, corsHeaders);
     }
     
-    // Validate chatHistory if provided
-    let validatedHistory: Array<{ role: string; content: string }> = [];
-    if (chatHistory !== undefined) {
-      if (!validate.isArray(chatHistory)) {
-        logStep("Invalid chatHistory: not an array");
-        return createErrorResponse(CLIENT_ERRORS.INVALID_REQUEST, 400, corsHeaders);
-      }
-      
-      // Limit history length and validate entries
-      validatedHistory = (chatHistory as unknown[])
-        .slice(-MAX_CHAT_HISTORY_LENGTH)
-        .filter((item): item is { role: string; content: string } => {
-          if (!validate.isObject(item)) return false;
-          const { role, content } = item as { role: unknown; content: unknown };
-          return (
-            validate.isEnum(role, ['user', 'assistant', 'system']) &&
-            validate.isNonEmptyString(content) &&
-            validate.maxLength(content, MAX_MESSAGE_LENGTH)
-          );
-        });
-    }
-    
-    logStep("Request validated", { messageLength: message.length, historyLength: validatedHistory.length });
+    logStep("Request validated", { messageLength: message.length });
     
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -386,6 +502,18 @@ serve(async (req) => {
     }
     
     logStep("User authenticated", { userId: user.id });
+
+    // Check rate limit
+    const rateLimitResult = await checkRateLimit(supabase, user.id);
+    if (!rateLimitResult.allowed) {
+      logStep("Rate limited", { retryAfterMs: rateLimitResult.retryAfterMs });
+      return createErrorResponse(
+        `Aguarde ${Math.ceil((rateLimitResult.retryAfterMs || 2000) / 1000)} segundos antes de enviar outra mensagem.`,
+        429,
+        corsHeaders,
+        { retryAfterMs: rateLimitResult.retryAfterMs }
+      );
+    }
 
     // Get user permissions and plan info
     const { data: permissionsData } = await supabase.rpc('get_user_permissions', { _user_id: user.id });
@@ -434,7 +562,22 @@ serve(async (req) => {
       ? (safeProfile.restrictions as unknown[]).filter(validate.isString).slice(0, 10).join(", ")
       : "Nenhuma";
 
-    // Get plan-specific system prompt with governance rules
+    // Load conversation history with sliding window and summarization
+    const { messages: historyMessages, summary } = await loadConversationHistory(
+      supabase, 
+      user.id, 
+      LOVABLE_API_KEY || ''
+    );
+    
+    logStep("Conversation history loaded", { 
+      historyCount: historyMessages.length,
+      hasSummary: Boolean(summary),
+    });
+
+    // Persist user message
+    await persistMessage(supabase, user.id, 'user', message);
+
+    // Get plan-specific system prompt with governance rules and summary
     const systemPrompt = getSystemPrompt(planName, userType, isLinkedToProfessional, {
       goal,
       dailyCalories,
@@ -443,11 +586,11 @@ serve(async (req) => {
       fatTarget,
       preferences,
       restrictions,
-    });
+    }, summary);
 
     const messages = [
       { role: "system", content: systemPrompt },
-      ...validatedHistory,
+      ...historyMessages,
       { role: "user", content: message }
     ];
 
@@ -469,6 +612,10 @@ serve(async (req) => {
     }
 
     const data = await response.json();
+    const assistantMessage = data.choices[0].message.content;
+
+    // Persist assistant response
+    await persistMessage(supabase, user.id, 'assistant', assistantMessage);
 
     // Increment chat usage after successful response
     await supabase.rpc('increment_usage', {
@@ -484,13 +631,17 @@ serve(async (req) => {
     const updatedLimit = updatedLimitData?.[0];
 
     return createSuccessResponse({ 
-      message: data.choices[0].message.content,
+      message: assistantMessage,
       usage: {
         current: updatedLimit?.current_usage || 0,
         limit: updatedLimit?.max_limit || 0,
       },
       planName,
       userType,
+      contextInfo: {
+        historyLoaded: historyMessages.length,
+        summarized: Boolean(summary),
+      },
     }, corsHeaders);
   } catch (error) {
     logStep("ERROR", { message: getErrorForLogging(error) });
