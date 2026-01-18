@@ -206,42 +206,44 @@ export default function Profile() {
   const targets = calculateTargets();
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background overflow-x-hidden">
       {/* Header */}
       <header className="sticky top-0 z-50 glass border-b">
-        <div className="container mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard')}>
-              <ArrowLeft className="h-5 w-5" />
+        <div className="container mx-auto px-3 sm:px-4 py-2 sm:py-3 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <Button variant="ghost" size="icon" className="w-9 h-9 sm:w-10 sm:h-10" onClick={() => navigate('/dashboard')}>
+              <ArrowLeft className="h-4 w-4 sm:h-5 sm:w-5" />
             </Button>
             <Logo size="sm" />
           </div>
-          <h1 className="text-lg font-semibold">Meu Perfil</h1>
+          <h1 className="text-base sm:text-lg font-semibold hidden xs:block">Meu Perfil</h1>
           <Button 
             size="sm" 
             onClick={handleSave} 
             disabled={loading || !hasChanges}
+            className="text-xs sm:text-sm h-8 sm:h-9"
           >
-            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
-            Salvar
+            {loading ? <Loader2 className="h-3 w-3 sm:h-4 sm:w-4 animate-spin" /> : <Save className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />}
+            <span className="hidden xs:inline">Salvar</span>
           </Button>
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-6 pb-24">
-        <Tabs defaultValue="personal" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="personal">
-              <User className="h-4 w-4 mr-2" />
-              Pessoal
+      <main className="container mx-auto px-3 sm:px-4 py-4 sm:py-6 pb-20 sm:pb-24">
+        <Tabs defaultValue="personal" className="space-y-4 sm:space-y-6">
+          {/* Tabs - scrollable on mobile */}
+          <TabsList className="grid w-full grid-cols-3 h-auto">
+            <TabsTrigger value="personal" className="text-xs sm:text-sm py-2 sm:py-2.5 px-1 sm:px-3">
+              <User className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+              <span className="hidden xs:inline">Pessoal</span>
             </TabsTrigger>
-            <TabsTrigger value="goals">
-              <Target className="h-4 w-4 mr-2" />
-              Objetivo
+            <TabsTrigger value="goals" className="text-xs sm:text-sm py-2 sm:py-2.5 px-1 sm:px-3">
+              <Target className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+              <span className="hidden xs:inline">Objetivo</span>
             </TabsTrigger>
-            <TabsTrigger value="diet">
-              <Utensils className="h-4 w-4 mr-2" />
-              Dieta
+            <TabsTrigger value="diet" className="text-xs sm:text-sm py-2 sm:py-2.5 px-1 sm:px-3">
+              <Utensils className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+              <span className="hidden xs:inline">Dieta</span>
             </TabsTrigger>
           </TabsList>
 

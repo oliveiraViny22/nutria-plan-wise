@@ -96,50 +96,50 @@ export default function Pricing() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background overflow-x-hidden">
       {/* Header */}
       <header className="border-b bg-card/50 backdrop-blur-sm sticky top-0 z-50">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
-            <ArrowLeft className="h-5 w-5" />
+        <div className="container mx-auto px-3 sm:px-4 py-3 sm:py-4 flex items-center justify-between">
+          <Button variant="ghost" size="icon" className="w-9 h-9 sm:w-10 sm:h-10" onClick={() => navigate(-1)}>
+            <ArrowLeft className="h-4 w-4 sm:h-5 sm:w-5" />
           </Button>
-          <h1 className="text-xl font-bold">Planos e Preços</h1>
-          <div className="w-10" />
+          <h1 className="text-lg sm:text-xl font-bold">Planos e Preços</h1>
+          <div className="w-9 sm:w-10" />
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-8">
+      <main className="container mx-auto px-3 sm:px-4 py-6 sm:py-8">
         {/* Hero */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="text-center mb-12"
+          className="text-center mb-8 sm:mb-12 px-2"
         >
-          <h2 className="text-4xl font-bold mb-4">
+          <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold mb-3 sm:mb-4">
             Escolha o plano ideal para você
           </h2>
-          <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
+          <p className="text-sm sm:text-base lg:text-lg text-muted-foreground max-w-2xl mx-auto">
             Desbloqueie todo o potencial da sua jornada nutricional com nossos planos personalizados.
           </p>
         </motion.div>
 
         {/* Account Type Tabs */}
-        <Tabs value={accountTab} onValueChange={(v) => setAccountTab(v as 'personal' | 'professional')} className="mb-8">
-          <TabsList className="grid w-full max-w-md mx-auto grid-cols-2">
-            <TabsTrigger value="personal" className="flex items-center gap-2">
-              <Zap className="h-4 w-4" />
-              Uso Pessoal
+        <Tabs value={accountTab} onValueChange={(v) => setAccountTab(v as 'personal' | 'professional')} className="mb-6 sm:mb-8">
+          <TabsList className="grid w-full max-w-md mx-auto grid-cols-2 h-auto">
+            <TabsTrigger value="personal" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm py-2 sm:py-2.5">
+              <Zap className="h-3 w-3 sm:h-4 sm:w-4" />
+              <span className="hidden xs:inline">Uso </span>Pessoal
             </TabsTrigger>
-            <TabsTrigger value="professional" className="flex items-center gap-2">
-              <Users className="h-4 w-4" />
+            <TabsTrigger value="professional" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm py-2 sm:py-2.5">
+              <Users className="h-3 w-3 sm:h-4 sm:w-4" />
               Profissional
             </TabsTrigger>
           </TabsList>
         </Tabs>
 
-        {/* Plans Grid */}
-        <div className={`grid gap-6 max-w-5xl mx-auto ${
-          filteredPlans.length === 2 ? 'md:grid-cols-2' : 'md:grid-cols-3'
+        {/* Plans Grid - Mobile: 1 col, Tablet: 2 col, Desktop: 2-3 col */}
+        <div className={`grid gap-4 sm:gap-6 max-w-5xl mx-auto grid-cols-1 ${
+          filteredPlans.length === 2 ? 'sm:grid-cols-2' : 'sm:grid-cols-2 lg:grid-cols-3'
         }`}>
           {filteredPlans.map((plan, index) => {
             const isCurrentPlan = currentPlan?.id === plan.id;
@@ -237,15 +237,15 @@ export default function Pricing() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.5 }}
-          className="mt-16 text-center"
+          className="mt-12 sm:mt-16 text-center px-2"
         >
-          <h3 className="text-2xl font-bold mb-4">Dúvidas?</h3>
-          <p className="text-muted-foreground mb-6">
+          <h3 className="text-xl sm:text-2xl font-bold mb-3 sm:mb-4">Dúvidas?</h3>
+          <p className="text-sm sm:text-base text-muted-foreground mb-4 sm:mb-6">
             Todos os planos incluem suporte e atualizações. Cancele quando quiser.
           </p>
-          <div className="flex justify-center gap-4">
-            <Button variant="outline" onClick={() => navigate('/chat')}>
-              <MessageCircle className="h-4 w-4 mr-2" />
+          <div className="flex justify-center gap-3 sm:gap-4">
+            <Button variant="outline" size="sm" className="text-xs sm:text-sm h-9 sm:h-10" onClick={() => navigate('/chat')}>
+              <MessageCircle className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
               Falar com Suporte
             </Button>
           </div>

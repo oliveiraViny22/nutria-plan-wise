@@ -58,18 +58,18 @@ export default function Subscription() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background overflow-x-hidden">
       <header className="border-b bg-card/50 backdrop-blur-sm sticky top-0 z-50">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
-            <ArrowLeft className="h-5 w-5" />
+        <div className="container mx-auto px-3 sm:px-4 py-3 sm:py-4 flex items-center justify-between">
+          <Button variant="ghost" size="icon" className="w-9 h-9 sm:w-10 sm:h-10" onClick={() => navigate(-1)}>
+            <ArrowLeft className="h-4 w-4 sm:h-5 sm:w-5" />
           </Button>
-          <h1 className="text-xl font-bold">Minha Assinatura</h1>
-          <div className="w-10" />
+          <h1 className="text-base sm:text-xl font-bold">Minha Assinatura</h1>
+          <div className="w-9 sm:w-10" />
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-8 max-w-2xl space-y-6">
+      <main className="container mx-auto px-3 sm:px-4 py-6 sm:py-8 max-w-2xl space-y-4 sm:space-y-6">
         {/* Current Plan Card */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}

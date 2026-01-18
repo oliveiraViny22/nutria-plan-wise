@@ -163,71 +163,72 @@ export default function Dashboard() {
   const currentFat = currentDietPlan?.total_fat || 0;
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
+    <div className="min-h-screen bg-background overflow-x-hidden">
+      {/* Header - Mobile responsive with hamburger concept via scrollable icons */}
       <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-md border-b border-border">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
+        <div className="container mx-auto px-3 sm:px-4 py-3 sm:py-4 flex items-center justify-between gap-2">
           <Logo />
-          <div className="flex items-center gap-1">
+          {/* Mobile: horizontal scroll for icons, Desktop: flex wrap */}
+          <div className="flex items-center gap-0.5 sm:gap-1 overflow-x-auto max-w-[60vw] sm:max-w-none scrollbar-hide">
             {(isSubscribed && accountType === 'professional') || (isProfessional && hasActiveLicense) ? (
               <>
                 <Link to="/professional">
-                  <Button variant="ghost" size="icon" title="Painel Profissional">
-                    <LayoutDashboard className="w-5 h-5" />
+                  <Button variant="ghost" size="icon" className="shrink-0 w-9 h-9 sm:w-10 sm:h-10" title="Painel Profissional">
+                    <LayoutDashboard className="w-4 h-4 sm:w-5 sm:h-5" />
                   </Button>
                 </Link>
                 <Link to="/students">
-                  <Button variant="ghost" size="icon" title="Gerenciar Alunos">
-                    <Users className="w-5 h-5" />
+                  <Button variant="ghost" size="icon" className="shrink-0 w-9 h-9 sm:w-10 sm:h-10" title="Gerenciar Alunos">
+                    <Users className="w-4 h-4 sm:w-5 sm:h-5" />
                   </Button>
                 </Link>
               </>
             ) : (
-              <Link to="/become-professional">
-                <Button variant="ghost" size="icon" title="Seja Profissional">
-                  <Crown className="w-5 h-5" />
+              <Link to="/become-professional" className="hidden sm:block">
+                <Button variant="ghost" size="icon" className="shrink-0 w-9 h-9 sm:w-10 sm:h-10" title="Seja Profissional">
+                  <Crown className="w-4 h-4 sm:w-5 sm:h-5" />
                 </Button>
               </Link>
             )}
-            <Link to="/subscription">
-              <Button variant="ghost" size="icon">
-                <CreditCard className="w-5 h-5" />
+            <Link to="/subscription" className="hidden xs:block">
+              <Button variant="ghost" size="icon" className="shrink-0 w-9 h-9 sm:w-10 sm:h-10">
+                <CreditCard className="w-4 h-4 sm:w-5 sm:h-5" />
               </Button>
             </Link>
             <Link to="/progress">
-              <Button variant="ghost" size="icon">
-                <TrendingUp className="w-5 h-5" />
+              <Button variant="ghost" size="icon" className="shrink-0 w-9 h-9 sm:w-10 sm:h-10">
+                <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5" />
               </Button>
             </Link>
             <Link to="/profile">
-              <Button variant="ghost" size="icon">
-                <User className="w-5 h-5" />
+              <Button variant="ghost" size="icon" className="shrink-0 w-9 h-9 sm:w-10 sm:h-10">
+                <User className="w-4 h-4 sm:w-5 sm:h-5" />
               </Button>
             </Link>
             <Link to="/chat">
-              <Button variant="ghost" size="icon">
-                <MessageCircle className="w-5 h-5" />
+              <Button variant="ghost" size="icon" className="shrink-0 w-9 h-9 sm:w-10 sm:h-10">
+                <MessageCircle className="w-4 h-4 sm:w-5 sm:h-5" />
               </Button>
             </Link>
-            <Button variant="ghost" size="icon" onClick={handleSignOut}>
-              <LogOut className="w-5 h-5" />
+            <Button variant="ghost" size="icon" className="shrink-0 w-9 h-9 sm:w-10 sm:h-10" onClick={handleSignOut}>
+              <LogOut className="w-4 h-4 sm:w-5 sm:h-5" />
             </Button>
           </div>
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-6 space-y-6 pb-24">
+      <main className="container mx-auto px-3 sm:px-4 py-4 sm:py-6 space-y-4 sm:space-y-6 pb-20 sm:pb-24">
         {/* Linked Student Read-Only Notice */}
         {isLinkedStudent && (
           <motion.div
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="bg-muted/50 border border-border rounded-xl p-4 flex items-center gap-3"
+            className="bg-muted/50 border border-border rounded-lg sm:rounded-xl p-3 sm:p-4 flex items-center gap-2 sm:gap-3"
           >
-            <Eye className="w-5 h-5 text-muted-foreground flex-shrink-0" />
+            <Eye className="w-4 h-4 sm:w-5 sm:h-5 text-muted-foreground flex-shrink-0" />
             <div>
-              <p className="text-sm font-medium text-foreground">Modo Visualização</p>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs sm:text-sm font-medium text-foreground">Modo Visualização</p>
+              <p className="text-[10px] sm:text-xs text-muted-foreground">
                 Seu plano alimentar é gerenciado pelo seu nutricionista.
               </p>
             </div>
@@ -238,30 +239,30 @@ export default function Dashboard() {
         <motion.section
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="space-y-2"
+          className="space-y-1 sm:space-y-2"
         >
-          <h1 className="text-2xl font-bold text-foreground">
+          <h1 className="text-xl sm:text-2xl font-bold text-foreground">
             Olá, {profile?.name?.split(' ')[0] || 'Usuário'}! 👋
           </h1>
-          <p className="text-muted-foreground">
+          <p className="text-sm sm:text-base text-muted-foreground">
             {profile?.goal
               ? `Objetivo: ${GOALS[profile.goal as keyof typeof GOALS]?.label}`
               : 'Acompanhe seu plano alimentar'}
           </p>
         </motion.section>
 
-        {/* Stats Cards */}
+        {/* Stats Cards - Mobile: stack, Desktop: side by side */}
         <motion.section
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          className="grid gap-4 sm:grid-cols-2"
+          className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2"
         >
           {/* Calorie Card */}
-          <div className="card-elevated rounded-2xl p-6 flex flex-col items-center">
-            <div className="flex items-center gap-2 mb-4">
-              <Flame className="w-5 h-5 text-primary" />
-              <h3 className="font-semibold text-foreground">Calorias</h3>
+          <div className="card-elevated rounded-xl sm:rounded-2xl p-4 sm:p-6 flex flex-col items-center">
+            <div className="flex items-center gap-2 mb-3 sm:mb-4">
+              <Flame className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
+              <h3 className="font-semibold text-foreground text-sm sm:text-base">Calorias</h3>
             </div>
             <CalorieRing
               current={currentCalories}
@@ -270,10 +271,10 @@ export default function Dashboard() {
           </div>
 
           {/* Macros Card */}
-          <div className="card-elevated rounded-2xl p-6">
-            <div className="flex items-center gap-2 mb-4">
-              <Target className="w-5 h-5 text-primary" />
-              <h3 className="font-semibold text-foreground">Macros</h3>
+          <div className="card-elevated rounded-xl sm:rounded-2xl p-4 sm:p-6">
+            <div className="flex items-center gap-2 mb-3 sm:mb-4">
+              <Target className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
+              <h3 className="font-semibold text-foreground text-sm sm:text-base">Macros</h3>
             </div>
             <MacroChart
               protein={currentProtein}
