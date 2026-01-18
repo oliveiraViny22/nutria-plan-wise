@@ -29,3 +29,6 @@ verify_jwt = false
 
 [functions.generate-documentation-pdf]
 verify_jwt = false
+
+[functions.validate-food-import]
+verify_jwt = false
