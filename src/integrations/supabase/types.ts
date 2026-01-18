@@ -499,7 +499,9 @@ export type Database = {
           created_at: string | null
           current_period_end: string | null
           current_period_start: string | null
+          grace_period_end: string | null
           id: string
+          last_reconciled: string | null
           plan_id: string
           provider: string | null
           provider_customer_id: string | null
@@ -515,7 +517,9 @@ export type Database = {
           created_at?: string | null
           current_period_end?: string | null
           current_period_start?: string | null
+          grace_period_end?: string | null
           id?: string
+          last_reconciled?: string | null
           plan_id: string
           provider?: string | null
           provider_customer_id?: string | null
@@ -531,7 +535,9 @@ export type Database = {
           created_at?: string | null
           current_period_end?: string | null
           current_period_start?: string | null
+          grace_period_end?: string | null
           id?: string
+          last_reconciled?: string | null
           plan_id?: string
           provider?: string | null
           provider_customer_id?: string | null
@@ -659,6 +665,29 @@ export type Database = {
           current_usage: number
           max_limit: number
           upgrade_required: boolean
+        }[]
+      }
+      get_professional_subscription_state: {
+        Args: { _professional_id: string }
+        Returns: {
+          grace_end: string
+          is_active: boolean
+          is_grace_period: boolean
+          is_suspended: boolean
+          sub_status: string
+        }[]
+      }
+      get_student_access_level: {
+        Args: { _student_id: string }
+        Returns: {
+          access_level: string
+          can_generate: boolean
+          can_substitute: boolean
+          can_use_chat: boolean
+          can_view_history: boolean
+          can_view_plan: boolean
+          has_access: boolean
+          professional_status: string
         }[]
       }
       get_student_count: { Args: { _professional_id: string }; Returns: number }

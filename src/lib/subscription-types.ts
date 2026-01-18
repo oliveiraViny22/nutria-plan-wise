@@ -56,6 +56,17 @@ export interface UserUsage {
   updated_at: string;
 }
 
+export interface StudentAccess {
+  hasAccess: boolean;
+  accessLevel: 'full' | 'read_only' | 'suspended';
+  canViewPlan: boolean;
+  canViewHistory: boolean;
+  canUseChat: boolean;
+  canGenerate: boolean;
+  canSubstitute: boolean;
+  professionalStatus: string | null;
+}
+
 export interface SubscriptionInfo {
   subscribed: boolean;
   subscription?: {
@@ -64,6 +75,7 @@ export interface SubscriptionInfo {
     billingCycle: string;
     periodEnd: string;
     cancelAtPeriodEnd: boolean;
+    gracePeriodEnd?: string;
   };
   plan?: Plan;
   usage?: {
@@ -74,6 +86,7 @@ export interface SubscriptionInfo {
   };
   accountType: 'personal' | 'professional';
   isLinkedToProfessional?: boolean;
+  studentAccess?: StudentAccess;
 }
 
 export type BillingCycle = 'monthly';

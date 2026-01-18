@@ -108,6 +108,27 @@ serve(async (req) => {
     const isLinkedToProfessional = Boolean(profileData?.professional_id);
     logStep("Checked professional link", { isLinkedToProfessional });
 
+    // Get student access level if linked to professional
+    let studentAccess = null;
+    if (isLinkedToProfessional) {
+      const { data: accessData } = await supabaseAdmin
+        .rpc('get_student_access_level', { _student_id: user.id });
+      
+      if (accessData && accessData.length > 0) {
+        studentAccess = {
+          hasAccess: accessData[0].has_access,
+          accessLevel: accessData[0].access_level,
+          canViewPlan: accessData[0].can_view_plan,
+          canViewHistory: accessData[0].can_view_history,
+          canUseChat: accessData[0].can_use_chat,
+          canGenerate: accessData[0].can_generate,
+          canSubstitute: accessData[0].can_substitute,
+          professionalStatus: accessData[0].professional_status,
+        };
+        logStep("Student access level", studentAccess);
+      }
+    }
+
     // Get user's subscription with plan details
     const { data: subscription, error: subError } = await supabaseAdmin
       .from('subscriptions')
@@ -116,7 +137,7 @@ serve(async (req) => {
         plan:plans(*)
       `)
       .eq('user_id', user.id)
-      .in('status', ['active', 'trial', 'past_due'])
+      .in('status', ['active', 'trial', 'past_due', 'grace_period'])
       .order('created_at', { ascending: false })
       .limit(1)
       .single();
@@ -138,6 +159,7 @@ serve(async (req) => {
         usage: null,
         accountType: isProfessional ? 'professional' : 'personal',
         isLinkedToProfessional,
+        studentAccess,
       }, corsHeaders);
     }
 
@@ -249,6 +271,7 @@ serve(async (req) => {
         billingCycle: subscription.billing_cycle,
         periodEnd: subscription.current_period_end,
         cancelAtPeriodEnd: subscription.cancel_at_period_end,
+        gracePeriodEnd: subscription.grace_period_end,
       },
       plan: subscription.plan,
       usage: usage || {
@@ -259,6 +282,7 @@ serve(async (req) => {
       },
       accountType: planType,
       isLinkedToProfessional,
+      studentAccess,
     }, corsHeaders);
   } catch (error) {
     logStep("ERROR", { message: getErrorForLogging(error) });
