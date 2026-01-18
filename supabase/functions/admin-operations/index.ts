@@ -11,13 +11,18 @@ const logStep = (step: string, details?: unknown) => {
   console.log(`[ADMIN-OPERATIONS] ${step}${detailsStr}`);
 };
 
-// Valid food categories and processing levels
+// Valid food categories and processing levels (new nutritional model)
 const VALID_CATEGORIES = [
+  'Carboidratos', 'Proteínas', 'Gorduras', 'Frutas', 'Vegetais',
+  'Leguminosas', 'Laticínios', 'Suplementos', 'Mistos',
+  // Legacy categories for backward compatibility
   'frutas', 'hortaliças_folhosas', 'legumes', 'cereais_tubérculos',
   'leguminosas', 'proteínas_animais', 'laticínios', 'óleos_oleaginosas', 'suplementos'
 ];
 
 const VALID_PROCESSING_LEVELS = [
+  'In natura', 'Minimamente processado', 'Processado', 'Ultraprocessado', 'Suplemento',
+  // Legacy levels for backward compatibility
   'in_natura', 'minimamente_processado', 'processado', 'ultraprocessado', 'suplemento'
 ];
 
