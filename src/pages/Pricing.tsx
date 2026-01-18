@@ -22,11 +22,18 @@ export default function Pricing() {
 
   // Filter plans based on tab and Premium visibility rules
   const filteredPlans = plans.filter(p => {
-    // Filter by account type tab
-    if (p.type !== accountTab) return false;
+    // Premium is a special plan for students linked to professionals - always hide from Pricing tabs
+    // Students see it only if linked and on personal tab, but we'll handle this separately
+    if (p.name === 'premium') {
+      // Premium only shows if user is linked to professional AND on personal tab
+      if (!isLinkedToProfessional) return false;
+      // Premium should appear in personal tab (its type is 'personal')
+      if (accountTab !== 'personal') return false;
+      return true;
+    }
     
-    // Premium is only visible to users linked to a professional
-    if (p.name === 'premium' && !isLinkedToProfessional) return false;
+    // Filter by account type tab for all other plans
+    if (p.type !== accountTab) return false;
     
     return true;
   });
@@ -196,10 +203,12 @@ export default function Pricing() {
                     <CardTitle className="text-2xl capitalize">
                       {plan.name === 'plano_pessoal_pago' ? 'Pessoal' : 
                        plan.name === 'profissional' ? 'Profissional' :
-                       plan.name === 'premium' ? 'Premium' : 'Gratuito'}
+                       plan.name === 'premium' ? 'Premium (Aluno)' : 'Gratuito'}
                     </CardTitle>
                     <CardDescription>
-                      {plan.description || 'Plano de nutrição'}
+                      {plan.name === 'premium' 
+                        ? 'Plano exclusivo para alunos vinculados a profissionais'
+                        : (plan.description || 'Plano de nutrição')}
                     </CardDescription>
                   </CardHeader>
 
