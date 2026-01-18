@@ -192,6 +192,7 @@ export default function Admin() {
     updateFood,
     deleteFood,
     batchUpdateFoods,
+    normalizeFoodNames,
   } = useAdminOperations();
 
   const [activeTab, setActiveTab] = useState('metrics');
@@ -2299,13 +2300,40 @@ export default function Admin() {
               {/* Manage Foods Section */}
               <Card className="mt-6">
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Database className="h-5 w-5" />
-                    Gerenciar Alimentos
-                  </CardTitle>
-                  <CardDescription>
-                    Busque, edite ou exclua alimentos existentes no banco de dados.
-                  </CardDescription>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle className="flex items-center gap-2">
+                        <Database className="h-5 w-5" />
+                        Gerenciar Alimentos
+                      </CardTitle>
+                      <CardDescription>
+                        Busque, edite ou exclua alimentos existentes no banco de dados.
+                      </CardDescription>
+                    </div>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={async () => {
+                        try {
+                          await normalizeFoodNames();
+                          // Refresh search results if any
+                          if (foodsSearch) {
+                            handleSearchFoods(0);
+                          }
+                        } catch (e) {
+                          // Error handled in hook
+                        }
+                      }}
+                      disabled={loading}
+                    >
+                      {loading ? (
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <Sparkles className="h-4 w-4 mr-2" />
+                      )}
+                      Normalizar Nomes
+                    </Button>
+                  </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   {/* Search */}
