@@ -15,6 +15,7 @@ import {
   ChevronRight,
   ClipboardCheck,
   Bell,
+  Shield,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -46,7 +47,7 @@ export function MobileNav() {
   const location = useLocation();
   const navigate = useNavigate();
   const { signOut } = useAuth();
-  const { isProfessional, hasActiveLicense, loading: roleLoading } = useUserRole();
+  const { isProfessional, hasActiveLicense, isAdmin, loading: roleLoading } = useUserRole();
   const { accountType, isSubscribed } = useSubscription();
   const { unreadCount, canSeeAlerts } = useUnreadAlerts();
 
@@ -118,6 +119,12 @@ export function MobileNav() {
       href: '/subscription',
       icon: <CreditCard className="h-5 w-5" />,
       show: true,
+    },
+    {
+      label: 'Painel Admin',
+      href: '/admin',
+      icon: <Shield className="h-5 w-5" />,
+      show: isAdmin,
     },
   ];
 
