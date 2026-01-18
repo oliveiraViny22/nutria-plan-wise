@@ -55,6 +55,16 @@ export default function Pricing() {
       return;
     }
 
+    // Block Premium subscription if not linked to professional
+    if (plan.name === 'premium' && !isLinkedToProfessional) {
+      toast({
+        title: 'Plano exclusivo',
+        description: 'O plano Premium é exclusivo para alunos vinculados a um profissional. Peça ao seu nutricionista para vincular sua conta.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setCheckoutLoading(plan.id);
     try {
       // Always use monthly billing
@@ -84,25 +94,42 @@ export default function Pricing() {
   const getPlanFeatures = (plan: Plan): string[] => {
     const features: string[] = [];
     
-    features.push(`${plan.diet_limit} dietas por mês`);
-    features.push(`${plan.substitution_limit} substituições`);
-    
-    if (plan.adjustment_limit > 0) {
-      features.push(`${plan.adjustment_limit} ajustes automáticos`);
+    // Only show limits that are > 0 to avoid confusing "0 dietas"
+    if (plan.diet_limit > 0) {
+      features.push(`${plan.diet_limit} ${plan.diet_limit === 1 ? 'dieta' : 'dietas'} por mês`);
     }
     
-    if (plan.has_chat) {
-      features.push(`${plan.chat_messages_per_day} mensagens de chat/dia`);
+    if (plan.substitution_limit > 0) {
+      features.push(`${plan.substitution_limit} ${plan.substitution_limit === 1 ? 'substituição' : 'substituições'}`);
+    }
+    
+    if (plan.adjustment_limit > 0) {
+      features.push(`${plan.adjustment_limit} ${plan.adjustment_limit === 1 ? 'ajuste automático' : 'ajustes automáticos'}`);
+    }
+    
+    if (plan.has_chat && plan.chat_messages_per_day > 0) {
+      features.push(`${plan.chat_messages_per_day} ${plan.chat_messages_per_day === 1 ? 'mensagem' : 'mensagens'} de chat/dia`);
+    } else if (plan.has_chat) {
+      features.push('Chat com IA educacional');
     }
     
     if (plan.patients_limit > 0) {
-      features.push(`${plan.patients_limit} pacientes`);
+      features.push(`${plan.patients_limit} ${plan.patients_limit === 1 ? 'paciente' : 'pacientes'}`);
     }
     
     if (plan.history_days === 9999) {
       features.push('Histórico ilimitado');
-    } else {
+    } else if (plan.history_days > 0) {
       features.push(`${plan.history_days} dias de histórico`);
+    }
+    
+    // Add feature descriptions for gratuito plan
+    if (plan.name === 'gratuito') {
+      if (features.length === 0) {
+        features.push('Visualização do plano alimentar');
+        features.push('Acompanhamento básico');
+      }
+      features.push('IA educacional básica');
     }
     
     return features;
