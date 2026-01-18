@@ -16,7 +16,12 @@ import {
   Eye,
   X,
   Database,
-  Users
+  Users,
+  Search,
+  ChevronLeft,
+  ChevronRight,
+  Edit2,
+  UserCog,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -30,8 +35,9 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useUserRole } from '@/hooks/useUserRole';
-import { useAdminOperations } from '@/hooks/useAdminOperations';
+import { useAdminOperations, UserProfile } from '@/hooks/useAdminOperations';
 import { useToast } from '@/hooks/use-toast';
 
 // CSV parsing helper
@@ -68,6 +74,9 @@ export default function Admin() {
     foodImports, 
     auditLogs,
     auditTotal,
+    users,
+    usersLoading,
+    usersTotal,
     fetchSettings, 
     updateSetting,
     fetchFoodImports,
@@ -75,7 +84,10 @@ export default function Admin() {
     importFoods,
     fetchAuditLogs,
     downloadTemplate,
-    seedTestData
+    seedTestData,
+    fetchUsers,
+    updateUser,
+    toggleUserRole,
   } = useAdminOperations();
 
   const [activeTab, setActiveTab] = useState('settings');
@@ -86,6 +98,13 @@ export default function Admin() {
   const [auditPage, setAuditPage] = useState(0);
   const [seedingData, setSeedingData] = useState(false);
   const [seedResults, setSeedResults] = useState<Record<string, unknown> | null>(null);
+  
+  // Users management state
+  const [userSearch, setUserSearch] = useState('');
+  const [userPage, setUserPage] = useState(0);
+  const [userFilter, setUserFilter] = useState<{ account_type?: 'aluno' | 'plano_pessoal' | 'premium' | 'profissional'; is_test?: boolean }>({});
+  const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
+  const [editedUserData, setEditedUserData] = useState<Partial<UserProfile>>({});
 
   // Redirect if not admin
   useEffect(() => {
@@ -381,10 +400,14 @@ export default function Admin() {
 
       <main className="container mx-auto px-4 py-6">
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full max-w-2xl grid-cols-5 mb-6">
+          <TabsList className="grid w-full max-w-3xl grid-cols-6 mb-6">
             <TabsTrigger value="settings" className="flex items-center gap-1">
               <Settings className="h-4 w-4" />
-              <span className="hidden sm:inline">Configurações</span>
+              <span className="hidden sm:inline">Config</span>
+            </TabsTrigger>
+            <TabsTrigger value="users" className="flex items-center gap-1">
+              <UserCog className="h-4 w-4" />
+              <span className="hidden sm:inline">Usuários</span>
             </TabsTrigger>
             <TabsTrigger value="foods" className="flex items-center gap-1">
               <Upload className="h-4 w-4" />
@@ -399,7 +422,7 @@ export default function Admin() {
               <span className="hidden sm:inline">Auditoria</span>
             </TabsTrigger>
             <TabsTrigger value="seed" className="flex items-center gap-1">
-              <Users className="h-4 w-4" />
+              <Database className="h-4 w-4" />
               <span className="hidden sm:inline">Seed</span>
             </TabsTrigger>
           </TabsList>
@@ -471,6 +494,230 @@ export default function Admin() {
                 ))}
               </motion.div>
             )}
+          </TabsContent>
+
+          {/* Users Management Tab */}
+          <TabsContent value="users">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <UserCog className="h-5 w-5 text-primary" />
+                  Gestão de Usuários
+                </CardTitle>
+                <CardDescription>
+                  Visualize e edite as contas de usuários do sistema ({usersTotal} total).
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* Search and Filters */}
+                <div className="flex flex-col sm:flex-row gap-4">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Buscar por nome ou email..."
+                      value={userSearch}
+                      onChange={(e) => setUserSearch(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          setUserPage(0);
+                          fetchUsers(50, 0, userSearch, userFilter);
+                        }
+                      }}
+                      className="pl-9"
+                    />
+                  </div>
+                  <Select 
+                    value={userFilter.account_type || 'all'} 
+                    onValueChange={(val) => {
+                      const newFilter = val === 'all' 
+                        ? { ...userFilter, account_type: undefined } 
+                        : { ...userFilter, account_type: val as 'aluno' | 'plano_pessoal' | 'premium' | 'profissional' };
+                      setUserFilter(newFilter);
+                      setUserPage(0);
+                      fetchUsers(50, 0, userSearch, newFilter);
+                    }}
+                  >
+                    <SelectTrigger className="w-[180px]">
+                      <SelectValue placeholder="Tipo de conta" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos os tipos</SelectItem>
+                      <SelectItem value="aluno">Aluno</SelectItem>
+                      <SelectItem value="plano_pessoal">Plano Pessoal</SelectItem>
+                      <SelectItem value="premium">Premium</SelectItem>
+                      <SelectItem value="profissional">Profissional</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Select 
+                    value={userFilter.is_test === undefined ? 'all' : userFilter.is_test ? 'test' : 'prod'}
+                    onValueChange={(val) => {
+                      const newFilter = val === 'all' 
+                        ? { ...userFilter, is_test: undefined }
+                        : { ...userFilter, is_test: val === 'test' };
+                      setUserFilter(newFilter);
+                      setUserPage(0);
+                      fetchUsers(50, 0, userSearch, newFilter);
+                    }}
+                  >
+                    <SelectTrigger className="w-[140px]">
+                      <SelectValue placeholder="Ambiente" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos</SelectItem>
+                      <SelectItem value="prod">Produção</SelectItem>
+                      <SelectItem value="test">Teste</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Button onClick={() => {
+                    setUserPage(0);
+                    fetchUsers(50, 0, userSearch, userFilter);
+                  }}>
+                    <Search className="h-4 w-4 mr-1" />
+                    Buscar
+                  </Button>
+                </div>
+
+                {/* Users Table */}
+                <ScrollArea className="h-[500px] border rounded-lg">
+                  {usersLoading ? (
+                    <div className="flex items-center justify-center py-12">
+                      <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                    </div>
+                  ) : users.length === 0 ? (
+                    <div className="py-12 text-center text-muted-foreground">
+                      {activeTab === 'users' && users.length === 0 && !usersLoading ? (
+                        <>
+                          <Users className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                          <p>Clique em "Buscar" para carregar os usuários</p>
+                        </>
+                      ) : (
+                        <p>Nenhum usuário encontrado.</p>
+                      )}
+                    </div>
+                  ) : (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Usuário</TableHead>
+                          <TableHead>Tipo Conta</TableHead>
+                          <TableHead>Roles</TableHead>
+                          <TableHead>Plano</TableHead>
+                          <TableHead className="text-center">Teste</TableHead>
+                          <TableHead className="text-right">Ações</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {users.map((user) => (
+                          <TableRow key={user.user_id}>
+                            <TableCell>
+                              <div className="flex flex-col">
+                                <span className="font-medium">{user.name || 'Sem nome'}</span>
+                                <span className="text-xs text-muted-foreground">{user.email}</span>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="outline">{user.account_type}</Badge>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex flex-wrap gap-1">
+                                {user.roles.map((role) => (
+                                  <Badge 
+                                    key={role} 
+                                    variant={role === 'admin' ? 'destructive' : role === 'professional' ? 'default' : 'secondary'}
+                                    className="text-xs"
+                                  >
+                                    {role}
+                                  </Badge>
+                                ))}
+                                {user.roles.length === 0 && (
+                                  <span className="text-xs text-muted-foreground">-</span>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex flex-col">
+                                <span className="text-sm">{user.plan_name || '-'}</span>
+                                {user.subscription_status && (
+                                  <Badge 
+                                    variant={user.subscription_status === 'active' ? 'default' : 'secondary'}
+                                    className="text-xs w-fit mt-0.5"
+                                  >
+                                    {user.subscription_status}
+                                  </Badge>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-center">
+                              {user.is_test ? (
+                                <Badge variant="outline" className="bg-yellow-100 text-yellow-800 border-yellow-300">
+                                  Teste
+                                </Badge>
+                              ) : (
+                                <span className="text-muted-foreground">-</span>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Button 
+                                variant="ghost" 
+                                size="sm"
+                                onClick={() => {
+                                  setEditingUser(user);
+                                  setEditedUserData({
+                                    name: user.name,
+                                    account_type: user.account_type,
+                                    user_type: user.user_type,
+                                    is_test: user.is_test,
+                                  });
+                                }}
+                              >
+                                <Edit2 className="h-4 w-4" />
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  )}
+                </ScrollArea>
+
+                {/* Pagination */}
+                {usersTotal > 50 && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-muted-foreground">
+                      Mostrando {userPage * 50 + 1} - {Math.min((userPage + 1) * 50, usersTotal)} de {usersTotal}
+                    </span>
+                    <div className="flex gap-2">
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        disabled={userPage === 0}
+                        onClick={() => {
+                          const newPage = userPage - 1;
+                          setUserPage(newPage);
+                          fetchUsers(50, newPage * 50, userSearch, userFilter);
+                        }}
+                      >
+                        <ChevronLeft className="h-4 w-4 mr-1" />
+                        Anterior
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        disabled={(userPage + 1) * 50 >= usersTotal}
+                        onClick={() => {
+                          const newPage = userPage + 1;
+                          setUserPage(newPage);
+                          fetchUsers(50, newPage * 50, userSearch, userFilter);
+                        }}
+                      >
+                        Próximo
+                        <ChevronRight className="h-4 w-4 ml-1" />
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </TabsContent>
 
           {/* Foods Upload Tab */}
@@ -824,6 +1071,139 @@ export default function Admin() {
                     <Upload className="h-4 w-4 mr-1" />
                   )}
                   Importar {csvPreview.validation.validRows.length} Alimentos
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit User Dialog */}
+      <Dialog open={!!editingUser} onOpenChange={(open) => !open && setEditingUser(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Edit2 className="h-5 w-5" />
+              Editar Usuário
+            </DialogTitle>
+            <DialogDescription>
+              {editingUser?.email}
+            </DialogDescription>
+          </DialogHeader>
+
+          {editingUser && (
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label>Nome</Label>
+                <Input
+                  value={editedUserData.name || ''}
+                  onChange={(e) => setEditedUserData(prev => ({ ...prev, name: e.target.value }))}
+                  placeholder="Nome do usuário"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Tipo de Conta</Label>
+                <Select 
+                  value={editedUserData.account_type || 'plano_pessoal'} 
+                  onValueChange={(val: 'aluno' | 'plano_pessoal' | 'premium' | 'profissional') => 
+                    setEditedUserData(prev => ({ ...prev, account_type: val }))
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="aluno">Aluno</SelectItem>
+                    <SelectItem value="plano_pessoal">Plano Pessoal</SelectItem>
+                    <SelectItem value="premium">Premium</SelectItem>
+                    <SelectItem value="profissional">Profissional</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Tipo de Usuário</Label>
+                <Select 
+                  value={editedUserData.user_type || 'usuario'} 
+                  onValueChange={(val: 'aluno' | 'usuario' | 'profissional') => 
+                    setEditedUserData(prev => ({ ...prev, user_type: val }))
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="usuario">Usuário</SelectItem>
+                    <SelectItem value="aluno">Aluno</SelectItem>
+                    <SelectItem value="profissional">Profissional</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <Switch
+                  checked={!!editedUserData.is_test}
+                  onCheckedChange={(checked) => setEditedUserData(prev => ({ ...prev, is_test: checked }))}
+                />
+                <Label>Conta de teste</Label>
+              </div>
+
+              <div className="space-y-2 pt-4 border-t">
+                <Label>Roles</Label>
+                <div className="flex flex-wrap gap-2">
+                  {(['admin', 'professional', 'student'] as const).map((role) => {
+                    const hasRole = editingUser.roles.includes(role);
+                    const isSaving = savingKeys.has(`role_${editingUser.user_id}_${role}`);
+                    return (
+                      <Button
+                        key={role}
+                        variant={hasRole ? 'default' : 'outline'}
+                        size="sm"
+                        disabled={isSaving}
+                        onClick={() => toggleUserRole(editingUser.user_id, role, !hasRole)}
+                        className="gap-1"
+                      >
+                        {isSaving && <Loader2 className="h-3 w-3 animate-spin" />}
+                        {role}
+                        {hasRole && <X className="h-3 w-3 ml-1" />}
+                      </Button>
+                    );
+                  })}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Clique para adicionar/remover roles
+                </p>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-4">
+                <Button variant="outline" onClick={() => setEditingUser(null)}>
+                  Cancelar
+                </Button>
+                <Button
+                  onClick={async () => {
+                    if (!editingUser) return;
+                    try {
+                      await updateUser(editingUser.user_id, {
+                        name: editedUserData.name,
+                        account_type: editedUserData.account_type as 'aluno' | 'plano_pessoal' | 'premium' | 'profissional',
+                        user_type: editedUserData.user_type as 'aluno' | 'usuario' | 'profissional' | null,
+                        is_test: editedUserData.is_test,
+                      });
+                      toast({ title: 'Usuário atualizado', description: 'As alterações foram salvas.' });
+                      setEditingUser(null);
+                    } catch {
+                      // Error handled in hook
+                    }
+                  }}
+                  disabled={savingKeys.has(`user_${editingUser.user_id}`)}
+                >
+                  {savingKeys.has(`user_${editingUser.user_id}`) ? (
+                    <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                  ) : (
+                    <Save className="h-4 w-4 mr-1" />
+                  )}
+                  Salvar
                 </Button>
               </div>
             </div>

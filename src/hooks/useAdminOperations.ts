@@ -1,6 +1,11 @@
 import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import type { Database } from '@/integrations/supabase/types';
+
+type AccountType = Database['public']['Enums']['account_type'];
+type UserType = Database['public']['Enums']['user_type'];
+type AppRole = Database['public']['Enums']['app_role'];
 
 interface SystemSetting {
   id: string;
@@ -64,6 +69,28 @@ interface FoodTemplate {
   validCategories: string[];
   validProcessingLevels: string[];
   csvContent: string;
+}
+
+export interface UserProfile {
+  user_id: string;
+  name: string | null;
+  email: string | null;
+  account_type: AccountType;
+  user_type: UserType | null;
+  is_test: boolean | null;
+  onboarding_completed: boolean | null;
+  professional_id: string | null;
+  created_at: string | null;
+  roles: string[];
+  subscription_status?: string;
+  plan_name?: string;
+}
+
+interface UserProfileUpdate {
+  name?: string | null;
+  account_type?: AccountType;
+  user_type?: UserType | null;
+  is_test?: boolean | null;
 }
 
 export function useAdminOperations() {
@@ -278,6 +305,173 @@ export function useAdminOperations() {
     }
   }, [toast]);
 
+  const [users, setUsers] = useState<UserProfile[]>([]);
+  const [usersLoading, setUsersLoading] = useState(false);
+  const [usersTotal, setUsersTotal] = useState(0);
+
+  const fetchUsers = useCallback(async (
+    limit = 50, 
+    offset = 0, 
+    search?: string,
+    filters?: { account_type?: AccountType; is_test?: boolean }
+  ) => {
+    setUsersLoading(true);
+    try {
+      let query = supabase
+        .from('profiles')
+        .select('user_id, name, email, account_type, user_type, is_test, onboarding_completed, professional_id, created_at', { count: 'exact' })
+        .order('created_at', { ascending: false })
+        .range(offset, offset + limit - 1);
+
+      if (search) {
+        query = query.or(`name.ilike.%${search}%,email.ilike.%${search}%`);
+      }
+      if (filters?.account_type) {
+        query = query.eq('account_type', filters.account_type);
+      }
+      if (filters?.is_test !== undefined) {
+        query = query.eq('is_test', filters.is_test);
+      }
+
+      const { data: profiles, error: profilesError, count } = await query;
+
+      if (profilesError) throw profilesError;
+
+      // Fetch roles for each user
+      const userIds = profiles?.map(p => p.user_id) || [];
+      const { data: rolesData } = await supabase
+        .from('user_roles')
+        .select('user_id, role')
+        .in('user_id', userIds);
+
+      // Fetch subscriptions
+      const { data: subsData } = await supabase
+        .from('subscriptions')
+        .select('user_id, status, plan_id, plans(name)')
+        .in('user_id', userIds);
+
+      // Map profiles with roles and subscription
+      const enrichedUsers: UserProfile[] = (profiles || []).map(profile => {
+        const userRoles = rolesData?.filter(r => r.user_id === profile.user_id).map(r => r.role) || [];
+        const userSub = subsData?.find(s => s.user_id === profile.user_id);
+        return {
+          ...profile,
+          roles: userRoles,
+          subscription_status: userSub?.status,
+          plan_name: (userSub?.plans as { name: string } | null)?.name,
+        };
+      });
+
+      setUsers(enrichedUsers);
+      setUsersTotal(count || 0);
+      return { users: enrichedUsers, total: count || 0 };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erro ao carregar usuários';
+      toast({ title: 'Erro', description: message, variant: 'destructive' });
+      return { users: [], total: 0 };
+    } finally {
+      setUsersLoading(false);
+    }
+  }, [toast]);
+
+  const updateUser = useCallback(async (
+    userId: string, 
+    updates: Partial<Pick<UserProfile, 'name' | 'account_type' | 'user_type' | 'is_test'>>
+  ) => {
+    setSavingKeys(prev => new Set(prev).add(`user_${userId}`));
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update(updates)
+        .eq('user_id', userId);
+
+      if (error) throw error;
+
+      // Update local state
+      setUsers(prev => prev.map(u => 
+        u.user_id === userId ? { ...u, ...updates } : u
+      ));
+
+      setSavedKeys(prev => new Set(prev).add(`user_${userId}`));
+      setTimeout(() => {
+        setSavedKeys(prev => {
+          const next = new Set(prev);
+          next.delete(`user_${userId}`);
+          return next;
+        });
+      }, 2000);
+      
+      return true;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erro ao atualizar usuário';
+      toast({ title: 'Erro', description: message, variant: 'destructive' });
+      setErrorKeys(prev => new Set(prev).add(`user_${userId}`));
+      setTimeout(() => {
+        setErrorKeys(prev => {
+          const next = new Set(prev);
+          next.delete(`user_${userId}`);
+          return next;
+        });
+      }, 3000);
+      throw error;
+    } finally {
+      setSavingKeys(prev => {
+        const next = new Set(prev);
+        next.delete(`user_${userId}`);
+        return next;
+      });
+    }
+  }, [toast]);
+
+  const toggleUserRole = useCallback(async (userId: string, role: 'admin' | 'professional' | 'student', add: boolean) => {
+    setSavingKeys(prev => new Set(prev).add(`role_${userId}_${role}`));
+    try {
+      if (add) {
+        const { error } = await supabase
+          .from('user_roles')
+          .insert({ user_id: userId, role });
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from('user_roles')
+          .delete()
+          .eq('user_id', userId)
+          .eq('role', role);
+        if (error) throw error;
+      }
+
+      // Update local state
+      setUsers(prev => prev.map(u => {
+        if (u.user_id !== userId) return u;
+        const newRoles = add 
+          ? [...u.roles, role] 
+          : u.roles.filter(r => r !== role);
+        return { ...u, roles: newRoles };
+      }));
+
+      setSavedKeys(prev => new Set(prev).add(`role_${userId}_${role}`));
+      setTimeout(() => {
+        setSavedKeys(prev => {
+          const next = new Set(prev);
+          next.delete(`role_${userId}_${role}`);
+          return next;
+        });
+      }, 2000);
+
+      return true;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erro ao atualizar role';
+      toast({ title: 'Erro', description: message, variant: 'destructive' });
+      throw error;
+    } finally {
+      setSavingKeys(prev => {
+        const next = new Set(prev);
+        next.delete(`role_${userId}_${role}`);
+        return next;
+      });
+    }
+  }, [toast]);
+
   return {
     loading,
     settingsLoading,
@@ -288,6 +482,9 @@ export function useAdminOperations() {
     foodImports,
     auditLogs,
     auditTotal,
+    users,
+    usersLoading,
+    usersTotal,
     fetchSettings,
     updateSetting,
     fetchFoodImports,
@@ -297,5 +494,8 @@ export function useAdminOperations() {
     getFoodTemplate,
     downloadTemplate,
     seedTestData,
+    fetchUsers,
+    updateUser,
+    toggleUserRole,
   };
 }
