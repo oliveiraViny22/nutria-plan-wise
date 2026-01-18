@@ -19,6 +19,7 @@ import {
   Lock,
   Eye,
   ClipboardCheck,
+  Bell,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Logo } from '@/components/Logo';
@@ -36,6 +37,7 @@ import { useUserRole } from '@/hooks/useUserRole';
 import { useSubscription } from '@/hooks/useSubscription';
 import { useLinkedStudent } from '@/hooks/useLinkedStudent';
 import { useAccountPermissions } from '@/hooks/useAccountPermissions';
+import { useUnreadAlerts } from '@/hooks/useUnreadAlerts';
 import { supabase } from '@/integrations/supabase/client';
 import { DietPlan, Meal, GOALS, MEAL_NAMES, MealType } from '@/lib/types';
 import { toast } from 'sonner';
@@ -51,6 +53,7 @@ export default function Dashboard() {
     accountType,
     isSubscribed,
   } = useSubscription();
+  const { unreadCount } = useUnreadAlerts();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [currentDietPlan, setCurrentDietPlan] = useState<DietPlan | null>(null);
@@ -179,8 +182,13 @@ export default function Dashboard() {
             {(isSubscribed && accountType === 'professional') || (isProfessional && hasActiveLicense) ? (
               <>
                 <Link to="/professional">
-                  <Button variant="ghost" size="icon" className="w-10 h-10" title="Painel Profissional">
+                  <Button variant="ghost" size="icon" className="w-10 h-10 relative" title="Painel Profissional">
                     <LayoutDashboard className="w-5 h-5" />
+                    {unreadCount > 0 && (
+                      <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-[10px] font-medium text-destructive-foreground">
+                        {unreadCount > 9 ? '9+' : unreadCount}
+                      </span>
+                    )}
                   </Button>
                 </Link>
                 <Link to="/students">

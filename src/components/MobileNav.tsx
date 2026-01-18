@@ -14,6 +14,7 @@ import {
   LogOut,
   ChevronRight,
   ClipboardCheck,
+  Bell,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -24,10 +25,12 @@ import {
   SheetTrigger,
   SheetClose,
 } from '@/components/ui/sheet';
+import { Badge } from '@/components/ui/badge';
 import { Logo } from '@/components/Logo';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useSubscription } from '@/hooks/useSubscription';
+import { useUnreadAlerts } from '@/hooks/useUnreadAlerts';
 import { cn } from '@/lib/utils';
 
 interface NavItem {
@@ -35,6 +38,7 @@ interface NavItem {
   href: string;
   icon: React.ReactNode;
   show?: boolean;
+  badge?: number;
 }
 
 export function MobileNav() {
@@ -44,6 +48,7 @@ export function MobileNav() {
   const { signOut } = useAuth();
   const { isProfessional, hasActiveLicense } = useUserRole();
   const { accountType, isSubscribed } = useSubscription();
+  const { unreadCount } = useUnreadAlerts();
 
   const showProfessionalLinks = 
     (isSubscribed && accountType === 'professional') || 
@@ -73,6 +78,7 @@ export function MobileNav() {
       href: '/professional',
       icon: <LayoutDashboard className="h-5 w-5" />,
       show: showProfessionalLinks,
+      badge: unreadCount > 0 ? unreadCount : undefined,
     },
     {
       label: 'Gerenciar Alunos',
@@ -120,10 +126,15 @@ export function MobileNav() {
         <Button 
           variant="ghost" 
           size="icon" 
-          className="md:hidden h-9 w-9"
+          className="md:hidden h-9 w-9 relative"
           aria-label="Abrir menu"
         >
           <Menu className="h-5 w-5" />
+          {unreadCount > 0 && (
+            <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-[10px] font-medium text-destructive-foreground">
+              {unreadCount > 9 ? '9+' : unreadCount}
+            </span>
+          )}
         </Button>
       </SheetTrigger>
       <SheetContent side="left" className="w-[280px] p-0">
@@ -156,6 +167,11 @@ export function MobileNav() {
               >
                 {item.icon}
                 <span className="flex-1">{item.label}</span>
+                {item.badge && (
+                  <Badge variant="destructive" className="h-5 min-w-5 px-1.5 text-xs">
+                    {item.badge > 99 ? '99+' : item.badge}
+                  </Badge>
+                )}
                 <ChevronRight className="h-4 w-4 opacity-50" />
               </Link>
             ))}
