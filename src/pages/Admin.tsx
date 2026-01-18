@@ -36,6 +36,7 @@ import {
   RefreshCw,
   Wallet,
   Crown,
+  Sparkles,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -59,6 +60,7 @@ import { useAdminOperations, UserProfile, Plan, DeleteUserPreview } from '@/hook
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { FoodImportValidator, ValidationResult as FoodValidationResult, FoodRow } from '@/components/FoodImportValidator';
+import { AIFoodValidation } from '@/components/AIFoodValidation';
 // Chart colors
 const CHART_COLORS = [
   'hsl(var(--primary))',
@@ -196,6 +198,7 @@ export default function Admin() {
   const [csvPreview, setCsvPreview] = useState<{ rows: Record<string, unknown>[]; validation: FoodValidationResult | null }>({ rows: [], validation: null });
   const [showPreview, setShowPreview] = useState(false);
   const [showValidating, setShowValidating] = useState(false);
+  const [showAIValidation, setShowAIValidation] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [auditPage, setAuditPage] = useState(0);
   const [seedingData, setSeedingData] = useState(false);
@@ -2735,7 +2738,7 @@ export default function Admin() {
                 </Table>
               </ScrollArea>
 
-              <div className="flex justify-end gap-2">
+              <div className="flex justify-between gap-2">
                 <Button variant="outline" onClick={() => {
                   setShowPreview(false);
                   setCsvFile(null);
@@ -2746,19 +2749,74 @@ export default function Admin() {
                 }}>
                   <X className="h-4 w-4 mr-1" /> Cancelar
                 </Button>
-                <Button 
-                  onClick={handleImport} 
-                  disabled={!csvPreview.validation.validRows.length || loading}
-                >
-                  {loading ? (
-                    <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                  ) : (
-                    <Upload className="h-4 w-4 mr-1" />
-                  )}
-                  Importar {csvPreview.validation.validRows.length} Alimentos
-                </Button>
+                <div className="flex gap-2">
+                  <Button 
+                    variant="secondary"
+                    onClick={() => {
+                      setShowPreview(false);
+                      setShowAIValidation(true);
+                    }}
+                    disabled={!csvPreview.validation.validRows.length}
+                  >
+                    <Sparkles className="h-4 w-4 mr-1" />
+                    Validar com IA
+                  </Button>
+                  <Button 
+                    onClick={handleImport} 
+                    disabled={!csvPreview.validation.validRows.length || loading}
+                  >
+                    {loading ? (
+                      <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                    ) : (
+                      <Upload className="h-4 w-4 mr-1" />
+                    )}
+                    Importar Direto
+                  </Button>
+                </div>
               </div>
             </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* AI Food Validation Dialog */}
+      <Dialog open={showAIValidation} onOpenChange={(open) => {
+        if (!open) {
+          setShowAIValidation(false);
+        }
+      }}>
+        <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-primary" />
+              Validação Inteligente com IA
+            </DialogTitle>
+            <DialogDescription>
+              {csvFile?.name} - {csvPreview.validation?.validRows.length || 0} alimentos para validar
+            </DialogDescription>
+          </DialogHeader>
+
+          {csvPreview.validation?.validRows && csvPreview.validation.validRows.length > 0 && (
+            <AIFoodValidation
+              foods={csvPreview.validation.validRows}
+              onValidationComplete={async (approvedFoods) => {
+                try {
+                  await importFoods(csvFile?.name || 'import.csv', approvedFoods);
+                  setShowAIValidation(false);
+                  setCsvFile(null);
+                  setCsvPreview({ rows: [], validation: null });
+                  if (fileInputRef.current) {
+                    fileInputRef.current.value = '';
+                  }
+                } catch {
+                  // Error handled in hook
+                }
+              }}
+              onCancel={() => {
+                setShowAIValidation(false);
+                setShowPreview(true);
+              }}
+            />
           )}
         </DialogContent>
       </Dialog>
