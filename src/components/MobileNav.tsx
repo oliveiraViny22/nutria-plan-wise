@@ -13,6 +13,7 @@ import {
   LayoutDashboard,
   LogOut,
   ChevronRight,
+  ClipboardCheck,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -59,6 +60,12 @@ export function MobileNav() {
       label: 'Dashboard',
       href: '/dashboard',
       icon: <Home className="h-5 w-5" />,
+      show: true,
+    },
+    {
+      label: 'Registro Diário',
+      href: '/daily-log',
+      icon: <ClipboardCheck className="h-5 w-5" />,
       show: true,
     },
     {

@@ -18,6 +18,7 @@ import {
   LayoutDashboard,
   Lock,
   Eye,
+  ClipboardCheck,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Logo } from '@/components/Logo';
@@ -390,9 +391,18 @@ export default function Dashboard() {
             transition={{ delay: 0.3 }}
             className="space-y-4"
           >
-            <h2 className="text-lg font-semibold text-foreground">
-              Plano de Hoje
-            </h2>
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-foreground">
+                Plano de Hoje
+              </h2>
+              <Link to="/daily-log">
+                <Button variant="outline" size="sm" className="gap-2">
+                  <ClipboardCheck className="h-4 w-4" />
+                  <span className="hidden sm:inline">Registrar consumo</span>
+                  <span className="sm:hidden">Registrar</span>
+                </Button>
+              </Link>
+            </div>
             <div className="space-y-3">
               {meals.map((meal, index) => (
                 <motion.div
