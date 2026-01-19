@@ -528,15 +528,21 @@ Lembre-se: quantity em gramas/ml, total EXATO de ${targetCalories} calorias, sem
       mealPlan = JSON.parse(content);
     } catch {
       // Fallback: create meals based on user's meals_per_day preference
-      const breakfastFoods = foods.filter((f: Food) => 
-        ["cereais_tubérculos", "frutas", "laticínios"].includes(f.category)
-      );
-      const mainFoods = foods.filter((f: Food) => 
-        ["proteínas_animais", "cereais_tubérculos", "hortaliças_folhosas", "leguminosas"].includes(f.category)
-      );
-      const snackFoods = foods.filter((f: Food) => 
-        ["frutas", "laticínios", "óleos_oleaginosas"].includes(f.category)
-      );
+      // Use normalized category matching for actual DB values
+      const normalizeCategory = (cat: string) => (cat || '').toLowerCase();
+      
+      const breakfastFoods = foods.filter((f: Food) => {
+        const cat = normalizeCategory(f.category);
+        return cat.includes('carbo') || cat.includes('frut') || cat.includes('latic');
+      });
+      const mainFoods = foods.filter((f: Food) => {
+        const cat = normalizeCategory(f.category);
+        return cat.includes('prote') || cat.includes('carbo') || cat.includes('vegeta') || cat.includes('legum');
+      });
+      const snackFoods = foods.filter((f: Food) => {
+        const cat = normalizeCategory(f.category);
+        return cat.includes('frut') || cat.includes('latic') || cat.includes('gordur');
+      });
       
       const fallbackMeals: MealPlan[] = mealTypes.map(mealType => {
         let selectedFoods: Food[];
