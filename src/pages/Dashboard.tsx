@@ -19,7 +19,6 @@ import {
   Lock,
   Eye,
   ClipboardCheck,
-  Bell,
   Shield,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -30,22 +29,19 @@ import { MacroChart } from '@/components/MacroChart';
 import { MacroRebalancer } from '@/components/MacroRebalancer';
 import { UsageLimits } from '@/components/UsageLimits';
 import { UpgradeDialog } from '@/components/UpgradeDialog';
-import { BlockedActionCTA } from '@/components/BlockedActionCTA';
-import { StudentRequestDialog } from '@/components/StudentRequestDialog';
 import { AdherenceWidget } from '@/components/AdherenceWidget';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useSubscription } from '@/hooks/useSubscription';
 import { useLinkedStudent } from '@/hooks/useLinkedStudent';
 import { useAccountPermissions } from '@/hooks/useAccountPermissions';
-import { useUnreadAlerts } from '@/hooks/useUnreadAlerts';
 import { supabase } from '@/integrations/supabase/client';
 import { DietPlan, Meal, GOALS, MEAL_NAMES, MealType } from '@/lib/types';
 import { toast } from 'sonner';
 
 export default function Dashboard() {
   const { profile, signOut } = useAuth();
-  const { isProfessional, hasActiveLicense, isAdmin } = useUserRole();
+  const { isProfessional, isAdmin } = useUserRole();
   const { isLinkedStudent } = useLinkedStudent();
   const permissions = useAccountPermissions();
   const {
@@ -54,7 +50,6 @@ export default function Dashboard() {
     accountType,
     isSubscribed,
   } = useSubscription();
-  const { unreadCount } = useUnreadAlerts();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [currentDietPlan, setCurrentDietPlan] = useState<DietPlan | null>(null);
@@ -65,7 +60,6 @@ export default function Dashboard() {
   const [upgradeFeature, setUpgradeFeature] = useState<string>('diet');
   const [upgradeLimit, setUpgradeLimit] = useState<number>(0);
   const [planReleased, setPlanReleased] = useState(false);
-  const [showRequestDialog, setShowRequestDialog] = useState(false);
 
   // Handle checkout success
   useEffect(() => {
@@ -73,7 +67,6 @@ export default function Dashboard() {
     if (checkoutStatus === 'success') {
       toast.success('Assinatura ativada com sucesso! 🎉');
       refreshSubscription();
-      // Clear the query param
       setSearchParams({});
     }
   }, [searchParams, setSearchParams, refreshSubscription]);
@@ -95,10 +88,10 @@ export default function Dashboard() {
       if (plans && plans.length > 0) {
         const plan = plans[0] as DietPlan;
         setCurrentDietPlan(plan);
-        setPlanReleased(plan.released_to_student ?? false);
+        setPlanReleased(true);
         await fetchMeals(plan.id);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error fetching plan:', error);
     } finally {
       setLoading(false);
@@ -120,11 +113,6 @@ export default function Dashboard() {
   const generateMealPlan = async () => {
     // Verificar permissões antes de gerar
     if (!permissions.can_create_plan) {
-      if (permissions.user_type === 'aluno' && permissions.is_linked_to_professional) {
-        toast.error('Seu plano é gerenciado pelo seu nutricionista. Envie uma solicitação se precisar de mudanças.');
-        setShowRequestDialog(true);
-        return;
-      }
       setShowUpgradeDialog(true);
       setUpgradeFeature('diet');
       return;
@@ -191,17 +179,12 @@ export default function Dashboard() {
               </>
             ) : (
               <>
-                {/* Profissionais com licença ativa */}
-                {(isSubscribed && accountType === 'professional') || (isProfessional && hasActiveLicense) ? (
+                {/* Profissionais */}
+                {(isSubscribed && accountType === 'professional') || isProfessional ? (
                   <>
                     <Link to="/professional">
                       <Button variant="ghost" size="icon" className="w-10 h-10 relative" title="Painel Profissional">
                         <LayoutDashboard className="w-5 h-5" />
-                        {unreadCount > 0 && (
-                          <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-[10px] font-medium text-destructive-foreground">
-                            {unreadCount > 9 ? '9+' : unreadCount}
-                          </span>
-                        )}
                       </Button>
                     </Link>
                     <Link to="/students">
@@ -386,17 +369,18 @@ export default function Dashboard() {
           </motion.section>
         )}
 
-        {/* Bloqueio para alunos vinculados */}
+        {/* Bloqueio para alunos vinculados - simplificado para v2 */}
         {isLinkedStudent && !planReleased && (
           <motion.section
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
+            className="p-4 bg-muted rounded-lg text-center"
           >
-            <BlockedActionCTA
-              action="editar seu plano alimentar"
-              onRequestClick={() => setShowRequestDialog(true)}
-            />
+            <Lock className="w-6 h-6 mx-auto mb-2 text-muted-foreground" />
+            <p className="text-sm text-muted-foreground">
+              Seu plano alimentar é gerenciado pelo seu nutricionista.
+            </p>
           </motion.section>
         )}
 
@@ -520,12 +504,6 @@ export default function Dashboard() {
         feature={upgradeFeature}
         currentPlan={subscriptionPlan?.name}
         limit={upgradeLimit}
-      />
-
-      {/* Student Request Dialog */}
-      <StudentRequestDialog
-        open={showRequestDialog}
-        onOpenChange={setShowRequestDialog}
       />
     </div>
   );
