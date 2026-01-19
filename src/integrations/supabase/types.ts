@@ -476,6 +476,10 @@ export type Database = {
           processing_level: string | null
           protein: number
           serving_size: string | null
+          unit_enabled: boolean | null
+          unit_increment: number | null
+          unit_name: string | null
+          unit_weight_grams: number | null
         }
         Insert: {
           calories: number
@@ -488,6 +492,10 @@ export type Database = {
           processing_level?: string | null
           protein: number
           serving_size?: string | null
+          unit_enabled?: boolean | null
+          unit_increment?: number | null
+          unit_name?: string | null
+          unit_weight_grams?: number | null
         }
         Update: {
           calories?: number
@@ -500,30 +508,46 @@ export type Database = {
           processing_level?: string | null
           protein?: number
           serving_size?: string | null
+          unit_enabled?: boolean | null
+          unit_increment?: number | null
+          unit_name?: string | null
+          unit_weight_grams?: number | null
         }
         Relationships: []
       }
       meal_foods: {
         Row: {
+          calculated_grams: number | null
           created_at: string | null
+          display_quantity: number | null
+          display_unit: string | null
           food_id: string
           id: string
           meal_id: string
           quantity: number | null
+          unit_conversion_locked: boolean | null
         }
         Insert: {
+          calculated_grams?: number | null
           created_at?: string | null
+          display_quantity?: number | null
+          display_unit?: string | null
           food_id: string
           id?: string
           meal_id: string
           quantity?: number | null
+          unit_conversion_locked?: boolean | null
         }
         Update: {
+          calculated_grams?: number | null
           created_at?: string | null
+          display_quantity?: number | null
+          display_unit?: string | null
           food_id?: string
           id?: string
           meal_id?: string
           quantity?: number | null
+          unit_conversion_locked?: boolean | null
         }
         Relationships: [
           {
@@ -611,25 +635,37 @@ export type Database = {
       }
       meal_option_foods: {
         Row: {
+          calculated_grams: number | null
           created_at: string
+          display_quantity: number | null
+          display_unit: string | null
           food_id: string
           id: string
           meal_option_id: string
           quantity: number
+          unit_conversion_locked: boolean | null
         }
         Insert: {
+          calculated_grams?: number | null
           created_at?: string
+          display_quantity?: number | null
+          display_unit?: string | null
           food_id: string
           id?: string
           meal_option_id: string
           quantity?: number
+          unit_conversion_locked?: boolean | null
         }
         Update: {
+          calculated_grams?: number | null
           created_at?: string
+          display_quantity?: number | null
+          display_unit?: string | null
           food_id?: string
           id?: string
           meal_option_id?: string
           quantity?: number
+          unit_conversion_locked?: boolean | null
         }
         Relationships: [
           {
@@ -1305,6 +1341,15 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      apply_unit_conversion: {
+        Args: { _food_id: string; _quantity_grams: number }
+        Returns: {
+          calculated_grams: number
+          conversion_applied: boolean
+          display_quantity: number
+          display_unit: string
+        }[]
+      }
       calculate_adherence_metrics: {
         Args: {
           _diet_plan_id: string
@@ -1338,6 +1383,21 @@ export type Database = {
           _user_id: string
         }
         Returns: Json
+      }
+      convert_grams_to_unit: {
+        Args: {
+          _grams: number
+          _tolerance_percent?: number
+          _unit_increment: number
+          _unit_weight_grams: number
+        }
+        Returns: {
+          calculated_grams: number
+          display_quantity: number
+          error_percent: number
+          fallback_to_grams: boolean
+          success: boolean
+        }[]
       }
       get_professional_subscription_state: {
         Args: { _professional_id: string }
