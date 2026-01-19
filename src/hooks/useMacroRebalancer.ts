@@ -14,22 +14,35 @@ interface Food {
   processing_level: string | null;
 }
 
-interface MealFood {
+interface MealOptionFood {
+  id: string;
+  meal_option_id: string;
+  food_id: string;
+  quantity_grams: number;
+  food: Food;
+}
+
+interface MealOption {
   id: string;
   meal_id: string;
-  food_id: string;
-  quantity: number;
-  food: Food;
+  option_number: number;
+  name: string | null;
+  total_calories: number | null;
+  total_protein: number | null;
+  total_carbs: number | null;
+  total_fat: number | null;
+  meal_option_foods: MealOptionFood[];
 }
 
 interface Meal {
   id: string;
   name: string;
   diet_plan_id: string;
-  total_calories: number;
-  total_protein: number;
-  total_carbs: number;
-  total_fat: number;
+  total_calories: number | null;
+  total_protein: number | null;
+  total_carbs: number | null;
+  total_fat: number | null;
+  meal_options: MealOption[];
 }
 
 export interface MacroTargets {
@@ -40,8 +53,9 @@ export interface MacroTargets {
 }
 
 export interface FoodAdjustment {
-  mealFoodId: string;
+  mealOptionFoodId: string;
   mealId: string;
+  mealOptionId: string;
   mealName: string;
   foodName: string;
   foodId: string;
@@ -70,7 +84,8 @@ export interface RebalanceProposal {
 }
 
 // Parse serving_size to extract base grams
-function parseServingGrams(servingSize: string): number {
+function parseServingGrams(servingSize: string | null): number {
+  if (!servingSize) return 100;
   const match = servingSize.match(/(\d+)\s*(g|ml)/i);
   if (match) return parseInt(match[1], 10);
   const parenMatch = servingSize.match(/\((\d+)(g|ml)\)/i);
@@ -100,24 +115,56 @@ export function useMacroRebalancer() {
   ): Promise<RebalanceProposal | null> => {
     setLoading(true);
     try {
-      // Fetch all meals with foods
+      // Fetch all meals with options and foods using v2 schema
       const { data: meals, error: mealsError } = await supabase
         .from('meals')
-        .select('*')
+        .select(`
+          id,
+          name,
+          diet_plan_id,
+          total_calories,
+          total_protein,
+          total_carbs,
+          total_fat,
+          meal_options (
+            id,
+            meal_id,
+            option_number,
+            name,
+            total_calories,
+            total_protein,
+            total_carbs,
+            total_fat,
+            meal_option_foods (
+              id,
+              meal_option_id,
+              food_id,
+              quantity_grams,
+              food:foods (*)
+            )
+          )
+        `)
         .eq('diet_plan_id', planId);
 
       if (mealsError) throw mealsError;
 
-      // Fetch all meal_foods with food details
-      const mealIds = meals?.map((m) => m.id) || [];
-      const { data: mealFoodsData, error: mfError } = await supabase
-        .from('meal_foods')
-        .select('*, food:foods(*)')
-        .in('meal_id', mealIds);
+      const typedMeals = (meals || []) as unknown as Meal[];
 
-      if (mfError) throw mfError;
-
-      const mealFoods = (mealFoodsData || []) as unknown as MealFood[];
+      // Flatten meal option foods for processing
+      const allMealOptionFoods: (MealOptionFood & { mealId: string; mealName: string; mealOptionId: string })[] = [];
+      
+      for (const meal of typedMeals) {
+        for (const option of meal.meal_options || []) {
+          for (const mof of option.meal_option_foods || []) {
+            allMealOptionFoods.push({
+              ...mof,
+              mealId: meal.id,
+              mealName: meal.name,
+              mealOptionId: option.id,
+            });
+          }
+        }
+      }
 
       // Fetch supplements for Step 2
       const { data: supplementsData } = await supabase
@@ -127,15 +174,15 @@ export function useMacroRebalancer() {
 
       const supplements = (supplementsData || []) as Food[];
 
-      // Calculate current macros
+      // Calculate current macros from first option of each meal
       let currentProtein = 0;
       let currentCarbs = 0;
       let currentFat = 0;
       let currentCalories = 0;
 
-      for (const mf of mealFoods) {
-        const food = mf.food;
-        const qty = mf.quantity >= 10 ? mf.quantity : parseServingGrams(food.serving_size) * mf.quantity;
+      for (const mof of allMealOptionFoods) {
+        const food = mof.food;
+        const qty = mof.quantity_grams;
         const nutrients = calcNutrients(food, qty);
         currentProtein += nutrients.protein;
         currentCarbs += nutrients.carbs;
@@ -158,23 +205,22 @@ export function useMacroRebalancer() {
       const adjustments: FoodAdjustment[] = [];
       const supplementsAdded: FoodAdjustment[] = [];
 
-      // Group meal foods by macro dominance for smart adjustments
-      const proteinFoods = mealFoods.filter((mf) => {
-        const f = mf.food;
+      // Group foods by macro dominance
+      const proteinFoods = allMealOptionFoods.filter((mof) => {
+        const f = mof.food;
         return f.protein > f.carbs && f.protein > f.fat && f.category !== 'suplementos';
       });
 
-      const carbFoods = mealFoods.filter((mf) => {
-        const f = mf.food;
+      const carbFoods = allMealOptionFoods.filter((mof) => {
+        const f = mof.food;
         return f.carbs > f.protein && f.carbs > f.fat && f.category !== 'suplementos';
       });
 
-      const fatFoods = mealFoods.filter((mf) => {
-        const f = mf.food;
+      const fatFoods = allMealOptionFoods.filter((mof) => {
+        const f = mof.food;
         return f.fat > f.protein && f.fat > f.carbs && f.category !== 'suplementos';
       });
 
-      const mealsMap = new Map(meals?.map((m) => [m.id, m]) || []);
       const mealNameMap: Record<string, string> = {
         breakfast: 'Café da Manhã',
         lunch: 'Almoço',
@@ -185,51 +231,47 @@ export function useMacroRebalancer() {
       // STEP 1: Adjust existing food quantities
       const adjustForMacro = (
         deficit: number,
-        foods: MealFood[],
+        foods: (MealOptionFood & { mealId: string; mealName: string; mealOptionId: string })[],
         macroKey: 'protein' | 'carbs' | 'fat',
-        maxIncreasePct: number = 0.5 // max 50% increase per food
+        maxIncreasePct: number = 0.5
       ): number => {
         if (deficit <= 0 || foods.length === 0) return deficit;
 
         let remaining = deficit;
         
-        // Sort by macro density (higher first)
         const sorted = [...foods].sort((a, b) => {
           const baseA = parseServingGrams(a.food.serving_size);
           const baseB = parseServingGrams(b.food.serving_size);
           return (b.food[macroKey] / baseB) - (a.food[macroKey] / baseA);
         });
 
-        for (const mf of sorted) {
+        for (const mof of sorted) {
           if (remaining <= 0) break;
 
-          const food = mf.food;
+          const food = mof.food;
           const baseGrams = parseServingGrams(food.serving_size);
-          const currentQty = mf.quantity >= 10 ? mf.quantity : baseGrams * mf.quantity;
+          const currentQty = mof.quantity_grams;
           const maxIncrease = currentQty * maxIncreasePct;
           
-          // How much grams needed to cover remaining deficit
           const macroPer100g = (food[macroKey] / baseGrams) * 100;
           const gramsNeeded = (remaining / macroPer100g) * 100;
           
           const actualIncrease = Math.min(gramsNeeded, maxIncrease);
-          if (actualIncrease < 5) continue; // Skip tiny adjustments
+          if (actualIncrease < 5) continue;
 
           const newQty = Math.round(currentQty + actualIncrease);
           const macroGain = (actualIncrease / baseGrams) * food[macroKey];
           
           remaining -= macroGain;
 
-          // Calculate full macro change
           const oldNutrients = calcNutrients(food, currentQty);
           const newNutrients = calcNutrients(food, newQty);
 
-          const meal = mealsMap.get(mf.meal_id);
-
           adjustments.push({
-            mealFoodId: mf.id,
-            mealId: mf.meal_id,
-            mealName: meal ? mealNameMap[meal.name] || meal.name : 'Refeição',
+            mealOptionFoodId: mof.id,
+            mealId: mof.mealId,
+            mealOptionId: mof.mealOptionId,
+            mealName: mealNameMap[mof.mealName] || mof.mealName,
             foodName: food.name,
             foodId: food.id,
             originalQuantity: Math.round(currentQty),
@@ -247,39 +289,37 @@ export function useMacroRebalancer() {
         return Math.max(0, remaining);
       };
 
-      // Handle deficits - increase portions
+      // Handle deficits
       proteinDeficit = adjustForMacro(proteinDeficit, proteinFoods, 'protein');
       carbsDeficit = adjustForMacro(carbsDeficit, carbFoods, 'carbs');
       fatDeficit = adjustForMacro(fatDeficit, fatFoods, 'fat');
 
-      // Handle excesses - reduce portions (negative deficit = excess)
+      // Handle excesses
       const reduceForMacro = (
-        excess: number, // positive value means excess
-        foods: MealFood[],
+        excess: number,
+        foods: (MealOptionFood & { mealId: string; mealName: string; mealOptionId: string })[],
         macroKey: 'protein' | 'carbs' | 'fat',
-        maxDecreasePct: number = 0.3 // max 30% decrease per food
+        maxDecreasePct: number = 0.3
       ): number => {
         if (excess <= 0 || foods.length === 0) return excess;
 
         let remaining = excess;
         
-        // Sort by macro density (lower first for reduction)
         const sorted = [...foods].sort((a, b) => {
           const baseA = parseServingGrams(a.food.serving_size);
           const baseB = parseServingGrams(b.food.serving_size);
           return (a.food[macroKey] / baseA) - (b.food[macroKey] / baseB);
         });
 
-        for (const mf of sorted) {
+        for (const mof of sorted) {
           if (remaining <= 0) break;
 
-          // Check if already adjusted
-          const existingAdjustment = adjustments.find((a) => a.mealFoodId === mf.id);
+          const existingAdjustment = adjustments.find((a) => a.mealOptionFoodId === mof.id);
           if (existingAdjustment) continue;
 
-          const food = mf.food;
+          const food = mof.food;
           const baseGrams = parseServingGrams(food.serving_size);
-          const currentQty = mf.quantity >= 10 ? mf.quantity : baseGrams * mf.quantity;
+          const currentQty = mof.quantity_grams;
           const maxDecrease = currentQty * maxDecreasePct;
           
           const macroPer100g = (food[macroKey] / baseGrams) * 100;
@@ -288,7 +328,7 @@ export function useMacroRebalancer() {
           const actualDecrease = Math.min(gramsToReduce, maxDecrease);
           if (actualDecrease < 5) continue;
 
-          const newQty = Math.max(10, Math.round(currentQty - actualDecrease)); // Min 10g
+          const newQty = Math.max(10, Math.round(currentQty - actualDecrease));
           const macroLoss = ((currentQty - newQty) / baseGrams) * food[macroKey];
           
           remaining -= macroLoss;
@@ -296,12 +336,11 @@ export function useMacroRebalancer() {
           const oldNutrients = calcNutrients(food, currentQty);
           const newNutrients = calcNutrients(food, newQty);
 
-          const meal = mealsMap.get(mf.meal_id);
-
           adjustments.push({
-            mealFoodId: mf.id,
-            mealId: mf.meal_id,
-            mealName: meal ? mealNameMap[meal.name] || meal.name : 'Refeição',
+            mealOptionFoodId: mof.id,
+            mealId: mof.mealId,
+            mealOptionId: mof.mealOptionId,
+            mealName: mealNameMap[mof.mealName] || mof.mealName,
             foodName: food.name,
             foodId: food.id,
             originalQuantity: Math.round(currentQty),
@@ -319,7 +358,6 @@ export function useMacroRebalancer() {
         return Math.max(0, remaining);
       };
 
-      // Check for excesses
       if (proteinDeficit < 0) {
         proteinDeficit = -reduceForMacro(-proteinDeficit, proteinFoods, 'protein');
       }
@@ -331,7 +369,6 @@ export function useMacroRebalancer() {
       }
 
       // STEP 2: Add supplements if deficits remain
-      // Find appropriate supplements
       const wheyProtein = supplements.find((s) => 
         s.name.toLowerCase().includes('whey') || 
         (s.protein > 20 && s.carbs < 5 && s.fat < 5)
@@ -347,22 +384,24 @@ export function useMacroRebalancer() {
         (s.fat > 80 && s.protein < 5 && s.carbs < 5)
       );
 
-      // Get a snack meal or create reference to last meal for supplements
-      const snackMeal = meals?.find((m) => m.name === 'snack');
-      const targetMealForSupplements = snackMeal || meals?.[meals.length - 1];
+      // Get a snack meal option for supplements
+      const snackMeal = typedMeals.find((m) => m.name === 'snack');
+      const targetMealForSupplements = snackMeal || typedMeals[typedMeals.length - 1];
+      const targetOption = targetMealForSupplements?.meal_options?.[0];
 
-      if (proteinDeficit > 5 && wheyProtein && targetMealForSupplements) {
+      if (proteinDeficit > 5 && wheyProtein && targetOption) {
         const baseGrams = parseServingGrams(wheyProtein.serving_size);
         const proteinPer100g = (wheyProtein.protein / baseGrams) * 100;
         const gramsNeeded = Math.round((proteinDeficit / proteinPer100g) * 100);
-        const roundedGrams = Math.min(90, Math.max(30, Math.round(gramsNeeded / 10) * 10)); // 30-90g, round to 10
+        const roundedGrams = Math.min(90, Math.max(30, Math.round(gramsNeeded / 10) * 10));
 
         const nutrients = calcNutrients(wheyProtein, roundedGrams);
         proteinDeficit -= nutrients.protein;
 
         supplementsAdded.push({
-          mealFoodId: '',
+          mealOptionFoodId: '',
           mealId: targetMealForSupplements.id,
+          mealOptionId: targetOption.id,
           mealName: mealNameMap[targetMealForSupplements.name] || targetMealForSupplements.name,
           foodName: wheyProtein.name,
           foodId: wheyProtein.id,
@@ -378,7 +417,7 @@ export function useMacroRebalancer() {
         });
       }
 
-      if (carbsDeficit > 10 && maltodextrin && targetMealForSupplements) {
+      if (carbsDeficit > 10 && maltodextrin && targetOption) {
         const baseGrams = parseServingGrams(maltodextrin.serving_size);
         const carbsPer100g = (maltodextrin.carbs / baseGrams) * 100;
         const gramsNeeded = Math.round((carbsDeficit / carbsPer100g) * 100);
@@ -388,8 +427,9 @@ export function useMacroRebalancer() {
         carbsDeficit -= nutrients.carbs;
 
         supplementsAdded.push({
-          mealFoodId: '',
+          mealOptionFoodId: '',
           mealId: targetMealForSupplements.id,
+          mealOptionId: targetOption.id,
           mealName: mealNameMap[targetMealForSupplements.name] || targetMealForSupplements.name,
           foodName: maltodextrin.name,
           foodId: maltodextrin.id,
@@ -405,7 +445,7 @@ export function useMacroRebalancer() {
         });
       }
 
-      if (fatDeficit > 5 && mctoil && targetMealForSupplements) {
+      if (fatDeficit > 5 && mctoil && targetOption) {
         const baseGrams = parseServingGrams(mctoil.serving_size);
         const fatPer100g = (mctoil.fat / baseGrams) * 100;
         const gramsNeeded = Math.round((fatDeficit / fatPer100g) * 100);
@@ -415,8 +455,9 @@ export function useMacroRebalancer() {
         fatDeficit -= nutrients.fat;
 
         supplementsAdded.push({
-          mealFoodId: '',
+          mealOptionFoodId: '',
           mealId: targetMealForSupplements.id,
+          mealOptionId: targetOption.id,
           mealName: mealNameMap[targetMealForSupplements.name] || targetMealForSupplements.name,
           foodName: mctoil.name,
           foodId: mctoil.id,
@@ -432,7 +473,7 @@ export function useMacroRebalancer() {
         });
       }
 
-      // Calculate proposed macros after all adjustments
+      // Calculate proposed macros
       let proposedProtein = currentProtein;
       let proposedCarbs = currentCarbs;
       let proposedFat = currentFat;
@@ -467,7 +508,7 @@ export function useMacroRebalancer() {
 
       setProposal(result);
       return result;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error calculating rebalance proposal:', error);
       toast.error('Erro ao calcular otimização de macros');
       return null;
@@ -481,61 +522,89 @@ export function useMacroRebalancer() {
 
     setLoading(true);
     try {
-      // Apply food quantity adjustments
+      // Apply food quantity adjustments using v2 schema
       for (const adj of proposal.adjustments) {
         await supabase
-          .from('meal_foods')
-          .update({ quantity: adj.newQuantity })
-          .eq('id', adj.mealFoodId);
+          .from('meal_option_foods')
+          .update({ quantity_grams: adj.newQuantity })
+          .eq('id', adj.mealOptionFoodId);
       }
 
       // Add new supplements
       for (const supp of proposal.supplementsAdded) {
-        await supabase.from('meal_foods').insert({
-          meal_id: supp.mealId,
+        await supabase.from('meal_option_foods').insert({
+          meal_option_id: supp.mealOptionId,
           food_id: supp.foodId,
-          quantity: supp.newQuantity,
+          quantity_grams: supp.newQuantity,
         });
       }
 
-      // Recalculate meal totals
+      // Recalculate meal option totals
+      const affectedOptionIds = new Set([
+        ...proposal.adjustments.map((a) => a.mealOptionId),
+        ...proposal.supplementsAdded.map((s) => s.mealOptionId),
+      ]);
+
+      for (const optionId of affectedOptionIds) {
+        const { data: optionFoods } = await supabase
+          .from('meal_option_foods')
+          .select('*, food:foods(*)')
+          .eq('meal_option_id', optionId);
+
+        let optionCalories = 0;
+        let optionProtein = 0;
+        let optionCarbs = 0;
+        let optionFat = 0;
+
+        if (optionFoods) {
+          for (const mof of optionFoods) {
+            const food = mof.food as Food;
+            const qty = mof.quantity_grams;
+            const nutrients = calcNutrients(food, qty);
+            optionCalories += nutrients.calories;
+            optionProtein += nutrients.protein;
+            optionCarbs += nutrients.carbs;
+            optionFat += nutrients.fat;
+          }
+        }
+
+        await supabase
+          .from('meal_options')
+          .update({
+            total_calories: Math.round(optionCalories),
+            total_protein: Math.round(optionProtein),
+            total_carbs: Math.round(optionCarbs),
+            total_fat: Math.round(optionFat),
+          })
+          .eq('id', optionId);
+      }
+
+      // Recalculate meal totals (using first option as default)
       const affectedMealIds = new Set([
         ...proposal.adjustments.map((a) => a.mealId),
         ...proposal.supplementsAdded.map((s) => s.mealId),
       ]);
 
       for (const mealId of affectedMealIds) {
-        const { data: mealFoods } = await supabase
-          .from('meal_foods')
-          .select('*, food:foods(*)')
-          .eq('meal_id', mealId);
+        const { data: mealOptions } = await supabase
+          .from('meal_options')
+          .select('*')
+          .eq('meal_id', mealId)
+          .order('option_number')
+          .limit(1);
 
-        let mealCalories = 0;
-        let mealProtein = 0;
-        let mealCarbs = 0;
-        let mealFat = 0;
-
-        if (mealFoods) {
-          for (const mf of mealFoods) {
-            const food = mf.food as Food;
-            const qty = mf.quantity >= 10 ? mf.quantity : parseServingGrams(food.serving_size) * mf.quantity;
-            const nutrients = calcNutrients(food, qty);
-            mealCalories += nutrients.calories;
-            mealProtein += nutrients.protein;
-            mealCarbs += nutrients.carbs;
-            mealFat += nutrients.fat;
-          }
+        if (mealOptions && mealOptions.length > 0) {
+          const firstOption = mealOptions[0];
+          await supabase
+            .from('meals')
+            .update({
+              total_calories: firstOption.total_calories,
+              total_protein: firstOption.total_protein,
+              total_carbs: firstOption.total_carbs,
+              total_fat: firstOption.total_fat,
+            })
+            .eq('id', mealId);
         }
-
-        await supabase
-          .from('meals')
-          .update({
-            total_calories: Math.round(mealCalories),
-            total_protein: Math.round(mealProtein),
-            total_carbs: Math.round(mealCarbs),
-            total_fat: Math.round(mealFat),
-          })
-          .eq('id', mealId);
       }
 
       // Recalculate plan totals
@@ -568,23 +637,10 @@ export function useMacroRebalancer() {
         })
         .eq('id', planId);
 
-      // Log to history
-      const { data: userData } = await supabase.auth.getUser();
-      if (userData.user?.id) {
-        await supabase.from('plan_history').insert([{
-          user_id: userData.user.id,
-          diet_plan_id: planId,
-          action: 'macro_rebalance',
-          description: 'Otimização automática de macros aplicada',
-          previous_values: JSON.parse(JSON.stringify(proposal.currentMacros)),
-          new_values: JSON.parse(JSON.stringify(proposal.proposedMacros)),
-        }]);
-      }
-
       setProposal(null);
       toast.success('Plano otimizado com sucesso!');
       return true;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error applying rebalance:', error);
       toast.error('Erro ao aplicar otimização');
       return false;

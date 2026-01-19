@@ -4,20 +4,16 @@ import { useAuth } from '@/contexts/AuthContext';
 
 interface CachedUserData {
   roles: string[];
-  hasActiveLicense: boolean;
-  permissions: {
-    user_type: string;
-    plan_name: string;
-    can_create_plan: boolean;
-    can_edit_plan: boolean;
-    can_view_plan: boolean;
-    can_substitute: boolean;
-    can_adjust: boolean;
-    can_use_ai: boolean;
-    can_use_simulations: boolean;
-    can_manage_students: boolean;
-    can_send_requests: boolean;
-    is_linked_to_professional: boolean;
+  planInfo: {
+    plan_id: string | null;
+    plan_name: string | null;
+    plan_type: string | null;
+    subscription_status: string | null;
+    diet_limit: number;
+    substitution_limit: number;
+    adjustment_limit: number;
+    chat_messages_per_day: number;
+    has_chat: boolean;
   } | null;
 }
 
@@ -29,11 +25,11 @@ let globalUserId: string | null = null;
 let fetchPromise: Promise<CachedUserData> | null = null;
 
 /**
- * Consolidated hook that fetches user roles, license, and permissions in a single batch
- * Reduces 3 separate queries to 1 batched operation with caching
+ * Consolidated hook that fetches user roles and plan info in a single batch
+ * Uses v2 schema - no professional_licenses or get_user_permissions
  */
 export function useCachedUserData() {
-  const { user, profile, loading: authLoading } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [data, setData] = useState<CachedUserData | null>(globalCache);
   const [loading, setLoading] = useState(!globalCache);
   const mountedRef = useRef(true);
@@ -42,8 +38,7 @@ export function useCachedUserData() {
     if (!user) {
       return {
         roles: [],
-        hasActiveLicense: false,
-        permissions: null,
+        planInfo: null,
       };
     }
 
@@ -60,48 +55,36 @@ export function useCachedUserData() {
 
     fetchPromise = (async () => {
       try {
-        // Batch all queries in parallel
-        const [rolesResult, licenseResult, permissionsResult] = await Promise.all([
+        // Batch queries in parallel - v2 schema
+        const [rolesResult, planResult] = await Promise.all([
           supabase
             .from('user_roles')
             .select('role')
             .eq('user_id', user.id),
-          supabase
-            .from('professional_licenses')
-            .select('expires_at')
-            .eq('user_id', user.id)
-            .gt('expires_at', new Date().toISOString())
-            .limit(1)
-            .maybeSingle(),
-          supabase.rpc('get_user_permissions', { _user_id: user.id }),
+          supabase.rpc('get_user_plan', { _user_id: user.id }),
         ]);
 
         const roles = (rolesResult.data || []).map(r => r.role);
-        const hasActiveLicense = !!licenseResult.data?.expires_at;
         
-        let permissions = null;
-        if (permissionsResult.data && permissionsResult.data.length > 0) {
-          const p = permissionsResult.data[0];
-          permissions = {
-            user_type: p.user_type,
+        let planInfo = null;
+        if (planResult.data && planResult.data.length > 0) {
+          const p = planResult.data[0];
+          planInfo = {
+            plan_id: p.plan_id,
             plan_name: p.plan_name,
-            can_create_plan: p.can_create_plan,
-            can_edit_plan: p.can_edit_plan,
-            can_view_plan: p.can_view_plan,
-            can_substitute: p.can_substitute,
-            can_adjust: p.can_adjust,
-            can_use_ai: p.can_use_ai,
-            can_use_simulations: p.can_use_simulations,
-            can_manage_students: p.can_manage_students,
-            can_send_requests: p.can_send_requests,
-            is_linked_to_professional: p.is_linked_to_professional,
+            plan_type: p.plan_type,
+            subscription_status: p.subscription_status,
+            diet_limit: p.diet_limit,
+            substitution_limit: p.substitution_limit,
+            adjustment_limit: p.adjustment_limit,
+            chat_messages_per_day: p.chat_messages_per_day,
+            has_chat: p.has_chat,
           };
         }
 
         const result: CachedUserData = {
           roles,
-          hasActiveLicense,
-          permissions,
+          planInfo,
         };
 
         // Update cache
@@ -124,7 +107,7 @@ export function useCachedUserData() {
     if (authLoading) return;
     
     if (!user) {
-      setData({ roles: [], hasActiveLicense: false, permissions: null });
+      setData({ roles: [], planInfo: null });
       setLoading(false);
       return;
     }
@@ -165,12 +148,14 @@ export function useCachedUserData() {
     globalCacheTime = 0;
   }, []);
 
-  // Derive convenience properties
+  // Derive convenience properties from roles
   const roles = data?.roles || [];
   const isProfessional = roles.includes('professional');
-  const isStudent = roles.includes('student');
+  const isStudent = roles.includes('user') && !roles.includes('professional') && !roles.includes('admin');
   const isAdmin = roles.includes('admin');
-  const isLinkedStudent = isStudent && !!profile?.professional_id;
+  // In v2, linked students are determined by checking if they have an active subscription
+  // managed by a professional - this is handled differently now
+  const isLinkedStudent = false; // Simplified for v2
 
   return {
     roles,
@@ -178,8 +163,7 @@ export function useCachedUserData() {
     isStudent,
     isAdmin,
     isLinkedStudent,
-    hasActiveLicense: data?.hasActiveLicense || false,
-    permissions: data?.permissions,
+    planInfo: data?.planInfo,
     loading: authLoading || loading,
     refresh,
     invalidateCache,

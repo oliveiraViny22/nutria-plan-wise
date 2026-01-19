@@ -1,17 +1,14 @@
-import { useAuth } from '@/contexts/AuthContext';
 import { useCachedUserData } from './useCachedUserData';
 
 /**
  * Hook to check if current user is a student linked to a professional
- * Linked students have read-only access
- * Now uses cached data to avoid redundant queries
+ * Simplified for v2 schema - linked students managed differently
  */
 export function useLinkedStudent() {
-  const { profile } = useAuth();
   const { isLinkedStudent } = useCachedUserData();
 
   return {
     isLinkedStudent,
-    professionalId: profile?.professional_id || null,
+    professionalId: null, // v2 schema doesn't have professional_id on profiles
   };
 }
