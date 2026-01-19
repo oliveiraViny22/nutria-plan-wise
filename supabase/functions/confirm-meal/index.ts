@@ -6,6 +6,21 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Status mapping: frontend (legacy) -> database (v2)
+const STATUS_MAP: Record<string, string> = {
+  'CONFIRMADA': 'confirmed',
+  'PULADA': 'skipped',
+  'FORA_DO_PLANO': 'out_of_plan',
+  // Direct v2 values (passthrough)
+  'confirmed': 'confirmed',
+  'skipped': 'skipped',
+  'out_of_plan': 'out_of_plan',
+  'pending': 'pending',
+  'late_confirmed': 'late_confirmed',
+};
+
+const VALID_STATUSES = ['confirmed', 'skipped', 'out_of_plan', 'CONFIRMADA', 'PULADA', 'FORA_DO_PLANO'];
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -37,7 +52,7 @@ serve(async (req) => {
     const { 
       mealId, 
       optionId, 
-      status, // CONFIRMADA, PULADA, FORA_DO_PLANO
+      status, // Accepts both legacy (CONFIRMADA) and v2 (confirmed) formats
       logDate,
       notes
     } = body;
@@ -49,18 +64,21 @@ serve(async (req) => {
       });
     }
 
-    if (!['CONFIRMADA', 'PULADA', 'FORA_DO_PLANO'].includes(status)) {
+    if (!VALID_STATUSES.includes(status)) {
       return new Response(JSON.stringify({ 
-        error: "Status inválido. Use: CONFIRMADA, PULADA ou FORA_DO_PLANO" 
+        error: "Status inválido. Use: confirmed, skipped, out_of_plan (ou legacy: CONFIRMADA, PULADA, FORA_DO_PLANO)" 
       }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    if (status === 'CONFIRMADA' && !optionId) {
+    // Convert to v2 status
+    const dbStatus = STATUS_MAP[status] || status;
+
+    if ((dbStatus === 'confirmed' || dbStatus === 'late_confirmed') && !optionId) {
       return new Response(JSON.stringify({ 
-        error: "optionId é obrigatório quando status é CONFIRMADA" 
+        error: "optionId é obrigatório quando status é confirmed/CONFIRMADA" 
       }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -73,8 +91,8 @@ serve(async (req) => {
       {
         _user_id: user.id,
         _meal_id: mealId,
-        _option_id: status === 'CONFIRMADA' ? optionId : null,
-        _status: status,
+        _option_id: (dbStatus === 'confirmed' || dbStatus === 'late_confirmed') ? optionId : null,
+        _status: dbStatus,
         _log_date: logDate || new Date().toISOString().split('T')[0],
       }
     );

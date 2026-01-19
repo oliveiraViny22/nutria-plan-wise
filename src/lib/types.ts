@@ -1,21 +1,25 @@
 // =====================================================
-// TIPOS DE USUÁRIO (imutável) - armazenado em profiles.user_type
+// TIPOS DO SISTEMA - Atualizados para banco v2
 // =====================================================
+
+// =====================================================
+// ENUMS DO BANCO (v2)
+// =====================================================
+export type PlanType = 'gratuito' | 'plano_pessoal_pago' | 'profissional';
+export type SubscriptionStatus = 'trial' | 'active' | 'past_due' | 'canceled' | 'expired';
+export type AppRole = 'admin' | 'user' | 'professional';
+export type MealStatus = 'pending' | 'confirmed' | 'skipped' | 'out_of_plan' | 'late_confirmed';
+export type DailyStatus = 'no_records' | 'partial' | 'complete';
+
+// Legacy - manter para compatibilidade com código antigo
 export type UserType = 'aluno' | 'usuario' | 'profissional';
-
-// =====================================================
-// PLANOS COMERCIAIS (mutável) - armazenado em subscriptions via plan_id
-// =====================================================
 export type CommercialPlan = 'gratuito' | 'plano_pessoal_pago' | 'premium' | 'profissional';
-
-// Legacy - manter para compatibilidade com profiles.account_type (enum do banco)
-// NOTA: 'plano_pessoal' no account_type é equivalente a 'plano_pessoal_pago' em CommercialPlan
 export type AccountType = 'aluno' | 'plano_pessoal' | 'premium' | 'profissional';
 
 // Status permitidos para planos alimentares
-export type DietPlanStatus = 'draft' | 'active' | 'finished' | 'cancelled' | 'archived';
+export type DietPlanStatus = 'active' | 'inactive';
 
-// Tipos de solicitação do aluno
+// Tipos de solicitação do aluno (legacy - não usado no banco v2)
 export type StudentRequestType = 'goal_change' | 'meals_change' | 'food_substitution';
 export type StudentRequestStatus = 'pending' | 'approved' | 'rejected';
 
@@ -25,33 +29,25 @@ export interface Profile {
   name: string | null;
   email: string | null;
   age: number | null;
-  sex: 'male' | 'female' | 'other' | null;
+  sex: 'M' | 'F' | null;
   height: number | null;
   weight: number | null;
-  goal: 'lose_weight' | 'maintain' | 'gain_muscle' | null;
+  goal: 'lose' | 'maintain' | 'gain' | null;
   activity_level: 'sedentary' | 'light' | 'moderate' | 'active' | 'very_active' | null;
-  preferences: string[];
-  restrictions: string[];
+  preferences: string[] | null;
+  restrictions: string[] | null;
   daily_calories: number | null;
   protein_target: number | null;
   carbs_target: number | null;
   fat_target: number | null;
   meals_per_day: number | null;
-  professional_id: string | null;
-  account_type: AccountType; // Legacy
-  user_type: UserType; // Novo campo imutável
   onboarding_completed: boolean;
-  professional_onboarding_completed: boolean;
-  is_test: boolean;
-  must_change_password: boolean;
-  created_by: string | null;
   created_at: string;
   updated_at: string;
 }
 
 // Informações de permissões do usuário
 export interface UserPermissions {
-  user_type: UserType;
   plan_name: CommercialPlan;
   can_create_plan: boolean;
   can_edit_plan: boolean;
@@ -119,8 +115,8 @@ export interface Food {
   carbs: number;
   fat: number;
   serving_size: string;
-  category: FoodCategory | null;
-  processing_level: ProcessingLevel;
+  category: FoodCategory | string | null;
+  processing_level: ProcessingLevel | string | null;
   created_at: string;
   // Campos de conversão de unidades
   unit_name?: string | null;
@@ -132,14 +128,13 @@ export interface Food {
 export interface DietPlan {
   id: string;
   user_id: string;
+  status: DietPlanStatus;
   total_calories: number;
   total_protein: number;
   total_carbs: number;
   total_fat: number;
-  released_to_student: boolean;
-  status: DietPlanStatus;
-  is_initial_plan: boolean;
   created_at: string;
+  updated_at: string;
 }
 
 // All possible meal types
@@ -157,27 +152,14 @@ export type MealType = typeof MEAL_TYPES[number];
 export interface Meal {
   id: string;
   diet_plan_id: string;
-  name: MealType;
+  name: MealType | string;
+  sort_order: number;
   total_calories: number;
   total_protein: number;
   total_carbs: number;
   total_fat: number;
   created_at: string;
-  foods?: MealFood[];
-}
-
-export interface MealFood {
-  id: string;
-  meal_id: string;
-  food_id: string;
-  quantity: number;
-  created_at: string;
-  food?: Food;
-  // Campos de conversão de unidades (camada de apresentação)
-  display_quantity?: number;
-  display_unit?: string;
-  calculated_grams?: number;
-  unit_conversion_locked?: boolean;
+  options?: MealOption[];
 }
 
 export interface MealOption {
@@ -197,14 +179,28 @@ export interface MealOptionFood {
   id: string;
   meal_option_id: string;
   food_id: string;
-  quantity: number;
+  quantity_grams: number; // Atualizado para v2
   created_at: string;
   food?: Food;
   // Campos de conversão de unidades (camada de apresentação)
   display_quantity?: number;
   display_unit?: string;
   calculated_grams?: number;
-  unit_conversion_locked?: boolean;
+  unit_locked?: boolean; // Atualizado para v2
+}
+
+// Legacy interface - manter para compatibilidade
+export interface MealFood {
+  id: string;
+  meal_id: string;
+  food_id: string;
+  quantity: number;
+  created_at: string;
+  food?: Food;
+  display_quantity?: number;
+  display_unit?: string;
+  calculated_grams?: number;
+  unit_locked?: boolean;
 }
 
 export interface ChatMessage {
@@ -224,9 +220,9 @@ export const ACTIVITY_LEVELS = {
 } as const;
 
 export const GOALS = {
-  lose_weight: { label: 'Perder Peso', calorieAdjustment: -500 },
+  lose: { label: 'Perder Peso', calorieAdjustment: -500 },
   maintain: { label: 'Manter Peso', calorieAdjustment: 0 },
-  gain_muscle: { label: 'Ganhar Massa', calorieAdjustment: 300 },
+  gain: { label: 'Ganhar Massa', calorieAdjustment: 300 },
 } as const;
 
 export const FOOD_PREFERENCES = [
@@ -247,7 +243,7 @@ export const FOOD_RESTRICTIONS = [
   'Sem Ovos',
 ] as const;
 
-export const MEAL_NAMES: Record<MealType, string> = {
+export const MEAL_NAMES: Record<string, string> = {
   breakfast: 'Café da Manhã',
   morning_snack: 'Lanche da Manhã',
   lunch: 'Almoço',
@@ -291,3 +287,18 @@ export function getMealCalorieDistribution(mealsPerDay: number): Record<MealType
       return { breakfast: 0.25, morning_snack: 0, lunch: 0.35, afternoon_snack: 0.10, dinner: 0.30, supper: 0 };
   }
 }
+
+// Mapeamento de status antigo para novo (para migração de código)
+export const STATUS_MIGRATION_MAP: Record<string, MealStatus> = {
+  'CONFIRMADA': 'confirmed',
+  'CONFIRMADA_TARDIA': 'late_confirmed',
+  'PULADA': 'skipped',
+  'FORA_DO_PLANO': 'out_of_plan',
+  'PENDENTE': 'pending',
+};
+
+export const DAILY_STATUS_MIGRATION_MAP: Record<string, DailyStatus> = {
+  'SEM_REGISTROS': 'no_records',
+  'PARCIAL': 'partial',
+  'COMPLETO': 'complete',
+};

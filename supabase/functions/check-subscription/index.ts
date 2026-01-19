@@ -89,35 +89,19 @@ serve(async (req) => {
     const user = { id: userId };
     log.info("User authenticated", { userId: user.id });
 
-    const { data: profileData } = await supabaseAdmin
-      .from('profiles')
-      .select('professional_id')
-      .eq('user_id', user.id)
-      .maybeSingle();
-    
-    const isLinkedToProfessional = Boolean(profileData?.professional_id);
-    log.info("Checked professional link", { isLinkedToProfessional });
+    // V2: profiles table no longer has professional_id
+    // Check if user has professional role instead
+    const { data: roles } = await supabaseAdmin
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user.id);
 
-    let studentAccess = null;
-    if (isLinkedToProfessional) {
-      const { data: accessData } = await supabaseAdmin
-        .rpc('get_student_access_level', { _student_id: user.id });
-      
-      if (accessData && accessData.length > 0) {
-        studentAccess = {
-          hasAccess: accessData[0].has_access,
-          accessLevel: accessData[0].access_level,
-          canViewPlan: accessData[0].can_view_plan,
-          canViewHistory: accessData[0].can_view_history,
-          canUseChat: accessData[0].can_use_chat,
-          canGenerate: accessData[0].can_generate,
-          canSubstitute: accessData[0].can_substitute,
-          professionalStatus: accessData[0].professional_status,
-        };
-        log.info("Student access level", studentAccess);
-      }
-    }
+    const isProfessional = (roles ?? []).some((r: { role: string }) => r.role === 'professional');
+    const isAdmin = (roles ?? []).some((r: { role: string }) => r.role === 'admin');
 
+    log.info("Checked user roles", { isProfessional, isAdmin });
+
+    // V2: Fetch subscription with plan details
     const { data: subscription, error: subError } = await supabaseAdmin
       .from('subscriptions')
       .select(`
@@ -125,7 +109,7 @@ serve(async (req) => {
         plan:plans(*)
       `)
       .eq('user_id', user.id)
-      .in('status', ['active', 'trial', 'past_due', 'grace_period'])
+      .in('status', ['active', 'trial', 'past_due'])
       .order('created_at', { ascending: false })
       .limit(1)
       .single();
@@ -133,20 +117,13 @@ serve(async (req) => {
     if (subError || !subscription) {
       log.info("No active subscription found");
       
-      const { data: roles } = await supabaseAdmin
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', user.id);
-
-      const isProfessional = (roles ?? []).some((r: { role: string }) => r.role === 'professional');
-      
       return createSuccessResponse({
         subscribed: false,
         plan: null,
         usage: null,
         accountType: isProfessional ? 'professional' : 'personal',
-        isLinkedToProfessional,
-        studentAccess,
+        isLinkedToProfessional: false, // V2: no more linked students in core
+        studentAccess: null,
       }, corsHeaders);
     }
 
@@ -155,86 +132,17 @@ serve(async (req) => {
       status: subscription.status 
     });
 
-    const planType = subscription.plan?.type || 'personal';
+    const planType = subscription.plan?.type || 'gratuito';
     const isSubscribed = subscription.status === 'active' || subscription.status === 'trial';
-    const shouldSyncProfessional =
-      planType === 'professional' && ['active', 'trial', 'past_due'].includes(subscription.status);
 
-    if (shouldSyncProfessional) {
-      try {
-        const { error: roleUpsertError } = await supabaseAdmin
-          .from('user_roles')
-          .upsert({ user_id: user.id, role: 'professional' }, { onConflict: 'user_id,role' });
-
-        if (roleUpsertError) {
-          log.warn('Failed to upsert professional role', { error: roleUpsertError.message });
-        } else {
-          log.info('Professional role ensured');
-        }
-
-        const licenseType = 'monthly';
-        const startsAt = subscription.current_period_start || new Date().toISOString().split('T')[0];
-        const expiresAt = subscription.current_period_end || new Date().toISOString().split('T')[0];
-        const maxStudents = subscription.plan?.patients_limit ?? 0;
-
-        const { data: existingLicense, error: existingLicenseError } = await supabaseAdmin
-          .from('professional_licenses')
-          .select('id')
-          .eq('user_id', user.id)
-          .order('expires_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-
-        if (existingLicenseError) {
-          log.warn('Failed to check existing license', { error: existingLicenseError.message });
-        }
-
-        if (existingLicense?.id) {
-          const { error: licenseUpdateError } = await supabaseAdmin
-            .from('professional_licenses')
-            .update({
-              license_type: licenseType,
-              starts_at: startsAt,
-              expires_at: expiresAt,
-              max_students: maxStudents,
-              updated_at: new Date().toISOString(),
-            })
-            .eq('id', existingLicense.id);
-
-          if (licenseUpdateError) {
-            log.warn('Failed to update license', { error: licenseUpdateError.message });
-          } else {
-            log.info('Professional license updated', { expiresAt, maxStudents });
-          }
-        } else {
-          const { error: licenseInsertError } = await supabaseAdmin
-            .from('professional_licenses')
-            .insert({
-              user_id: user.id,
-              license_type: licenseType,
-              starts_at: startsAt,
-              expires_at: expiresAt,
-              max_students: maxStudents,
-              updated_at: new Date().toISOString(),
-            });
-
-          if (licenseInsertError) {
-            log.warn('Failed to insert license', { error: licenseInsertError.message });
-          } else {
-            log.info('Professional license created', { expiresAt, maxStudents });
-          }
-        }
-      } catch (syncError) {
-        log.error('Entitlement sync error', getErrorDetails(syncError));
-      }
-    }
-
-    const { data: usage } = await supabaseAdmin
+    // V2: Get or create usage record
+    let { data: usage } = await supabaseAdmin
       .from('user_usage')
       .select('*')
       .eq('user_id', user.id)
       .single();
 
+    // Reset chat messages if new day
     if (usage && new Date(usage.last_chat_reset) < new Date(new Date().toDateString())) {
       await supabaseAdmin
         .from('user_usage')
@@ -243,6 +151,8 @@ serve(async (req) => {
           last_chat_reset: new Date().toISOString().split('T')[0],
         })
         .eq('user_id', user.id);
+      
+      usage = { ...usage, chat_messages_today: 0 };
     }
 
     return createSuccessResponse({
@@ -250,10 +160,8 @@ serve(async (req) => {
       subscription: {
         id: subscription.id,
         status: subscription.status,
-        billingCycle: subscription.billing_cycle,
         periodEnd: subscription.current_period_end,
         cancelAtPeriodEnd: subscription.cancel_at_period_end,
-        gracePeriodEnd: subscription.grace_period_end,
       },
       plan: subscription.plan,
       usage: usage || {
@@ -263,8 +171,8 @@ serve(async (req) => {
         chat_messages_today: 0,
       },
       accountType: planType,
-      isLinkedToProfessional,
-      studentAccess,
+      isLinkedToProfessional: false, // V2: professional features dormant
+      studentAccess: null, // V2: professional features dormant
     }, corsHeaders);
   } catch (error) {
     log.error("Unexpected error", getErrorDetails(error));
