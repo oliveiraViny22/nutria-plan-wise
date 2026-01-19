@@ -50,7 +50,6 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Logo } from '@/components/Logo';
 import { MobileNav } from '@/components/MobileNav';
-import { CreateStudentForm } from '@/components/CreateStudentForm';
 import { useProfessionalStudents } from '@/hooks/useProfessionalStudents';
 import { useUserRole } from '@/hooks/useUserRole';
 import { GOALS } from '@/lib/types';
@@ -202,13 +201,14 @@ export default function Students() {
               <DialogHeader>
                 <DialogTitle className="text-base sm:text-lg">Cadastrar Novo Aluno</DialogTitle>
                 <DialogDescription className="text-xs sm:text-sm">
-                  Preencha todos os dados do aluno. Ele receberá as credenciais de acesso para entrar na plataforma.
+                  Funcionalidade em desenvolvimento. Em breve você poderá cadastrar alunos diretamente pela plataforma.
                 </DialogDescription>
               </DialogHeader>
-              <CreateStudentForm
-                onSuccess={handleStudentCreated}
-                onCancel={() => setIsCreateDialogOpen(false)}
-              />
+              <div className="flex justify-end pt-4">
+                <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
+                  Fechar
+                </Button>
+              </div>
             </DialogContent>
           </Dialog>
         </div>

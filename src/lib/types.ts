@@ -29,10 +29,10 @@ export interface Profile {
   name: string | null;
   email: string | null;
   age: number | null;
-  sex: 'M' | 'F' | null;
+  sex: 'male' | 'female' | null;
   height: number | null;
   weight: number | null;
-  goal: 'lose' | 'maintain' | 'gain' | null;
+  goal: 'lose_weight' | 'maintain' | 'gain_muscle' | null;
   activity_level: 'sedentary' | 'light' | 'moderate' | 'active' | 'very_active' | null;
   preferences: string[] | null;
   restrictions: string[] | null;
@@ -220,9 +220,9 @@ export const ACTIVITY_LEVELS = {
 } as const;
 
 export const GOALS = {
-  lose: { label: 'Perder Peso', calorieAdjustment: -500 },
+  lose_weight: { label: 'Perder Peso', calorieAdjustment: -500 },
   maintain: { label: 'Manter Peso', calorieAdjustment: 0 },
-  gain: { label: 'Ganhar Massa', calorieAdjustment: 300 },
+  gain_muscle: { label: 'Ganhar Massa', calorieAdjustment: 300 },
 } as const;
 
 export const FOOD_PREFERENCES = [
