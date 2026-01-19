@@ -95,9 +95,9 @@ export default function Progress() {
 
   // Goal weight (estimated based on goal)
   const goal = profile?.goal;
-  const goalWeight = (goal === 'lose_weight' || goal === 'lose')
+  const goalWeight = goal === 'lose_weight'
     ? (profile?.weight || 70) - 5
-    : (goal === 'gain_muscle' || goal === 'gain')
+    : goal === 'gain_muscle'
     ? (profile?.weight || 70) + 3
     : profile?.weight || 70;
 

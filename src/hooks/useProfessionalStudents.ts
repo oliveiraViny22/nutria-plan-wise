@@ -13,6 +13,8 @@ export interface StudentWithProfile {
   profile: {
     name: string | null;
     email: string | null;
+    goal: string | null;
+    daily_calories: number | null;
   } | null;
 }
 
