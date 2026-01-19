@@ -95,7 +95,7 @@ const VALID_CATEGORIES = [
   'suplementos',
 ];
 
-const ALLOWED_PROCESSING_LEVELS = ['in_natura', 'minimamente_processado'];
+const ALLOWED_PROCESSING_LEVELS = ['in_natura', 'minimamente_processado', 'In natura', 'Minimamente processado'];
 
 // Category priorities by meal type
 const MEAL_CATEGORY_PRIORITIES: Record<MealType, string[]> = {
@@ -129,18 +129,23 @@ function selectFoodsIntelligently(
   
   // Filter out supplements and ultra-processed
   const eligibleFoods = allFoods.filter((f: Food) => {
-    if (f.category === 'suplementos') return false;
-    const level = f.processing_level || 'in_natura';
-    if (!ALLOWED_PROCESSING_LEVELS.includes(level)) return false;
+    // Normalize category for comparison (handle both old and new formats)
+    const normalizedCategory = (f.category || '').toLowerCase();
+    if (normalizedCategory === 'suplementos' || normalizedCategory.includes('suplemento')) return false;
+    
+    // Normalize processing level for comparison
+    const level = (f.processing_level || 'in_natura').toLowerCase().replace(/ /g, '_');
+    const allowedNormalized = ['in_natura', 'minimamente_processado'];
+    if (!allowedNormalized.some(allowed => level.includes(allowed.replace('_', ' ')) || level.includes(allowed))) return false;
     
     // Check restrictions
     const foodName = f.name.toLowerCase();
     const isRestricted = restrictions.some(r => {
       const restriction = r.toLowerCase();
-      if (restriction.includes('lactose') && f.category === 'laticínios') return true;
+      if (restriction.includes('lactose') && normalizedCategory.includes('latic')) return true;
       if (restriction.includes('gluten') && (foodName.includes('trigo') || foodName.includes('aveia') || foodName.includes('pão'))) return true;
-      if (restriction.includes('vegetariano') && f.category === 'proteínas_animais') return true;
-      if (restriction.includes('vegano') && (f.category === 'proteínas_animais' || f.category === 'laticínios')) return true;
+      if (restriction.includes('vegetariano') && (normalizedCategory.includes('prote') && !normalizedCategory.includes('vegetal'))) return true;
+      if (restriction.includes('vegano') && (normalizedCategory.includes('prote') || normalizedCategory.includes('latic'))) return true;
       return foodName.includes(restriction);
     });
     
@@ -168,18 +173,27 @@ function selectFoodsIntelligently(
       score *= 1.5;
     }
     
-    // Category diversity bonus
-    const categoryBonus: Record<string, number> = {
-      'proteínas_animais': goal === 'gain_muscle' ? 2 : 1.2,
-      'hortaliças_folhosas': goal === 'lose_weight' ? 1.8 : 1.2,
-      'legumes': 1.3,
-      'leguminosas': 1.4,
-      'frutas': 1.2,
-      'cereais_tubérculos': goal === 'gain_muscle' ? 1.5 : 1,
-      'laticínios': 1.2,
-      'óleos_oleaginosas': 1.1,
-    };
-    score *= categoryBonus[f.category] || 1;
+    // Category diversity bonus (handle both old and new category formats)
+    const normalizedCat = (f.category || '').toLowerCase();
+    let categoryMultiplier = 1;
+    
+    if (normalizedCat.includes('prote')) {
+      categoryMultiplier = goal === 'gain_muscle' ? 2 : 1.2;
+    } else if (normalizedCat.includes('vegeta') || normalizedCat.includes('hortali') || normalizedCat.includes('folhos')) {
+      categoryMultiplier = goal === 'lose_weight' ? 1.8 : 1.2;
+    } else if (normalizedCat.includes('legum')) {
+      categoryMultiplier = 1.4;
+    } else if (normalizedCat.includes('frut')) {
+      categoryMultiplier = 1.2;
+    } else if (normalizedCat.includes('carbo') || normalizedCat.includes('cerea') || normalizedCat.includes('tubér')) {
+      categoryMultiplier = goal === 'gain_muscle' ? 1.5 : 1;
+    } else if (normalizedCat.includes('latic')) {
+      categoryMultiplier = 1.2;
+    } else if (normalizedCat.includes('gordur') || normalizedCat.includes('óleo') || normalizedCat.includes('oleagin')) {
+      categoryMultiplier = 1.1;
+    }
+    
+    score *= categoryMultiplier;
     
     return { food: f, score };
   });
@@ -188,23 +202,31 @@ function selectFoodsIntelligently(
   scoredFoods.sort((a, b) => b.score - a.score);
   
   // Ensure category diversity - pick foods from each category
-  const selectedFoods: Food[] = [];
-  const categoryQuotas: Record<string, number> = {
-    'proteínas_animais': Math.ceil(maxFoods * 0.2),
-    'cereais_tubérculos': Math.ceil(maxFoods * 0.15),
-    'hortaliças_folhosas': Math.ceil(maxFoods * 0.15),
-    'legumes': Math.ceil(maxFoods * 0.1),
-    'frutas': Math.ceil(maxFoods * 0.15),
-    'leguminosas': Math.ceil(maxFoods * 0.08),
-    'laticínios': Math.ceil(maxFoods * 0.1),
-    'óleos_oleaginosas': Math.ceil(maxFoods * 0.07),
+  // Category quotas (use normalized matching for actual DB categories)
+  const categoryQuotaRules: Array<{ match: string; quota: number }> = [
+    { match: 'prote', quota: Math.ceil(maxFoods * 0.2) },
+    { match: 'carbo', quota: Math.ceil(maxFoods * 0.15) },
+    { match: 'vegeta', quota: Math.ceil(maxFoods * 0.15) },
+    { match: 'frut', quota: Math.ceil(maxFoods * 0.15) },
+    { match: 'legum', quota: Math.ceil(maxFoods * 0.1) },
+    { match: 'latic', quota: Math.ceil(maxFoods * 0.1) },
+    { match: 'gordur', quota: Math.ceil(maxFoods * 0.1) },
+  ];
+  
+  const getQuota = (category: string): number => {
+    const normalized = category.toLowerCase();
+    for (const rule of categoryQuotaRules) {
+      if (normalized.includes(rule.match)) return rule.quota;
+    }
+    return 3;
   };
   
+  const selectedFoods: Food[] = [];
   const categoryCount: Record<string, number> = {};
   
   for (const { food } of scoredFoods) {
-    const cat = food.category;
-    const quota = categoryQuotas[cat] || 3;
+    const cat = food.category || '';
+    const quota = getQuota(cat);
     const current = categoryCount[cat] || 0;
     
     if (current < quota) {
