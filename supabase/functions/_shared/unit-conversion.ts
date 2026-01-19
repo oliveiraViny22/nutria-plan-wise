@@ -8,10 +8,9 @@
  * 4. O backend REAPLICA decisões SEM IA
  * 5. O frontend NUNCA executa lógica nutricional
  * 
- * FLUXO:
- * - IA decide UMA VEZ na criação/substituição
- * - Sistema executa SEMPRE deterministicamente
- * - Exibição usa valores PERSISTIDOS
+ * ATUALIZADO PARA BANCO V2:
+ * - quantity_grams (não mais quantity)
+ * - unit_locked (não mais unit_conversion_locked)
  */
 
 export interface FoodUnitConfig {
@@ -32,11 +31,11 @@ export interface ConversionResult {
 
 export interface MealFoodDisplay {
   food_id: string;
-  quantity: number; // gramas originais do cálculo
+  quantity_grams: number; // gramas originais do cálculo (v2)
   display_quantity: number;
   display_unit: string;
   calculated_grams: number;
-  unit_conversion_locked: boolean;
+  unit_locked: boolean; // v2: renomeado de unit_conversion_locked
 }
 
 /**
@@ -153,11 +152,13 @@ export function applyUnitConversion(
  * Processa lista de alimentos aplicando conversão determinística.
  * Usado na geração e exibição de planos.
  * 
+ * ATUALIZADO: Retorna quantity_grams e unit_locked (v2)
+ * 
  * @param foods - Lista de alimentos com quantidades em gramas
  * @param foodConfigs - Mapa de configurações de unidades por food_id
  */
 export function processFoodsForDisplay(
-  foods: Array<{ food_id: string; quantity: number }>,
+  foods: Array<{ food_id: string; quantity_grams: number }>,
   foodConfigs: Map<string, FoodUnitConfig>
 ): MealFoodDisplay[] {
   return foods.map(item => {
@@ -167,23 +168,23 @@ export function processFoodsForDisplay(
       // Sem configuração = exibir em gramas
       return {
         food_id: item.food_id,
-        quantity: item.quantity,
-        display_quantity: Math.round(item.quantity * 10) / 10,
+        quantity_grams: item.quantity_grams,
+        display_quantity: Math.round(item.quantity_grams * 10) / 10,
         display_unit: 'g',
-        calculated_grams: item.quantity,
-        unit_conversion_locked: true, // Sem config = locked por padrão
+        calculated_grams: item.quantity_grams,
+        unit_locked: true, // Sem config = locked por padrão
       };
     }
 
-    const result = applyUnitConversion(item.quantity, config);
+    const result = applyUnitConversion(item.quantity_grams, config);
 
     return {
       food_id: item.food_id,
-      quantity: item.quantity,
+      quantity_grams: item.quantity_grams,
       display_quantity: result.display_quantity,
       display_unit: result.display_unit,
       calculated_grams: result.calculated_grams,
-      unit_conversion_locked: true, // Conversão aplicada = locked
+      unit_locked: true, // Conversão aplicada = locked
     };
   });
 }
@@ -226,7 +227,7 @@ export function formatQuantityForDisplay(
 
 /**
  * Recalcula macros baseado nos gramas finais (após arredondamento).
- * IMPORTANTE: Sempre usar calculated_grams, não quantity original.
+ * IMPORTANTE: Sempre usar calculated_grams, não quantity_grams original.
  */
 export function recalculateMacros(
   calculatedGrams: number,

@@ -101,11 +101,14 @@ export function AdherenceWidget() {
         daysLogged.add(log.log_date);
         (log.meal_logs || []).forEach((ml: any) => {
           total++;
-          if (ml.status === 'CONFIRMADA' || ml.status === 'CONFIRMADA_TARDIA') {
+          // Support both v2 and legacy status values
+          const status = ml.status?.toLowerCase?.() || ml.status;
+          if (status === 'confirmed' || status === 'late_confirmed' || 
+              ml.status === 'CONFIRMADA' || ml.status === 'CONFIRMADA_TARDIA') {
             confirmed++;
-          } else if (ml.status === 'PULADA') {
+          } else if (status === 'skipped' || ml.status === 'PULADA') {
             skipped++;
-          } else if (ml.status === 'FORA_DO_PLANO') {
+          } else if (status === 'out_of_plan' || ml.status === 'FORA_DO_PLANO') {
             outOfPlan++;
           }
         });

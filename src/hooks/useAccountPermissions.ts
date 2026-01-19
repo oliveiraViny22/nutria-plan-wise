@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCachedUserData } from './useCachedUserData';
-import { UserType, CommercialPlan, UserPermissions } from '@/lib/types';
+import { CommercialPlan, UserPermissions } from '@/lib/types';
 
 export interface AccountPermissions extends UserPermissions {
   loading: boolean;
@@ -11,7 +11,6 @@ export interface AccountPermissions extends UserPermissions {
 }
 
 const DEFAULT_PERMISSIONS: UserPermissions = {
-  user_type: 'usuario',
   plan_name: 'gratuito',
   can_create_plan: false,
   can_edit_plan: false,
@@ -27,15 +26,13 @@ const DEFAULT_PERMISSIONS: UserPermissions = {
 
 /**
  * Hook for account permissions - now uses cached consolidated fetch
- * Eliminates redundant RPC call by sharing cache with useUserRole
+ * Updated for v2 schema (removed user_type, professional_id)
  */
 export function useAccountPermissions(): AccountPermissions {
-  const { profile } = useAuth();
   const { permissions, loading, refresh } = useCachedUserData();
 
   // Use cached permissions or fallback
   const activePermissions = permissions ? {
-    user_type: permissions.user_type as UserType,
     plan_name: permissions.plan_name as CommercialPlan,
     can_create_plan: permissions.can_create_plan,
     can_edit_plan: permissions.can_edit_plan,
@@ -47,7 +44,7 @@ export function useAccountPermissions(): AccountPermissions {
     can_manage_students: permissions.can_manage_students,
     can_send_requests: permissions.can_send_requests,
     is_linked_to_professional: permissions.is_linked_to_professional,
-  } : getFallbackPermissions(profile);
+  } : DEFAULT_PERMISSIONS;
 
   const getBlockMessage = useCallback((action: string) => {
     if (activePermissions.is_linked_to_professional) {
@@ -68,28 +65,4 @@ export function useAccountPermissions(): AccountPermissions {
     refresh,
     getBlockMessage,
   };
-}
-
-function getFallbackPermissions(profile: any): UserPermissions {
-  const userType = (profile?.user_type || 'usuario') as UserType;
-  const isLinked = !!profile?.professional_id;
-  
-  if (isLinked) {
-    return {
-      user_type: userType,
-      plan_name: 'gratuito',
-      can_create_plan: false,
-      can_edit_plan: false,
-      can_view_plan: true,
-      can_substitute: false,
-      can_adjust: false,
-      can_use_ai: userType === 'aluno',
-      can_use_simulations: false,
-      can_manage_students: false,
-      can_send_requests: userType === 'aluno',
-      is_linked_to_professional: true,
-    };
-  }
-  
-  return DEFAULT_PERMISSIONS;
 }
