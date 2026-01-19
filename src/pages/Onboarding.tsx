@@ -39,7 +39,7 @@ export default function Onboarding() {
   const { isProfessional } = useUserRole();
   const navigate = useNavigate();
 
-  // Form data
+  // Form data - using v2 schema values
   const [formData, setFormData] = useState({
     age: '',
     sex: '' as 'male' | 'female' | 'other' | '',
@@ -107,7 +107,7 @@ export default function Onboarding() {
     try {
       const targets = calculateTargets();
       
-      // 1. Verificar se já existe plano ativo (regra 2.5)
+      // 1. Check for existing active plan
       const { data: existingPlans, error: plansError } = await supabase
         .from('diet_plans')
         .select('id')
@@ -118,7 +118,7 @@ export default function Onboarding() {
       
       const hasActivePlan = existingPlans && existingPlans.length > 0;
       
-      // 2. Atualizar perfil
+      // 2. Update profile
       const { error } = await supabase
         .from('profiles')
         .update({
@@ -141,17 +141,9 @@ export default function Onboarding() {
 
       if (error) throw error;
 
-      // 3. Registrar peso inicial
-      await supabase.from('weight_logs').upsert({
-        user_id: user?.id,
-        weight: Number(formData.weight),
-        logged_at: new Date().toISOString().split('T')[0],
-        notes: 'Peso inicial do cadastro',
-      }, { onConflict: 'user_id,logged_at' });
-
-      // 4. Gerar plano automático apenas se:
-      // - Não for profissional (regra 2.7)
-      // - Não tiver plano ativo (regra 2.5)
+      // 3. Generate automatic plan if:
+      // - Not a professional
+      // - No active plan exists
       if (!isProfessional && !hasActivePlan) {
         toast.info('Gerando seu plano alimentar inicial...');
         
@@ -167,7 +159,7 @@ export default function Onboarding() {
               goal: formData.goal,
               meals_per_day: formData.meals_per_day,
             },
-            isInitialPlan: true, // Marca como plano inicial automático
+            isInitialPlan: true,
           },
         });
 
@@ -175,7 +167,6 @@ export default function Onboarding() {
           console.error('Error generating initial plan:', planResponse.error);
           toast.error('Erro ao gerar plano, mas seu perfil foi salvo');
         } else {
-          // Mensagem final conforme regra 2.8
           toast.success(
             'Seu plano alimentar inicial foi criado com sucesso. Você já pode visualizar seu plano e acompanhar seu progresso.'
           );
@@ -479,19 +470,19 @@ export default function Onboarding() {
                 exit={{ opacity: 0, x: -20 }}
                 className="card-elevated rounded-xl sm:rounded-2xl p-4 sm:p-6 md:p-8"
               >
-                <div className="space-y-4 sm:space-y-6">
-                  <div className="space-y-2 sm:space-y-3">
-                    <Label className="text-sm">Preferências alimentares (opcional)</Label>
+                <div className="space-y-6 sm:space-y-8">
+                  <div className="space-y-3 sm:space-y-4">
+                    <Label className="text-sm">Preferências Alimentares (opcional)</Label>
                     <div className="flex flex-wrap gap-1.5 sm:gap-2">
                       {FOOD_PREFERENCES.map((pref) => (
                         <button
                           key={pref}
                           type="button"
                           onClick={() => togglePreference(pref)}
-                          className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-full border transition-all text-xs sm:text-sm ${
+                          className={`px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm transition-colors ${
                             formData.preferences.includes(pref)
-                              ? 'border-primary bg-primary text-primary-foreground'
-                              : 'border-border hover:border-primary/50'
+                              ? 'bg-primary text-primary-foreground'
+                              : 'bg-muted hover:bg-muted/80'
                           }`}
                         >
                           {pref}
@@ -500,18 +491,18 @@ export default function Onboarding() {
                     </div>
                   </div>
 
-                  <div className="space-y-2 sm:space-y-3">
-                    <Label className="text-sm">Restrições alimentares (opcional)</Label>
+                  <div className="space-y-3 sm:space-y-4">
+                    <Label className="text-sm">Restrições Alimentares (opcional)</Label>
                     <div className="flex flex-wrap gap-1.5 sm:gap-2">
                       {FOOD_RESTRICTIONS.map((rest) => (
                         <button
                           key={rest}
                           type="button"
                           onClick={() => toggleRestriction(rest)}
-                          className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-full border transition-all text-xs sm:text-sm ${
+                          className={`px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm transition-colors ${
                             formData.restrictions.includes(rest)
-                              ? 'border-destructive bg-destructive text-destructive-foreground'
-                              : 'border-border hover:border-destructive/50'
+                              ? 'bg-destructive text-destructive-foreground'
+                              : 'bg-muted hover:bg-muted/80'
                           }`}
                         >
                           {rest}
@@ -526,44 +517,45 @@ export default function Onboarding() {
         </div>
       </div>
 
-      {/* Footer Navigation */}
-      <div className="fixed bottom-0 left-0 right-0 p-4 sm:p-6 bg-background/80 backdrop-blur-md border-t border-border pb-safe">
-        <div className="max-w-2xl mx-auto flex items-center justify-between gap-3">
-          <Button
-            variant="ghost"
-            onClick={() => setCurrentStep(currentStep - 1)}
-            disabled={currentStep === 1}
-            className="text-sm h-10 sm:h-11"
-          >
-            <ArrowLeft className="w-4 h-4 mr-1 sm:mr-2" />
-            <span className="hidden xs:inline">Voltar</span>
-          </Button>
-
+      {/* Footer */}
+      <footer className="fixed bottom-0 left-0 right-0 p-4 sm:p-6 bg-background/80 backdrop-blur-md border-t pb-safe">
+        <div className="max-w-2xl mx-auto flex gap-3 sm:gap-4">
+          {currentStep > 1 && (
+            <Button
+              variant="outline"
+              onClick={() => setCurrentStep(currentStep - 1)}
+              disabled={loading}
+              className="flex-1 h-11 sm:h-12"
+            >
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Voltar
+            </Button>
+          )}
           <Button
             variant="hero"
             onClick={handleNext}
             disabled={!canProceed() || loading}
-            className="text-sm h-10 sm:h-11 min-w-[120px] sm:min-w-[140px]"
+            className="flex-1 h-11 sm:h-12"
           >
             {loading ? (
               <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                <span className="hidden sm:inline ml-1">Gerando plano...</span>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Salvando...
               </>
             ) : currentStep === steps.length ? (
               <>
+                <Check className="w-4 h-4 mr-2" />
                 Concluir
-                <Check className="w-4 h-4 ml-1 sm:ml-2" />
               </>
             ) : (
               <>
-                Próximo
-                <ArrowRight className="w-4 h-4 ml-1 sm:ml-2" />
+                Continuar
+                <ArrowRight className="w-4 h-4 ml-2" />
               </>
             )}
           </Button>
         </div>
-      </div>
+      </footer>
     </div>
   );
 }

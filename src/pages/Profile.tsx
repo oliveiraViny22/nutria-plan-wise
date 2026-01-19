@@ -51,14 +51,29 @@ export default function Profile() {
 
   useEffect(() => {
     if (profile) {
+      // Map database values to form values
+      const mapSex = (dbSex: string | null): 'male' | 'female' | 'other' | '' => {
+        if (dbSex === 'M' || dbSex === 'male') return 'male';
+        if (dbSex === 'F' || dbSex === 'female') return 'female';
+        if (dbSex === 'other') return 'other';
+        return '';
+      };
+      
+      const mapGoal = (dbGoal: string | null): 'lose_weight' | 'maintain' | 'gain_muscle' | '' => {
+        if (dbGoal === 'lose' || dbGoal === 'lose_weight') return 'lose_weight';
+        if (dbGoal === 'gain' || dbGoal === 'gain_muscle') return 'gain_muscle';
+        if (dbGoal === 'maintain') return 'maintain';
+        return '';
+      };
+      
       setFormData({
         name: profile.name || '',
         age: profile.age?.toString() || '',
-        sex: profile.sex || '',
+        sex: mapSex(profile.sex),
         height: profile.height?.toString() || '',
         weight: profile.weight?.toString() || '',
-        goal: profile.goal || '',
-        activity_level: profile.activity_level || '',
+        goal: mapGoal(profile.goal),
+        activity_level: (profile.activity_level as any) || '',
         meals_per_day: (profile as any).meals_per_day || 4,
         preferences: profile.preferences || [],
         restrictions: profile.restrictions || [],
@@ -162,26 +177,6 @@ export default function Profile() {
         .eq('user_id', user.id);
 
       if (error) throw error;
-
-      // Log weight change
-      if (formData.weight && Number(formData.weight) !== profile?.weight) {
-        await supabase.from('weight_logs').upsert({
-          user_id: user.id,
-          weight: Number(formData.weight),
-          logged_at: new Date().toISOString().split('T')[0],
-        }, { onConflict: 'user_id,logged_at' });
-      }
-
-      // Log goal change in history
-      if (goalChanged && formData.goal) {
-        await supabase.from('plan_history').insert({
-          user_id: user.id,
-          action: 'goal_changed',
-          description: `Objetivo alterado para ${GOALS[formData.goal as keyof typeof GOALS]?.label}`,
-          previous_values: { goal: previousGoal },
-          new_values: { goal: formData.goal, ...targets },
-        });
-      }
 
       await refreshProfile();
       setHasChanges(false);
@@ -460,9 +455,9 @@ export default function Profile() {
                         key={num}
                         type="button"
                         onClick={() => handleChange('meals_per_day', num)}
-                        className={`h-12 rounded-lg border font-medium transition-colors ${
+                        className={`h-12 rounded-lg border text-lg font-medium transition-colors ${
                           formData.meals_per_day === num
-                            ? 'border-primary bg-primary text-primary-foreground'
+                            ? 'border-primary bg-primary/10 text-primary'
                             : 'border-border hover:border-primary/50'
                         }`}
                       >
@@ -476,7 +471,7 @@ export default function Profile() {
               <Card>
                 <CardHeader>
                   <CardTitle>Preferências Alimentares</CardTitle>
-                  <CardDescription>Selecione seus estilos de alimentação</CardDescription>
+                  <CardDescription>Selecione os tipos de alimentos que você prefere</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="flex flex-wrap gap-2">
@@ -485,10 +480,10 @@ export default function Profile() {
                         key={pref}
                         type="button"
                         onClick={() => togglePreference(pref)}
-                        className={`px-4 py-2 rounded-full border transition-all ${
+                        className={`px-3 py-2 rounded-full text-sm transition-colors ${
                           formData.preferences.includes(pref)
-                            ? 'border-primary bg-primary text-primary-foreground'
-                            : 'border-border hover:border-primary/50'
+                            ? 'bg-primary text-primary-foreground'
+                            : 'bg-muted hover:bg-muted/80'
                         }`}
                       >
                         {pref}
@@ -501,7 +496,7 @@ export default function Profile() {
               <Card>
                 <CardHeader>
                   <CardTitle>Restrições Alimentares</CardTitle>
-                  <CardDescription>Alimentos que você não pode consumir</CardDescription>
+                  <CardDescription>Selecione alimentos que você não pode ou não quer consumir</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="flex flex-wrap gap-2">
@@ -510,10 +505,10 @@ export default function Profile() {
                         key={rest}
                         type="button"
                         onClick={() => toggleRestriction(rest)}
-                        className={`px-4 py-2 rounded-full border transition-all ${
+                        className={`px-3 py-2 rounded-full text-sm transition-colors ${
                           formData.restrictions.includes(rest)
-                            ? 'border-destructive bg-destructive text-destructive-foreground'
-                            : 'border-border hover:border-destructive/50'
+                            ? 'bg-destructive text-destructive-foreground'
+                            : 'bg-muted hover:bg-muted/80'
                         }`}
                       >
                         {rest}

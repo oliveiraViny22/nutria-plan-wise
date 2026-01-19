@@ -7,7 +7,6 @@ import { Input } from '@/components/ui/input';
 import { MobileNav } from '@/components/MobileNav';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { ChatMessage } from '@/lib/types';
 import { toast } from 'sonner';
 import { ChatUsageIndicator } from '@/components/ChatUsageIndicator';
 
@@ -16,13 +15,20 @@ interface ChatUsage {
   limit: number;
 }
 
+interface ChatMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  created_at: string;
+}
+
 export default function Chat() {
   const navigate = useNavigate();
   const { user, profile } = useAuth();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
-  const [loadingHistory, setLoadingHistory] = useState(true);
+  const [loadingHistory, setLoadingHistory] = useState(false);
   const [usage, setUsage] = useState<ChatUsage>({ current: 0, limit: 3 });
   const [planName, setPlanName] = useState('gratuito');
   const [limitReached, setLimitReached] = useState(false);
@@ -30,9 +36,8 @@ export default function Chat() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    fetchChatHistory();
     fetchInitialUsage();
-  }, []);
+  }, [user?.id]);
 
   useEffect(() => {
     scrollToBottom();
@@ -43,46 +48,30 @@ export default function Chat() {
   };
 
   const fetchInitialUsage = useCallback(async () => {
+    if (!user?.id) return;
+    
     try {
-      const { data, error } = await supabase.rpc('check_feature_limit', {
-        _user_id: user?.id,
+      // Check if chat is available using can_use_feature
+      const { data: canUse } = await supabase.rpc('can_use_feature', {
+        _user_id: user.id,
         _feature: 'chat',
       });
       
-      if (!error && data?.[0]) {
-        setUsage({
-          current: data[0].current_usage,
-          limit: data[0].max_limit,
-        });
-        setLimitReached(!data[0].allowed);
-      }
+      setLimitReached(!canUse);
 
-      // Get plan name
-      const { data: permData } = await supabase.rpc('get_user_permissions', { _user_id: user?.id });
-      if (permData?.[0]) {
-        setPlanName(permData[0].plan_name || 'gratuito');
+      // Get plan info
+      const { data: planData } = await supabase.rpc('get_user_plan', { _user_id: user.id });
+      if (planData?.[0]) {
+        setPlanName(planData[0].plan_name || 'gratuito');
+        setUsage({
+          current: 0, // Will be updated on first message
+          limit: planData[0].chat_messages_per_day || 3,
+        });
       }
     } catch (error) {
       console.error('Error fetching usage:', error);
     }
   }, [user?.id]);
-
-  const fetchChatHistory = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('chat_messages')
-        .select('*')
-        .order('created_at', { ascending: true })
-        .limit(50);
-
-      if (error) throw error;
-      setMessages((data || []) as ChatMessage[]);
-    } catch (error: any) {
-      console.error('Error fetching chat history:', error);
-    } finally {
-      setLoadingHistory(false);
-    }
-  };
 
   const sendMessage = async () => {
     if (!input.trim() || loading || limitReached) return;
@@ -94,7 +83,6 @@ export default function Chat() {
     // Optimistically add user message
     const tempUserMsg: ChatMessage = {
       id: `temp-${Date.now()}`,
-      user_id: user?.id || '',
       role: 'user',
       content: userMessage,
       created_at: new Date().toISOString(),
@@ -102,21 +90,7 @@ export default function Chat() {
     setMessages((prev) => [...prev, tempUserMsg]);
 
     try {
-      // Save user message to database
-      const { data: savedUserMsg, error: userMsgError } = await supabase
-        .from('chat_messages')
-        .insert({ user_id: user?.id, role: 'user', content: userMessage })
-        .select()
-        .single();
-
-      if (userMsgError) throw userMsgError;
-
-      // Update temp message with real data
-      setMessages((prev) =>
-        prev.map((m) => (m.id === tempUserMsg.id ? (savedUserMsg as ChatMessage) : m))
-      );
-
-      // Get AI response
+      // Get AI response via edge function
       const response = await supabase.functions.invoke('nutritional-chat', {
         body: {
           message: userMessage,
@@ -146,9 +120,7 @@ export default function Chat() {
             setLimitMessage(errorData.error || 'Limite de mensagens atingido.');
             toast.error(errorData.error || 'Limite de mensagens atingido.');
             // Remove the user message since it wasn't processed
-            setMessages((prev) => prev.filter((m) => m.id !== savedUserMsg.id));
-            // Delete from database
-            await supabase.from('chat_messages').delete().eq('id', savedUserMsg.id);
+            setMessages((prev) => prev.filter((m) => m.id !== tempUserMsg.id));
             return;
           } catch {
             setLimitReached(true);
@@ -187,16 +159,14 @@ export default function Chat() {
         setPlanName(response.data.planName);
       }
 
-      // Save assistant message
-      const { data: savedAssistantMsg, error: assistantMsgError } = await supabase
-        .from('chat_messages')
-        .insert({ user_id: user?.id, role: 'assistant', content: assistantContent })
-        .select()
-        .single();
-
-      if (assistantMsgError) throw assistantMsgError;
-
-      setMessages((prev) => [...prev, savedAssistantMsg as ChatMessage]);
+      // Add assistant message to local state (no database in v2)
+      const assistantMsg: ChatMessage = {
+        id: `assistant-${Date.now()}`,
+        role: 'assistant',
+        content: assistantContent,
+        created_at: new Date().toISOString(),
+      };
+      setMessages((prev) => [...prev, assistantMsg]);
     } catch (error: any) {
       console.error('Error sending message:', error);
       toast.error('Erro ao enviar mensagem. Tente novamente.');
