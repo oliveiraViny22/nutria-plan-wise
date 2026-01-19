@@ -14,330 +14,13 @@ export type Database = {
   }
   public: {
     Tables: {
-      adherence_alert_configs: {
-        Row: {
-          check_period_days: number
-          created_at: string
-          id: string
-          is_active: boolean
-          notify_on_low: boolean
-          notify_on_warning: boolean
-          professional_id: string
-          threshold_low: number
-          threshold_warning: number
-          updated_at: string
-        }
-        Insert: {
-          check_period_days?: number
-          created_at?: string
-          id?: string
-          is_active?: boolean
-          notify_on_low?: boolean
-          notify_on_warning?: boolean
-          professional_id: string
-          threshold_low?: number
-          threshold_warning?: number
-          updated_at?: string
-        }
-        Update: {
-          check_period_days?: number
-          created_at?: string
-          id?: string
-          is_active?: boolean
-          notify_on_low?: boolean
-          notify_on_warning?: boolean
-          professional_id?: string
-          threshold_low?: number
-          threshold_warning?: number
-          updated_at?: string
-        }
-        Relationships: []
-      }
-      adherence_alerts: {
-        Row: {
-          adherence_rate: number
-          alert_type: string
-          created_at: string
-          diet_plan_id: string
-          id: string
-          is_read: boolean
-          message: string
-          period_end: string
-          period_start: string
-          professional_id: string
-          read_at: string | null
-          student_id: string
-          threshold_used: number
-        }
-        Insert: {
-          adherence_rate: number
-          alert_type: string
-          created_at?: string
-          diet_plan_id: string
-          id?: string
-          is_read?: boolean
-          message: string
-          period_end: string
-          period_start: string
-          professional_id: string
-          read_at?: string | null
-          student_id: string
-          threshold_used: number
-        }
-        Update: {
-          adherence_rate?: number
-          alert_type?: string
-          created_at?: string
-          diet_plan_id?: string
-          id?: string
-          is_read?: boolean
-          message?: string
-          period_end?: string
-          period_start?: string
-          professional_id?: string
-          read_at?: string | null
-          student_id?: string
-          threshold_used?: number
-        }
-        Relationships: []
-      }
-      adherence_metrics: {
-        Row: {
-          adherence_by_meal: Json | null
-          adherence_by_option: Json | null
-          calculated_at: string
-          days_with_records: number
-          diet_plan_id: string
-          exception_distribution: Json | null
-          id: string
-          meals_confirmed: number | null
-          meals_late_confirmed: number | null
-          meals_out_of_plan: number | null
-          meals_skipped: number | null
-          overall_adherence_rate: number | null
-          period_end: string
-          period_start: string
-          plan_version: number
-          total_days: number
-          user_id: string
-        }
-        Insert: {
-          adherence_by_meal?: Json | null
-          adherence_by_option?: Json | null
-          calculated_at?: string
-          days_with_records?: number
-          diet_plan_id: string
-          exception_distribution?: Json | null
-          id?: string
-          meals_confirmed?: number | null
-          meals_late_confirmed?: number | null
-          meals_out_of_plan?: number | null
-          meals_skipped?: number | null
-          overall_adherence_rate?: number | null
-          period_end: string
-          period_start: string
-          plan_version?: number
-          total_days?: number
-          user_id: string
-        }
-        Update: {
-          adherence_by_meal?: Json | null
-          adherence_by_option?: Json | null
-          calculated_at?: string
-          days_with_records?: number
-          diet_plan_id?: string
-          exception_distribution?: Json | null
-          id?: string
-          meals_confirmed?: number | null
-          meals_late_confirmed?: number | null
-          meals_out_of_plan?: number | null
-          meals_skipped?: number | null
-          overall_adherence_rate?: number | null
-          period_end?: string
-          period_start?: string
-          plan_version?: number
-          total_days?: number
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "adherence_metrics_diet_plan_id_fkey"
-            columns: ["diet_plan_id"]
-            isOneToOne: false
-            referencedRelation: "diet_plans"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      adherence_report_files: {
-        Row: {
-          diet_plan_id: string
-          file_path: string
-          generated_at: string
-          id: string
-          metrics_snapshot: Json
-          period_end: string
-          period_start: string
-          plan_type: string
-          plan_version: number
-          student_id: string | null
-          user_id: string
-        }
-        Insert: {
-          diet_plan_id: string
-          file_path: string
-          generated_at?: string
-          id?: string
-          metrics_snapshot: Json
-          period_end: string
-          period_start: string
-          plan_type: string
-          plan_version?: number
-          student_id?: string | null
-          user_id: string
-        }
-        Update: {
-          diet_plan_id?: string
-          file_path?: string
-          generated_at?: string
-          id?: string
-          metrics_snapshot?: Json
-          period_end?: string
-          period_start?: string
-          plan_type?: string
-          plan_version?: number
-          student_id?: string | null
-          user_id?: string
-        }
-        Relationships: []
-      }
-      admin_audit_log: {
-        Row: {
-          action: string
-          created_at: string
-          entity_id: string | null
-          entity_type: string
-          id: string
-          ip_address: string | null
-          new_value: Json | null
-          old_value: Json | null
-          user_agent: string | null
-          user_id: string
-        }
-        Insert: {
-          action: string
-          created_at?: string
-          entity_id?: string | null
-          entity_type: string
-          id?: string
-          ip_address?: string | null
-          new_value?: Json | null
-          old_value?: Json | null
-          user_agent?: string | null
-          user_id: string
-        }
-        Update: {
-          action?: string
-          created_at?: string
-          entity_id?: string | null
-          entity_type?: string
-          id?: string
-          ip_address?: string | null
-          new_value?: Json | null
-          old_value?: Json | null
-          user_agent?: string | null
-          user_id?: string
-        }
-        Relationships: []
-      }
-      ai_suggestions: {
-        Row: {
-          adherence_data_used: Json
-          created_at: string
-          diet_plan_id: string
-          hypothesis: string
-          id: string
-          proposed_changes: Json
-          rationale: string
-          review_notes: string | null
-          reviewed_at: string | null
-          reviewed_by: string | null
-          status: string
-          suggestion_type: string
-          user_id: string
-        }
-        Insert: {
-          adherence_data_used: Json
-          created_at?: string
-          diet_plan_id: string
-          hypothesis: string
-          id?: string
-          proposed_changes: Json
-          rationale: string
-          review_notes?: string | null
-          reviewed_at?: string | null
-          reviewed_by?: string | null
-          status?: string
-          suggestion_type: string
-          user_id: string
-        }
-        Update: {
-          adherence_data_used?: Json
-          created_at?: string
-          diet_plan_id?: string
-          hypothesis?: string
-          id?: string
-          proposed_changes?: Json
-          rationale?: string
-          review_notes?: string | null
-          reviewed_at?: string | null
-          reviewed_by?: string | null
-          status?: string
-          suggestion_type?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "ai_suggestions_diet_plan_id_fkey"
-            columns: ["diet_plan_id"]
-            isOneToOne: false
-            referencedRelation: "diet_plans"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      chat_messages: {
-        Row: {
-          content: string
-          created_at: string | null
-          id: string
-          role: string
-          user_id: string
-        }
-        Insert: {
-          content: string
-          created_at?: string | null
-          id?: string
-          role: string
-          user_id: string
-        }
-        Update: {
-          content?: string
-          created_at?: string | null
-          id?: string
-          role?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
       daily_logs: {
         Row: {
           created_at: string
           diet_plan_id: string
           id: string
           log_date: string
-          plan_version: number
-          status: string
+          status: Database["public"]["Enums"]["daily_status"]
           total_calories_consumed: number | null
           total_carbs_consumed: number | null
           total_fat_consumed: number | null
@@ -350,8 +33,7 @@ export type Database = {
           diet_plan_id: string
           id?: string
           log_date: string
-          plan_version?: number
-          status?: string
+          status?: Database["public"]["Enums"]["daily_status"]
           total_calories_consumed?: number | null
           total_carbs_consumed?: number | null
           total_fat_consumed?: number | null
@@ -364,8 +46,7 @@ export type Database = {
           diet_plan_id?: string
           id?: string
           log_date?: string
-          plan_version?: number
-          status?: string
+          status?: Database["public"]["Enums"]["daily_status"]
           total_calories_consumed?: number | null
           total_carbs_consumed?: number | null
           total_fat_consumed?: number | null
@@ -381,95 +62,65 @@ export type Database = {
             referencedRelation: "diet_plans"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "daily_logs_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
         ]
       }
       diet_plans: {
         Row: {
-          created_at: string | null
+          created_at: string
           id: string
-          is_initial_plan: boolean
-          released_to_student: boolean
           status: string
           total_calories: number
           total_carbs: number
           total_fat: number
           total_protein: number
+          updated_at: string
           user_id: string
         }
         Insert: {
-          created_at?: string | null
+          created_at?: string
           id?: string
-          is_initial_plan?: boolean
-          released_to_student?: boolean
           status?: string
           total_calories: number
           total_carbs: number
           total_fat: number
           total_protein: number
+          updated_at?: string
           user_id: string
         }
         Update: {
-          created_at?: string | null
+          created_at?: string
           id?: string
-          is_initial_plan?: boolean
-          released_to_student?: boolean
           status?: string
           total_calories?: number
           total_carbs?: number
           total_fat?: number
           total_protein?: number
+          updated_at?: string
           user_id?: string
         }
-        Relationships: []
-      }
-      food_imports: {
-        Row: {
-          completed_at: string | null
-          created_at: string
-          errors: Json | null
-          failed_rows: number | null
-          filename: string
-          id: string
-          imported_by: string
-          imported_rows: number | null
-          started_at: string | null
-          status: string
-          total_rows: number | null
-        }
-        Insert: {
-          completed_at?: string | null
-          created_at?: string
-          errors?: Json | null
-          failed_rows?: number | null
-          filename: string
-          id?: string
-          imported_by: string
-          imported_rows?: number | null
-          started_at?: string | null
-          status?: string
-          total_rows?: number | null
-        }
-        Update: {
-          completed_at?: string | null
-          created_at?: string
-          errors?: Json | null
-          failed_rows?: number | null
-          filename?: string
-          id?: string
-          imported_by?: string
-          imported_rows?: number | null
-          started_at?: string | null
-          status?: string
-          total_rows?: number | null
-        }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "diet_plans_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
       }
       foods: {
         Row: {
           calories: number
           carbs: number
           category: string | null
-          created_at: string | null
+          created_at: string
           fat: number
           id: string
           name: string
@@ -485,7 +136,7 @@ export type Database = {
           calories: number
           carbs: number
           category?: string | null
-          created_at?: string | null
+          created_at?: string
           fat: number
           id?: string
           name: string
@@ -501,7 +152,7 @@ export type Database = {
           calories?: number
           carbs?: number
           category?: string | null
-          created_at?: string | null
+          created_at?: string
           fat?: number
           id?: string
           name?: string
@@ -514,57 +165,6 @@ export type Database = {
           unit_weight_grams?: number | null
         }
         Relationships: []
-      }
-      meal_foods: {
-        Row: {
-          calculated_grams: number | null
-          created_at: string | null
-          display_quantity: number | null
-          display_unit: string | null
-          food_id: string
-          id: string
-          meal_id: string
-          quantity: number | null
-          unit_conversion_locked: boolean | null
-        }
-        Insert: {
-          calculated_grams?: number | null
-          created_at?: string | null
-          display_quantity?: number | null
-          display_unit?: string | null
-          food_id: string
-          id?: string
-          meal_id: string
-          quantity?: number | null
-          unit_conversion_locked?: boolean | null
-        }
-        Update: {
-          calculated_grams?: number | null
-          created_at?: string | null
-          display_quantity?: number | null
-          display_unit?: string | null
-          food_id?: string
-          id?: string
-          meal_id?: string
-          quantity?: number | null
-          unit_conversion_locked?: boolean | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "meal_foods_food_id_fkey"
-            columns: ["food_id"]
-            isOneToOne: false
-            referencedRelation: "foods"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "meal_foods_meal_id_fkey"
-            columns: ["meal_id"]
-            isOneToOne: false
-            referencedRelation: "meals"
-            referencedColumns: ["id"]
-          },
-        ]
       }
       meal_logs: {
         Row: {
@@ -579,7 +179,7 @@ export type Database = {
           meal_id: string
           notes: string | null
           protein_consumed: number | null
-          status: string
+          status: Database["public"]["Enums"]["meal_status"]
         }
         Insert: {
           calories_consumed?: number | null
@@ -593,7 +193,7 @@ export type Database = {
           meal_id: string
           notes?: string | null
           protein_consumed?: number | null
-          status?: string
+          status?: Database["public"]["Enums"]["meal_status"]
         }
         Update: {
           calories_consumed?: number | null
@@ -607,7 +207,7 @@ export type Database = {
           meal_id?: string
           notes?: string | null
           protein_consumed?: number | null
-          status?: string
+          status?: Database["public"]["Enums"]["meal_status"]
         }
         Relationships: [
           {
@@ -642,8 +242,8 @@ export type Database = {
           food_id: string
           id: string
           meal_option_id: string
-          quantity: number
-          unit_conversion_locked: boolean | null
+          quantity_grams: number
+          unit_locked: boolean | null
         }
         Insert: {
           calculated_grams?: number | null
@@ -653,8 +253,8 @@ export type Database = {
           food_id: string
           id?: string
           meal_option_id: string
-          quantity?: number
-          unit_conversion_locked?: boolean | null
+          quantity_grams: number
+          unit_locked?: boolean | null
         }
         Update: {
           calculated_grams?: number | null
@@ -664,8 +264,8 @@ export type Database = {
           food_id?: string
           id?: string
           meal_option_id?: string
-          quantity?: number
-          unit_conversion_locked?: boolean | null
+          quantity_grams?: number
+          unit_locked?: boolean | null
         }
         Relationships: [
           {
@@ -691,21 +291,21 @@ export type Database = {
           meal_id: string
           name: string | null
           option_number: number
-          total_calories: number
-          total_carbs: number
-          total_fat: number
-          total_protein: number
+          total_calories: number | null
+          total_carbs: number | null
+          total_fat: number | null
+          total_protein: number | null
         }
         Insert: {
           created_at?: string
           id?: string
           meal_id: string
           name?: string | null
-          option_number: number
-          total_calories?: number
-          total_carbs?: number
-          total_fat?: number
-          total_protein?: number
+          option_number?: number
+          total_calories?: number | null
+          total_carbs?: number | null
+          total_fat?: number | null
+          total_protein?: number | null
         }
         Update: {
           created_at?: string
@@ -713,10 +313,10 @@ export type Database = {
           meal_id?: string
           name?: string | null
           option_number?: number
-          total_calories?: number
-          total_carbs?: number
-          total_fat?: number
-          total_protein?: number
+          total_calories?: number | null
+          total_carbs?: number | null
+          total_fat?: number | null
+          total_protein?: number | null
         }
         Relationships: [
           {
@@ -730,30 +330,33 @@ export type Database = {
       }
       meals: {
         Row: {
-          created_at: string | null
+          created_at: string
           diet_plan_id: string
           id: string
           name: string
+          sort_order: number
           total_calories: number | null
           total_carbs: number | null
           total_fat: number | null
           total_protein: number | null
         }
         Insert: {
-          created_at?: string | null
+          created_at?: string
           diet_plan_id: string
           id?: string
           name: string
+          sort_order?: number
           total_calories?: number | null
           total_carbs?: number | null
           total_fat?: number | null
           total_protein?: number | null
         }
         Update: {
-          created_at?: string | null
+          created_at?: string
           diet_plan_id?: string
           id?: string
           name?: string
+          sort_order?: number
           total_calories?: number | null
           total_carbs?: number | null
           total_fat?: number | null
@@ -769,109 +372,19 @@ export type Database = {
           },
         ]
       }
-      plan_history: {
-        Row: {
-          action: string
-          created_at: string | null
-          description: string
-          diet_plan_id: string | null
-          id: string
-          new_values: Json | null
-          previous_values: Json | null
-          user_id: string
-        }
-        Insert: {
-          action: string
-          created_at?: string | null
-          description: string
-          diet_plan_id?: string | null
-          id?: string
-          new_values?: Json | null
-          previous_values?: Json | null
-          user_id: string
-        }
-        Update: {
-          action?: string
-          created_at?: string | null
-          description?: string
-          diet_plan_id?: string | null
-          id?: string
-          new_values?: Json | null
-          previous_values?: Json | null
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "plan_history_diet_plan_id_fkey"
-            columns: ["diet_plan_id"]
-            isOneToOne: false
-            referencedRelation: "diet_plans"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      plan_versions: {
-        Row: {
-          approved_at: string | null
-          approved_by: string | null
-          created_at: string
-          diet_plan_id: string
-          id: string
-          notes: string | null
-          snapshot: Json
-          version_number: number
-        }
-        Insert: {
-          approved_at?: string | null
-          approved_by?: string | null
-          created_at?: string
-          diet_plan_id: string
-          id?: string
-          notes?: string | null
-          snapshot: Json
-          version_number?: number
-        }
-        Update: {
-          approved_at?: string | null
-          approved_by?: string | null
-          created_at?: string
-          diet_plan_id?: string
-          id?: string
-          notes?: string | null
-          snapshot?: Json
-          version_number?: number
-        }
-        Relationships: [
-          {
-            foreignKeyName: "plan_versions_diet_plan_id_fkey"
-            columns: ["diet_plan_id"]
-            isOneToOne: false
-            referencedRelation: "diet_plans"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       plans: {
         Row: {
           adjustment_limit: number
           chat_messages_per_day: number
-          created_at: string | null
+          created_at: string
           description: string | null
           diet_limit: number
           has_chat: boolean
-          history_days: number
           id: string
           is_active: boolean
           name: string
-          patients_limit: number
-          price_annual: number | null
           price_monthly: number | null
-          price_quarterly: number | null
-          price_semiannual: number | null
-          stripe_price_annual: string | null
           stripe_price_monthly: string | null
-          stripe_price_quarterly: string | null
-          stripe_price_semiannual: string | null
           stripe_product_id: string | null
           substitution_limit: number
           type: Database["public"]["Enums"]["plan_type"]
@@ -879,23 +392,15 @@ export type Database = {
         Insert: {
           adjustment_limit?: number
           chat_messages_per_day?: number
-          created_at?: string | null
+          created_at?: string
           description?: string | null
           diet_limit?: number
           has_chat?: boolean
-          history_days?: number
           id?: string
           is_active?: boolean
           name: string
-          patients_limit?: number
-          price_annual?: number | null
           price_monthly?: number | null
-          price_quarterly?: number | null
-          price_semiannual?: number | null
-          stripe_price_annual?: string | null
           stripe_price_monthly?: string | null
-          stripe_price_quarterly?: string | null
-          stripe_price_semiannual?: string | null
           stripe_product_id?: string | null
           substitution_limit?: number
           type: Database["public"]["Enums"]["plan_type"]
@@ -903,274 +408,128 @@ export type Database = {
         Update: {
           adjustment_limit?: number
           chat_messages_per_day?: number
-          created_at?: string | null
+          created_at?: string
           description?: string | null
           diet_limit?: number
           has_chat?: boolean
-          history_days?: number
           id?: string
           is_active?: boolean
           name?: string
-          patients_limit?: number
-          price_annual?: number | null
           price_monthly?: number | null
-          price_quarterly?: number | null
-          price_semiannual?: number | null
-          stripe_price_annual?: string | null
           stripe_price_monthly?: string | null
-          stripe_price_quarterly?: string | null
-          stripe_price_semiannual?: string | null
           stripe_product_id?: string | null
           substitution_limit?: number
           type?: Database["public"]["Enums"]["plan_type"]
         }
         Relationships: []
       }
-      professional_licenses: {
-        Row: {
-          created_at: string | null
-          expires_at: string
-          id: string
-          license_type: string
-          max_students: number | null
-          starts_at: string
-          updated_at: string | null
-          user_id: string
-        }
-        Insert: {
-          created_at?: string | null
-          expires_at: string
-          id?: string
-          license_type?: string
-          max_students?: number | null
-          starts_at?: string
-          updated_at?: string | null
-          user_id: string
-        }
-        Update: {
-          created_at?: string | null
-          expires_at?: string
-          id?: string
-          license_type?: string
-          max_students?: number | null
-          starts_at?: string
-          updated_at?: string | null
-          user_id?: string
-        }
-        Relationships: []
-      }
-      professional_students: {
-        Row: {
-          created_at: string | null
-          id: string
-          professional_id: string
-          status: string
-          student_id: string
-          updated_at: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          id?: string
-          professional_id: string
-          status?: string
-          student_id: string
-          updated_at?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          id?: string
-          professional_id?: string
-          status?: string
-          student_id?: string
-          updated_at?: string | null
-        }
-        Relationships: []
-      }
       profiles: {
         Row: {
-          account_type: Database["public"]["Enums"]["account_type"]
           activity_level: string | null
           age: number | null
           carbs_target: number | null
-          created_at: string | null
-          created_by: string | null
+          created_at: string
           daily_calories: number | null
           email: string | null
           fat_target: number | null
           goal: string | null
           height: number | null
           id: string
-          is_test: boolean | null
           meals_per_day: number | null
-          must_change_password: boolean | null
           name: string | null
           onboarding_completed: boolean | null
           preferences: string[] | null
-          professional_id: string | null
-          professional_onboarding_completed: boolean | null
           protein_target: number | null
           restrictions: string[] | null
           sex: string | null
-          updated_at: string | null
+          updated_at: string
           user_id: string
-          user_type: Database["public"]["Enums"]["user_type"] | null
           weight: number | null
         }
         Insert: {
-          account_type?: Database["public"]["Enums"]["account_type"]
           activity_level?: string | null
           age?: number | null
           carbs_target?: number | null
-          created_at?: string | null
-          created_by?: string | null
+          created_at?: string
           daily_calories?: number | null
           email?: string | null
           fat_target?: number | null
           goal?: string | null
           height?: number | null
           id?: string
-          is_test?: boolean | null
           meals_per_day?: number | null
-          must_change_password?: boolean | null
           name?: string | null
           onboarding_completed?: boolean | null
           preferences?: string[] | null
-          professional_id?: string | null
-          professional_onboarding_completed?: boolean | null
           protein_target?: number | null
           restrictions?: string[] | null
           sex?: string | null
-          updated_at?: string | null
+          updated_at?: string
           user_id: string
-          user_type?: Database["public"]["Enums"]["user_type"] | null
           weight?: number | null
         }
         Update: {
-          account_type?: Database["public"]["Enums"]["account_type"]
           activity_level?: string | null
           age?: number | null
           carbs_target?: number | null
-          created_at?: string | null
-          created_by?: string | null
+          created_at?: string
           daily_calories?: number | null
           email?: string | null
           fat_target?: number | null
           goal?: string | null
           height?: number | null
           id?: string
-          is_test?: boolean | null
           meals_per_day?: number | null
-          must_change_password?: boolean | null
           name?: string | null
           onboarding_completed?: boolean | null
           preferences?: string[] | null
-          professional_id?: string | null
-          professional_onboarding_completed?: boolean | null
           protein_target?: number | null
           restrictions?: string[] | null
           sex?: string | null
-          updated_at?: string | null
+          updated_at?: string
           user_id?: string
-          user_type?: Database["public"]["Enums"]["user_type"] | null
           weight?: number | null
-        }
-        Relationships: []
-      }
-      student_requests: {
-        Row: {
-          created_at: string | null
-          description: string
-          id: string
-          justification: string
-          professional_feedback: string | null
-          professional_id: string
-          professional_response: string | null
-          request_type: string
-          status: string
-          student_id: string
-          updated_at: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          description: string
-          id?: string
-          justification: string
-          professional_feedback?: string | null
-          professional_id: string
-          professional_response?: string | null
-          request_type: string
-          status?: string
-          student_id: string
-          updated_at?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          description?: string
-          id?: string
-          justification?: string
-          professional_feedback?: string | null
-          professional_id?: string
-          professional_response?: string | null
-          request_type?: string
-          status?: string
-          student_id?: string
-          updated_at?: string | null
         }
         Relationships: []
       }
       subscriptions: {
         Row: {
-          billing_cycle: Database["public"]["Enums"]["billing_cycle"] | null
           cancel_at_period_end: boolean | null
-          created_at: string | null
+          created_at: string
           current_period_end: string | null
           current_period_start: string | null
-          grace_period_end: string | null
           id: string
-          last_reconciled: string | null
           plan_id: string
-          provider: string | null
-          provider_customer_id: string | null
-          provider_subscription_id: string | null
           status: Database["public"]["Enums"]["subscription_status"]
-          stripe_price_id: string | null
-          updated_at: string | null
+          stripe_customer_id: string | null
+          stripe_subscription_id: string | null
+          updated_at: string
           user_id: string
         }
         Insert: {
-          billing_cycle?: Database["public"]["Enums"]["billing_cycle"] | null
           cancel_at_period_end?: boolean | null
-          created_at?: string | null
+          created_at?: string
           current_period_end?: string | null
           current_period_start?: string | null
-          grace_period_end?: string | null
           id?: string
-          last_reconciled?: string | null
           plan_id: string
-          provider?: string | null
-          provider_customer_id?: string | null
-          provider_subscription_id?: string | null
           status?: Database["public"]["Enums"]["subscription_status"]
-          stripe_price_id?: string | null
-          updated_at?: string | null
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          updated_at?: string
           user_id: string
         }
         Update: {
-          billing_cycle?: Database["public"]["Enums"]["billing_cycle"] | null
           cancel_at_period_end?: boolean | null
-          created_at?: string | null
+          created_at?: string
           current_period_end?: string | null
           current_period_start?: string | null
-          grace_period_end?: string | null
           id?: string
-          last_reconciled?: string | null
           plan_id?: string
-          provider?: string | null
-          provider_customer_id?: string | null
-          provider_subscription_id?: string | null
           status?: Database["public"]["Enums"]["subscription_status"]
-          stripe_price_id?: string | null
-          updated_at?: string | null
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          updated_at?: string
           user_id?: string
         }
         Relationships: [
@@ -1181,110 +540,97 @@ export type Database = {
             referencedRelation: "plans"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "subscriptions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
         ]
-      }
-      system_settings: {
-        Row: {
-          category: string
-          created_at: string
-          description: string | null
-          id: string
-          is_sensitive: boolean | null
-          key: string
-          updated_at: string
-          updated_by: string | null
-          value: Json
-        }
-        Insert: {
-          category?: string
-          created_at?: string
-          description?: string | null
-          id?: string
-          is_sensitive?: boolean | null
-          key: string
-          updated_at?: string
-          updated_by?: string | null
-          value?: Json
-        }
-        Update: {
-          category?: string
-          created_at?: string
-          description?: string | null
-          id?: string
-          is_sensitive?: boolean | null
-          key?: string
-          updated_at?: string
-          updated_by?: string | null
-          value?: Json
-        }
-        Relationships: []
       }
       user_roles: {
         Row: {
-          created_at: string | null
+          created_at: string
           id: string
           role: Database["public"]["Enums"]["app_role"]
           user_id: string
         }
         Insert: {
-          created_at?: string | null
+          created_at?: string
           id?: string
           role: Database["public"]["Enums"]["app_role"]
           user_id: string
         }
         Update: {
-          created_at?: string | null
+          created_at?: string
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "user_roles_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
       }
       user_usage: {
         Row: {
           adjustments_used: number
           chat_messages_today: number
-          created_at: string | null
+          created_at: string
           diets_used: number
           id: string
           last_chat_reset: string
           period_end: string
           period_start: string
           substitutions_used: number
-          updated_at: string | null
+          updated_at: string
           user_id: string
         }
         Insert: {
           adjustments_used?: number
           chat_messages_today?: number
-          created_at?: string | null
+          created_at?: string
           diets_used?: number
           id?: string
           last_chat_reset?: string
           period_end?: string
           period_start?: string
           substitutions_used?: number
-          updated_at?: string | null
+          updated_at?: string
           user_id: string
         }
         Update: {
           adjustments_used?: number
           chat_messages_today?: number
-          created_at?: string | null
+          created_at?: string
           diets_used?: number
           id?: string
           last_chat_reset?: string
           period_end?: string
           period_start?: string
           substitutions_used?: number
-          updated_at?: string | null
+          updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "user_usage_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
       }
       webhook_events: {
         Row: {
-          created_at: string | null
+          created_at: string
           event_id: string
           event_type: string
           id: string
@@ -1292,7 +638,7 @@ export type Database = {
           processed_at: string | null
         }
         Insert: {
-          created_at?: string | null
+          created_at?: string
           event_id: string
           event_type: string
           id?: string
@@ -1300,7 +646,7 @@ export type Database = {
           processed_at?: string | null
         }
         Update: {
-          created_at?: string | null
+          created_at?: string
           event_id?: string
           event_type?: string
           id?: string
@@ -1309,70 +655,14 @@ export type Database = {
         }
         Relationships: []
       }
-      weight_logs: {
-        Row: {
-          created_at: string | null
-          id: string
-          logged_at: string
-          notes: string | null
-          user_id: string
-          weight: number
-        }
-        Insert: {
-          created_at?: string | null
-          id?: string
-          logged_at?: string
-          notes?: string | null
-          user_id: string
-          weight: number
-        }
-        Update: {
-          created_at?: string | null
-          id?: string
-          logged_at?: string
-          notes?: string | null
-          user_id?: string
-          weight?: number
-        }
-        Relationships: []
-      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      apply_unit_conversion: {
-        Args: { _food_id: string; _quantity_grams: number }
-        Returns: {
-          calculated_grams: number
-          conversion_applied: boolean
-          display_quantity: number
-          display_unit: string
-        }[]
-      }
-      calculate_adherence_metrics: {
-        Args: {
-          _diet_plan_id: string
-          _period_end: string
-          _period_start: string
-          _user_id: string
-        }
-        Returns: Json
-      }
-      can_create_plan: { Args: { _user_id: string }; Returns: boolean }
-      can_edit_plan: { Args: { _user_id: string }; Returns: boolean }
       can_use_feature: {
         Args: { _feature: string; _user_id: string }
         Returns: boolean
-      }
-      check_feature_limit: {
-        Args: { _feature: string; _user_id: string }
-        Returns: {
-          allowed: boolean
-          current_usage: number
-          max_limit: number
-          upgrade_required: boolean
-        }[]
       }
       confirm_meal_consumption: {
         Args: {
@@ -1399,47 +689,6 @@ export type Database = {
           success: boolean
         }[]
       }
-      get_professional_subscription_state: {
-        Args: { _professional_id: string }
-        Returns: {
-          grace_end: string
-          is_active: boolean
-          is_grace_period: boolean
-          is_suspended: boolean
-          sub_status: string
-        }[]
-      }
-      get_student_access_level: {
-        Args: { _student_id: string }
-        Returns: {
-          access_level: string
-          can_generate: boolean
-          can_substitute: boolean
-          can_use_chat: boolean
-          can_view_history: boolean
-          can_view_plan: boolean
-          has_access: boolean
-          professional_status: string
-        }[]
-      }
-      get_student_count: { Args: { _professional_id: string }; Returns: number }
-      get_user_permissions: {
-        Args: { _user_id: string }
-        Returns: {
-          can_adjust: boolean
-          can_create_plan: boolean
-          can_edit_plan: boolean
-          can_manage_students: boolean
-          can_send_requests: boolean
-          can_substitute: boolean
-          can_use_ai: boolean
-          can_use_simulations: boolean
-          can_view_plan: boolean
-          is_linked_to_professional: boolean
-          plan_name: string
-          user_type: Database["public"]["Enums"]["user_type"]
-        }[]
-      }
       get_user_plan: {
         Args: { _user_id: string }
         Returns: {
@@ -1447,8 +696,6 @@ export type Database = {
           chat_messages_per_day: number
           diet_limit: number
           has_chat: boolean
-          history_days: number
-          patients_limit: number
           plan_id: string
           plan_name: string
           plan_type: Database["public"]["Enums"]["plan_type"]
@@ -1456,7 +703,6 @@ export type Database = {
           substitution_limit: number
         }[]
       }
-      has_active_license: { Args: { _user_id: string }; Returns: boolean }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -1468,41 +714,23 @@ export type Database = {
         Args: { _feature: string; _user_id: string }
         Returns: boolean
       }
-      professional_manages_meal: {
-        Args: { _meal_id: string; _professional_id: string }
-        Returns: boolean
-      }
-      professional_manages_meal_option: {
-        Args: { _meal_option_id: string; _professional_id: string }
-        Returns: boolean
-      }
-      reset_monthly_usage: { Args: { _user_id: string }; Returns: undefined }
-      user_owns_meal: {
-        Args: { _meal_id: string; _user_id: string }
-        Returns: boolean
-      }
-      user_owns_meal_option: {
-        Args: { _meal_option_id: string; _user_id: string }
-        Returns: boolean
-      }
     }
     Enums: {
-      account_type: "aluno" | "plano_pessoal" | "premium" | "profissional"
-      app_role: "admin" | "professional" | "student"
-      billing_cycle: "monthly" | "quarterly" | "semiannual" | "annual"
-      plan_type: "personal" | "professional"
-      plan_type_commercial:
-        | "gratuito"
-        | "plano_pessoal_pago"
-        | "premium"
-        | "profissional"
+      app_role: "admin" | "user" | "professional"
+      daily_status: "no_records" | "partial" | "complete"
+      meal_status:
+        | "pending"
+        | "confirmed"
+        | "skipped"
+        | "out_of_plan"
+        | "late_confirmed"
+      plan_type: "gratuito" | "plano_pessoal_pago" | "profissional"
       subscription_status:
         | "trial"
         | "active"
         | "past_due"
         | "canceled"
         | "expired"
-      user_type: "aluno" | "usuario" | "profissional"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1630,16 +858,16 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      account_type: ["aluno", "plano_pessoal", "premium", "profissional"],
-      app_role: ["admin", "professional", "student"],
-      billing_cycle: ["monthly", "quarterly", "semiannual", "annual"],
-      plan_type: ["personal", "professional"],
-      plan_type_commercial: [
-        "gratuito",
-        "plano_pessoal_pago",
-        "premium",
-        "profissional",
+      app_role: ["admin", "user", "professional"],
+      daily_status: ["no_records", "partial", "complete"],
+      meal_status: [
+        "pending",
+        "confirmed",
+        "skipped",
+        "out_of_plan",
+        "late_confirmed",
       ],
+      plan_type: ["gratuito", "plano_pessoal_pago", "profissional"],
       subscription_status: [
         "trial",
         "active",
@@ -1647,7 +875,6 @@ export const Constants = {
         "canceled",
         "expired",
       ],
-      user_type: ["aluno", "usuario", "profissional"],
     },
   },
 } as const
