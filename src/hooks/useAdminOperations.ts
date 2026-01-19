@@ -3,8 +3,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import type { Database } from '@/integrations/supabase/types';
 
-type AccountType = Database['public']['Enums']['account_type'];
-type UserType = Database['public']['Enums']['user_type'];
 type AppRole = Database['public']['Enums']['app_role'];
 
 interface SystemSetting {
@@ -76,44 +74,25 @@ export interface UserProfile {
   user_id: string;
   name: string | null;
   email: string | null;
-  account_type: AccountType;
-  user_type: UserType | null;
-  is_test: boolean | null;
   onboarding_completed: boolean | null;
-  professional_id: string | null;
   created_at: string | null;
   roles: string[];
   subscription_status?: string;
   plan_name?: string;
 }
 
-interface UserProfileUpdate {
-  name?: string | null;
-  account_type?: AccountType;
-  user_type?: UserType | null;
-  is_test?: boolean | null;
-}
-
 export interface Plan {
   id: string;
   name: string;
-  type: 'personal' | 'professional';
+  type: 'gratuito' | 'plano_pessoal_pago' | 'profissional';
   description: string | null;
   is_active: boolean;
   price_monthly: number | null;
-  price_quarterly: number | null;
-  price_semiannual: number | null;
-  price_annual: number | null;
   stripe_price_monthly: string | null;
-  stripe_price_quarterly: string | null;
-  stripe_price_semiannual: string | null;
-  stripe_price_annual: string | null;
   stripe_product_id: string | null;
   diet_limit: number;
   substitution_limit: number;
   adjustment_limit: number;
-  patients_limit: number;
-  history_days: number;
   has_chat: boolean;
   chat_messages_per_day: number;
 }
@@ -122,9 +101,6 @@ export interface DeleteUserPreview {
   user: {
     name: string | null;
     email: string | null;
-    account_type: string;
-    user_type: string | null;
-    professional_id: string | null;
     created_at: string;
   };
   records: Record<string, number>;
@@ -171,7 +147,6 @@ export function useAdminOperations() {
   }, [invokeAdmin, toast]);
 
   const updateSetting = useCallback(async (key: string, value: unknown) => {
-    // Add to saving state
     setSavingKeys(prev => new Set(prev).add(key));
     setSavedKeys(prev => {
       const next = new Set(prev);
@@ -187,13 +162,10 @@ export function useAdminOperations() {
     try {
       const data = await invokeAdmin('update_setting', { key, value });
       
-      // Update local state
       setSettings(prev => prev.map(s => s.key === key ? { ...s, value, updated_at: new Date().toISOString() } : s));
       
-      // Mark as saved
       setSavedKeys(prev => new Set(prev).add(key));
       
-      // Clear saved indicator after 2 seconds
       setTimeout(() => {
         setSavedKeys(prev => {
           const next = new Set(prev);
@@ -208,7 +180,6 @@ export function useAdminOperations() {
       toast({ title: 'Erro', description: message, variant: 'destructive' });
       setErrorKeys(prev => new Set(prev).add(key));
       
-      // Clear error indicator after 3 seconds
       setTimeout(() => {
         setErrorKeys(prev => {
           const next = new Set(prev);
@@ -256,13 +227,11 @@ export function useAdminOperations() {
   const importFoods = useCallback(async (filename: string, foods: FoodRow[]) => {
     setLoading(true);
     try {
-      // Create import record first
       const importRecord = await invokeAdmin('create_import_record', { 
         filename, 
         totalRows: foods.length 
       });
 
-      // Then import foods
       const result = await invokeAdmin('import_foods', { 
         importId: importRecord.import.id, 
         foods 
@@ -273,7 +242,6 @@ export function useAdminOperations() {
         description: `${result.imported} alimentos importados, ${result.failed} falharam.` 
       });
 
-      // Refresh imports list
       await fetchFoodImports();
 
       return result;
@@ -350,46 +318,36 @@ export function useAdminOperations() {
   const fetchUsers = useCallback(async (
     limit = 50, 
     offset = 0, 
-    search?: string,
-    filters?: { account_type?: AccountType; is_test?: boolean }
+    search?: string
   ) => {
     setUsersLoading(true);
     try {
       let query = supabase
         .from('profiles')
-        .select('user_id, name, email, account_type, user_type, is_test, onboarding_completed, professional_id, created_at', { count: 'exact' })
-        .neq('email', 'admin@nutriai.app') // Hide system admin account
+        .select('user_id, name, email, onboarding_completed, created_at', { count: 'exact' })
+        .neq('email', 'admin@nutriai.app')
         .order('created_at', { ascending: false })
         .range(offset, offset + limit - 1);
 
       if (search) {
         query = query.or(`name.ilike.%${search}%,email.ilike.%${search}%`);
       }
-      if (filters?.account_type) {
-        query = query.eq('account_type', filters.account_type);
-      }
-      if (filters?.is_test !== undefined) {
-        query = query.eq('is_test', filters.is_test);
-      }
 
       const { data: profiles, error: profilesError, count } = await query;
 
       if (profilesError) throw profilesError;
 
-      // Fetch roles for each user
       const userIds = profiles?.map(p => p.user_id) || [];
       const { data: rolesData } = await supabase
         .from('user_roles')
         .select('user_id, role')
         .in('user_id', userIds);
 
-      // Fetch subscriptions
       const { data: subsData } = await supabase
         .from('subscriptions')
         .select('user_id, status, plan_id, plans(name)')
         .in('user_id', userIds);
 
-      // Map profiles with roles and subscription
       const enrichedUsers: UserProfile[] = (profiles || []).map(profile => {
         const userRoles = rolesData?.filter(r => r.user_id === profile.user_id).map(r => r.role) || [];
         const userSub = subsData?.find(s => s.user_id === profile.user_id);
@@ -415,7 +373,7 @@ export function useAdminOperations() {
 
   const updateUser = useCallback(async (
     userId: string, 
-    updates: Partial<Pick<UserProfile, 'name' | 'account_type' | 'user_type' | 'is_test'>>
+    updates: Partial<Pick<UserProfile, 'name'>>
   ) => {
     setSavingKeys(prev => new Set(prev).add(`user_${userId}`));
     try {
@@ -426,7 +384,6 @@ export function useAdminOperations() {
 
       if (error) throw error;
 
-      // Update local state
       setUsers(prev => prev.map(u => 
         u.user_id === userId ? { ...u, ...updates } : u
       ));
@@ -462,7 +419,7 @@ export function useAdminOperations() {
     }
   }, [toast]);
 
-  const toggleUserRole = useCallback(async (userId: string, role: 'admin' | 'professional' | 'student', add: boolean) => {
+  const toggleUserRole = useCallback(async (userId: string, role: AppRole, add: boolean) => {
     setSavingKeys(prev => new Set(prev).add(`role_${userId}_${role}`));
     try {
       if (add) {
@@ -479,7 +436,6 @@ export function useAdminOperations() {
         if (error) throw error;
       }
 
-      // Update local state
       setUsers(prev => prev.map(u => {
         if (u.user_id !== userId) return u;
         const newRoles = add 
@@ -499,8 +455,16 @@ export function useAdminOperations() {
 
       return true;
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Erro ao atualizar role';
+      const message = error instanceof Error ? error.message : 'Erro ao alterar papel';
       toast({ title: 'Erro', description: message, variant: 'destructive' });
+      setErrorKeys(prev => new Set(prev).add(`role_${userId}_${role}`));
+      setTimeout(() => {
+        setErrorKeys(prev => {
+          const next = new Set(prev);
+          next.delete(`role_${userId}_${role}`);
+          return next;
+        });
+      }, 3000);
       throw error;
     } finally {
       setSavingKeys(prev => {
@@ -511,243 +475,37 @@ export function useAdminOperations() {
     }
   }, [toast]);
 
-  const [plans, setPlans] = useState<Plan[]>([]);
-  const [plansLoading, setPlansLoading] = useState(false);
-
-  const changeUserPassword = useCallback(async (targetUserId: string, newPassword: string) => {
-    setSavingKeys(prev => new Set(prev).add(`password_${targetUserId}`));
+  const deleteUser = useCallback(async (userId: string): Promise<boolean> => {
+    setLoading(true);
     try {
-      const data = await invokeAdmin('change_user_password', { targetUserId, newPassword });
+      const result = await invokeAdmin('delete_user', { userId });
       
-      setSavedKeys(prev => new Set(prev).add(`password_${targetUserId}`));
-      setTimeout(() => {
-        setSavedKeys(prev => {
-          const next = new Set(prev);
-          next.delete(`password_${targetUserId}`);
-          return next;
-        });
-      }, 2000);
-      
-      toast({ title: 'Sucesso', description: 'Senha alterada com sucesso.' });
-      return data;
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Erro ao alterar senha';
-      toast({ title: 'Erro', description: message, variant: 'destructive' });
-      throw error;
-    } finally {
-      setSavingKeys(prev => {
-        const next = new Set(prev);
-        next.delete(`password_${targetUserId}`);
-        return next;
-      });
-    }
-  }, [invokeAdmin, toast]);
-
-  const previewDeleteUser = useCallback(async (targetUserId: string): Promise<DeleteUserPreview> => {
-    try {
-      const data = await invokeAdmin('preview_delete_user', { targetUserId });
-      return data as DeleteUserPreview;
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Erro ao carregar preview';
-      toast({ title: 'Erro', description: message, variant: 'destructive' });
-      throw error;
-    }
-  }, [invokeAdmin, toast]);
-
-  const deleteUser = useCallback(async (targetUserId: string) => {
-    setSavingKeys(prev => new Set(prev).add(`delete_${targetUserId}`));
-    try {
-      await invokeAdmin('delete_user', { targetUserId });
-      
-      // Remove from local state
-      setUsers(prev => prev.filter(u => u.user_id !== targetUserId));
+      setUsers(prev => prev.filter(u => u.user_id !== userId));
       setUsersTotal(prev => prev - 1);
       
-      toast({ title: 'Sucesso', description: 'Usuário excluído com sucesso.' });
+      toast({ 
+        title: 'Usuário excluído', 
+        description: `${result.deletedRecords} registros removidos.` 
+      });
+      
       return true;
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Erro ao excluir usuário';
       toast({ title: 'Erro', description: message, variant: 'destructive' });
-      throw error;
-    } finally {
-      setSavingKeys(prev => {
-        const next = new Set(prev);
-        next.delete(`delete_${targetUserId}`);
-        return next;
-      });
-    }
-  }, [invokeAdmin, toast]);
-
-  const fetchPlans = useCallback(async () => {
-    setPlansLoading(true);
-    try {
-      const data = await invokeAdmin('get_plans');
-      setPlans(data.plans || []);
-      return data.plans;
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Erro ao carregar planos';
-      toast({ title: 'Erro', description: message, variant: 'destructive' });
-      return [];
-    } finally {
-      setPlansLoading(false);
-    }
-  }, [invokeAdmin, toast]);
-
-  const updatePlan = useCallback(async (planId: string, updates: Partial<Plan>) => {
-    setSavingKeys(prev => new Set(prev).add(`plan_${planId}`));
-    try {
-      const data = await invokeAdmin('update_plan', { planId, updates });
-      
-      // Update local state
-      setPlans(prev => prev.map(p => p.id === planId ? { ...p, ...updates } : p));
-      
-      setSavedKeys(prev => new Set(prev).add(`plan_${planId}`));
-      setTimeout(() => {
-        setSavedKeys(prev => {
-          const next = new Set(prev);
-          next.delete(`plan_${planId}`);
-          return next;
-        });
-      }, 2000);
-      
-      toast({ title: 'Sucesso', description: 'Plano atualizado com sucesso.' });
-      return data.plan;
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Erro ao atualizar plano';
-      toast({ title: 'Erro', description: message, variant: 'destructive' });
-      setErrorKeys(prev => new Set(prev).add(`plan_${planId}`));
-      throw error;
-    } finally {
-      setSavingKeys(prev => {
-        const next = new Set(prev);
-        next.delete(`plan_${planId}`);
-        return next;
-      });
-    }
-  }, [invokeAdmin, toast]);
-
-  // Food management
-  const searchFoods = useCallback(async (query: string, limit = 50, offset = 0) => {
-    setLoading(true);
-    try {
-      const data = await invokeAdmin('search_foods', { query, limit, offset });
-      return data as { foods: FoodRow[]; total: number };
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Erro ao buscar alimentos';
-      toast({ title: 'Erro', description: message, variant: 'destructive' });
-      return { foods: [], total: 0 };
+      return false;
     } finally {
       setLoading(false);
     }
   }, [invokeAdmin, toast]);
 
-  const updateFood = useCallback(async (foodId: string, updates: Partial<FoodRow>) => {
-    setSavingKeys(prev => new Set(prev).add(`food_${foodId}`));
+  const previewDeleteUser = useCallback(async (userId: string): Promise<DeleteUserPreview | null> => {
     try {
-      const data = await invokeAdmin('update_food', { foodId, updates });
-      toast({ title: 'Sucesso', description: 'Alimento atualizado com sucesso.' });
-      setSavedKeys(prev => new Set(prev).add(`food_${foodId}`));
-      setTimeout(() => {
-        setSavedKeys(prev => {
-          const next = new Set(prev);
-          next.delete(`food_${foodId}`);
-          return next;
-        });
-      }, 2000);
-      return data.food;
+      const data = await invokeAdmin('preview_delete_user', { userId });
+      return data as DeleteUserPreview;
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Erro ao atualizar alimento';
+      const message = error instanceof Error ? error.message : 'Erro ao verificar usuário';
       toast({ title: 'Erro', description: message, variant: 'destructive' });
-      setErrorKeys(prev => new Set(prev).add(`food_${foodId}`));
-      setTimeout(() => {
-        setErrorKeys(prev => {
-          const next = new Set(prev);
-          next.delete(`food_${foodId}`);
-          return next;
-        });
-      }, 3000);
-      throw error;
-    } finally {
-      setSavingKeys(prev => {
-        const next = new Set(prev);
-        next.delete(`food_${foodId}`);
-        return next;
-      });
-    }
-  }, [invokeAdmin, toast]);
-
-  const deleteFood = useCallback(async (foodId: string) => {
-    setSavingKeys(prev => new Set(prev).add(`delete_food_${foodId}`));
-    try {
-      await invokeAdmin('delete_food', { foodId });
-      toast({ title: 'Sucesso', description: 'Alimento excluído com sucesso.' });
-      return true;
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Erro ao excluir alimento';
-      toast({ title: 'Erro', description: message, variant: 'destructive' });
-      throw error;
-    } finally {
-      setSavingKeys(prev => {
-        const next = new Set(prev);
-        next.delete(`delete_food_${foodId}`);
-        return next;
-      });
-    }
-  }, [invokeAdmin, toast]);
-
-  const batchUpdateFoods = useCallback(async (
-    updates: Array<{ foodId: string; updates: { category?: string; processing_level?: string } }>
-  ) => {
-    setLoading(true);
-    try {
-      const result = await invokeAdmin('batch_update_foods', { updates });
-      
-      if (result.success > 0) {
-        toast({ 
-          title: 'Migração aplicada', 
-          description: `${result.success} alimentos atualizados${result.failed > 0 ? `, ${result.failed} falharam` : ''}.` 
-        });
-      }
-      
-      return result as { success: number; failed: number; errors: Array<{ foodId: string; error: string }> };
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Erro ao atualizar alimentos em lote';
-      toast({ title: 'Erro', description: message, variant: 'destructive' });
-      throw error;
-    } finally {
-      setLoading(false);
-    }
-  }, [invokeAdmin, toast]);
-
-  const normalizeFoodNames = useCallback(async () => {
-    setLoading(true);
-    try {
-      const result = await invokeAdmin('normalize_food_names', {});
-      
-      if (result.updated > 0) {
-        toast({ 
-          title: 'Nomes normalizados', 
-          description: `${result.updated} alimentos atualizados de ${result.total}.` 
-        });
-      } else {
-        toast({ 
-          title: 'Nenhuma alteração', 
-          description: 'Todos os nomes já estão normalizados.' 
-        });
-      }
-      
-      return result as { 
-        updated: number; 
-        unchanged: number; 
-        total: number; 
-        examples: Array<{ id: string; old_name: string; new_name: string }> 
-      };
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Erro ao normalizar nomes';
-      toast({ title: 'Erro', description: message, variant: 'destructive' });
-      throw error;
-    } finally {
-      setLoading(false);
+      return null;
     }
   }, [invokeAdmin, toast]);
 
@@ -764,8 +522,6 @@ export function useAdminOperations() {
     users,
     usersLoading,
     usersTotal,
-    plans,
-    plansLoading,
     fetchSettings,
     updateSetting,
     fetchFoodImports,
@@ -778,15 +534,7 @@ export function useAdminOperations() {
     fetchUsers,
     updateUser,
     toggleUserRole,
-    changeUserPassword,
-    previewDeleteUser,
     deleteUser,
-    fetchPlans,
-    updatePlan,
-    searchFoods,
-    updateFood,
-    deleteFood,
-    batchUpdateFoods,
-    normalizeFoodNames,
+    previewDeleteUser,
   };
 }

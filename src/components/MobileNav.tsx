@@ -14,7 +14,6 @@ import {
   LogOut,
   ChevronRight,
   ClipboardCheck,
-  Bell,
   Shield,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -26,12 +25,10 @@ import {
   SheetTrigger,
   SheetClose,
 } from '@/components/ui/sheet';
-import { Badge } from '@/components/ui/badge';
 import { Logo } from '@/components/Logo';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useSubscription } from '@/hooks/useSubscription';
-import { useUnreadAlerts } from '@/hooks/useUnreadAlerts';
 import { cn } from '@/lib/utils';
 
 interface NavItem {
@@ -39,27 +36,19 @@ interface NavItem {
   href: string;
   icon: React.ReactNode;
   show?: boolean;
-  badge?: number;
 }
 
 export function MobileNav() {
   const [open, setOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
-  const { signOut, profile } = useAuth();
-  const { isProfessional, hasActiveLicense, isAdmin, loading: roleLoading } = useUserRole();
-  const { accountType, isSubscribed, isLinkedToProfessional } = useSubscription();
-  const { unreadCount, canSeeAlerts } = useUnreadAlerts();
+  const { signOut } = useAuth();
+  const { isProfessional, isAdmin, loading: roleLoading } = useUserRole();
+  const { accountType, isSubscribed } = useSubscription();
 
   const showProfessionalLinks = 
     (isSubscribed && accountType === 'professional') || 
-    (isProfessional && hasActiveLicense);
-  
-  // Aluno vinculado ao profissional
-  const isLinkedStudent = profile?.professional_id && isLinkedToProfessional;
-  
-  // Show notification badge for professionals and plano_pessoal_pago users
-  const showNotificationBadge = !roleLoading && canSeeAlerts && unreadCount > 0;
+    isProfessional;
 
   const handleSignOut = async () => {
     setOpen(false);
@@ -96,7 +85,6 @@ export function MobileNav() {
       href: '/professional',
       icon: <LayoutDashboard className="h-5 w-5" />,
       show: showProfessionalLinks,
-      badge: showNotificationBadge ? unreadCount : undefined,
     },
     {
       label: 'Gerenciar Alunos',
@@ -108,8 +96,7 @@ export function MobileNav() {
       label: 'Seja Profissional',
       href: '/become-professional',
       icon: <Crown className="h-5 w-5" />,
-      // Só mostra se não é profissional E não é aluno vinculado
-      show: !showProfessionalLinks && !isLinkedStudent,
+      show: !showProfessionalLinks,
     },
     {
       label: 'Progresso',
@@ -133,8 +120,7 @@ export function MobileNav() {
       label: 'Assinatura',
       href: '/subscription',
       icon: <CreditCard className="h-5 w-5" />,
-      // Profissional não vê (gerencia no painel), Aluno vinculado não vê (gerenciado pelo profissional)
-      show: !isProfessional && !isLinkedStudent,
+      show: !isProfessional,
     },
   ];
 
@@ -153,11 +139,6 @@ export function MobileNav() {
           aria-label="Abrir menu"
         >
           <Menu className="h-5 w-5" />
-          {showNotificationBadge && (
-            <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-[10px] font-medium text-destructive-foreground">
-              {unreadCount > 9 ? '9+' : unreadCount}
-            </span>
-          )}
         </Button>
       </SheetTrigger>
       <SheetContent side="left" className="w-[280px] p-0">
@@ -190,11 +171,6 @@ export function MobileNav() {
               >
                 {item.icon}
                 <span className="flex-1">{item.label}</span>
-                {item.badge && (
-                  <Badge variant="destructive" className="h-5 min-w-5 px-1.5 text-xs">
-                    {item.badge > 99 ? '99+' : item.badge}
-                  </Badge>
-                )}
                 <ChevronRight className="h-4 w-4 opacity-50" />
               </Link>
             ))}
