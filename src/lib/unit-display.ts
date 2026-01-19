@@ -1,0 +1,89 @@
+/**
+ * Utilitários para exibição de quantidades com unidades
+ * 
+ * REGRA: O frontend NUNCA executa lógica nutricional
+ * Apenas formata dados já calculados pelo backend
+ */
+
+import type { MealFood, MealOptionFood } from './types';
+
+/**
+ * Mapeia plurais para unidades em português
+ */
+const PLURAL_MAP: Record<string, string> = {
+  'unidade': 'unidades',
+  'fatia': 'fatias',
+  'colher': 'colheres',
+  'xícara': 'xícaras',
+  'copo': 'copos',
+  'porção': 'porções',
+  'ovo': 'ovos',
+  'pedaço': 'pedaços',
+  'folha': 'folhas',
+};
+
+/**
+ * Formata quantidade para exibição humana.
+ * Usa dados persistidos pelo backend (display_quantity, display_unit).
+ * 
+ * @example
+ * formatQuantityDisplay(2, 'unidade') // "2 unidades"
+ * formatQuantityDisplay(150, 'g') // "150g"
+ * formatQuantityDisplay(1.5, 'fatia') // "1.5 fatias"
+ */
+export function formatQuantityDisplay(
+  displayQuantity: number,
+  displayUnit: string
+): string {
+  if (displayUnit === 'g') {
+    return `${Math.round(displayQuantity)}g`;
+  }
+
+  const qty = displayQuantity;
+  const isPlural = qty !== 1;
+  
+  const unit = isPlural && PLURAL_MAP[displayUnit] 
+    ? PLURAL_MAP[displayUnit] 
+    : displayUnit;
+
+  // Formatar número (inteiro se possível, senão 1 casa decimal)
+  const formattedQty = Number.isInteger(qty) ? qty : qty.toFixed(1);
+
+  return `${formattedQty} ${unit}`;
+}
+
+/**
+ * Obtém a quantidade formatada de um item de refeição.
+ * Prioriza display_quantity/display_unit se disponíveis.
+ * Fallback para quantity + 'g' se não houver conversão.
+ */
+export function getMealFoodDisplay(item: MealFood | MealOptionFood): string {
+  if (item.display_quantity != null && item.display_unit) {
+    return formatQuantityDisplay(item.display_quantity, item.display_unit);
+  }
+  
+  // Fallback: exibir em gramas
+  return `${Math.round(item.quantity)}g`;
+}
+
+/**
+ * Obtém os gramas reais para cálculos (se necessário no frontend).
+ * IMPORTANTE: Preferir calculated_grams sobre quantity.
+ */
+export function getActualGrams(item: MealFood | MealOptionFood): number {
+  return item.calculated_grams ?? item.quantity;
+}
+
+/**
+ * Verifica se um item teve conversão de unidade aplicada.
+ */
+export function hasUnitConversion(item: MealFood | MealOptionFood): boolean {
+  return item.display_unit != null && item.display_unit !== 'g';
+}
+
+/**
+ * Verifica se a conversão está bloqueada (não pode ser reavaliada).
+ */
+export function isConversionLocked(item: MealFood | MealOptionFood): boolean {
+  return item.unit_conversion_locked ?? false;
+}

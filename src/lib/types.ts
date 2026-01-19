@@ -122,6 +122,11 @@ export interface Food {
   category: FoodCategory | null;
   processing_level: ProcessingLevel;
   created_at: string;
+  // Campos de conversão de unidades
+  unit_name?: string | null;
+  unit_weight_grams?: number | null;
+  unit_increment?: number;
+  unit_enabled?: boolean;
 }
 
 export interface DietPlan {
@@ -168,6 +173,11 @@ export interface MealFood {
   quantity: number;
   created_at: string;
   food?: Food;
+  // Campos de conversão de unidades (camada de apresentação)
+  display_quantity?: number;
+  display_unit?: string;
+  calculated_grams?: number;
+  unit_conversion_locked?: boolean;
 }
 
 export interface MealOption {
@@ -190,6 +200,11 @@ export interface MealOptionFood {
   quantity: number;
   created_at: string;
   food?: Food;
+  // Campos de conversão de unidades (camada de apresentação)
+  display_quantity?: number;
+  display_unit?: string;
+  calculated_grams?: number;
+  unit_conversion_locked?: boolean;
 }
 
 export interface ChatMessage {

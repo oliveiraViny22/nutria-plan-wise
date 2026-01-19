@@ -16,12 +16,26 @@ interface Food {
   category: string;
   serving_size: string;
   processing_level: string;
+  // Campos de conversão de unidades
+  unit_name: string | null;
+  unit_weight_grams: number | null;
+  unit_increment: number;
+  unit_enabled: boolean;
+}
+
+interface FoodWithDisplay {
+  food: Food;
+  quantity: number; // gramas originais do cálculo
+  display_quantity: number;
+  display_unit: string;
+  calculated_grams: number;
+  unit_conversion_locked: boolean;
 }
 
 interface MealOption {
   option_number: number;
   name: string;
-  foods: { food: Food; quantity: number }[];
+  foods: FoodWithDisplay[];
   total_calories: number;
   total_protein: number;
   total_carbs: number;
@@ -31,6 +45,108 @@ interface MealOption {
 interface MealPlan {
   name: string;
   options: MealOption[];
+}
+
+// ========================================================
+// CONVERSÃO DETERMINÍSTICA DE UNIDADES
+// Princípio: Gramas são verdade nutricional, unidades são apresentação
+// ========================================================
+
+interface ConversionResult {
+  success: boolean;
+  display_quantity: number;
+  display_unit: string;
+  calculated_grams: number;
+  error_percent: number;
+}
+
+/**
+ * Converte gramas para unidades de forma determinística.
+ * Esta função NÃO usa IA - é puramente matemática.
+ */
+function convertGramsToUnit(
+  grams: number,
+  unitWeightGrams: number | null,
+  unitIncrement: number = 1,
+  tolerancePercent: number = 5
+): ConversionResult {
+  if (!unitWeightGrams || unitWeightGrams <= 0) {
+    return {
+      success: false,
+      display_quantity: Math.round(grams * 10) / 10,
+      display_unit: 'g',
+      calculated_grams: grams,
+      error_percent: 0,
+    };
+  }
+
+  if (!unitIncrement || unitIncrement <= 0) {
+    unitIncrement = 1;
+  }
+
+  const rawUnits = grams / unitWeightGrams;
+  let roundedUnits = Math.round(rawUnits / unitIncrement) * unitIncrement;
+
+  if (roundedUnits < unitIncrement) {
+    roundedUnits = unitIncrement;
+  }
+
+  const finalGrams = roundedUnits * unitWeightGrams;
+  const errorPercent = grams > 0 ? Math.abs(finalGrams - grams) / grams * 100 : 0;
+
+  if (errorPercent <= tolerancePercent) {
+    return {
+      success: true,
+      display_quantity: roundedUnits,
+      display_unit: '', // Será preenchido com unit_name
+      calculated_grams: finalGrams,
+      error_percent: errorPercent,
+    };
+  } else {
+    return {
+      success: false,
+      display_quantity: Math.round(grams * 10) / 10,
+      display_unit: 'g',
+      calculated_grams: grams,
+      error_percent: errorPercent,
+    };
+  }
+}
+
+/**
+ * Aplica conversão de unidade para um alimento.
+ * Retorna dados prontos para persistência.
+ */
+function applyUnitConversion(
+  food: Food,
+  quantityGrams: number
+): FoodWithDisplay {
+  if (!food.unit_enabled || !food.unit_name) {
+    return {
+      food,
+      quantity: quantityGrams,
+      display_quantity: Math.round(quantityGrams * 10) / 10,
+      display_unit: 'g',
+      calculated_grams: quantityGrams,
+      unit_conversion_locked: true,
+    };
+  }
+
+  const result = convertGramsToUnit(
+    quantityGrams,
+    food.unit_weight_grams,
+    food.unit_increment,
+    5
+  );
+
+  return {
+    food,
+    quantity: quantityGrams,
+    display_quantity: result.display_quantity,
+    display_unit: result.success ? food.unit_name : 'g',
+    calculated_grams: result.calculated_grams,
+    unit_conversion_locked: true,
+  };
 }
 
 const MEAL_NAMES = ["Café da Manhã", "Lanche da Manhã", "Almoço", "Lanche da Tarde", "Jantar", "Ceia"];
@@ -196,18 +312,45 @@ function generateEquivalentOption(
   let total_carbs = 0;
   let total_fat = 0;
   
+  // Aplicar conversão determinística de unidades
+  const foodsWithDisplay: FoodWithDisplay[] = [];
+  
   for (const { food, quantity } of selectedFoods) {
-    total_calories += food.calories * quantity;
-    total_protein += food.protein * quantity;
-    total_carbs += food.carbs * quantity;
-    total_fat += food.fat * quantity;
+    const converted = applyUnitConversion(food, quantity);
+    foodsWithDisplay.push(converted);
+    
+    // Usar calculated_grams para cálculos nutricionais (verdade)
+    const factor = converted.calculated_grams / 100; // assumindo macros por 100g
+    total_calories += food.calories * (converted.calculated_grams / quantity) * quantity / 100 * 100;
+    total_protein += food.protein * (converted.calculated_grams / quantity) * quantity / 100 * 100;
+    total_carbs += food.carbs * (converted.calculated_grams / quantity) * quantity / 100 * 100;
+    total_fat += food.fat * (converted.calculated_grams / quantity) * quantity / 100 * 100;
+  }
+  
+  // Recalcular usando gramas convertidos
+  total_calories = 0;
+  total_protein = 0;
+  total_carbs = 0;
+  total_fat = 0;
+  
+  for (const item of foodsWithDisplay) {
+    const gramsMultiplier = item.calculated_grams;
+    total_calories += item.food.calories * gramsMultiplier;
+    total_protein += item.food.protein * gramsMultiplier;
+    total_carbs += item.food.carbs * gramsMultiplier;
+    total_fat += item.food.fat * gramsMultiplier;
   }
   
   // Scale to match target calories within tolerance
-  const scaleFactor = targetCalories / total_calories;
+  const scaleFactor = total_calories > 0 ? targetCalories / total_calories : 1;
   if (Math.abs(scaleFactor - 1) > 0.2) {
-    for (const item of selectedFoods) {
-      item.quantity *= scaleFactor;
+    for (const item of foodsWithDisplay) {
+      const newGrams = item.quantity * scaleFactor;
+      const converted = applyUnitConversion(item.food, newGrams);
+      item.quantity = newGrams;
+      item.display_quantity = converted.display_quantity;
+      item.display_unit = converted.display_unit;
+      item.calculated_grams = converted.calculated_grams;
     }
     total_calories *= scaleFactor;
     total_protein *= scaleFactor;
@@ -218,7 +361,7 @@ function generateEquivalentOption(
   return {
     option_number: optionNumber,
     name: `Opção ${optionNumber}`,
-    foods: selectedFoods,
+    foods: foodsWithDisplay,
     total_calories: Math.round(total_calories),
     total_protein: Math.round(total_protein * 10) / 10,
     total_carbs: Math.round(total_carbs * 10) / 10,
@@ -349,7 +492,7 @@ serve(async (req) => {
       const options: MealOption[] = [];
 
       // Generate first option
-      const firstOptionFoods = selectFoodsForMeal(
+      const rawFirstOptionFoods = selectFoodsForMeal(
         foods,
         targetMealCalories,
         targetMealProtein,
@@ -360,16 +503,22 @@ serve(async (req) => {
         mealName
       );
 
+      // Aplicar conversão determinística de unidades para a primeira opção
+      const firstOptionFoods: FoodWithDisplay[] = rawFirstOptionFoods.map(({ food, quantity }) => 
+        applyUnitConversion(food, quantity)
+      );
+
       let total_calories = 0;
       let total_protein = 0;
       let total_carbs = 0;
       let total_fat = 0;
 
-      for (const { food, quantity } of firstOptionFoods) {
-        total_calories += food.calories * quantity;
-        total_protein += food.protein * quantity;
-        total_carbs += food.carbs * quantity;
-        total_fat += food.fat * quantity;
+      // Usar calculated_grams para cálculos nutricionais (verdade)
+      for (const item of firstOptionFoods) {
+        total_calories += item.food.calories * item.calculated_grams;
+        total_protein += item.food.protein * item.calculated_grams;
+        total_carbs += item.food.carbs * item.calculated_grams;
+        total_fat += item.food.fat * item.calculated_grams;
       }
 
       const firstOption: MealOption = {
@@ -486,26 +635,34 @@ serve(async (req) => {
           continue;
         }
 
-        // Save option foods
-        for (const { food, quantity } of option.foods) {
+        // Save option foods com dados de conversão de unidades
+        for (const item of option.foods) {
           await supabase
             .from("meal_option_foods")
             .insert({
               meal_option_id: mealOption.id,
-              food_id: food.id,
-              quantity,
+              food_id: item.food.id,
+              quantity: item.quantity,
+              display_quantity: item.display_quantity,
+              display_unit: item.display_unit,
+              calculated_grams: item.calculated_grams,
+              unit_conversion_locked: item.unit_conversion_locked,
             });
         }
       }
 
       // Also save to meal_foods for backward compatibility
-      for (const { food, quantity } of mealPlan.options[0]?.foods || []) {
+      for (const item of mealPlan.options[0]?.foods || []) {
         await supabase
           .from("meal_foods")
           .insert({
             meal_id: meal.id,
-            food_id: food.id,
-            quantity,
+            food_id: item.food.id,
+            quantity: item.quantity,
+            display_quantity: item.display_quantity,
+            display_unit: item.display_unit,
+            calculated_grams: item.calculated_grams,
+            unit_conversion_locked: item.unit_conversion_locked,
           });
       }
     }
