@@ -42,15 +42,13 @@ function getUnit(servingSize: string): string {
   return 'g';
 }
 
-// Calculate total grams for display
-function getTotalGrams(food: Food, quantity: number): number {
-  const baseGrams = parseServingGrams(food.serving_size);
-  // If quantity is stored as grams (>10), use directly; otherwise treat as multiplier
-  if (quantity >= 10) return Math.round(quantity);
-  return Math.round(baseGrams * quantity);
+// Calculate total grams for display - v2 uses quantity_grams directly
+function getTotalGrams(food: Food, quantityGrams: number): number {
+  // quantity_grams is already in grams, just round it
+  return Math.round(quantityGrams);
 }
 
-// Calculate nutrients for a given quantity
+// Calculate nutrients for a given quantity in grams
 function calcNutrients(food: Food, gramsQty: number) {
   const baseGrams = parseServingGrams(food.serving_size);
   const multiplier = gramsQty / baseGrams;
@@ -233,7 +231,7 @@ export default function MealDetail() {
     if (!selectedMealOptionFood?.food) return;
     
     const originalFood = selectedMealOptionFood.food as Food;
-    const originalQty = getTotalGrams(originalFood, selectedMealOptionFood.quantity);
+    const originalQty = getTotalGrams(originalFood, selectedMealOptionFood.quantity_grams);
     const originalNutrients = calcNutrients(originalFood, originalQty);
     
     // Calculate quantity of new food to EXACTLY match calories of original
@@ -303,14 +301,14 @@ export default function MealDetail() {
 
     try {
       const oldFood = selectedMealOptionFood.food as Food;
-      const oldQty = getTotalGrams(oldFood, selectedMealOptionFood.quantity);
+      const oldQty = getTotalGrams(oldFood, selectedMealOptionFood.quantity_grams);
       const oldNutrients = calcNutrients(oldFood, oldQty);
       const newNutrients = calcNutrients(selectedNewFood, adjustedQuantity);
 
-      // Update meal_option_food with new food and adjusted quantity
+      // Update meal_option_food with new food and adjusted quantity (v2 uses quantity_grams)
       const { error: updateError } = await supabase
         .from('meal_option_foods')
-        .update({ food_id: selectedNewFood.id, quantity: adjustedQuantity })
+        .update({ food_id: selectedNewFood.id, quantity_grams: adjustedQuantity })
         .eq('id', selectedMealOptionFood.id);
 
       if (updateError) throw updateError;
@@ -329,7 +327,7 @@ export default function MealDetail() {
       if (updatedOptionFoods) {
         for (const mof of updatedOptionFoods) {
           const food = mof.food as Food;
-          const qty = getTotalGrams(food, mof.quantity);
+          const qty = getTotalGrams(food, mof.quantity_grams);
           const nutrients = calcNutrients(food, qty);
           optionCalories += nutrients.calories;
           optionProtein += nutrients.protein;
@@ -460,15 +458,15 @@ export default function MealDetail() {
                         <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-primary flex-shrink-0 mt-0.5" />
                         <div className="min-w-0 flex-1">
                           <h3 className="font-semibold text-foreground mb-1 sm:mb-2 text-sm sm:text-base">
-                            Impacto nutricional da substituição
+                            Impacto da Substituição
                           </h3>
-                          <p className="text-muted-foreground text-xs sm:text-sm leading-relaxed">
+                          <p className="text-xs sm:text-sm text-muted-foreground whitespace-pre-wrap">
                             {impactExplanation}
                           </p>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="mt-2 text-xs sm:text-sm"
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="mt-2 text-xs"
                             onClick={() => setShowImpact(false)}
                           >
                             Fechar
@@ -484,276 +482,188 @@ export default function MealDetail() {
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.1 }}
-                  className="space-y-2 sm:space-y-3"
+                  className="space-y-3"
                 >
                   <h2 className="font-semibold text-foreground text-sm sm:text-base">
-                    Alimentos ({option.foods?.length || 0})
+                    Alimentos
                   </h2>
-                  {(option.foods || []).map((optionFood, index) => {
-                    const food = optionFood.food as Food;
-                    if (!food) return null;
-                    
-                    const totalGrams = getTotalGrams(food, optionFood.quantity);
-                    const unit = getUnit(food.serving_size);
-                    const nutrients = calcNutrients(food, totalGrams);
-                    
-                    return (
-                      <motion.div
-                        key={optionFood.id}
-                        initial={{ opacity: 0, x: -20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: 0.2 + index * 0.1 }}
-                        className="card-elevated rounded-lg sm:rounded-xl p-3 sm:p-4"
-                      >
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="flex-1 min-w-0">
-                            <h3 className="font-medium text-foreground text-sm sm:text-base truncate">
-                              {food?.name}
-                            </h3>
-                            <p className="text-xs sm:text-sm text-muted-foreground">
-                              {totalGrams}{unit}
-                            </p>
-                            <div className="flex flex-wrap gap-2 sm:gap-3 mt-1.5 sm:mt-2 text-[10px] sm:text-xs">
-                              <span className="text-protein font-medium">
-                                P: {nutrients.protein}g
-                              </span>
-                              <span className="text-carbs font-medium">
-                                C: {nutrients.carbs}g
-                              </span>
-                              <span className="text-fat font-medium">
-                                G: {nutrients.fat}g
-                              </span>
-                            </div>
-                          </div>
-                          <div className="text-right flex-shrink-0">
-                            <p className="font-semibold text-foreground text-sm sm:text-base">
-                              {nutrients.calories} kcal
-                            </p>
-                            {/* Show substitute button for users who can edit */}
-                            {canEdit && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="mt-1.5 sm:mt-2 text-xs h-7 sm:h-8 px-2 sm:px-3"
-                                onClick={() => openSubstituteModal(optionFood, option.id)}
-                              >
-                                <RefreshCw className="w-3 h-3 mr-1" />
-                                <span className="hidden xs:inline">Substituir</span>
-                                <span className="xs:hidden">Sub.</span>
-                              </Button>
-                            )}
-                          </div>
-                        </div>
-                      </motion.div>
-                    );
-                  })}
                   
-                  {(!option.foods || option.foods.length === 0) && (
-                    <div className="text-center py-8 text-muted-foreground">
-                      <p>Nenhum alimento nesta opção</p>
+                  {option.foods && option.foods.length > 0 ? (
+                    <div className="space-y-2 sm:space-y-3">
+                      {option.foods.map((optionFood: MealOptionFood) => {
+                        const food = optionFood.food as Food;
+                        if (!food) return null;
+                        
+                        const qty = getTotalGrams(food, optionFood.quantity_grams);
+                        const nutrients = calcNutrients(food, qty);
+                        const unit = getUnit(food.serving_size);
+                        const canSubstitute = canEdit && canBeSubstituted(food);
+                        
+                        return (
+                          <motion.div
+                            key={optionFood.id}
+                            layout
+                            className="card-elevated rounded-lg sm:rounded-xl p-3 sm:p-4"
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0 flex-1">
+                                <h3 className="font-medium text-foreground text-sm sm:text-base truncate">
+                                  {food.name}
+                                </h3>
+                                <p className="text-xs sm:text-sm text-muted-foreground">
+                                  {qty}{unit}
+                                </p>
+                                <div className="flex flex-wrap gap-2 mt-2">
+                                  <Badge variant="outline" className="text-[10px] sm:text-xs">
+                                    {nutrients.calories} kcal
+                                  </Badge>
+                                  <Badge variant="outline" className="text-[10px] sm:text-xs text-protein border-protein/30">
+                                    P: {nutrients.protein}g
+                                  </Badge>
+                                  <Badge variant="outline" className="text-[10px] sm:text-xs text-carbs border-carbs/30">
+                                    C: {nutrients.carbs}g
+                                  </Badge>
+                                  <Badge variant="outline" className="text-[10px] sm:text-xs text-fat border-fat/30">
+                                    G: {nutrients.fat}g
+                                  </Badge>
+                                </div>
+                              </div>
+                              {canSubstitute && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="shrink-0 text-xs"
+                                  onClick={() => openSubstituteModal(optionFood, option.id)}
+                                >
+                                  <RefreshCw className="w-3 h-3 mr-1" />
+                                  Trocar
+                                </Button>
+                              )}
+                            </div>
+                          </motion.div>
+                        );
+                      })}
                     </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground text-center py-8">
+                      Nenhum alimento nesta opção
+                    </p>
                   )}
                 </motion.section>
               </TabsContent>
             ))}
           </Tabs>
         ) : (
-          <div className="text-center py-12 text-muted-foreground">
-            <p>Nenhuma opção de refeição disponível</p>
+          <div className="text-center py-12">
+            <p className="text-muted-foreground">Nenhuma opção de refeição encontrada</p>
           </div>
         )}
       </main>
 
       {/* Substitute Modal */}
       <Dialog open={showSubstituteModal} onOpenChange={setShowSubstituteModal}>
-        <DialogContent className="max-w-[95vw] sm:max-w-lg max-h-[85vh] sm:max-h-[90vh] overflow-y-auto scrollbar-hide mx-2 sm:mx-auto p-4 sm:p-6">
+        <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="text-base sm:text-lg">Substituir Alimento</DialogTitle>
+            <DialogTitle>Substituir Alimento</DialogTitle>
           </DialogHeader>
-
-          <div className="space-y-3 sm:space-y-4">
-            {/* Current Food */}
-            <div className="p-3 sm:p-4 bg-muted rounded-lg sm:rounded-xl">
-              <p className="text-[10px] sm:text-xs text-muted-foreground mb-1">
-                Alimento atual
-              </p>
-              <p className="font-medium text-foreground text-sm sm:text-base">
-                {(selectedMealOptionFood?.food as Food)?.name}
-              </p>
-              {selectedMealOptionFood?.food && (
-                <div className="flex flex-wrap gap-2 sm:gap-3 mt-1 text-[10px] sm:text-xs text-muted-foreground">
-                  {(() => {
-                    const food = selectedMealOptionFood.food as Food;
-                    const qty = getTotalGrams(food, selectedMealOptionFood.quantity);
-                    const nutrients = calcNutrients(food, qty);
-                    return (
-                      <>
-                        <span>{qty}{getUnit(food.serving_size)}</span>
-                        <span>{nutrients.calories} kcal</span>
-                        <span>P: {nutrients.protein}g</span>
-                        <span>C: {nutrients.carbs}g</span>
-                        <span>G: {nutrients.fat}g</span>
-                      </>
-                    );
-                  })()}
-                </div>
-              )}
-            </div>
-
-            {/* Category Info */}
-            {selectedMealOptionFood?.food && (
-              <div className="p-2.5 sm:p-3 bg-primary/10 rounded-lg">
-                <p className="text-[10px] sm:text-xs text-primary font-medium">
-                  📌 Categoria: {(selectedMealOptionFood.food as Food).category}
+          
+          {selectedMealOptionFood?.food && (
+            <div className="space-y-4">
+              <div className="p-3 bg-muted rounded-lg">
+                <p className="text-sm text-muted-foreground">Substituindo:</p>
+                <p className="font-medium">{(selectedMealOptionFood.food as Food).name}</p>
+                <p className="text-sm text-muted-foreground">
+                  {getTotalGrams(selectedMealOptionFood.food as Food, selectedMealOptionFood.quantity_grams)}
+                  {getUnit((selectedMealOptionFood.food as Food).serving_size)}
                 </p>
-                <p className="text-[10px] sm:text-xs text-muted-foreground mt-1">
-                  Substituições permitidas apenas entre alimentos naturais ou minimamente processados da mesma categoria.
-                </p>
-                {(selectedMealOptionFood.food as Food).category === 'suplementos' && (
-                  <p className="text-[10px] sm:text-xs text-destructive mt-1">
-                    ⚠️ Suplementos não podem ser substituídos automaticamente.
-                  </p>
-                )}
               </div>
-            )}
 
-            {/* New Food Selection */}
-            <div className="space-y-2">
-              <p className="text-xs sm:text-sm font-medium text-foreground">
-                Escolha o novo alimento ({filteredFoodsForSubstitution.length} opções)
-              </p>
-              {filteredFoodsForSubstitution.length === 0 ? (
-                <p className="text-xs sm:text-sm text-muted-foreground p-3 sm:p-4 text-center">
-                  Não há outros alimentos disponíveis nesta categoria.
-                </p>
-              ) : (
-                <div className="max-h-40 sm:max-h-48 overflow-y-auto scrollbar-hide space-y-1 border rounded-lg p-1.5 sm:p-2">
-                  {filteredFoodsForSubstitution.map((food) => (
-                    <button
-                      key={food.id}
-                      onClick={() => handleSelectNewFood(food)}
-                      className={`w-full text-left p-2.5 sm:p-3 rounded-lg transition-colors ${
-                        selectedNewFood?.id === food.id
-                          ? 'bg-primary/10 border border-primary'
-                          : 'hover:bg-muted'
-                      }`}
-                    >
-                      <p className="font-medium text-foreground text-xs sm:text-sm">
-                        {food.name}
+              {!selectedNewFood ? (
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">Selecione o novo alimento:</p>
+                  <div className="max-h-60 overflow-y-auto space-y-1">
+                    {filteredFoodsForSubstitution.length > 0 ? (
+                      filteredFoodsForSubstitution.map((food) => (
+                        <button
+                          key={food.id}
+                          className="w-full text-left p-2 rounded-lg hover:bg-muted transition-colors"
+                          onClick={() => handleSelectNewFood(food)}
+                        >
+                          <p className="font-medium text-sm">{food.name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {food.calories} kcal / {food.serving_size}
+                          </p>
+                        </button>
+                      ))
+                    ) : (
+                      <p className="text-sm text-muted-foreground text-center py-4">
+                        Nenhum alimento disponível para substituição nesta categoria
                       </p>
-                      <div className="flex flex-wrap gap-1.5 sm:gap-2 text-[10px] sm:text-xs text-muted-foreground">
-                        <span>{food.calories} kcal/{food.serving_size}</span>
-                        <span>P: {food.protein}g</span>
-                        <span>C: {food.carbs}g</span>
-                        <span>G: {food.fat}g</span>
-                      </div>
-                    </button>
-                  ))}
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="p-3 bg-primary/10 rounded-lg">
+                    <p className="text-sm text-muted-foreground">Novo alimento:</p>
+                    <p className="font-medium">{selectedNewFood.name}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {adjustedQuantity}{getUnit(selectedNewFood.serving_size)} (ajustado para manter calorias)
+                    </p>
+                  </div>
+
+                  {loadingImpact ? (
+                    <div className="flex items-center justify-center py-4">
+                      <Loader2 className="w-5 h-5 animate-spin text-primary" />
+                      <span className="ml-2 text-sm">Analisando impacto...</span>
+                    </div>
+                  ) : impactExplanation && (
+                    <div className="p-3 bg-muted rounded-lg">
+                      <p className="text-sm font-medium mb-1">Impacto da troca:</p>
+                      <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                        {impactExplanation}
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      className="flex-1"
+                      onClick={() => setSelectedNewFood(null)}
+                    >
+                      Voltar
+                    </Button>
+                    <Button
+                      className="flex-1"
+                      onClick={confirmSubstitution}
+                      disabled={substituting}
+                    >
+                      {substituting ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                          Substituindo...
+                        </>
+                      ) : (
+                        <>
+                          <Check className="w-4 h-4 mr-2" />
+                          Confirmar
+                        </>
+                      )}
+                    </Button>
+                  </div>
                 </div>
               )}
             </div>
-
-            {/* Impact Explanation */}
-            {selectedNewFood && (
-              <div className="p-3 sm:p-4 bg-secondary/50 rounded-lg sm:rounded-xl border-l-4 border-l-primary">
-                {loadingImpact ? (
-                  <div className="flex items-center gap-2">
-                    <Loader2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 animate-spin text-primary" />
-                    <span className="text-xs sm:text-sm text-muted-foreground">
-                      Analisando impacto nutricional...
-                    </span>
-                  </div>
-                ) : (
-                  <>
-                    <div className="flex items-center gap-2 mb-1.5 sm:mb-2">
-                      <Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-primary" />
-                      <span className="text-xs sm:text-sm font-medium text-foreground">
-                        Impacto da substituição
-                      </span>
-                    </div>
-                    <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
-                      {impactExplanation}
-                    </p>
-                  </>
-                )}
-              </div>
-            )}
-
-            {/* Comparison */}
-            {selectedNewFood && selectedMealOptionFood?.food && (
-              <div className="grid grid-cols-2 gap-2 sm:gap-4">
-                <div className="p-2.5 sm:p-3 bg-muted rounded-lg text-center">
-                  <p className="text-[10px] sm:text-xs text-muted-foreground mb-0.5 sm:mb-1">Antes</p>
-                  {(() => {
-                    const food = selectedMealOptionFood.food as Food;
-                    const qty = getTotalGrams(food, selectedMealOptionFood.quantity);
-                    const nutrients = calcNutrients(food, qty);
-                    return (
-                      <>
-                        <p className="text-base sm:text-lg font-bold text-foreground">
-                          {nutrients.calories} kcal
-                        </p>
-                        <p className="text-[10px] sm:text-xs text-muted-foreground">
-                          {qty}{getUnit(food.serving_size)}
-                        </p>
-                      </>
-                    );
-                  })()}
-                </div>
-                <div className="p-2.5 sm:p-3 bg-primary/10 rounded-lg text-center">
-                  <p className="text-[10px] sm:text-xs text-muted-foreground mb-0.5 sm:mb-1">Depois</p>
-                  {(() => {
-                    const nutrients = calcNutrients(selectedNewFood, adjustedQuantity);
-                    return (
-                      <>
-                        <p className="text-base sm:text-lg font-bold text-primary">
-                          {nutrients.calories} kcal
-                        </p>
-                        <p className="text-[10px] sm:text-xs text-muted-foreground">
-                          {adjustedQuantity}{getUnit(selectedNewFood.serving_size)}
-                        </p>
-                      </>
-                    );
-                  })()}
-                </div>
-              </div>
-            )}
-
-            {/* Actions */}
-            <div className="flex gap-2 sm:gap-3 pt-2">
-              <Button
-                variant="outline"
-                className="flex-1 text-xs sm:text-sm h-9 sm:h-10"
-                onClick={() => setShowSubstituteModal(false)}
-              >
-                Cancelar
-              </Button>
-              <Button
-                variant="hero"
-                className="flex-1 text-xs sm:text-sm h-9 sm:h-10"
-                onClick={confirmSubstitution}
-                disabled={!selectedNewFood || substituting}
-              >
-                {substituting ? (
-                  <>
-                    <Loader2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 animate-spin" />
-                    <span className="hidden xs:inline ml-1">Substituindo...</span>
-                  </>
-                ) : (
-                  <span className="truncate">Confirmar</span>
-                )}
-              </Button>
-            </div>
-          </div>
+          )}
         </DialogContent>
       </Dialog>
 
-      <UpgradeDialog
-        open={showUpgradeDialog}
+      {/* Upgrade Dialog */}
+      <UpgradeDialog 
+        open={showUpgradeDialog} 
         onOpenChange={setShowUpgradeDialog}
-        feature="substituições"
-        currentPlan="Gratuito"
-        limit={1}
+        feature="substituição de alimentos"
       />
     </div>
   );

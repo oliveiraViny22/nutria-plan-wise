@@ -4,243 +4,28 @@ import { motion } from 'framer-motion';
 import { 
   ArrowLeft, 
   User,
-  Target,
-  Flame,
-  Calendar,
-  Utensils,
-  TrendingUp,
-  RefreshCw,
-  Loader2,
-  Send,
-  Lock,
-  Unlock,
-  Sparkles,
-  BarChart3,
+  AlertCircle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { Card, CardContent } from '@/components/ui/card';
 import { Logo } from '@/components/Logo';
 import { MobileNav } from '@/components/MobileNav';
-import { CalorieRing } from '@/components/CalorieRing';
-import { MacroChart } from '@/components/MacroChart';
-import { MacroRebalancer } from '@/components/MacroRebalancer';
-import { AISuggestionsReview } from '@/components/AISuggestionsReview';
-import { AdherenceDashboard } from '@/components/AdherenceDashboard';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserRole } from '@/hooks/useUserRole';
-import { Profile, Meal, DietPlan, MEAL_NAMES, GOALS, MealType } from '@/lib/types';
-import { toast } from '@/hooks/use-toast';
-import { format } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
-
-interface MealFood {
-  id: string;
-  quantity: number;
-  food: {
-    id: string;
-    name: string;
-    calories: number;
-    protein: number;
-    carbs: number;
-    fat: number;
-    serving_size: string;
-  };
-}
-
-interface MealWithFoods extends Meal {
-  meal_foods: MealFood[];
-}
 
 export default function StudentView() {
   const { studentId } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { isProfessional } = useUserRole();
-  
-  const [studentProfile, setStudentProfile] = useState<Profile | null>(null);
-  const [dietPlan, setDietPlan] = useState<DietPlan | null>(null);
-  const [meals, setMeals] = useState<MealWithFoods[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [generating, setGenerating] = useState(false);
-  const [releasing, setReleasing] = useState(false);
+  const { isProfessional, loading: roleLoading } = useUserRole();
 
-  const fetchStudentData = async () => {
-    if (!studentId || !user) return;
-    
-    setLoading(true);
-    try {
-      // Verify professional has access to this student
-      const { data: linkData, error: linkError } = await supabase
-        .from('professional_students')
-        .select('id')
-        .eq('professional_id', user.id)
-        .eq('student_id', studentId)
-        .single();
-
-      if (linkError || !linkData) {
-        toast({
-          variant: 'destructive',
-          title: 'Acesso negado',
-          description: 'Você não tem permissão para visualizar este aluno.',
-        });
-        navigate('/students');
-        return;
-      }
-
-      // Fetch student profile
-      const { data: profileData, error: profileError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('user_id', studentId)
-        .single();
-
-      if (profileError) throw profileError;
-      setStudentProfile(profileData as Profile);
-
-      // Fetch latest diet plan
-      const { data: planData, error: planError } = await supabase
-        .from('diet_plans')
-        .select('*')
-        .eq('user_id', studentId)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .single();
-
-      if (planError && planError.code !== 'PGRST116') {
-        console.error('Error fetching diet plan:', planError);
-      }
-
-      if (planData) {
-        setDietPlan(planData as DietPlan);
-
-        // Fetch meals with foods
-        const { data: mealsData, error: mealsError } = await supabase
-          .from('meals')
-          .select(`
-            *,
-            meal_foods (
-              id,
-              quantity,
-              food:foods (
-                id,
-                name,
-                calories,
-                protein,
-                carbs,
-                fat,
-                serving_size
-              )
-            )
-          `)
-          .eq('diet_plan_id', planData.id)
-          .order('created_at');
-
-        if (mealsError) throw mealsError;
-        setMeals((mealsData as MealWithFoods[]) || []);
-      } else {
-        setDietPlan(null);
-        setMeals([]);
-      }
-    } catch (error) {
-      console.error('Error fetching student data:', error);
-      toast({
-        variant: 'destructive',
-        title: 'Erro',
-        description: 'Não foi possível carregar os dados do aluno.',
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchStudentData();
-  }, [studentId, user, navigate]);
-
-  // Generate meal plan for student
-  const generateMealPlan = async () => {
-    if (!studentProfile || !studentId) return;
-    
-    setGenerating(true);
-    try {
-      const response = await supabase.functions.invoke('generate-meal-plan', {
-        body: {
-          profile: {
-            daily_calories: studentProfile.daily_calories,
-            protein_target: studentProfile.protein_target,
-            carbs_target: studentProfile.carbs_target,
-            fat_target: studentProfile.fat_target,
-            preferences: studentProfile.preferences,
-            restrictions: studentProfile.restrictions,
-            goal: studentProfile.goal,
-            meals_per_day: studentProfile.meals_per_day || 4,
-          },
-          studentId: studentId,
-        },
-      });
-
-      if (response.error) throw response.error;
-
-      toast({
-        title: 'Sucesso!',
-        description: 'Plano alimentar gerado com sucesso.',
-      });
-      
-      // Refresh the data without full page reload
-      await fetchStudentData();
-    } catch (error: any) {
-      console.error('Error generating plan:', error);
-      toast({
-        variant: 'destructive',
-        title: 'Erro',
-        description: 'Erro ao gerar plano alimentar',
-      });
-    } finally {
-      setGenerating(false);
-    }
-  };
-
-  // Release/unrelease plan to student
-  const togglePlanRelease = async () => {
-    if (!dietPlan) return;
-    
-    setReleasing(true);
-    try {
-      const newReleaseStatus = !dietPlan.released_to_student;
-      
-      const { error } = await supabase
-        .from('diet_plans')
-        .update({ released_to_student: newReleaseStatus })
-        .eq('id', dietPlan.id);
-
-      if (error) throw error;
-
-      setDietPlan({ ...dietPlan, released_to_student: newReleaseStatus });
-      
-      toast({
-        title: newReleaseStatus ? 'Plano liberado!' : 'Plano ocultado',
-        description: newReleaseStatus 
-          ? 'O aluno agora pode visualizar o plano alimentar.'
-          : 'O plano foi ocultado do aluno.',
-      });
-    } catch (error: any) {
-      console.error('Error toggling plan release:', error);
-      toast({
-        variant: 'destructive',
-        title: 'Erro',
-        description: 'Erro ao alterar status do plano',
-      });
-    } finally {
-      setReleasing(false);
-    }
-  };
-
-  // Refetch after macro rebalancer completes
-  const handleMacroRebalanceComplete = () => {
-    fetchStudentData();
-  };
+  if (roleLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+      </div>
+    );
+  }
 
   if (!isProfessional) {
     return (
@@ -261,34 +46,6 @@ export default function StudentView() {
     );
   }
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
-      </div>
-    );
-  }
-
-  if (!studentProfile) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-4">
-        <Card className="max-w-md w-full text-center">
-          <CardContent className="pt-6">
-            <User className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-            <h2 className="text-xl font-semibold mb-2">Aluno não encontrado</h2>
-            <Button onClick={() => navigate('/students')}>
-              Voltar para Alunos
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  const goalLabel = studentProfile.goal 
-    ? GOALS[studentProfile.goal as keyof typeof GOALS]?.label || studentProfile.goal 
-    : 'Não definido';
-
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -302,299 +59,32 @@ export default function StudentView() {
             <Logo size="sm" />
           </div>
           <h1 className="text-sm sm:text-lg font-semibold truncate max-w-[140px] sm:max-w-[200px]">
-            {studentProfile.name || 'Aluno'}
+            Visualização de Aluno
           </h1>
           <div className="w-9 sm:w-10" />
         </div>
       </header>
 
       <main className="container mx-auto px-3 sm:px-4 py-4 sm:py-6 space-y-4 sm:space-y-6 pb-safe">
-        {/* Student Info */}
-        <motion.div
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-        >
-          <Card>
-            <CardContent className="py-3 sm:py-4 px-3 sm:px-6">
-              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4">
-                <div className="flex items-center gap-3 w-full sm:w-auto">
-                  <div className="w-10 h-10 sm:w-14 sm:h-14 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                    <span className="text-base sm:text-xl font-semibold text-primary">
-                      {(studentProfile.name || 'A')[0].toUpperCase()}
-                    </span>
-                  </div>
-                  <div className="flex-1 min-w-0 sm:hidden">
-                    <h2 className="text-base font-semibold truncate">{studentProfile.name || 'Aluno'}</h2>
-                    <p className="text-xs text-muted-foreground truncate">{studentProfile.email}</p>
-                  </div>
-                </div>
-                <div className="hidden sm:block flex-1 min-w-0">
-                  <h2 className="text-xl font-semibold">{studentProfile.name || 'Aluno'}</h2>
-                  <p className="text-muted-foreground">{studentProfile.email}</p>
-                </div>
-                <div className="flex items-center gap-2 sm:gap-4 text-xs sm:text-sm flex-wrap w-full sm:w-auto">
-                  <Badge variant="outline" className="gap-1 text-[10px] sm:text-xs">
-                    <Target className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
-                    {goalLabel}
-                  </Badge>
-                  {studentProfile.daily_calories && (
-                    <Badge variant="outline" className="gap-1 text-[10px] sm:text-xs">
-                      <Flame className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
-                      {studentProfile.daily_calories} kcal/dia
-                    </Badge>
-                  )}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-
-        {/* Action Buttons for Professional */}
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.05 }}
-          className="space-y-3"
         >
-          {/* Generate/Regenerate Plan */}
-          <Button
-            variant="hero"
-            size="lg"
-            className="w-full"
-            onClick={generateMealPlan}
-            disabled={generating}
-          >
-            {generating ? (
-              <>
-                <Loader2 className="w-5 h-5 animate-spin" />
-                Gerando plano...
-              </>
-            ) : dietPlan ? (
-              <>
-                <RefreshCw className="w-5 h-5" />
-                Gerar novo plano
-              </>
-            ) : (
-              <>
-                <Utensils className="w-5 h-5" />
-                Criar plano alimentar
-              </>
-            )}
-          </Button>
-
-          {/* Macro Rebalancer */}
-          {dietPlan && (
-            <MacroRebalancer
-              planId={dietPlan.id}
-              targets={{
-                protein: studentProfile.protein_target || 150,
-                carbs: studentProfile.carbs_target || 250,
-                fat: studentProfile.fat_target || 65,
-                calories: studentProfile.daily_calories || 2000,
-              }}
-              currentMacros={{
-                protein: dietPlan.total_protein,
-                carbs: dietPlan.total_carbs,
-                fat: dietPlan.total_fat,
-                calories: dietPlan.total_calories,
-              }}
-              onComplete={handleMacroRebalanceComplete}
-            />
-          )}
-
-          {/* Release/Unrelease Plan Button */}
-          {dietPlan && (
-            <Button
-              variant={dietPlan.released_to_student ? "outline" : "default"}
-              size="lg"
-              className="w-full"
-              onClick={togglePlanRelease}
-              disabled={releasing}
-            >
-              {releasing ? (
-                <>
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                  Processando...
-                </>
-              ) : dietPlan.released_to_student ? (
-                <>
-                  <Lock className="w-5 h-5" />
-                  Ocultar plano do aluno
-                </>
-              ) : (
-                <>
-                  <Send className="w-5 h-5" />
-                  Liberar plano para o aluno
-                </>
-              )}
-            </Button>
-          )}
-
-          {/* Status Badge */}
-          {dietPlan && (
-            <div className="flex justify-center">
-              <Badge variant={dietPlan.released_to_student ? "default" : "secondary"} className="gap-1">
-                {dietPlan.released_to_student ? (
-                  <>
-                    <Unlock className="h-3 w-3" />
-                    Plano visível para o aluno
-                  </>
-                ) : (
-                  <>
-                    <Lock className="h-3 w-3" />
-                    Plano oculto do aluno
-                  </>
-                )}
-              </Badge>
-            </div>
-          )}
-        </motion.div>
-
-        {/* Stats */}
-        {dietPlan && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.1 }}
-            className="grid md:grid-cols-2 gap-6"
-          >
-            <Card className="card-elevated">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Flame className="h-4 w-4 text-primary" />
-                  Calorias do Plano
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <CalorieRing
-                  current={dietPlan.total_calories}
-                  target={studentProfile.daily_calories || 2000}
-                />
-              </CardContent>
-            </Card>
-
-            <Card className="card-elevated">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <TrendingUp className="h-4 w-4 text-primary" />
-                  Macronutrientes
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <MacroChart
-                  protein={dietPlan.total_protein}
-                  carbs={dietPlan.total_carbs}
-                  fat={dietPlan.total_fat}
-                  proteinTarget={studentProfile.protein_target || 150}
-                  carbsTarget={studentProfile.carbs_target || 250}
-                  fatTarget={studentProfile.fat_target || 65}
-                />
-              </CardContent>
-            </Card>
-          </motion.div>
-        )}
-
-        {/* Adherence Dashboard */}
-        {dietPlan && studentId && (
-          <AdherenceDashboard
-            studentId={studentId}
-            dietPlanId={dietPlan.id}
-            studentName={studentProfile.name || undefined}
-          />
-        )}
-
-        {/* AI Suggestions Review */}
-        {dietPlan && studentId && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.2 }}
-          >
-            <AISuggestionsReview
-              studentId={studentId}
-              dietPlanId={dietPlan.id}
-              onSuggestionApplied={fetchStudentData}
-            />
-          </motion.div>
-        )}
-
-        {/* Meals */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.2 }}
-          className="space-y-4"
-        >
-          <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold flex items-center gap-2">
-              <Utensils className="h-5 w-5 text-primary" />
-              Plano Alimentar
-            </h2>
-            {dietPlan && (
-              <p className="text-sm text-muted-foreground flex items-center gap-1">
-                <Calendar className="h-4 w-4" />
-                {format(new Date(dietPlan.created_at), "dd/MM/yyyy", { locale: ptBR })}
+          <Card>
+            <CardContent className="py-12 text-center">
+              <AlertCircle className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+              <h2 className="text-xl font-semibold mb-2">Funcionalidade em Desenvolvimento</h2>
+              <p className="text-muted-foreground mb-4">
+                O gerenciamento de alunos estará disponível em breve.
               </p>
-            )}
-          </div>
-
-          {meals.length === 0 ? (
-            <Card>
-              <CardContent className="py-8 text-center">
-                <Utensils className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <h3 className="text-lg font-medium mb-2">Nenhum plano alimentar</h3>
-                <p className="text-muted-foreground">
-                  O aluno ainda não gerou um plano alimentar.
-                </p>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="grid gap-4">
-              {meals.map((meal, index) => (
-                <motion.div
-                  key={meal.id}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.1 * index }}
-                >
-                  <Card 
-                    className="card-interactive cursor-pointer hover:border-primary/50 transition-colors"
-                    onClick={() => navigate(`/meal/${meal.id}?studentId=${studentId}`)}
-                  >
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-base flex items-center justify-between">
-                        <span>{MEAL_NAMES[meal.name as keyof typeof MEAL_NAMES] || meal.name}</span>
-                        <div className="flex items-center gap-2">
-                          <Badge variant="secondary">
-                            {meal.total_calories || 0} kcal
-                          </Badge>
-                          <RefreshCw className="h-4 w-4 text-muted-foreground" />
-                        </div>
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-2">
-                        {meal.meal_foods?.map((mf) => (
-                          <div key={mf.id} className="flex items-center justify-between text-sm">
-                            <span>{mf.food.name}</span>
-                            <span className="text-muted-foreground">
-                              {mf.quantity}x {mf.food.serving_size}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                      <div className="flex gap-4 mt-4 pt-3 border-t text-xs text-muted-foreground">
-                        <span className="text-protein">P: {meal.total_protein?.toFixed(0) || 0}g</span>
-                        <span className="text-carbs">C: {meal.total_carbs?.toFixed(0) || 0}g</span>
-                        <span className="text-fat">G: {meal.total_fat?.toFixed(0) || 0}g</span>
-                      </div>
-                      <p className="text-xs text-primary mt-2">Clique para editar substituições</p>
-                    </CardContent>
-                  </Card>
-                </motion.div>
-              ))}
-            </div>
-          )}
+              <p className="text-sm text-muted-foreground mb-6">
+                Esta funcionalidade está sendo atualizada para a nova versão do sistema.
+              </p>
+              <Button onClick={() => navigate('/professional-dashboard')}>
+                Voltar ao Painel Profissional
+              </Button>
+            </CardContent>
+          </Card>
         </motion.div>
       </main>
     </div>
