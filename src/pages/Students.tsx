@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Users, 
-  Plus, 
   Search, 
   ArrowLeft,
   MoreVertical,
@@ -13,7 +12,6 @@ import {
   Target,
   Flame,
   Crown,
-  Calendar,
   AlertCircle,
   UserCheck,
   UserX,
@@ -50,15 +48,14 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Logo } from '@/components/Logo';
 import { MobileNav } from '@/components/MobileNav';
+import { CreateStudentForm } from '@/components/CreateStudentForm';
 import { useProfessionalStudents } from '@/hooks/useProfessionalStudents';
 import { useUserRole } from '@/hooks/useUserRole';
 import { GOALS } from '@/lib/types';
-import { format, differenceInDays } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
 
 export default function Students() {
   const navigate = useNavigate();
-  const { students, license, loading, studentCount, isLicenseActive, removeStudent, updateStudentStatus, refresh } = useProfessionalStudents();
+  const { students, loading, studentCount, isLicenseActive, addStudent, removeStudent, updateStudentStatus, refresh } = useProfessionalStudents();
   const { isProfessional, loading: roleLoading } = useUserRole();
   
   const [searchQuery, setSearchQuery] = useState('');
@@ -84,10 +81,7 @@ export default function Students() {
     setStudentToRemove(null);
   };
 
-  const getDaysRemaining = () => {
-    if (!license) return 0;
-    return differenceInDays(new Date(license.expires_at), new Date());
-  };
+  // No license system in v2 - simplified
 
   if (roleLoading || loading) {
     return (
@@ -134,26 +128,24 @@ export default function Students() {
       </header>
 
       <main className="container mx-auto px-3 sm:px-4 py-4 sm:py-6 space-y-4 sm:space-y-6">
-        {/* License Status */}
+        {/* Status Card */}
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
         >
-          <Card className={`border-l-4 ${isLicenseActive ? 'border-l-primary' : 'border-l-destructive'}`}>
+          <Card className="border-l-4 border-l-primary">
             <CardContent className="py-3 sm:py-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
                 <div className="flex items-center gap-2 sm:gap-3">
-                  <div className={`p-1.5 sm:p-2 rounded-full ${isLicenseActive ? 'bg-primary/10' : 'bg-destructive/10'}`}>
-                    <Crown className={`h-4 w-4 sm:h-5 sm:w-5 ${isLicenseActive ? 'text-primary' : 'text-destructive'}`} />
+                  <div className="p-1.5 sm:p-2 rounded-full bg-primary/10">
+                    <Crown className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
                   </div>
                   <div>
                     <p className="font-medium text-sm sm:text-base">
-                      Licença Mensal
+                      Gestão de Alunos
                     </p>
                     <p className="text-xs sm:text-sm text-muted-foreground">
-                      {isLicenseActive 
-                        ? `${getDaysRemaining()} dias restantes`
-                        : 'Licença expirada'}
+                      Gerencie seus alunos vinculados
                     </p>
                   </div>
                 </div>
@@ -161,14 +153,8 @@ export default function Students() {
                 <div className="flex items-center gap-3 sm:gap-4 text-xs sm:text-sm ml-8 sm:ml-0">
                   <div className="flex items-center gap-1 sm:gap-2">
                     <Users className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
-                    <span>{studentCount} / {license?.max_students || 0}</span>
+                    <span>{studentCount} alunos</span>
                   </div>
-                  {license && (
-                    <div className="hidden sm:flex items-center gap-2 text-muted-foreground">
-                      <Calendar className="h-4 w-4" />
-                      <span>Expira em {format(new Date(license.expires_at), "dd/MM/yyyy", { locale: ptBR })}</span>
-                    </div>
-                  )}
                 </div>
               </div>
             </CardContent>
@@ -190,7 +176,6 @@ export default function Students() {
           <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
             <DialogTrigger asChild>
               <Button 
-                disabled={!isLicenseActive || studentCount >= (license?.max_students || 0)}
                 className="w-full sm:w-auto text-sm h-10"
               >
                 <UserPlus className="h-4 w-4 mr-2" />
@@ -199,16 +184,16 @@ export default function Students() {
             </DialogTrigger>
             <DialogContent className="mx-4 sm:mx-0 max-w-lg max-h-[90vh] overflow-hidden">
               <DialogHeader>
-                <DialogTitle className="text-base sm:text-lg">Cadastrar Novo Aluno</DialogTitle>
+                <DialogTitle className="text-base sm:text-lg">Adicionar Aluno</DialogTitle>
                 <DialogDescription className="text-xs sm:text-sm">
-                  Funcionalidade em desenvolvimento. Em breve você poderá cadastrar alunos diretamente pela plataforma.
+                  Adicione um aluno que já está cadastrado na plataforma pelo email.
                 </DialogDescription>
               </DialogHeader>
-              <div className="flex justify-end pt-4">
-                <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
-                  Fechar
-                </Button>
-              </div>
+              <CreateStudentForm
+                onSuccess={handleStudentCreated}
+                onCancel={() => setIsCreateDialogOpen(false)}
+                onAddStudent={addStudent}
+              />
             </DialogContent>
           </Dialog>
         </div>
