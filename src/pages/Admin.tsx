@@ -1177,36 +1177,6 @@ export default function Admin() {
                 </CardContent>
               </Card>
 
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Database className="h-5 w-5 text-primary" />
-                    Dados de Teste
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <Button 
-                    variant="outline" 
-                    onClick={handleSeedTestData}
-                    disabled={seedingData}
-                  >
-                    {seedingData ? (
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    ) : (
-                      <Database className="h-4 w-4 mr-2" />
-                    )}
-                    Criar Dados de Teste
-                  </Button>
-                  {seedResults && (
-                    <Alert className="mt-4">
-                      <CheckCircle className="h-4 w-4" />
-                      <AlertDescription>
-                        Dados criados com sucesso!
-                      </AlertDescription>
-                    </Alert>
-                  )}
-                </CardContent>
-              </Card>
 
               {/* Foods Management Table */}
               <Card>
