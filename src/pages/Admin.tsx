@@ -47,7 +47,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { useUserRole } from '@/hooks/useUserRole';
-import { useAdminOperations, UserProfile, DeleteUserPreview, Plan, UserUsage } from '@/hooks/useAdminOperations';
+import { useAdminOperations, UserProfile, DeleteUserPreview, Plan, UserUsage, Food } from '@/hooks/useAdminOperations';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { FoodImportValidator, ValidationResult as FoodValidationResult, FoodRow } from '@/components/FoodImportValidator';
@@ -113,6 +113,9 @@ export default function Admin() {
     usersTotal,
     plans,
     plansLoading,
+    foods,
+    foodsLoading,
+    foodsTotal,
     fetchSettings, 
     updateSetting,
     fetchFoodImports,
@@ -129,6 +132,10 @@ export default function Admin() {
     updatePlan,
     getUserUsage,
     updateUserUsage,
+    fetchFoods,
+    updateFood,
+    deleteFood,
+    normalizeFoodNames,
   } = useAdminOperations();
 
   const [activeTab, setActiveTab] = useState('metrics');
@@ -162,6 +169,14 @@ export default function Admin() {
   const [downloadingDoc, setDownloadingDoc] = useState<string | null>(null);
   const [editingPlanPrice, setEditingPlanPrice] = useState<string | null>(null);
   const [editedPrices, setEditedPrices] = useState<Record<string, number>>({});
+  
+  // Foods management state
+  const [foodSearch, setFoodSearch] = useState('');
+  const [foodPage, setFoodPage] = useState(0);
+  const [editingFood, setEditingFood] = useState<Food | null>(null);
+  const [editedFoodData, setEditedFoodData] = useState<Partial<Food>>({});
+  const [deletingFoodId, setDeletingFoodId] = useState<string | null>(null);
+  const [normalizingNames, setNormalizingNames] = useState(false);
 
   useEffect(() => {
     if (!roleLoading && !isAdmin) {
@@ -1193,6 +1208,191 @@ export default function Admin() {
                 </CardContent>
               </Card>
 
+              {/* Foods Management Table */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Database className="h-5 w-5 text-primary" />
+                    Banco de Alimentos
+                  </CardTitle>
+                  <CardDescription>
+                    Visualize, edite e gerencie os alimentos cadastrados ({foodsTotal} total).
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {/* Search and Actions */}
+                  <div className="flex flex-wrap items-center gap-4">
+                    <div className="relative flex-1 min-w-[200px] max-w-md">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Buscar alimentos..."
+                        value={foodSearch}
+                        onChange={(e) => {
+                          setFoodSearch(e.target.value);
+                          setFoodPage(0);
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            fetchFoods(foodSearch, 0);
+                          }
+                        }}
+                        className="pl-10"
+                      />
+                    </div>
+                    <Button 
+                      variant="outline" 
+                      onClick={() => fetchFoods(foodSearch, foodPage)}
+                      disabled={foodsLoading}
+                    >
+                      {foodsLoading ? (
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <Search className="h-4 w-4 mr-2" />
+                      )}
+                      Buscar
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      onClick={async () => {
+                        setNormalizingNames(true);
+                        await normalizeFoodNames();
+                        await fetchFoods(foodSearch, foodPage);
+                        setNormalizingNames(false);
+                      }}
+                      disabled={normalizingNames}
+                    >
+                      {normalizingNames ? (
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <RefreshCw className="h-4 w-4 mr-2" />
+                      )}
+                      Normalizar Nomes
+                    </Button>
+                  </div>
+
+                  {/* Foods Table */}
+                  {foodsLoading ? (
+                    <div className="flex items-center justify-center py-12">
+                      <Loader2 className="h-8 w-8 animate-spin" />
+                    </div>
+                  ) : foods.length === 0 ? (
+                    <div className="py-12 text-center text-muted-foreground">
+                      <Database className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                      <p>Nenhum alimento encontrado. Use o botão "Buscar" para carregar os alimentos.</p>
+                    </div>
+                  ) : (
+                    <>
+                      <ScrollArea className="h-[400px]">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="w-[250px]">Nome</TableHead>
+                              <TableHead>Categoria</TableHead>
+                              <TableHead>Processamento</TableHead>
+                              <TableHead className="text-right">Calorias</TableHead>
+                              <TableHead className="text-right">Proteína</TableHead>
+                              <TableHead className="text-right">Carbos</TableHead>
+                              <TableHead className="text-right">Gordura</TableHead>
+                              <TableHead className="text-center">Ações</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {foods.map((food) => (
+                              <TableRow key={food.id}>
+                                <TableCell className="font-medium">{food.name}</TableCell>
+                                <TableCell>
+                                  <Badge variant="outline">{food.category || 'Sem categoria'}</Badge>
+                                </TableCell>
+                                <TableCell>
+                                  <Badge variant="secondary">{food.processing_level || 'N/A'}</Badge>
+                                </TableCell>
+                                <TableCell className="text-right">{food.calories} kcal</TableCell>
+                                <TableCell className="text-right">{food.protein}g</TableCell>
+                                <TableCell className="text-right">{food.carbs}g</TableCell>
+                                <TableCell className="text-right">{food.fat}g</TableCell>
+                                <TableCell className="text-center">
+                                  <div className="flex items-center justify-center gap-1">
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={() => {
+                                        setEditingFood(food);
+                                        setEditedFoodData({
+                                          name: food.name,
+                                          calories: food.calories,
+                                          protein: food.protein,
+                                          carbs: food.carbs,
+                                          fat: food.fat,
+                                          category: food.category,
+                                          processing_level: food.processing_level,
+                                          serving_size: food.serving_size,
+                                        });
+                                      }}
+                                    >
+                                      <Edit2 className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={() => setDeletingFoodId(food.id)}
+                                      disabled={savingKeys.has(`food_${food.id}`)}
+                                    >
+                                      {savingKeys.has(`food_${food.id}`) ? (
+                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                      ) : (
+                                        <Trash2 className="h-4 w-4 text-destructive" />
+                                      )}
+                                    </Button>
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </ScrollArea>
+
+                      {/* Pagination */}
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm text-muted-foreground">
+                          Mostrando {foods.length} de {foodsTotal} alimentos
+                        </p>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              const newPage = foodPage - 1;
+                              setFoodPage(newPage);
+                              fetchFoods(foodSearch, newPage);
+                            }}
+                            disabled={foodPage === 0}
+                          >
+                            <ChevronLeft className="h-4 w-4 mr-1" />
+                            Anterior
+                          </Button>
+                          <span className="text-sm text-muted-foreground">
+                            Página {foodPage + 1} de {Math.ceil(foodsTotal / 20) || 1}
+                          </span>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              const newPage = foodPage + 1;
+                              setFoodPage(newPage);
+                              fetchFoods(foodSearch, newPage);
+                            }}
+                            disabled={(foodPage + 1) * 20 >= foodsTotal}
+                          >
+                            Próxima
+                            <ChevronRight className="h-4 w-4 ml-1" />
+                          </Button>
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </CardContent>
+              </Card>
+
               {/* Food Imports History */}
               <Card>
                 <CardHeader>
@@ -1946,6 +2146,176 @@ export default function Admin() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Edit Food Dialog */}
+      <Dialog open={!!editingFood} onOpenChange={(open) => !open && setEditingFood(null)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Edit2 className="h-5 w-5" />
+              Editar Alimento
+            </DialogTitle>
+            <DialogDescription>
+              Atualize as informações do alimento
+            </DialogDescription>
+          </DialogHeader>
+
+          {editingFood && (
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label>Nome</Label>
+                <Input
+                  value={editedFoodData.name || ''}
+                  onChange={(e) => setEditedFoodData(prev => ({ ...prev, name: e.target.value }))}
+                  placeholder="Nome do alimento"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Calorias (kcal)</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    value={editedFoodData.calories || 0}
+                    onChange={(e) => setEditedFoodData(prev => ({ ...prev, calories: parseFloat(e.target.value) || 0 }))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Proteína (g)</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    step="0.1"
+                    value={editedFoodData.protein || 0}
+                    onChange={(e) => setEditedFoodData(prev => ({ ...prev, protein: parseFloat(e.target.value) || 0 }))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Carboidratos (g)</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    step="0.1"
+                    value={editedFoodData.carbs || 0}
+                    onChange={(e) => setEditedFoodData(prev => ({ ...prev, carbs: parseFloat(e.target.value) || 0 }))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Gordura (g)</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    step="0.1"
+                    value={editedFoodData.fat || 0}
+                    onChange={(e) => setEditedFoodData(prev => ({ ...prev, fat: parseFloat(e.target.value) || 0 }))}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Categoria</Label>
+                  <select
+                    className="w-full px-3 py-2 rounded-md border border-input bg-background text-sm"
+                    value={editedFoodData.category || ''}
+                    onChange={(e) => setEditedFoodData(prev => ({ ...prev, category: e.target.value || null }))}
+                  >
+                    <option value="">Selecionar...</option>
+                    <option value="Carboidratos">Carboidratos</option>
+                    <option value="Proteínas">Proteínas</option>
+                    <option value="Gorduras">Gorduras</option>
+                    <option value="Frutas">Frutas</option>
+                    <option value="Vegetais">Vegetais</option>
+                    <option value="Leguminosas">Leguminosas</option>
+                    <option value="Laticínios">Laticínios</option>
+                    <option value="Suplementos">Suplementos</option>
+                    <option value="Mistos">Mistos</option>
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Nível de Processamento</Label>
+                  <select
+                    className="w-full px-3 py-2 rounded-md border border-input bg-background text-sm"
+                    value={editedFoodData.processing_level || ''}
+                    onChange={(e) => setEditedFoodData(prev => ({ ...prev, processing_level: e.target.value || null }))}
+                  >
+                    <option value="">Selecionar...</option>
+                    <option value="In natura">In natura</option>
+                    <option value="Minimamente processado">Minimamente processado</option>
+                    <option value="Processado">Processado</option>
+                    <option value="Ultraprocessado">Ultraprocessado</option>
+                    <option value="Suplemento">Suplemento</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Porção</Label>
+                <Input
+                  value={editedFoodData.serving_size || '100g'}
+                  onChange={(e) => setEditedFoodData(prev => ({ ...prev, serving_size: e.target.value }))}
+                  placeholder="Ex: 100g"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-4">
+                <Button variant="outline" onClick={() => setEditingFood(null)}>
+                  Cancelar
+                </Button>
+                <Button
+                  onClick={async () => {
+                    if (!editingFood) return;
+                    const success = await updateFood(editingFood.id, editedFoodData);
+                    if (success) {
+                      setEditingFood(null);
+                    }
+                  }}
+                  disabled={savingKeys.has(`food_${editingFood.id}`)}
+                >
+                  {savingKeys.has(`food_${editingFood.id}`) ? (
+                    <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                  ) : (
+                    <Save className="h-4 w-4 mr-1" />
+                  )}
+                  Salvar
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Food Confirmation */}
+      <AlertDialog open={!!deletingFoodId} onOpenChange={(open) => !open && setDeletingFoodId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir este alimento? Esta ação não pode ser desfeita.
+              {deletingFoodId && foods.find(f => f.id === deletingFoodId) && (
+                <span className="block mt-2 font-medium text-foreground">
+                  Alimento: {foods.find(f => f.id === deletingFoodId)?.name}
+                </span>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={async () => {
+                if (deletingFoodId) {
+                  await deleteFood(deletingFoodId);
+                  setDeletingFoodId(null);
+                }
+              }}
+            >
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

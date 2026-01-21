@@ -123,6 +123,23 @@ export interface DeleteUserPreview {
   totalRecords: number;
 }
 
+export interface Food {
+  id: string;
+  name: string;
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+  serving_size: string | null;
+  category: string | null;
+  processing_level: string | null;
+  unit_name: string | null;
+  unit_weight_grams: number | null;
+  unit_increment: number | null;
+  unit_enabled: boolean;
+  created_at: string;
+}
+
 export function useAdminOperations() {
   const [loading, setLoading] = useState(false);
   const [settingsLoading, setSettingsLoading] = useState(false);
@@ -133,6 +150,12 @@ export function useAdminOperations() {
   const [foodImports, setFoodImports] = useState<FoodImport[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [auditTotal, setAuditTotal] = useState(0);
+  
+  // Foods state
+  const [foods, setFoods] = useState<Food[]>([]);
+  const [foodsLoading, setFoodsLoading] = useState(false);
+  const [foodsTotal, setFoodsTotal] = useState(0);
+  
   const { toast } = useToast();
 
   const invokeAdmin = useCallback(async (action: string, params: Record<string, unknown> = {}) => {
@@ -655,6 +678,113 @@ export function useAdminOperations() {
     }
   }, [invokeAdmin, toast]);
 
+  // Foods management
+  const fetchFoods = useCallback(async (search: string = '', page: number = 0, pageSize: number = 20) => {
+    setFoodsLoading(true);
+    try {
+      let query = supabase
+        .from('foods')
+        .select('*', { count: 'exact' });
+      
+      if (search.trim()) {
+        query = query.ilike('name', `%${search.trim()}%`);
+      }
+      
+      const { data, count, error } = await query
+        .order('name', { ascending: true })
+        .range(page * pageSize, (page + 1) * pageSize - 1);
+      
+      if (error) throw error;
+      
+      setFoods(data as Food[]);
+      setFoodsTotal(count || 0);
+      return { foods: data as Food[], total: count || 0 };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erro ao buscar alimentos';
+      toast({ title: 'Erro', description: message, variant: 'destructive' });
+      return { foods: [], total: 0 };
+    } finally {
+      setFoodsLoading(false);
+    }
+  }, [toast]);
+
+  const updateFood = useCallback(async (foodId: string, updates: Partial<Food>): Promise<boolean> => {
+    setSavingKeys(prev => new Set(prev).add(`food_${foodId}`));
+    try {
+      await invokeAdmin('update_food', { foodId, updates });
+      
+      setFoods(prev => prev.map(f => f.id === foodId ? { ...f, ...updates } : f));
+      
+      setSavedKeys(prev => new Set(prev).add(`food_${foodId}`));
+      setTimeout(() => {
+        setSavedKeys(prev => {
+          const next = new Set(prev);
+          next.delete(`food_${foodId}`);
+          return next;
+        });
+      }, 2000);
+      
+      toast({ title: 'Alimento atualizado' });
+      return true;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erro ao atualizar alimento';
+      toast({ title: 'Erro', description: message, variant: 'destructive' });
+      setErrorKeys(prev => new Set(prev).add(`food_${foodId}`));
+      setTimeout(() => {
+        setErrorKeys(prev => {
+          const next = new Set(prev);
+          next.delete(`food_${foodId}`);
+          return next;
+        });
+      }, 3000);
+      return false;
+    } finally {
+      setSavingKeys(prev => {
+        const next = new Set(prev);
+        next.delete(`food_${foodId}`);
+        return next;
+      });
+    }
+  }, [invokeAdmin, toast]);
+
+  const deleteFood = useCallback(async (foodId: string): Promise<boolean> => {
+    setSavingKeys(prev => new Set(prev).add(`food_${foodId}`));
+    try {
+      await invokeAdmin('delete_food', { foodId });
+      
+      setFoods(prev => prev.filter(f => f.id !== foodId));
+      setFoodsTotal(prev => prev - 1);
+      
+      toast({ title: 'Alimento excluído' });
+      return true;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erro ao excluir alimento';
+      toast({ title: 'Erro', description: message, variant: 'destructive' });
+      return false;
+    } finally {
+      setSavingKeys(prev => {
+        const next = new Set(prev);
+        next.delete(`food_${foodId}`);
+        return next;
+      });
+    }
+  }, [invokeAdmin, toast]);
+
+  const normalizeFoodNames = useCallback(async (): Promise<{ normalized: number; total: number } | null> => {
+    setLoading(true);
+    try {
+      const data = await invokeAdmin('normalize_food_names');
+      toast({ title: 'Nomes normalizados', description: `${data.normalized} de ${data.total} alimentos atualizados` });
+      return data as { normalized: number; total: number };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erro ao normalizar nomes';
+      toast({ title: 'Erro', description: message, variant: 'destructive' });
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  }, [invokeAdmin, toast]);
+
   return {
     loading,
     settingsLoading,
@@ -670,6 +800,9 @@ export function useAdminOperations() {
     usersTotal,
     plans,
     plansLoading,
+    foods,
+    foodsLoading,
+    foodsTotal,
     fetchSettings,
     updateSetting,
     fetchFoodImports,
@@ -688,5 +821,9 @@ export function useAdminOperations() {
     updatePlan,
     getUserUsage,
     updateUserUsage,
+    fetchFoods,
+    updateFood,
+    deleteFood,
+    normalizeFoodNames,
   };
 }
