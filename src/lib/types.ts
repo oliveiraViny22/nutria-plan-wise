@@ -106,8 +106,8 @@ export interface Food {
   carbs: number;
   fat: number;
   serving_size: string;
-  category: FoodCategory | string | null;
-  processing_level: ProcessingLevel | string | null;
+  category: FoodCategoryType | string | null;
+  processing_level: ProcessingLevelType | string | null;
   created_at: string;
   // Campos de conversão de unidades
   unit_name?: string | null;
