@@ -53,6 +53,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { FoodImportValidator, ValidationResult as FoodValidationResult, FoodRow } from '@/components/FoodImportValidator';
 import SystemAudit from '@/components/SystemAudit';
 import { FoodCuration } from '@/components/FoodCuration';
+import { PendingFoodsReview } from '@/components/PendingFoodsReview';
 import { useRealtimeSettings } from '@/hooks/useRealtimeSettings';
 
 const CHART_COLORS = [
@@ -1263,6 +1264,8 @@ export default function Admin() {
                 </Card>
               </div>
 
+              {/* Pending Foods Review Section */}
+              <PendingFoodsReview />
 
               {/* Food Curation Section */}
               <FoodCuration />
