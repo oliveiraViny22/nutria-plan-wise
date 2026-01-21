@@ -51,6 +51,7 @@ import { useAdminOperations, UserProfile, DeleteUserPreview, Plan, UserUsage, Fo
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { FoodImportValidator, ValidationResult as FoodValidationResult, FoodRow } from '@/components/FoodImportValidator';
+import SystemAudit from '@/components/SystemAudit';
 
 const CHART_COLORS = [
   'hsl(var(--primary))',
@@ -672,13 +673,13 @@ export default function Admin() {
               <Users className="h-4 w-4" />
               Usuários
             </TabsTrigger>
-            <TabsTrigger value="settings" className="flex items-center gap-2">
-              <Settings className="h-4 w-4" />
-              Configurações
-            </TabsTrigger>
             <TabsTrigger value="foods" className="flex items-center gap-2">
               <Database className="h-4 w-4" />
               Alimentos
+            </TabsTrigger>
+            <TabsTrigger value="settings" className="flex items-center gap-2">
+              <Settings className="h-4 w-4" />
+              Configurações
             </TabsTrigger>
             <TabsTrigger value="plans" className="flex items-center gap-2">
               <CreditCard className="h-4 w-4" />
@@ -1431,49 +1432,12 @@ export default function Admin() {
 
           {/* Audit Tab */}
           <TabsContent value="audit">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <History className="h-5 w-5 text-primary" />
-                  Logs de Auditoria
-                </CardTitle>
-                <CardDescription>
-                  Histórico de ações administrativas ({auditTotal} total).
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {loading ? (
-                  <div className="flex items-center justify-center py-12">
-                    <Loader2 className="h-8 w-8 animate-spin" />
-                  </div>
-                ) : auditLogs.length === 0 ? (
-                  <p className="text-muted-foreground text-center py-8">
-                    Nenhum log de auditoria encontrado.
-                  </p>
-                ) : (
-                  <ScrollArea className="h-[400px]">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Ação</TableHead>
-                          <TableHead>Entidade</TableHead>
-                          <TableHead>Data</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {auditLogs.map((log) => (
-                          <TableRow key={log.id}>
-                            <TableCell className="font-medium">{log.action}</TableCell>
-                            <TableCell>{log.entity_type}</TableCell>
-                            <TableCell>{new Date(log.created_at).toLocaleString('pt-BR')}</TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </ScrollArea>
-                )}
-              </CardContent>
-            </Card>
+            <SystemAudit
+              auditLogs={auditLogs}
+              auditTotal={auditTotal}
+              loading={loading}
+              fetchAuditLogs={fetchAuditLogs}
+            />
           </TabsContent>
 
           {/* Plans Tab */}
