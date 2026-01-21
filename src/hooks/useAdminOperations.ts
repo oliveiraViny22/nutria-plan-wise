@@ -106,6 +106,7 @@ export interface Plan {
   adjustment_limit: number;
   has_chat: boolean;
   chat_messages_per_day: number;
+  meal_options_limit: number;
 }
 
 export interface AISettings {
@@ -585,7 +586,7 @@ export function useAdminOperations() {
 
   const updatePlan = useCallback(async (
     planId: string,
-    updates: Partial<Pick<Plan, 'diet_limit' | 'substitution_limit' | 'adjustment_limit' | 'chat_messages_per_day' | 'has_chat' | 'is_active' | 'price_monthly'>>
+    updates: Partial<Pick<Plan, 'diet_limit' | 'substitution_limit' | 'adjustment_limit' | 'chat_messages_per_day' | 'has_chat' | 'is_active' | 'price_monthly' | 'meal_options_limit'>>
   ) => {
     setSavingKeys(prev => new Set(prev).add(`plan_${planId}`));
     try {

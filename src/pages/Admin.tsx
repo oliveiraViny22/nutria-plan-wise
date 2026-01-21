@@ -1509,8 +1509,8 @@ export default function Admin() {
                             </div>
                           </div>
 
-                          {/* Preço Mensal */}
-                          <div className="grid gap-4 md:grid-cols-5">
+                          {/* Preço Mensal e Limites */}
+                          <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-6">
                             <div className="space-y-2">
                               <Label className="text-sm font-medium text-green-700">Preço Mensal (R$)</Label>
                               <Input
@@ -1585,6 +1585,21 @@ export default function Admin() {
                                   updatePlan(plan.id, { chat_messages_per_day: value });
                                 }}
                                 disabled={savingKeys.has(`plan_${plan.id}`) || !plan.has_chat}
+                                className="w-full"
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label className="text-sm">Opções por Refeição</Label>
+                              <Input
+                                type="number"
+                                min={1}
+                                max={10}
+                                value={plan.meal_options_limit ?? 3}
+                                onChange={(e) => {
+                                  const value = parseInt(e.target.value) || 1;
+                                  updatePlan(plan.id, { meal_options_limit: Math.max(1, Math.min(10, value)) });
+                                }}
+                                disabled={savingKeys.has(`plan_${plan.id}`)}
                                 className="w-full"
                               />
                             </div>
