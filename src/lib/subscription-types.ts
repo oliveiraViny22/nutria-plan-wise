@@ -139,7 +139,7 @@ export const PLAN_CHAT_LIMITS: Record<CommercialPlan, number> = {
 
 // Limites de dietas por mês
 export const PLAN_DIET_LIMITS: Record<CommercialPlan, number> = {
-  gratuito: 0,
+  gratuito: 1,
   premium: 0,
   plano_pessoal_pago: 999,
   profissional: 999,
@@ -147,7 +147,7 @@ export const PLAN_DIET_LIMITS: Record<CommercialPlan, number> = {
 
 // Limites de substituições por mês
 export const PLAN_SUBSTITUTION_LIMITS: Record<CommercialPlan, number> = {
-  gratuito: 0,
+  gratuito: 3,
   premium: 0,
   plano_pessoal_pago: 999,
   profissional: 999,
@@ -155,7 +155,7 @@ export const PLAN_SUBSTITUTION_LIMITS: Record<CommercialPlan, number> = {
 
 // Limites de ajustes por mês
 export const PLAN_ADJUSTMENT_LIMITS: Record<CommercialPlan, number> = {
-  gratuito: 0,
+  gratuito: 1,
   premium: 0,
   plano_pessoal_pago: 999,
   profissional: 999,

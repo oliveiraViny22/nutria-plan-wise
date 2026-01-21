@@ -13,6 +13,7 @@
 
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import {
   rebalancePlan,
@@ -245,6 +246,7 @@ function transformToProposal(
 // =====================================================
 
 export function useMacroRebalancer() {
+  const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [proposal, setProposal] = useState<RebalanceProposal | null>(null);
   const [corePlan, setCorePlan] = useState<DietPlan | null>(null);
@@ -453,6 +455,14 @@ export function useMacroRebalancer() {
           total_fat: Math.round(planFat),
         })
         .eq('id', planId);
+
+      // Incrementar uso de ajuste
+      if (user?.id) {
+        await supabase.rpc('increment_usage', {
+          _user_id: user.id,
+          _feature: 'adjustment',
+        });
+      }
 
       setProposal(null);
       setCorePlan(null);

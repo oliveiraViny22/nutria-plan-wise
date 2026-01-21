@@ -83,11 +83,11 @@ export default function MealDetail() {
   const studentIdFromQuery = searchParams.get('studentId');
   const isProfessionalViewingStudent = isProfessional && !!studentIdFromQuery;
   
-  const { plan_name, meal_options_limit } = useAccountPermissions();
+  const { plan_name, meal_options_limit, can_substitute } = useAccountPermissions();
   const isPaidPlan = plan_name !== 'gratuito';
   
   const canEdit = !isLinkedStudent || isProfessionalViewingStudent;
-  const canShowSubstituteButton = canEdit;
+  const canShowSubstituteButton = canEdit && can_substitute;
   const canAddRemoveFoods = canEdit && (isProfessional || isPaidPlan);
   
   const [meal, setMeal] = useState<Meal | null>(null);
