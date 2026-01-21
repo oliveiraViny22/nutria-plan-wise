@@ -26,6 +26,8 @@ import {
   TrendingUp,
   Activity,
   RefreshCw,
+  BookOpen,
+  Briefcase,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -130,6 +132,8 @@ export default function Admin() {
   const [metricsLoading, setMetricsLoading] = useState(false);
   const [timeSeriesData, setTimeSeriesData] = useState<TimeSeriesDataPoint[]>([]);
   const [timeSeriesLoading, setTimeSeriesLoading] = useState(false);
+  const [downloadingFoods, setDownloadingFoods] = useState(false);
+  const [downloadingDoc, setDownloadingDoc] = useState<string | null>(null);
 
   useEffect(() => {
     if (!roleLoading && !isAdmin) {
@@ -341,6 +345,96 @@ export default function Admin() {
     }
   };
 
+  const handleDownloadFoods = async () => {
+    setDownloadingFoods(true);
+    try {
+      const { data, error } = await supabase
+        .from('foods')
+        .select('name, calories, protein, carbs, fat, category, processing_level, serving_size')
+        .order('name');
+
+      if (error) throw error;
+
+      // Convert to CSV
+      const headers = ['Nome', 'Calorias', 'Proteína (g)', 'Carboidratos (g)', 'Gordura (g)', 'Categoria', 'Nível de Processamento', 'Porção'];
+      const csvRows = [
+        headers.join(';'),
+        ...(data || []).map(food => [
+          food.name,
+          food.calories,
+          food.protein,
+          food.carbs,
+          food.fat,
+          food.category || '',
+          food.processing_level || '',
+          food.serving_size || ''
+        ].join(';'))
+      ];
+      const csvContent = csvRows.join('\n');
+
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `alimentos_nutriaplan_${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      toast({ title: 'Download concluído', description: `${data?.length || 0} alimentos exportados.` });
+    } catch (error) {
+      console.error('Error downloading foods:', error);
+      toast({
+        title: 'Erro ao baixar alimentos',
+        description: error instanceof Error ? error.message : 'Erro desconhecido',
+        variant: 'destructive'
+      });
+    } finally {
+      setDownloadingFoods(false);
+    }
+  };
+
+  const handleDownloadDocumentation = async (docType: 'technical' | 'commercial') => {
+    setDownloadingDoc(docType);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Não autenticado');
+
+      const response = await supabase.functions.invoke('generate-documentation-pdf', {
+        body: { docType }
+      });
+
+      if (response.error) throw response.error;
+
+      const content = response.data;
+      const filename = docType === 'technical' 
+        ? 'DOCUMENTACAO_TECNICA_NUTRIAPLAN.txt' 
+        : 'DOCUMENTACAO_COMERCIAL_NUTRIAPLAN.txt';
+
+      const blob = new Blob([content], { type: 'text/plain;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      toast({ title: 'Download concluído', description: `Documentação ${docType === 'technical' ? 'técnica' : 'comercial'} baixada.` });
+    } catch (error) {
+      console.error('Error downloading documentation:', error);
+      toast({
+        title: 'Erro ao baixar documentação',
+        description: error instanceof Error ? error.message : 'Erro desconhecido',
+        variant: 'destructive'
+      });
+    } finally {
+      setDownloadingDoc(null);
+    }
+  };
+
   const renderSettingEditor = (setting: { key: string; value: unknown; description: string | null }) => {
     const currentValue = editedSettings[setting.key] ?? setting.value;
     const hasChanges = setting.key in editedSettings;
@@ -497,6 +591,10 @@ export default function Admin() {
             <TabsTrigger value="audit" className="flex items-center gap-2">
               <History className="h-4 w-4" />
               Auditoria
+            </TabsTrigger>
+            <TabsTrigger value="docs" className="flex items-center gap-2">
+              <BookOpen className="h-4 w-4" />
+              Documentação
             </TabsTrigger>
           </TabsList>
 
@@ -849,6 +947,14 @@ export default function Admin() {
                       <Download className="h-4 w-4 mr-2" />
                       Baixar Modelo
                     </Button>
+                    <Button variant="outline" onClick={handleDownloadFoods} disabled={downloadingFoods}>
+                      {downloadingFoods ? (
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <Download className="h-4 w-4 mr-2" />
+                      )}
+                      Exportar Banco de Alimentos
+                    </Button>
                   </div>
                 </CardContent>
               </Card>
@@ -973,6 +1079,102 @@ export default function Admin() {
                 )}
               </CardContent>
             </Card>
+          </TabsContent>
+
+          {/* Documentation Tab */}
+          <TabsContent value="docs">
+            <div className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <BookOpen className="h-5 w-5 text-primary" />
+                    Documentação do Sistema
+                  </CardTitle>
+                  <CardDescription>
+                    Acesse a documentação técnica e comercial do NutriaPlan.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <Card className="border-2">
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-lg flex items-center gap-2">
+                          <FileText className="h-5 w-5 text-blue-500" />
+                          Documentação Técnica
+                        </CardTitle>
+                        <CardDescription>
+                          Arquitetura, banco de dados, edge functions, fluxos técnicos e regras de negócio.
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <Button 
+                          onClick={() => handleDownloadDocumentation('technical')}
+                          disabled={downloadingDoc === 'technical'}
+                          className="w-full"
+                        >
+                          {downloadingDoc === 'technical' ? (
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          ) : (
+                            <Download className="h-4 w-4 mr-2" />
+                          )}
+                          Baixar Documentação Técnica
+                        </Button>
+                      </CardContent>
+                    </Card>
+
+                    <Card className="border-2">
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-lg flex items-center gap-2">
+                          <Briefcase className="h-5 w-5 text-green-500" />
+                          Documentação Comercial
+                        </CardTitle>
+                        <CardDescription>
+                          Proposta de valor, públicos-alvo, planos, funcionalidades e modelo de negócio.
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <Button 
+                          onClick={() => handleDownloadDocumentation('commercial')}
+                          disabled={downloadingDoc === 'commercial'}
+                          variant="secondary"
+                          className="w-full"
+                        >
+                          {downloadingDoc === 'commercial' ? (
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          ) : (
+                            <Download className="h-4 w-4 mr-2" />
+                          )}
+                          Baixar Documentação Comercial
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <FileText className="h-5 w-5 text-primary" />
+                    Outras Documentações
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-sm text-muted-foreground space-y-2">
+                    <p>
+                      A documentação técnica e comercial consolidada (v2.0) contém todas as informações necessárias para:
+                    </p>
+                    <ul className="list-disc list-inside space-y-1 ml-2">
+                      <li>Entender a arquitetura do sistema</li>
+                      <li>Consultar regras de negócio e fluxos</li>
+                      <li>Verificar estrutura do banco de dados</li>
+                      <li>Conhecer integrações (Stripe, IA)</li>
+                      <li>Apresentar a plataforma para investidores e parceiros</li>
+                    </ul>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
         </Tabs>
       </main>
