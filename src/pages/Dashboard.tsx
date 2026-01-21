@@ -319,8 +319,8 @@ export default function Dashboard() {
           </div>
         </motion.section>
 
-        {/* Adherence Widget */}
-        {currentDietPlan && (
+        {/* Adherence Widget - only for paid users */}
+        {currentDietPlan && permissions.plan_name !== 'gratuito' && (
           <motion.section
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -432,13 +432,16 @@ export default function Dashboard() {
               <h2 className="text-lg font-semibold text-foreground">
                 Plano de Hoje
               </h2>
-              <Link to="/daily-log">
-                <Button variant="outline" size="sm" className="gap-2">
-                  <ClipboardCheck className="h-4 w-4" />
-                  <span className="hidden sm:inline">Registrar consumo</span>
-                  <span className="sm:hidden">Registrar</span>
-                </Button>
-              </Link>
+              {/* Only show daily log button for paid users */}
+              {permissions.plan_name !== 'gratuito' && (
+                <Link to="/daily-log">
+                  <Button variant="outline" size="sm" className="gap-2">
+                    <ClipboardCheck className="h-4 w-4" />
+                    <span className="hidden sm:inline">Registrar consumo</span>
+                    <span className="sm:hidden">Registrar</span>
+                  </Button>
+                </Link>
+              )}
             </div>
             <div className="space-y-3">
               {meals.map((meal, index) => (
