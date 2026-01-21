@@ -123,7 +123,7 @@ export const PLAN_SHORT_DESCRIPTIONS: Record<CommercialPlan, string> = {
 export const PLAN_PRICES: Record<CommercialPlan, number> = {
   gratuito: 0,
   premium: 4.90,
-  plano_pessoal_pago: 14.90,
+  plano_pessoal_pago: 29.90,
   profissional: 99.00,
 };
 
@@ -131,8 +131,32 @@ export const PLAN_PRICES: Record<CommercialPlan, number> = {
 export const PLAN_CHAT_LIMITS: Record<CommercialPlan, number> = {
   gratuito: 3,
   premium: 10,
-  plano_pessoal_pago: 30,
+  plano_pessoal_pago: 50,
   profissional: 100,
+};
+
+// Limites de dietas por mês
+export const PLAN_DIET_LIMITS: Record<CommercialPlan, number> = {
+  gratuito: 0,
+  premium: 0,
+  plano_pessoal_pago: 999,
+  profissional: 999,
+};
+
+// Limites de substituições por mês
+export const PLAN_SUBSTITUTION_LIMITS: Record<CommercialPlan, number> = {
+  gratuito: 0,
+  premium: 0,
+  plano_pessoal_pago: 999,
+  profissional: 999,
+};
+
+// Limites de ajustes por mês
+export const PLAN_ADJUSTMENT_LIMITS: Record<CommercialPlan, number> = {
+  gratuito: 0,
+  premium: 0,
+  plano_pessoal_pago: 999,
+  profissional: 999,
 };
 
 // Mapeamento legacy: plano_pessoal -> plano_pessoal_pago

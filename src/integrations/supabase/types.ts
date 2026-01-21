@@ -899,6 +899,14 @@ export type Database = {
           success: boolean
         }[]
       }
+      get_usage_info: {
+        Args: { _feature: string; _user_id: string }
+        Returns: {
+          allowed: boolean
+          current_usage: number
+          max_limit: number
+        }[]
+      }
       get_user_plan: {
         Args: { _user_id: string }
         Returns: {
