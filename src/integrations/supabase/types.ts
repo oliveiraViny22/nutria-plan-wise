@@ -505,6 +505,7 @@ export type Database = {
           has_chat: boolean
           id: string
           is_active: boolean
+          meal_options_limit: number
           name: string
           price_monthly: number | null
           stripe_price_monthly: string | null
@@ -521,6 +522,7 @@ export type Database = {
           has_chat?: boolean
           id?: string
           is_active?: boolean
+          meal_options_limit?: number
           name: string
           price_monthly?: number | null
           stripe_price_monthly?: string | null
@@ -537,6 +539,7 @@ export type Database = {
           has_chat?: boolean
           id?: string
           is_active?: boolean
+          meal_options_limit?: number
           name?: string
           price_monthly?: number | null
           stripe_price_monthly?: string | null
@@ -900,6 +903,7 @@ export type Database = {
           chat_messages_per_day: number
           diet_limit: number
           has_chat: boolean
+          meal_options_limit: number
           plan_id: string
           plan_name: string
           plan_type: Database["public"]["Enums"]["plan_type"]
