@@ -1,8 +1,8 @@
 # DOCUMENTAÇÃO COMERCIAL E INSTITUCIONAL — NUTRIAPLAN
 
-## Versão do Documento: 2.0
+## Versão do Documento: 2.1
 ## Data de Geração: 18 de Janeiro de 2026
-## Última Atualização: 18 de Janeiro de 2026
+## Última Atualização: 21 de Janeiro de 2026
 
 ---
 
@@ -10,6 +10,7 @@
 
 | Versão | Data | Alterações |
 |--------|------|------------|
+| 2.1 | 21/01/2026 | Alinhamento com documentação técnica v2.2. Atualização de recursos e limites. Clarificação de funcionalidades do rebalanceador de macros. |
 | 2.0 | 18/01/2026 | Versão consolidada e alinhada com documentação técnica v2.0, detalhamento de funcionalidades por perfil, clarificação de limites |
 | 1.0 | 18/01/2026 | Versão inicial |
 
