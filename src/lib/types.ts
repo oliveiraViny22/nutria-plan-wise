@@ -29,7 +29,7 @@ export interface Profile {
   name: string | null;
   email: string | null;
   age: number | null;
-  sex: 'male' | 'female' | null;
+  sex: 'male' | 'female' | 'other' | null;
   height: number | null;
   weight: number | null;
   goal: 'lose_weight' | 'maintain' | 'gain_muscle' | null;
