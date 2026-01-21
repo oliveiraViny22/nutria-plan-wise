@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { ArrowRight, Leaf, Target, RefreshCw, MessageCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Logo } from '@/components/Logo';
+import { ThemeToggle } from '@/components/ThemeToggle';
 
 export default function Index() {
   const features = [
@@ -16,14 +17,15 @@ export default function Index() {
       {/* Header - Mobile-first responsive */}
       <header className="container mx-auto px-4 py-4 sm:py-6 flex items-center justify-between gap-2">
         <Logo size="lg" />
-        <div className="flex items-center gap-2 sm:gap-3">
+        <div className="flex items-center gap-1 sm:gap-3">
+          <ThemeToggle />
           <Link to="/login">
-            <Button variant="ghost" size="sm" className="text-xs sm:text-sm px-2 sm:px-4">
+            <Button variant="ghost" size="sm" className="text-xs sm:text-sm px-2 sm:px-4 touch-manipulation">
               Entrar
             </Button>
           </Link>
           <Link to="/signup">
-            <Button variant="hero" size="sm" className="text-xs sm:text-sm px-2 sm:px-4">
+            <Button variant="hero" size="sm" className="text-xs sm:text-sm px-2 sm:px-4 touch-manipulation">
               <span className="hidden xs:inline">Começar grátis</span>
               <span className="xs:hidden">Começar</span>
             </Button>

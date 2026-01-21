@@ -15,6 +15,8 @@ import {
   ChevronRight,
   ClipboardCheck,
   Shield,
+  Moon,
+  Sun,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -29,6 +31,7 @@ import { Logo } from '@/components/Logo';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useSubscription } from '@/hooks/useSubscription';
+import { useTheme } from '@/contexts/ThemeContext';
 import { cn } from '@/lib/utils';
 
 interface NavItem {
@@ -175,10 +178,11 @@ export function MobileNav() {
               </Link>
             ))}
           
-          <div className="border-t mt-4 pt-4">
+          <div className="border-t mt-4 pt-4 space-y-1">
+            <ThemeToggleItem />
             <button
               onClick={handleSignOut}
-              className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-destructive hover:bg-destructive/10 transition-colors w-full"
+              className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-destructive hover:bg-destructive/10 transition-colors w-full touch-manipulation"
             >
               <LogOut className="h-5 w-5" />
               <span>Sair</span>
@@ -187,5 +191,24 @@ export function MobileNav() {
         </nav>
       </SheetContent>
     </Sheet>
+  );
+}
+
+function ThemeToggleItem() {
+  const { resolvedTheme, toggleTheme } = useTheme();
+  
+  return (
+    <button
+      onClick={toggleTheme}
+      className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors w-full touch-manipulation"
+    >
+      {resolvedTheme === 'dark' ? (
+        <Moon className="h-5 w-5" />
+      ) : (
+        <Sun className="h-5 w-5" />
+      )}
+      <span>{resolvedTheme === 'dark' ? 'Modo Escuro' : 'Modo Claro'}</span>
+      <ChevronRight className="h-4 w-4 opacity-50 ml-auto" />
+    </button>
   );
 }
