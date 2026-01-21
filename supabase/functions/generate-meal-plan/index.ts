@@ -661,7 +661,6 @@ Lembre-se: quantity em gramas/ml, total EXATO de ${targetCalories} calorias, sem
       total_fat: Math.round(finalTotalF * 10) / 10,
       released_to_student: false, // Default to not released
       status: 'active', // Status ativo por padrão
-      is_initial_plan: isInitialPlan === true, // Marca se é plano inicial automático
     }).select().single();
 
     if (planError || !plan) {
