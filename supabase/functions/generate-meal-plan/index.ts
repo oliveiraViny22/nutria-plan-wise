@@ -650,8 +650,7 @@ Lembre-se: quantity em gramas/ml, total EXATO de ${targetCalories} calorias, sem
       total_protein: Math.round(finalTotalP * 10) / 10,
       total_carbs: Math.round(finalTotalC * 10) / 10,
       total_fat: Math.round(finalTotalF * 10) / 10,
-      released_to_student: false, // Default to not released
-      status: 'active', // Status ativo por padrão
+      status: 'active',
     }).select().single();
 
     if (planError || !plan) {
@@ -665,11 +664,13 @@ Lembre-se: quantity em gramas/ml, total EXATO de ${targetCalories} calorias, sem
       _feature: 'diet',
     });
 
-    // Save meals
-    for (const meal of adjustedMeals) {
+    // Save meals with v2 schema (meal_options and meal_option_foods)
+    for (let sortOrder = 0; sortOrder < adjustedMeals.length; sortOrder++) {
+      const meal = adjustedMeals[sortOrder];
       const { data: savedMeal, error: mealError } = await supabase.from("meals").insert({
         diet_plan_id: plan.id,
         name: meal.name,
+        sort_order: sortOrder,
         total_calories: meal.total_calories,
         total_protein: meal.total_protein,
         total_carbs: meal.total_carbs,
@@ -681,12 +682,29 @@ Lembre-se: quantity em gramas/ml, total EXATO de ${targetCalories} calorias, sem
         continue;
       }
 
+      // Create meal option (v2 schema requires meal_options)
+      const { data: savedOption, error: optionError } = await supabase.from("meal_options").insert({
+        meal_id: savedMeal.id,
+        option_number: 1,
+        name: 'Opção Principal',
+        total_calories: meal.total_calories,
+        total_protein: meal.total_protein,
+        total_carbs: meal.total_carbs,
+        total_fat: meal.total_fat,
+      }).select().single();
+
+      if (optionError || !savedOption) {
+        logStep("Failed to create meal option", { error: optionError?.message });
+        continue;
+      }
+
+      // Insert foods into meal_option_foods (v2 schema)
       for (const food of meal.foods) {
         if (food.food_id) {
-          await supabase.from("meal_foods").insert({ 
-            meal_id: savedMeal.id, 
+          await supabase.from("meal_option_foods").insert({ 
+            meal_option_id: savedOption.id, 
             food_id: food.food_id, 
-            quantity: food.quantity 
+            quantity_grams: food.quantity,
           });
         }
       }
