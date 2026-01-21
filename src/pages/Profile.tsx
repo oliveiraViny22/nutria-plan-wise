@@ -11,13 +11,26 @@ import {
   Utensils,
   Scale,
   Flame,
-  TrendingUp
+  TrendingUp,
+  Trash2,
+  AlertTriangle
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { Logo } from '@/components/Logo';
 import { MobileNav } from '@/components/MobileNav';
 import { useAuth } from '@/contexts/AuthContext';
@@ -30,11 +43,15 @@ import {
   FOOD_RESTRICTIONS,
 } from '@/lib/types';
 
+const ADMIN_EMAIL = "admin@nutriaplan.com";
+
 export default function Profile() {
   const navigate = useNavigate();
-  const { user, profile, refreshProfile } = useAuth();
+  const { user, profile, refreshProfile, signOut } = useAuth();
   const [loading, setLoading] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
 
   const [formData, setFormData] = useState({
     name: '',
@@ -199,6 +216,39 @@ export default function Profile() {
     }
   };
 
+  const handleDeleteAccount = async () => {
+    if (!user || user.email === ADMIN_EMAIL) return;
+    if (deleteConfirmText !== 'EXCLUIR') {
+      toast.error('Digite EXCLUIR para confirmar');
+      return;
+    }
+
+    setDeleting(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Sessão inválida');
+
+      const response = await supabase.functions.invoke('delete-account', {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
+
+      if (response.error) throw response.error;
+
+      toast.success('Conta excluída com sucesso');
+      await signOut();
+      navigate('/');
+    } catch (error: any) {
+      console.error('Error deleting account:', error);
+      toast.error(error.message || 'Erro ao excluir conta');
+    } finally {
+      setDeleting(false);
+      setDeleteConfirmText('');
+    }
+  };
+
+  const isAdmin = user?.email === ADMIN_EMAIL;
   const targets = calculateTargets();
 
   return (
@@ -517,6 +567,79 @@ export default function Profile() {
                   </div>
                 </CardContent>
               </Card>
+
+              {/* Delete Account Section */}
+              {!isAdmin && (
+                <Card className="border-destructive/30 bg-destructive/5">
+                  <CardHeader>
+                    <CardTitle className="text-destructive flex items-center gap-2">
+                      <AlertTriangle className="h-5 w-5" />
+                      Zona de Perigo
+                    </CardTitle>
+                    <CardDescription>
+                      Ações irreversíveis para sua conta
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button variant="destructive" className="w-full sm:w-auto">
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Excluir minha conta
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle className="flex items-center gap-2 text-destructive">
+                            <AlertTriangle className="h-5 w-5" />
+                            Excluir conta permanentemente?
+                          </AlertDialogTitle>
+                          <AlertDialogDescription className="space-y-3">
+                            <p>
+                              Esta ação é <strong>irreversível</strong>. Todos os seus dados serão excluídos permanentemente:
+                            </p>
+                            <ul className="list-disc list-inside text-sm space-y-1">
+                              <li>Perfil e informações pessoais</li>
+                              <li>Planos alimentares e histórico</li>
+                              <li>Registros de refeições e adesão</li>
+                              <li>Conversas com o chat nutricional</li>
+                            </ul>
+                            <div className="pt-2">
+                              <Label htmlFor="confirm-delete" className="text-sm font-medium">
+                                Digite <strong>EXCLUIR</strong> para confirmar:
+                              </Label>
+                              <Input
+                                id="confirm-delete"
+                                value={deleteConfirmText}
+                                onChange={(e) => setDeleteConfirmText(e.target.value.toUpperCase())}
+                                placeholder="EXCLUIR"
+                                className="mt-2"
+                              />
+                            </div>
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel onClick={() => setDeleteConfirmText('')}>
+                            Cancelar
+                          </AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={handleDeleteAccount}
+                            disabled={deleteConfirmText !== 'EXCLUIR' || deleting}
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                          >
+                            {deleting ? (
+                              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                            ) : (
+                              <Trash2 className="h-4 w-4 mr-2" />
+                            )}
+                            Excluir permanentemente
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </CardContent>
+                </Card>
+              )}
             </motion.div>
           </TabsContent>
         </Tabs>
