@@ -1,8 +1,8 @@
 # DOCUMENTAÇÃO TÉCNICA OFICIAL — NUTRIAPLAN
 
-## Versão do Documento: 2.0
+## Versão do Documento: 2.1
 ## Data de Geração: 18 de Janeiro de 2026
-## Última Atualização: 18 de Janeiro de 2026
+## Última Atualização: 21 de Janeiro de 2026
 
 ---
 
@@ -10,6 +10,7 @@
 
 | Versão | Data | Alterações |
 |--------|------|------------|
+| 2.1 | 21/01/2026 | Correção do constraint `profiles_sex_check` para aceitar valores 'male', 'female', 'other'. Atualização pós-auditoria de banco de dados v2. |
 | 2.0 | 18/01/2026 | Versão consolidada: adicionados fluxos completos por perfil (Admin, Profissional, Aluno), detalhamento de gestão de alimentos, estrutura completa do banco de dados com cardinalidades, aprofundamento da IA, seção de auditoria administrativa, edge functions recentes |
 | 1.1 | 18/01/2026 | Versão inicial com estrutura base |
 
