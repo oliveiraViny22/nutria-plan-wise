@@ -19,6 +19,7 @@ export function UsageLimits() {
 
   // Calcula o limite efetivo de opções de refeição (override ou padrão do plano)
   const effectiveMealOptionsLimit = usage?.meal_options_override ?? currentPlan.meal_options_limit ?? 3;
+  const isFreePlan = currentPlan.name === 'gratuito';
 
   const limits = [
     {
@@ -39,13 +40,14 @@ export function UsageLimits() {
       limit: currentPlan.adjustment_limit,
       key: 'adjustment',
     },
-    {
+    // Só mostra opções por refeição para planos pagos
+    ...(!isFreePlan ? [{
       name: 'Opções por refeição',
       used: effectiveMealOptionsLimit,
       limit: effectiveMealOptionsLimit,
       key: 'meal_options',
       isStatic: true, // Não é um contador de uso, é um limite
-    },
+    }] : []),
   ];
 
   if (currentPlan.has_chat) {
