@@ -86,7 +86,7 @@ export default function MealDetail() {
   const isProfessionalViewingStudent = isProfessional && !!studentIdFromQuery;
   
   // Use account permissions to check if user can add/remove foods
-  const { plan_name, can_substitute } = useAccountPermissions();
+  const { plan_name, can_substitute, meal_options_limit } = useAccountPermissions();
   const isPaidPlan = plan_name !== 'gratuito';
   
   // Only restrict editing for linked students (not for professionals or regular users)
@@ -214,6 +214,16 @@ export default function MealDetail() {
   const currentOption = useMemo(() => {
     return mealOptions.find(opt => opt.option_number.toString() === selectedOption);
   }, [mealOptions, selectedOption]);
+
+  // Filter meal options based on user's plan limit
+  const visibleMealOptions = useMemo(() => {
+    // If no limit or limit is 0, show all options (fallback for edge cases)
+    if (!meal_options_limit || meal_options_limit <= 0) {
+      return mealOptions;
+    }
+    // Only show options up to the user's plan limit
+    return mealOptions.filter(opt => opt.option_number <= meal_options_limit);
+  }, [mealOptions, meal_options_limit]);
 
   // Check if a food can be used in automatic substitutions
   const canBeSubstituted = (food: Food): boolean => {
@@ -513,7 +523,7 @@ export default function MealDetail() {
               {MEAL_NAMES[meal.name as MealType] || meal.name}
             </h1>
             <p className="text-xs sm:text-sm text-muted-foreground">
-              {mealOptions.length} opções disponíveis
+              {visibleMealOptions.length} {visibleMealOptions.length === 1 ? 'opção disponível' : 'opções disponíveis'}
             </p>
           </div>
         </div>
@@ -521,10 +531,10 @@ export default function MealDetail() {
 
       <main className="container mx-auto px-3 sm:px-4 py-4 sm:py-6 space-y-4 sm:space-y-6 pb-safe">
         {/* Options Tabs */}
-        {mealOptions.length > 0 ? (
+        {visibleMealOptions.length > 0 ? (
           <Tabs value={selectedOption} onValueChange={setSelectedOption} className="w-full">
-            <TabsList className="grid w-full" style={{ gridTemplateColumns: `repeat(${mealOptions.length}, 1fr)` }}>
-              {mealOptions.map((option) => (
+            <TabsList className="grid w-full" style={{ gridTemplateColumns: `repeat(${visibleMealOptions.length}, 1fr)` }}>
+              {visibleMealOptions.map((option) => (
                 <TabsTrigger 
                   key={option.id} 
                   value={option.option_number.toString()}
@@ -535,7 +545,7 @@ export default function MealDetail() {
               ))}
             </TabsList>
 
-            {mealOptions.map((option) => (
+            {visibleMealOptions.map((option) => (
               <TabsContent key={option.id} value={option.option_number.toString()} className="space-y-4 sm:space-y-6 mt-4">
                 {/* Macros Overview */}
                 <motion.section

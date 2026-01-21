@@ -14,6 +14,7 @@ interface CachedUserData {
     adjustment_limit: number;
     chat_messages_per_day: number;
     has_chat: boolean;
+    meal_options_limit: number;
   } | null;
 }
 
@@ -79,6 +80,7 @@ export function useCachedUserData() {
             adjustment_limit: p.adjustment_limit,
             chat_messages_per_day: p.chat_messages_per_day,
             has_chat: p.has_chat,
+            meal_options_limit: p.meal_options_limit ?? 1,
           };
         }
 

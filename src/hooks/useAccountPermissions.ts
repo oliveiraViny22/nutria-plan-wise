@@ -12,6 +12,7 @@ export interface AccountPermissions {
   can_adjust: boolean;
   can_use_chat: boolean;
   can_manage_students: boolean;
+  meal_options_limit: number;
   refresh: () => Promise<void>;
   getBlockMessage: (action: string) => string;
 }
@@ -44,6 +45,7 @@ export function useAccountPermissions(): AccountPermissions {
     can_adjust,
     can_use_chat: planInfo?.has_chat || false,
     can_manage_students: isProfessional,
+    meal_options_limit: planInfo?.meal_options_limit ?? 1,
     refresh,
     getBlockMessage,
   };
