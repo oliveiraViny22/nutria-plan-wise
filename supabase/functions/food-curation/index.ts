@@ -301,9 +301,9 @@ serve(async (req) => {
     }
 
     const body = await req.json().catch(() => ({}));
-    const { mode = 'full', category_filter = null, limit = 500 } = body;
+    const { mode = 'full', category_filter = null, limit = 100 } = body; // Reduced default limit
 
-    console.log(`Running food curation in ${mode} mode...`);
+    console.log(`Running food curation in ${mode} mode with limit ${limit}...`);
 
     // Fetch foods based on mode
     let query = supabase
@@ -385,7 +385,7 @@ serve(async (req) => {
         : 'Realize auditoria completa E sugira novos alimentos necessários.'
     });
 
-    // Call AI via Lovable AI Gateway
+    // Call AI via Lovable AI Gateway with smaller batches
     const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -399,7 +399,7 @@ serve(async (req) => {
           { role: 'user', content: userMessage }
         ],
         temperature: 0.1,
-        max_tokens: 16000,
+        max_tokens: 32000, // Increased token limit
       }),
     });
 
@@ -434,8 +434,47 @@ serve(async (req) => {
     try {
       aiResult = JSON.parse(cleanedContent);
     } catch (parseError) {
-      console.error('Failed to parse AI response:', cleanedContent.substring(0, 500));
-      throw new Error('Invalid JSON response from AI');
+      console.error('Failed to parse AI response, attempting recovery...', cleanedContent.substring(0, 500));
+      
+      // Attempt to recover partial valid JSON
+      try {
+        // Try to find the last complete object in each array
+        const partialResult: { alerts: AuditAlert[]; suggested_foods: SuggestedFood[]; duplicates: DuplicateCandidate[] } = {
+          alerts: [],
+          suggested_foods: [],
+          duplicates: []
+        };
+        
+        // Try to extract alerts array if present
+        const alertsMatch = cleanedContent.match(/"alerts"\s*:\s*\[([\s\S]*?)(?:\],|\]$)/);
+        if (alertsMatch) {
+          try {
+            const alertsJson = '[' + alertsMatch[1].replace(/,\s*$/, '') + ']';
+            // Try to parse, removing incomplete last object if needed
+            let alertsStr = alertsJson;
+            while (alertsStr.length > 2) {
+              try {
+                partialResult.alerts = JSON.parse(alertsStr);
+                break;
+              } catch {
+                // Remove last character and try again
+                const lastBrace = alertsStr.lastIndexOf('{');
+                if (lastBrace > 1) {
+                  alertsStr = alertsStr.substring(0, lastBrace).replace(/,\s*$/, '') + ']';
+                } else {
+                  break;
+                }
+              }
+            }
+          } catch { /* ignore */ }
+        }
+        
+        aiResult = partialResult;
+        console.log('Recovered partial result with', partialResult.alerts.length, 'alerts');
+      } catch (recoveryError) {
+        console.error('Recovery failed:', recoveryError);
+        throw new Error('Invalid JSON response from AI - could not recover partial data');
+      }
     }
 
     // Validate and sanitize results
