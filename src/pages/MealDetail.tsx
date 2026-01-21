@@ -219,12 +219,24 @@ export default function MealDetail() {
   const canBeSubstituted = (food: Food): boolean => {
     // Supplements cannot be auto-substituted
     if (food.category === 'suplementos') return false;
-    // Only in_natura and minimamente_processado can be substituted
-    const processingLevel = (food as any).processing_level as ProcessingLevel | undefined;
-    if (processingLevel && !SUBSTITUTABLE_PROCESSING_LEVELS.includes(processingLevel)) {
-      return false;
-    }
-    return true;
+    
+    // Normalize processing level for comparison (DB has "In natura", code expects "in_natura")
+    const processingLevel = food.processing_level;
+    if (!processingLevel) return true; // Allow if not set
+    
+    // Normalize: lowercase and replace spaces with underscores
+    const normalizedLevel = processingLevel.toLowerCase().replace(/\s+/g, '_') as ProcessingLevel;
+    
+    // Also check for Portuguese format without normalization
+    const allowedLevels = [
+      'in_natura',
+      'minimamente_processado',
+      'in natura',
+      'minimamente processado',
+    ];
+    
+    return allowedLevels.includes(normalizedLevel) || 
+           allowedLevels.includes(processingLevel.toLowerCase());
   };
 
   // Filter foods by same category for substitution (respecting processing level rules)
