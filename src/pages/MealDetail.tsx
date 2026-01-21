@@ -7,9 +7,7 @@ import {
   Loader2,
   Sparkles,
   Check,
-  Plus,
   Trash2,
-  Search,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -113,13 +111,6 @@ export default function MealDetail() {
   const [loadingImpact, setLoadingImpact] = useState(false);
   const [showUpgradeDialog, setShowUpgradeDialog] = useState(false);
   
-  // Add food modal state
-  const [showAddFoodModal, setShowAddFoodModal] = useState(false);
-  const [addFoodOptionId, setAddFoodOptionId] = useState<string | null>(null);
-  const [addFoodSearch, setAddFoodSearch] = useState('');
-  const [addFoodQuantity, setAddFoodQuantity] = useState<number>(100);
-  const [selectedFoodToAdd, setSelectedFoodToAdd] = useState<Food | null>(null);
-  const [addingFood, setAddingFood] = useState(false);
   
   // Remove food dialog state
   const [showRemoveDialog, setShowRemoveDialog] = useState(false);
@@ -437,58 +428,6 @@ export default function MealDetail() {
       .eq('id', optionId);
   };
 
-  // Open add food modal
-  const openAddFoodModal = (optionId: string) => {
-    if (!canAddRemoveFoods) {
-      setShowUpgradeDialog(true);
-      return;
-    }
-    setAddFoodOptionId(optionId);
-    setAddFoodSearch('');
-    setAddFoodQuantity(100);
-    setSelectedFoodToAdd(null);
-    setShowAddFoodModal(true);
-  };
-
-  // Filtered foods for add modal
-  const filteredFoodsForAdd = useMemo(() => {
-    if (!addFoodSearch.trim()) return allFoods.slice(0, 20);
-    const search = addFoodSearch.toLowerCase();
-    return allFoods
-      .filter(f => f.name.toLowerCase().includes(search))
-      .slice(0, 30);
-  }, [allFoods, addFoodSearch]);
-
-  // Add food to option
-  const handleAddFood = async () => {
-    if (!selectedFoodToAdd || !addFoodOptionId || addFoodQuantity <= 0) return;
-    
-    setAddingFood(true);
-    try {
-      // Insert new meal_option_food
-      const { error: insertError } = await supabase
-        .from('meal_option_foods')
-        .insert({
-          meal_option_id: addFoodOptionId,
-          food_id: selectedFoodToAdd.id,
-          quantity_grams: addFoodQuantity,
-        });
-
-      if (insertError) throw insertError;
-
-      // Recalculate totals
-      await recalculateOptionTotals(addFoodOptionId);
-
-      toast.success('Alimento adicionado com sucesso!');
-      setShowAddFoodModal(false);
-      await fetchMealData();
-    } catch (error: any) {
-      console.error('Error adding food:', error);
-      toast.error(`Erro ao adicionar alimento: ${error.message || 'Tente novamente'}`);
-    } finally {
-      setAddingFood(false);
-    }
-  };
 
   // Open remove food dialog
   const openRemoveDialog = (optionFood: MealOptionFood, optionId: string) => {
@@ -650,17 +589,6 @@ export default function MealDetail() {
                     <h2 className="font-semibold text-foreground text-sm sm:text-base">
                       Alimentos
                     </h2>
-                    {canAddRemoveFoods && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="text-xs"
-                        onClick={() => openAddFoodModal(option.id)}
-                      >
-                        <Plus className="w-3 h-3 mr-1" />
-                        Adicionar
-                      </Button>
-                    )}
                   </div>
                   
                   {option.foods && option.foods.length > 0 ? (
@@ -734,19 +662,9 @@ export default function MealDetail() {
                     </div>
                   ) : (
                     <div className="text-center py-8">
-                      <p className="text-sm text-muted-foreground mb-3">
+                      <p className="text-sm text-muted-foreground">
                         Nenhum alimento nesta opção
                       </p>
-                      {canAddRemoveFoods && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => openAddFoodModal(option.id)}
-                        >
-                          <Plus className="w-4 h-4 mr-2" />
-                          Adicionar alimento
-                        </Button>
-                      )}
                     </div>
                   )}
                 </motion.section>
@@ -859,108 +777,6 @@ export default function MealDetail() {
         </DialogContent>
       </Dialog>
 
-      {/* Add Food Modal */}
-      <Dialog open={showAddFoodModal} onOpenChange={setShowAddFoodModal}>
-        <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Adicionar Alimento</DialogTitle>
-          </DialogHeader>
-          
-          <div className="space-y-4">
-            {!selectedFoodToAdd ? (
-              <>
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Buscar alimento..."
-                    value={addFoodSearch}
-                    onChange={(e) => setAddFoodSearch(e.target.value)}
-                    className="pl-10"
-                  />
-                </div>
-                
-                <div className="max-h-60 overflow-y-auto space-y-1">
-                  {filteredFoodsForAdd.length > 0 ? (
-                    filteredFoodsForAdd.map((food) => (
-                      <button
-                        key={food.id}
-                        className="w-full text-left p-2 rounded-lg hover:bg-muted transition-colors"
-                        onClick={() => setSelectedFoodToAdd(food)}
-                      >
-                        <p className="font-medium text-sm">{food.name}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {food.calories} kcal / {food.serving_size} | 
-                          P: {food.protein}g C: {food.carbs}g G: {food.fat}g
-                        </p>
-                      </button>
-                    ))
-                  ) : (
-                    <p className="text-sm text-muted-foreground text-center py-4">
-                      {addFoodSearch ? 'Nenhum alimento encontrado' : 'Digite para buscar'}
-                    </p>
-                  )}
-                </div>
-              </>
-            ) : (
-              <div className="space-y-4">
-                <div className="p-3 bg-primary/10 rounded-lg">
-                  <p className="text-sm text-muted-foreground">Alimento selecionado:</p>
-                  <p className="font-medium">{selectedFoodToAdd.name}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {selectedFoodToAdd.calories} kcal / {selectedFoodToAdd.serving_size}
-                  </p>
-                </div>
-                
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Quantidade (gramas)</label>
-                  <Input
-                    type="number"
-                    min="1"
-                    max="1000"
-                    value={addFoodQuantity}
-                    onChange={(e) => setAddFoodQuantity(Math.max(1, parseInt(e.target.value) || 100))}
-                  />
-                  {addFoodQuantity > 0 && (
-                    <p className="text-xs text-muted-foreground">
-                      ≈ {Math.round(selectedFoodToAdd.calories * addFoodQuantity / 100)} kcal |
-                      P: {Math.round(selectedFoodToAdd.protein * addFoodQuantity / 100)}g |
-                      C: {Math.round(selectedFoodToAdd.carbs * addFoodQuantity / 100)}g |
-                      G: {Math.round(selectedFoodToAdd.fat * addFoodQuantity / 100)}g
-                    </p>
-                  )}
-                </div>
-                
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    className="flex-1"
-                    onClick={() => setSelectedFoodToAdd(null)}
-                  >
-                    Voltar
-                  </Button>
-                  <Button
-                    className="flex-1"
-                    onClick={handleAddFood}
-                    disabled={addingFood || addFoodQuantity <= 0}
-                  >
-                    {addingFood ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                        Adicionando...
-                      </>
-                    ) : (
-                      <>
-                        <Plus className="w-4 h-4 mr-2" />
-                        Adicionar
-                      </>
-                    )}
-                  </Button>
-                </div>
-              </div>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
 
       {/* Remove Food Confirmation */}
       <AlertDialog open={showRemoveDialog} onOpenChange={setShowRemoveDialog}>
