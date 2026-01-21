@@ -460,10 +460,12 @@ export default function Dashboard() {
                         <h3 className="font-medium text-foreground">
                           {MEAL_NAMES[meal.name as MealType] || meal.name}
                         </h3>
-                        <div className="flex items-center gap-1 text-xs text-primary bg-primary/10 px-2 py-0.5 rounded-full">
-                          <Layers className="w-3 h-3" />
-                          <span>2 opções</span>
-                        </div>
+                        {permissions.meal_options_limit > 1 && (
+                          <div className="flex items-center gap-1 text-xs text-primary bg-primary/10 px-2 py-0.5 rounded-full">
+                            <Layers className="w-3 h-3" />
+                            <span>{permissions.meal_options_limit} opções</span>
+                          </div>
+                        )}
                       </div>
                       <p className="text-sm text-muted-foreground">
                         {meal.total_calories} kcal • P: {Math.round(meal.total_protein)}g • C:{' '}
