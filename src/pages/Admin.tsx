@@ -52,6 +52,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { FoodImportValidator, ValidationResult as FoodValidationResult, FoodRow } from '@/components/FoodImportValidator';
 import SystemAudit from '@/components/SystemAudit';
+import { FoodCuration } from '@/components/FoodCuration';
 import { useRealtimeSettings } from '@/hooks/useRealtimeSettings';
 
 const CHART_COLORS = [
@@ -699,6 +700,10 @@ export default function Admin() {
             <TabsTrigger value="audit" className="flex items-center gap-2">
               <History className="h-4 w-4" />
               Auditoria
+            </TabsTrigger>
+            <TabsTrigger value="curation" className="flex items-center gap-2">
+              <Bot className="h-4 w-4" />
+              Curadoria IA
             </TabsTrigger>
             <TabsTrigger value="docs" className="flex items-center gap-2">
               <BookOpen className="h-4 w-4" />
@@ -1462,7 +1467,11 @@ export default function Admin() {
             />
           </TabsContent>
 
-          {/* Plans Tab */}
+          {/* Food Curation Tab */}
+          <TabsContent value="curation">
+            <FoodCuration />
+          </TabsContent>
+
           <TabsContent value="plans">
             <div className="space-y-6">
               {/* Plans Management */}

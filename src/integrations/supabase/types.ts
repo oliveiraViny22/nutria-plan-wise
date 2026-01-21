@@ -241,15 +241,24 @@ export type Database = {
       foods: {
         Row: {
           calories: number
+          canonical_name: string | null
           carbs: number
           category: string | null
+          confidence_level: string | null
           created_at: string
+          created_by_id: string | null
+          created_by_type: string | null
           fat: number
           id: string
+          is_active: boolean | null
+          is_optional: boolean | null
           name: string
+          origin: string | null
           processing_level: string | null
           protein: number
+          review_status: string | null
           serving_size: string | null
+          type: string | null
           unit_enabled: boolean | null
           unit_increment: number | null
           unit_name: string | null
@@ -257,15 +266,24 @@ export type Database = {
         }
         Insert: {
           calories: number
+          canonical_name?: string | null
           carbs: number
           category?: string | null
+          confidence_level?: string | null
           created_at?: string
+          created_by_id?: string | null
+          created_by_type?: string | null
           fat: number
           id?: string
+          is_active?: boolean | null
+          is_optional?: boolean | null
           name: string
+          origin?: string | null
           processing_level?: string | null
           protein: number
+          review_status?: string | null
           serving_size?: string | null
+          type?: string | null
           unit_enabled?: boolean | null
           unit_increment?: number | null
           unit_name?: string | null
@@ -273,15 +291,24 @@ export type Database = {
         }
         Update: {
           calories?: number
+          canonical_name?: string | null
           carbs?: number
           category?: string | null
+          confidence_level?: string | null
           created_at?: string
+          created_by_id?: string | null
+          created_by_type?: string | null
           fat?: number
           id?: string
+          is_active?: boolean | null
+          is_optional?: boolean | null
           name?: string
+          origin?: string | null
           processing_level?: string | null
           protein?: number
+          review_status?: string | null
           serving_size?: string | null
+          type?: string | null
           unit_enabled?: boolean | null
           unit_increment?: number | null
           unit_name?: string | null
@@ -899,6 +926,7 @@ export type Database = {
           success: boolean
         }[]
       }
+      generate_canonical_name: { Args: { food_name: string }; Returns: string }
       get_usage_info: {
         Args: { _feature: string; _user_id: string }
         Returns: {
@@ -933,6 +961,7 @@ export type Database = {
         Args: { _feature: string; _user_id: string }
         Returns: boolean
       }
+      remove_accents: { Args: { input_text: string }; Returns: string }
     }
     Enums: {
       app_role: "admin" | "user" | "professional"
