@@ -1,6 +1,8 @@
-// Re-export the SmartRebalancer as MacroRebalancer for backwards compatibility
-// The old implementation is preserved in useMacroRebalancer.ts for local-only calculations
-// The new SmartRebalancer uses the edge function with profile-aware permissions
+// =====================================================
+// MACRO REBALANCER - COMPONENTE UI
+// =====================================================
+// Re-export the SmartRebalancer for backwards compatibility
+// Uses the refactored useMacroRebalancer hook with pure core logic
 
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -16,6 +18,7 @@ import {
   ArrowRight,
   AlertCircle,
   Beaker,
+  AlertTriangle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -26,6 +29,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   useMacroRebalancer,
   RebalanceProposal,
@@ -169,13 +173,9 @@ export function MacroRebalancer({
     setShowDetails(false);
   };
 
-  const hasAdjustments = proposal && 
-    (proposal.adjustments.length > 0 || proposal.supplementsAdded.length > 0);
-
-  const needsOptimization = 
-    Math.abs(currentMacros.protein - targets.protein) > 5 ||
-    Math.abs(currentMacros.carbs - targets.carbs) > 10 ||
-    Math.abs(currentMacros.fat - targets.fat) > 5;
+  const hasAdjustments = proposal && proposal.adjustments.length > 0;
+  const hasSupplementNeeds = proposal && proposal.supplementNeeds && proposal.supplementNeeds.length > 0;
+  const hasValidationErrors = proposal && !proposal.isValid;
 
   return (
     <>
@@ -212,6 +212,21 @@ export function MacroRebalancer({
 
           {proposal && (
             <div className="space-y-4">
+              {/* Validation Errors */}
+              {hasValidationErrors && (
+                <Alert variant="destructive">
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertDescription>
+                    <p className="font-medium">Erros de validação:</p>
+                    <ul className="list-disc list-inside mt-1">
+                      {proposal.validationErrors.map((err, i) => (
+                        <li key={i} className="text-sm">{err}</li>
+                      ))}
+                    </ul>
+                  </AlertDescription>
+                </Alert>
+              )}
+
               {/* Macro Comparison */}
               <div className="space-y-2">
                 <MacroComparisonCard
@@ -219,21 +234,21 @@ export function MacroRebalancer({
                   current={proposal.currentMacros.protein}
                   target={proposal.targetMacros.protein}
                   proposed={proposal.proposedMacros.protein}
-                  colorClass="text-protein"
+                  colorClass="text-red-500"
                 />
                 <MacroComparisonCard
                   label="Carboidrato"
                   current={proposal.currentMacros.carbs}
                   target={proposal.targetMacros.carbs}
                   proposed={proposal.proposedMacros.carbs}
-                  colorClass="text-carbs"
+                  colorClass="text-amber-500"
                 />
                 <MacroComparisonCard
                   label="Gordura"
                   current={proposal.currentMacros.fat}
                   target={proposal.targetMacros.fat}
                   proposed={proposal.proposedMacros.fat}
-                  colorClass="text-fat"
+                  colorClass="text-yellow-500"
                 />
                 <MacroComparisonCard
                   label="Calorias"
@@ -253,7 +268,7 @@ export function MacroRebalancer({
                     className="w-full flex items-center justify-between p-3 rounded-xl bg-muted/50 hover:bg-muted transition-colors"
                   >
                     <span className="text-sm font-medium text-foreground">
-                      {proposal.adjustments.length + proposal.supplementsAdded.length} alterações propostas
+                      {proposal.adjustments.length} alterações propostas
                     </span>
                     {showDetails ? (
                       <ChevronUp className="w-4 h-4 text-muted-foreground" />
@@ -271,30 +286,15 @@ export function MacroRebalancer({
                         className="overflow-hidden"
                       >
                         <div className="space-y-4 pt-2">
-                          {/* Step 1: Food Adjustments */}
+                          {/* Food Adjustments */}
                           {proposal.adjustments.length > 0 && (
                             <div>
                               <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-                                Etapa 1 — Ajuste de porções
+                                Ajuste de porções
                               </h4>
                               <div className="divide-y divide-border">
                                 {proposal.adjustments.map((adj, i) => (
                                   <AdjustmentItem key={i} adjustment={adj} />
-                                ))}
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Step 2: Supplements */}
-                          {proposal.supplementsAdded.length > 0 && (
-                            <div>
-                              <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 flex items-center gap-1">
-                                <Beaker className="w-3 h-3" />
-                                Etapa 2 — Suplementação
-                              </h4>
-                              <div className="divide-y divide-border">
-                                {proposal.supplementsAdded.map((supp, i) => (
-                                  <AdjustmentItem key={i} adjustment={supp} />
                                 ))}
                               </div>
                             </div>
@@ -318,8 +318,26 @@ export function MacroRebalancer({
                 </div>
               )}
 
+              {/* Supplement Needs (sinalização, não adição automática) */}
+              {hasSupplementNeeds && (
+                <Alert className="bg-blue-500/10 border-blue-500/20">
+                  <Beaker className="h-4 w-4 text-blue-500" />
+                  <AlertDescription className="text-blue-700 dark:text-blue-300">
+                    <p className="font-medium mb-1">Suplementação pode ser necessária:</p>
+                    <ul className="list-disc list-inside text-sm">
+                      {proposal.supplementNeeds.map((need, i) => (
+                        <li key={i}>{need.message}</li>
+                      ))}
+                    </ul>
+                    <p className="text-xs mt-2 text-muted-foreground">
+                      Consulte um profissional para adicionar suplementos ao seu plano.
+                    </p>
+                  </AlertDescription>
+                </Alert>
+              )}
+
               {/* Remaining deficits warning */}
-              {(proposal.deficits.protein > 5 || proposal.deficits.carbs > 10 || proposal.deficits.fat > 5) && (
+              {(proposal.deficits.protein > 5 || proposal.deficits.carbs > 10 || proposal.deficits.fat > 5) && !hasSupplementNeeds && (
                 <div className="flex items-start gap-3 p-4 rounded-xl bg-amber-500/10 border border-amber-500/20">
                   <AlertCircle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
                   <div>
@@ -342,7 +360,7 @@ export function MacroRebalancer({
               <X className="w-4 h-4 mr-2" />
               Cancelar
             </Button>
-            {hasAdjustments && (
+            {hasAdjustments && proposal?.isValid && (
               <Button onClick={handleConfirm} disabled={loading}>
                 {loading ? (
                   <>
