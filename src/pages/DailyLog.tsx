@@ -12,6 +12,7 @@ import {
   ChevronRight,
   Clock,
   Loader2,
+  RefreshCw,
   SkipForward,
   UtensilsCrossed,
   XCircle,
@@ -534,6 +535,17 @@ export default function DailyLog() {
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-3">
+                    {/* Link to meal detail for substitutions */}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-xs text-muted-foreground hover:text-primary w-full justify-start -mt-1 mb-1"
+                      onClick={() => navigate(`/meal/${meal.id}`)}
+                    >
+                      <RefreshCw className="h-3 w-3 mr-1" />
+                      Ver detalhes / Substituir alimentos
+                    </Button>
+
                     {/* Show confirmed option details if confirmed */}
                     {meal.log?.status && ['CONFIRMADA', 'CONFIRMADA_TARDIA'].includes(meal.log.status) && meal.log.confirmed_option_id && (
                       <div className="p-3 bg-green-50 dark:bg-green-950/30 rounded-lg border border-green-200 dark:border-green-800">
