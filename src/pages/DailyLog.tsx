@@ -47,6 +47,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useAccountPermissions } from '@/hooks/useAccountPermissions';
 import { toast } from '@/hooks/use-toast';
 import { MEAL_NAMES, MealType } from '@/lib/types';
 
@@ -100,7 +101,19 @@ type ExceptionStatus = 'PULADA' | 'FORA_DO_PLANO';
 export default function DailyLog() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const permissions = useAccountPermissions();
   
+  // Redirect free users to dashboard
+  useEffect(() => {
+    if (!permissions.loading && permissions.plan_name === 'gratuito') {
+      toast({
+        title: 'Funcionalidade Premium',
+        description: 'O registro de consumo está disponível apenas para planos pagos.',
+        variant: 'destructive',
+      });
+      navigate('/dashboard');
+    }
+  }, [permissions.loading, permissions.plan_name, navigate]);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [loading, setLoading] = useState(true);
   const [meals, setMeals] = useState<MealWithOptions[]>([]);
