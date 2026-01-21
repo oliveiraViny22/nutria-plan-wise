@@ -2,115 +2,149 @@
 @tailwind components;
 @tailwind utilities;
 
-/* NutriAI Planner Design System - Health/Medtech Theme */
+/* NutriAI Planner Design System - Premium Health/Wellness Theme */
 
 @layer base {
   :root {
-    /* Fresh green-based health theme */
-    --background: 150 20% 99%;
-    --foreground: 150 25% 10%;
+    /* Light theme - Clean, fresh, and professional */
+    --background: 150 30% 98%;
+    --foreground: 160 30% 12%;
 
     --card: 0 0% 100%;
-    --card-foreground: 150 25% 10%;
+    --card-foreground: 160 30% 12%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 150 25% 10%;
+    --popover-foreground: 160 30% 12%;
 
-    /* Primary: Fresh green for health/vitality */
-    --primary: 152 82% 38%;
+    /* Primary: Vibrant emerald green for health/vitality */
+    --primary: 158 64% 42%;
     --primary-foreground: 0 0% 100%;
 
-    /* Secondary: Soft teal */
-    --secondary: 168 40% 95%;
-    --secondary-foreground: 168 50% 25%;
+    /* Secondary: Warm sage for balance */
+    --secondary: 145 25% 93%;
+    --secondary-foreground: 155 35% 25%;
 
-    --muted: 150 15% 95%;
-    --muted-foreground: 150 10% 45%;
+    --muted: 150 20% 94%;
+    --muted-foreground: 155 15% 45%;
 
-    /* Accent: Vibrant teal */
-    --accent: 168 76% 42%;
+    /* Accent: Teal for CTAs and highlights */
+    --accent: 172 66% 40%;
     --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 84% 60%;
+    --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
 
-    /* Warning/caution */
+    /* Warning - Warm amber */
     --warning: 38 92% 50%;
-    --warning-foreground: 0 0% 100%;
+    --warning-foreground: 38 92% 10%;
 
-    /* Success - matches primary */
-    --success: 152 82% 38%;
+    /* Success - Matching primary */
+    --success: 158 64% 42%;
     --success-foreground: 0 0% 100%;
 
-    --border: 150 20% 90%;
-    --input: 150 20% 90%;
-    --ring: 152 82% 38%;
+    --border: 150 25% 88%;
+    --input: 150 25% 88%;
+    --ring: 158 64% 42%;
 
     --radius: 0.75rem;
 
-    /* Custom gradients */
-    --gradient-primary: linear-gradient(135deg, hsl(152, 82%, 38%) 0%, hsl(168, 76%, 42%) 100%);
-    --gradient-hero: linear-gradient(180deg, hsl(150, 20%, 99%) 0%, hsl(168, 40%, 97%) 100%);
-    --gradient-card: linear-gradient(180deg, hsl(0, 0%, 100%) 0%, hsl(150, 15%, 98%) 100%);
+    /* Premium gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(158, 64%, 42%) 0%, hsl(172, 66%, 40%) 100%);
+    --gradient-hero: linear-gradient(180deg, hsl(150, 30%, 98%) 0%, hsl(155, 35%, 95%) 50%, hsl(160, 30%, 92%) 100%);
+    --gradient-card: linear-gradient(180deg, hsl(0, 0%, 100%) 0%, hsl(150, 25%, 98%) 100%);
+    --gradient-accent: linear-gradient(135deg, hsl(172, 66%, 40%) 0%, hsl(185, 60%, 45%) 100%);
 
-    /* Shadows */
-    --shadow-sm: 0 1px 2px 0 hsl(150 25% 10% / 0.05);
-    --shadow-md: 0 4px 6px -1px hsl(150 25% 10% / 0.07), 0 2px 4px -2px hsl(150 25% 10% / 0.05);
-    --shadow-lg: 0 10px 15px -3px hsl(150 25% 10% / 0.08), 0 4px 6px -4px hsl(150 25% 10% / 0.05);
-    --shadow-xl: 0 20px 25px -5px hsl(150 25% 10% / 0.1), 0 8px 10px -6px hsl(150 25% 10% / 0.05);
+    /* Refined shadows for light mode */
+    --shadow-sm: 0 1px 3px 0 hsl(160 30% 20% / 0.06), 0 1px 2px -1px hsl(160 30% 20% / 0.04);
+    --shadow-md: 0 4px 8px -1px hsl(160 30% 20% / 0.08), 0 2px 4px -2px hsl(160 30% 20% / 0.05);
+    --shadow-lg: 0 12px 20px -4px hsl(160 30% 20% / 0.1), 0 4px 8px -4px hsl(160 30% 20% / 0.06);
+    --shadow-xl: 0 24px 32px -8px hsl(160 30% 20% / 0.12), 0 8px 12px -6px hsl(160 30% 20% / 0.08);
+    --shadow-glow: 0 0 24px -4px hsl(158 64% 42% / 0.25);
 
-    /* Macro colors */
-    --macro-protein: 213 94% 56%;
-    --macro-carbs: 45 93% 47%;
-    --macro-fat: 340 82% 52%;
+    /* Macro colors - vibrant and distinct */
+    --macro-protein: 220 90% 56%;
+    --macro-carbs: 45 95% 48%;
+    --macro-fat: 350 80% 55%;
 
-    --sidebar-background: 150 20% 98%;
-    --sidebar-foreground: 150 25% 25%;
-    --sidebar-primary: 152 82% 38%;
+    /* Sidebar */
+    --sidebar-background: 155 30% 97%;
+    --sidebar-foreground: 160 30% 20%;
+    --sidebar-primary: 158 64% 42%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 168 40% 95%;
-    --sidebar-accent-foreground: 168 50% 25%;
-    --sidebar-border: 150 20% 90%;
-    --sidebar-ring: 152 82% 38%;
+    --sidebar-accent: 155 30% 92%;
+    --sidebar-accent-foreground: 155 35% 25%;
+    --sidebar-border: 150 25% 88%;
+    --sidebar-ring: 158 64% 42%;
   }
 
   .dark {
-    --background: 150 25% 6%;
-    --foreground: 150 10% 95%;
+    /* Dark theme - Rich, sophisticated, and easy on the eyes */
+    --background: 160 25% 7%;
+    --foreground: 155 15% 92%;
 
-    --card: 150 20% 8%;
-    --card-foreground: 150 10% 95%;
+    --card: 158 22% 10%;
+    --card-foreground: 155 15% 92%;
 
-    --popover: 150 20% 8%;
-    --popover-foreground: 150 10% 95%;
+    --popover: 158 22% 10%;
+    --popover-foreground: 155 15% 92%;
 
-    --primary: 152 72% 48%;
-    --primary-foreground: 150 25% 6%;
+    /* Primary: Luminous green that pops on dark */
+    --primary: 158 70% 50%;
+    --primary-foreground: 160 30% 8%;
 
-    --secondary: 168 30% 15%;
-    --secondary-foreground: 168 30% 85%;
+    /* Secondary: Deep teal undertones */
+    --secondary: 165 25% 15%;
+    --secondary-foreground: 160 20% 80%;
 
-    --muted: 150 15% 15%;
-    --muted-foreground: 150 10% 60%;
+    --muted: 160 18% 14%;
+    --muted-foreground: 155 12% 55%;
 
-    --accent: 168 66% 48%;
-    --accent-foreground: 150 25% 6%;
+    /* Accent: Bright teal for highlights */
+    --accent: 172 65% 50%;
+    --accent-foreground: 160 30% 8%;
 
-    --destructive: 0 62% 50%;
+    --destructive: 0 65% 55%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 150 15% 18%;
-    --input: 150 15% 18%;
-    --ring: 152 72% 48%;
+    /* Warning */
+    --warning: 40 90% 55%;
+    --warning-foreground: 40 90% 10%;
 
-    --sidebar-background: 150 20% 8%;
-    --sidebar-foreground: 150 10% 85%;
-    --sidebar-primary: 152 72% 48%;
-    --sidebar-primary-foreground: 150 25% 6%;
-    --sidebar-accent: 168 30% 15%;
-    --sidebar-accent-foreground: 168 30% 85%;
-    --sidebar-border: 150 15% 18%;
-    --sidebar-ring: 152 72% 48%;
+    /* Success */
+    --success: 158 70% 50%;
+    --success-foreground: 160 30% 8%;
+
+    --border: 160 18% 18%;
+    --input: 160 18% 18%;
+    --ring: 158 70% 50%;
+
+    /* Dark mode gradients - subtle and elegant */
+    --gradient-primary: linear-gradient(135deg, hsl(158, 70%, 50%) 0%, hsl(172, 65%, 50%) 100%);
+    --gradient-hero: linear-gradient(180deg, hsl(160, 25%, 7%) 0%, hsl(158, 22%, 9%) 50%, hsl(165, 20%, 11%) 100%);
+    --gradient-card: linear-gradient(180deg, hsl(158, 22%, 10%) 0%, hsl(160, 20%, 12%) 100%);
+    --gradient-accent: linear-gradient(135deg, hsl(172, 65%, 50%) 0%, hsl(185, 55%, 55%) 100%);
+
+    /* Dark mode shadows - subtle glows */
+    --shadow-sm: 0 1px 3px 0 hsl(0 0% 0% / 0.2), 0 1px 2px -1px hsl(0 0% 0% / 0.15);
+    --shadow-md: 0 4px 8px -1px hsl(0 0% 0% / 0.25), 0 2px 4px -2px hsl(0 0% 0% / 0.2);
+    --shadow-lg: 0 12px 20px -4px hsl(0 0% 0% / 0.3), 0 4px 8px -4px hsl(0 0% 0% / 0.25);
+    --shadow-xl: 0 24px 32px -8px hsl(0 0% 0% / 0.35), 0 8px 12px -6px hsl(0 0% 0% / 0.3);
+    --shadow-glow: 0 0 24px -4px hsl(158 70% 50% / 0.3);
+
+    /* Macro colors - adjusted for dark mode contrast */
+    --macro-protein: 218 85% 62%;
+    --macro-carbs: 48 92% 52%;
+    --macro-fat: 348 78% 60%;
+
+    /* Sidebar - darker and cohesive */
+    --sidebar-background: 158 22% 9%;
+    --sidebar-foreground: 155 12% 85%;
+    --sidebar-primary: 158 70% 50%;
+    --sidebar-primary-foreground: 160 30% 8%;
+    --sidebar-accent: 165 20% 14%;
+    --sidebar-accent-foreground: 160 20% 80%;
+    --sidebar-border: 160 18% 18%;
+    --sidebar-ring: 158 70% 50%;
   }
 }
 
@@ -140,9 +174,13 @@
 }
 
 @layer components {
-  /* Glass effect */
+  /* Glass effect - enhanced for both modes */
   .glass {
-    @apply bg-card/80 backdrop-blur-md border border-border/50;
+    @apply bg-card/85 backdrop-blur-lg border border-border/40;
+  }
+
+  .glass-subtle {
+    @apply bg-card/60 backdrop-blur-sm border border-border/30;
   }
 
   /* Gradient backgrounds */
@@ -154,18 +192,46 @@
     background: var(--gradient-hero);
   }
 
-  /* Card variants */
+  .gradient-accent {
+    background: var(--gradient-accent);
+  }
+
+  /* Card variants - refined for both modes */
   .card-elevated {
     box-shadow: var(--shadow-md);
-    @apply bg-card border border-border/50;
+    @apply bg-card border border-border/50 transition-shadow duration-200;
+  }
+
+  .card-elevated:hover {
+    box-shadow: var(--shadow-lg);
   }
 
   .card-interactive {
     box-shadow: var(--shadow-sm);
-    @apply bg-card border border-border/50 transition-all duration-200 hover:shadow-lg hover:border-primary/20;
+    @apply bg-card border border-border/50 transition-all duration-200;
   }
 
-  /* Macro color utilities */
+  .card-interactive:hover {
+    box-shadow: var(--shadow-lg);
+    @apply border-primary/30;
+  }
+
+  /* Premium glow effect for primary elements */
+  .glow-primary {
+    box-shadow: var(--shadow-glow);
+  }
+
+  /* Subtle surface variants */
+  .surface-raised {
+    @apply bg-card border border-border/40;
+    box-shadow: var(--shadow-sm);
+  }
+
+  .surface-sunken {
+    @apply bg-muted/50 border border-border/20;
+  }
+
+  /* Macro color utilities - enhanced */
   .text-protein {
     color: hsl(var(--macro-protein));
   }
@@ -191,15 +257,37 @@
   }
 
   .bg-protein-soft {
-    background-color: hsl(var(--macro-protein) / 0.15);
+    background-color: hsl(var(--macro-protein) / 0.12);
   }
 
   .bg-carbs-soft {
-    background-color: hsl(var(--macro-carbs) / 0.15);
+    background-color: hsl(var(--macro-carbs) / 0.12);
   }
 
   .bg-fat-soft {
-    background-color: hsl(var(--macro-fat) / 0.15);
+    background-color: hsl(var(--macro-fat) / 0.12);
+  }
+
+  /* Ring utilities for focus states */
+  .ring-protein {
+    --tw-ring-color: hsl(var(--macro-protein) / 0.4);
+  }
+
+  .ring-carbs {
+    --tw-ring-color: hsl(var(--macro-carbs) / 0.4);
+  }
+
+  .ring-fat {
+    --tw-ring-color: hsl(var(--macro-fat) / 0.4);
+  }
+
+  /* Divider styles */
+  .divider-subtle {
+    @apply border-t border-border/50;
+  }
+
+  .divider-strong {
+    @apply border-t border-border;
   }
 }
 

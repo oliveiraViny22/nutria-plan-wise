@@ -44,8 +44,11 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       // Update meta theme-color for mobile browsers
       const metaThemeColor = document.querySelector('meta[name="theme-color"]');
       if (metaThemeColor) {
-        metaThemeColor.setAttribute('content', newTheme === 'dark' ? '#0a1210' : '#f7faf9');
+        metaThemeColor.setAttribute('content', newTheme === 'dark' ? '#0f1a17' : '#f7fbf9');
       }
+      
+      // Add transition class for smooth theme switching
+      root.style.setProperty('--theme-transition', 'background-color 0.3s ease, color 0.2s ease, border-color 0.2s ease');
     };
 
     if (theme === 'system') {
