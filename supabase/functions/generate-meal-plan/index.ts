@@ -269,6 +269,116 @@ function calcNutrients(food: Food, gramsQty: number) {
   };
 }
 
+// Generate an equivalent meal option with different foods but similar macros
+function generateEquivalentOption(
+  originalFoods: Array<{ food_id: string; quantity: number }>,
+  allFoods: Food[],
+  targetCalories: number,
+  targetProtein: number,
+  targetCarbs: number,
+  targetFat: number,
+  restrictions: string[],
+  mealType: MealType
+): Array<{ food_id: string; quantity: number }> {
+  const usedFoodIds = new Set(originalFoods.map(f => f.food_id));
+  const categoryPriorities = MEAL_CATEGORY_PRIORITIES[mealType] || [];
+  
+  // Group available foods by category (excluding already used)
+  const availableByCategory: Record<string, Food[]> = {};
+  
+  for (const food of allFoods) {
+    if (usedFoodIds.has(food.id)) continue;
+    
+    // Check processing level
+    const level = (food.processing_level || 'in_natura').toLowerCase().replace(/ /g, '_');
+    const allowedNormalized = ['in_natura', 'minimamente_processado'];
+    if (!allowedNormalized.some(allowed => level.includes(allowed.replace('_', ' ')) || level.includes(allowed))) continue;
+    
+    // Skip supplements
+    const normalizedCategory = (food.category || '').toLowerCase();
+    if (normalizedCategory === 'suplementos' || normalizedCategory.includes('suplemento')) continue;
+    
+    // Check restrictions
+    const foodName = food.name.toLowerCase();
+    const isRestricted = restrictions.some(r => {
+      const restriction = r.toLowerCase();
+      if (restriction.includes('lactose') && normalizedCategory.includes('latic')) return true;
+      if (restriction.includes('gluten') && (foodName.includes('trigo') || foodName.includes('aveia') || foodName.includes('pão'))) return true;
+      return false;
+    });
+    if (isRestricted) continue;
+    
+    const cat = food.category || 'outros';
+    if (!availableByCategory[cat]) availableByCategory[cat] = [];
+    availableByCategory[cat].push(food);
+  }
+  
+  const equivalentFoods: Array<{ food_id: string; quantity: number }> = [];
+  let currentCalories = 0;
+  let currentProtein = 0;
+  let currentCarbs = 0;
+  let currentFat = 0;
+  
+  // For each original food, try to find an equivalent from the same category
+  for (const origFood of originalFoods) {
+    const originalFoodData = allFoods.find(f => f.id === origFood.food_id);
+    if (!originalFoodData) continue;
+    
+    const origCategory = originalFoodData.category || 'outros';
+    const origNutrients = calcNutrients(originalFoodData, origFood.quantity);
+    
+    // Get alternatives from the same category
+    const alternatives = availableByCategory[origCategory] || [];
+    
+    if (alternatives.length > 0) {
+      // Pick a random alternative from the category
+      const randomIndex = Math.floor(Math.random() * alternatives.length);
+      const altFood = alternatives[randomIndex];
+      
+      // Calculate quantity to match original calories
+      const baseGrams = parseServingGrams(altFood.serving_size);
+      const caloriesPerGram = altFood.calories / baseGrams;
+      let targetQty = caloriesPerGram > 0 
+        ? origNutrients.calories / caloriesPerGram 
+        : origFood.quantity;
+      
+      // Round and clamp
+      targetQty = Math.round(targetQty / 5) * 5;
+      targetQty = Math.min(500, Math.max(10, targetQty));
+      
+      const altNutrients = calcNutrients(altFood, targetQty);
+      
+      equivalentFoods.push({ food_id: altFood.id, quantity: targetQty });
+      currentCalories += altNutrients.calories;
+      currentProtein += altNutrients.protein;
+      currentCarbs += altNutrients.carbs;
+      currentFat += altNutrients.fat;
+      
+      // Remove from available to avoid duplicates
+      const idx = alternatives.findIndex(f => f.id === altFood.id);
+      if (idx > -1) alternatives.splice(idx, 1);
+    } else {
+      // If no alternative found, use the original
+      equivalentFoods.push(origFood);
+      currentCalories += origNutrients.calories;
+      currentProtein += origNutrients.protein;
+      currentCarbs += origNutrients.carbs;
+      currentFat += origNutrients.fat;
+    }
+  }
+  
+  // Fine-tune to match target calories (scale proportionally)
+  if (currentCalories > 0 && Math.abs(currentCalories - targetCalories) > 50) {
+    const scaleFactor = targetCalories / currentCalories;
+    for (const ef of equivalentFoods) {
+      const scaledQty = Math.round((ef.quantity * scaleFactor) / 5) * 5;
+      ef.quantity = Math.min(500, Math.max(10, scaledQty));
+    }
+  }
+  
+  return equivalentFoods;
+}
+
 serve(async (req) => {
   const corsHeaders = getCorsHeaders(req);
   
@@ -664,6 +774,9 @@ Lembre-se: quantity em gramas/ml, total EXATO de ${targetCalories} calorias, sem
       _feature: 'diet',
     });
 
+    // Generate equivalent options for each meal
+    const OPTIONS_PER_MEAL = 2;
+    
     // Save meals with v2 schema (meal_options and meal_option_foods)
     for (let sortOrder = 0; sortOrder < adjustedMeals.length; sortOrder++) {
       const meal = adjustedMeals[sortOrder];
@@ -682,30 +795,71 @@ Lembre-se: quantity em gramas/ml, total EXATO de ${targetCalories} calorias, sem
         continue;
       }
 
-      // Create meal option (v2 schema requires meal_options)
-      const { data: savedOption, error: optionError } = await supabase.from("meal_options").insert({
-        meal_id: savedMeal.id,
-        option_number: 1,
-        name: 'Opção Principal',
-        total_calories: meal.total_calories,
-        total_protein: meal.total_protein,
-        total_carbs: meal.total_carbs,
-        total_fat: meal.total_fat,
-      }).select().single();
+      // Create multiple meal options (nutritionally equivalent)
+      for (let optionNum = 1; optionNum <= OPTIONS_PER_MEAL; optionNum++) {
+        let optionFoods = meal.foods;
+        let optionCalories = meal.total_calories;
+        let optionProtein = meal.total_protein;
+        let optionCarbs = meal.total_carbs;
+        let optionFat = meal.total_fat;
+        
+        // For option 2+, generate equivalent alternatives
+        if (optionNum > 1) {
+          const equivalentFoods = generateEquivalentOption(
+            meal.foods,
+            foods,
+            meal.total_calories,
+            meal.total_protein,
+            meal.total_carbs,
+            meal.total_fat,
+            restrictions,
+            meal.name as MealType
+          );
+          
+          // Recalculate macros for the equivalent option
+          let eqCal = 0, eqP = 0, eqC = 0, eqF = 0;
+          for (const ef of equivalentFoods) {
+            const food = foods.find((fd: Food) => fd.id === ef.food_id);
+            if (food) {
+              const nutrients = calcNutrients(food, ef.quantity);
+              eqCal += nutrients.calories;
+              eqP += nutrients.protein;
+              eqC += nutrients.carbs;
+              eqF += nutrients.fat;
+            }
+          }
+          
+          optionFoods = equivalentFoods;
+          optionCalories = Math.round(eqCal);
+          optionProtein = Math.round(eqP * 10) / 10;
+          optionCarbs = Math.round(eqC * 10) / 10;
+          optionFat = Math.round(eqF * 10) / 10;
+        }
+        
+        const { data: savedOption, error: optionError } = await supabase.from("meal_options").insert({
+          meal_id: savedMeal.id,
+          option_number: optionNum,
+          name: optionNum === 1 ? 'Opção Principal' : `Opção ${optionNum}`,
+          total_calories: optionCalories,
+          total_protein: optionProtein,
+          total_carbs: optionCarbs,
+          total_fat: optionFat,
+        }).select().single();
 
-      if (optionError || !savedOption) {
-        logStep("Failed to create meal option", { error: optionError?.message });
-        continue;
-      }
+        if (optionError || !savedOption) {
+          logStep("Failed to create meal option", { error: optionError?.message, optionNum });
+          continue;
+        }
 
-      // Insert foods into meal_option_foods (v2 schema)
-      for (const food of meal.foods) {
-        if (food.food_id) {
-          await supabase.from("meal_option_foods").insert({ 
-            meal_option_id: savedOption.id, 
-            food_id: food.food_id, 
-            quantity_grams: food.quantity,
-          });
+        // Insert foods into meal_option_foods (v2 schema)
+        for (const food of optionFoods) {
+          if (food.food_id) {
+            await supabase.from("meal_option_foods").insert({ 
+              meal_option_id: savedOption.id, 
+              food_id: food.food_id, 
+              quantity_grams: food.quantity,
+            });
+          }
         }
       }
     }

@@ -21,6 +21,7 @@ import {
   ClipboardCheck,
   Shield,
   HelpCircle,
+  Layers,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Logo } from '@/components/Logo';
@@ -451,16 +452,22 @@ export default function Dashboard() {
                     to={`/meal/${meal.id}`}
                     className="card-interactive rounded-xl p-4 flex items-center justify-between"
                   >
-                    <div>
-                      <h3 className="font-medium text-foreground">
-                        {MEAL_NAMES[meal.name as MealType] || meal.name}
-                      </h3>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-medium text-foreground">
+                          {MEAL_NAMES[meal.name as MealType] || meal.name}
+                        </h3>
+                        <div className="flex items-center gap-1 text-xs text-primary bg-primary/10 px-2 py-0.5 rounded-full">
+                          <Layers className="w-3 h-3" />
+                          <span>2 opções</span>
+                        </div>
+                      </div>
                       <p className="text-sm text-muted-foreground">
                         {meal.total_calories} kcal • P: {Math.round(meal.total_protein)}g • C:{' '}
                         {Math.round(meal.total_carbs)}g • G: {Math.round(meal.total_fat)}g
                       </p>
                     </div>
-                    <ChevronRight className="w-5 h-5 text-muted-foreground" />
+                    <ChevronRight className="w-5 h-5 text-muted-foreground flex-shrink-0" />
                   </Link>
                 </motion.div>
               ))}
