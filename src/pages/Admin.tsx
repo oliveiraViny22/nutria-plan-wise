@@ -47,7 +47,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { useUserRole } from '@/hooks/useUserRole';
-import { useAdminOperations, UserProfile, DeleteUserPreview, Plan } from '@/hooks/useAdminOperations';
+import { useAdminOperations, UserProfile, DeleteUserPreview, Plan, UserUsage } from '@/hooks/useAdminOperations';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { FoodImportValidator, ValidationResult as FoodValidationResult, FoodRow } from '@/components/FoodImportValidator';
@@ -114,6 +114,8 @@ export default function Admin() {
     deleteUser,
     fetchPlans,
     updatePlan,
+    getUserUsage,
+    updateUserUsage,
   } = useAdminOperations();
 
   const [activeTab, setActiveTab] = useState('metrics');
@@ -134,6 +136,10 @@ export default function Admin() {
   const [deleteConfirmUser, setDeleteConfirmUser] = useState<UserProfile | null>(null);
   const [deletePreview, setDeletePreview] = useState<DeleteUserPreview | null>(null);
   const [loadingDeletePreview, setLoadingDeletePreview] = useState(false);
+  const [editingQuotaUser, setEditingQuotaUser] = useState<UserProfile | null>(null);
+  const [userUsage, setUserUsage] = useState<UserUsage | null>(null);
+  const [editedQuotas, setEditedQuotas] = useState<Partial<UserUsage>>({});
+  const [loadingUserUsage, setLoadingUserUsage] = useState(false);
 
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
   const [metricsLoading, setMetricsLoading] = useState(false);
@@ -818,6 +824,33 @@ export default function Admin() {
                             </TableCell>
                             <TableCell className="text-right">
                               <div className="flex items-center justify-end gap-1">
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm"
+                                  onClick={async () => {
+                                    setEditingQuotaUser(user);
+                                    setUserUsage(null);
+                                    setEditedQuotas({});
+                                    setLoadingUserUsage(true);
+                                    try {
+                                      const usage = await getUserUsage(user.user_id);
+                                      setUserUsage(usage);
+                                      if (usage) {
+                                        setEditedQuotas({
+                                          diets_used: usage.diets_used,
+                                          substitutions_used: usage.substitutions_used,
+                                          adjustments_used: usage.adjustments_used,
+                                          chat_messages_today: usage.chat_messages_today,
+                                        });
+                                      }
+                                    } finally {
+                                      setLoadingUserUsage(false);
+                                    }
+                                  }}
+                                  title="Editar cotas"
+                                >
+                                  <BarChart3 className="h-4 w-4" />
+                                </Button>
                                 <Button 
                                   variant="ghost" 
                                   size="sm"
@@ -1625,6 +1658,104 @@ export default function Admin() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Edit User Quotas Dialog */}
+      <Dialog open={!!editingQuotaUser} onOpenChange={(open) => {
+        if (!open) {
+          setEditingQuotaUser(null);
+          setUserUsage(null);
+          setEditedQuotas({});
+        }
+      }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <BarChart3 className="h-5 w-5" />
+              Editar Cotas de Uso
+            </DialogTitle>
+            <DialogDescription>
+              {editingQuotaUser?.name || editingQuotaUser?.email}
+            </DialogDescription>
+          </DialogHeader>
+
+          {loadingUserUsage ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-8 w-8 animate-spin" />
+            </div>
+          ) : (
+            <div className="space-y-4 py-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Dietas usadas</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    value={editedQuotas.diets_used ?? 0}
+                    onChange={(e) => setEditedQuotas(prev => ({ ...prev, diets_used: parseInt(e.target.value) || 0 }))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Substituições usadas</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    value={editedQuotas.substitutions_used ?? 0}
+                    onChange={(e) => setEditedQuotas(prev => ({ ...prev, substitutions_used: parseInt(e.target.value) || 0 }))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Ajustes usados</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    value={editedQuotas.adjustments_used ?? 0}
+                    onChange={(e) => setEditedQuotas(prev => ({ ...prev, adjustments_used: parseInt(e.target.value) || 0 }))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Mensagens hoje</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    value={editedQuotas.chat_messages_today ?? 0}
+                    onChange={(e) => setEditedQuotas(prev => ({ ...prev, chat_messages_today: parseInt(e.target.value) || 0 }))}
+                  />
+                </div>
+              </div>
+
+              {userUsage && (
+                <div className="text-xs text-muted-foreground pt-2 border-t">
+                  <p>Período: {new Date(userUsage.period_start).toLocaleDateString('pt-BR')} - {new Date(userUsage.period_end).toLocaleDateString('pt-BR')}</p>
+                  <p>Último reset de chat: {new Date(userUsage.last_chat_reset).toLocaleDateString('pt-BR')}</p>
+                </div>
+              )}
+
+              <div className="flex justify-end gap-2 pt-4">
+                <Button variant="outline" onClick={() => setEditingQuotaUser(null)}>
+                  Cancelar
+                </Button>
+                <Button
+                  onClick={async () => {
+                    if (!editingQuotaUser) return;
+                    const success = await updateUserUsage(editingQuotaUser.user_id, editedQuotas);
+                    if (success) {
+                      setEditingQuotaUser(null);
+                    }
+                  }}
+                  disabled={savingKeys.has(`usage_${editingQuotaUser?.user_id}`)}
+                >
+                  {savingKeys.has(`usage_${editingQuotaUser?.user_id}`) ? (
+                    <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                  ) : (
+                    <Save className="h-4 w-4 mr-1" />
+                  )}
+                  Salvar
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
