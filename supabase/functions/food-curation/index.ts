@@ -385,8 +385,8 @@ serve(async (req) => {
         : 'Realize auditoria completa E sugira novos alimentos necessários.'
     });
 
-    // Call AI
-    const aiResponse = await fetch('https://api.lovable.dev/v1/chat/completions', {
+    // Call AI via Lovable AI Gateway
+    const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${lovableApiKey}`,
