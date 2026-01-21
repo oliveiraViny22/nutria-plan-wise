@@ -554,7 +554,7 @@ export function useAdminOperations() {
 
   const updatePlan = useCallback(async (
     planId: string,
-    updates: Partial<Pick<Plan, 'diet_limit' | 'substitution_limit' | 'adjustment_limit' | 'chat_messages_per_day' | 'has_chat' | 'is_active'>>
+    updates: Partial<Pick<Plan, 'diet_limit' | 'substitution_limit' | 'adjustment_limit' | 'chat_messages_per_day' | 'has_chat' | 'is_active' | 'price_monthly'>>
   ) => {
     setSavingKeys(prev => new Set(prev).add(`plan_${planId}`));
     try {
