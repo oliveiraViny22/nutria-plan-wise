@@ -193,6 +193,44 @@ function validateEquivalence(options: MealOption[]): { valid: boolean; errors: s
   return { valid: errors.length === 0, errors };
 }
 
+// Foods appropriate for each meal type
+const MEAL_FOOD_PREFERENCES: Record<string, { 
+  preferCategories: string[]; 
+  avoidCategories: string[];
+  preferKeywords: string[];
+}> = {
+  "Café da Manhã": {
+    preferCategories: ['laticínios', 'frutas', 'cereais_tubérculos'],
+    avoidCategories: [],
+    preferKeywords: ['pão', 'queijo', 'leite', 'iogurte', 'ovo', 'aveia', 'granola', 'café', 'banana', 'maçã', 'mamão', 'tapioca', 'mel', 'manteiga']
+  },
+  "Lanche da Manhã": {
+    preferCategories: ['frutas', 'oleaginosas', 'laticínios'],
+    avoidCategories: [],
+    preferKeywords: ['fruta', 'castanha', 'nozes', 'iogurte', 'barrinha', 'biscoito', 'banana', 'maçã']
+  },
+  "Almoço": {
+    preferCategories: ['proteínas_animais', 'cereais_tubérculos', 'legumes', 'hortaliças_folhosas', 'leguminosas'],
+    avoidCategories: [],
+    preferKeywords: ['arroz', 'feijão', 'frango', 'carne', 'peixe', 'salada', 'legume', 'batata', 'macarrão']
+  },
+  "Lanche da Tarde": {
+    preferCategories: ['frutas', 'oleaginosas', 'laticínios'],
+    avoidCategories: [],
+    preferKeywords: ['fruta', 'iogurte', 'sanduíche', 'pão', 'queijo', 'castanha', 'barrinha']
+  },
+  "Jantar": {
+    preferCategories: ['proteínas_animais', 'hortaliças_folhosas', 'legumes'],
+    avoidCategories: [],
+    preferKeywords: ['frango', 'peixe', 'carne', 'salada', 'legume', 'ovo', 'sopa']
+  },
+  "Ceia": {
+    preferCategories: ['laticínios', 'frutas'],
+    avoidCategories: ['proteínas_animais'],
+    preferKeywords: ['chá', 'iogurte', 'leite', 'fruta', 'biscoito', 'queijo']
+  }
+};
+
 function selectFoodsForMeal(
   foods: Food[],
   targetCalories: number,
@@ -201,82 +239,202 @@ function selectFoodsForMeal(
   targetFat: number,
   preferences: string[],
   restrictions: string[],
-  category: string
+  mealName: string
 ): { food: Food; quantity: number }[] {
-  // Filter foods based on restrictions and preferences
+  const mealPrefs = MEAL_FOOD_PREFERENCES[mealName] || MEAL_FOOD_PREFERENCES["Almoço"];
+  
+  // Filter foods based on restrictions
   let availableFoods = foods.filter(f => {
     const nameLower = f.name.toLowerCase();
+    const categoryLower = (f.category || '').toLowerCase();
+    
+    // Apply restrictions
     for (const restriction of restrictions) {
       if (nameLower.includes(restriction.toLowerCase())) return false;
     }
+    
+    // Avoid categories not appropriate for this meal
+    for (const avoid of mealPrefs.avoidCategories) {
+      if (categoryLower === avoid.toLowerCase()) return false;
+    }
+    
     return true;
   });
   
-  // Prioritize preferred foods
-  if (preferences.length > 0) {
-    availableFoods.sort((a, b) => {
-      const aPreferred = preferences.some(p => a.name.toLowerCase().includes(p.toLowerCase()));
-      const bPreferred = preferences.some(p => b.name.toLowerCase().includes(p.toLowerCase()));
-      return (bPreferred ? 1 : 0) - (aPreferred ? 1 : 0);
-    });
-  }
+  // Score foods based on meal appropriateness
+  const scoredFoods = availableFoods.map(f => {
+    let score = 0;
+    const nameLower = f.name.toLowerCase();
+    const categoryLower = (f.category || '').toLowerCase();
+    
+    // Prefer categories for this meal
+    if (mealPrefs.preferCategories.some(c => categoryLower.includes(c.toLowerCase()))) {
+      score += 10;
+    }
+    
+    // Prefer keywords for this meal
+    for (const keyword of mealPrefs.preferKeywords) {
+      if (nameLower.includes(keyword.toLowerCase())) {
+        score += 5;
+      }
+    }
+    
+    // User preferences bonus
+    for (const pref of preferences) {
+      if (nameLower.includes(pref.toLowerCase())) {
+        score += 3;
+      }
+    }
+    
+    return { food: f, score };
+  });
+  
+  // Sort by score descending with some randomness
+  scoredFoods.sort((a, b) => {
+    const scoreDiff = b.score - a.score;
+    if (Math.abs(scoreDiff) < 3) {
+      return Math.random() - 0.5; // Randomize similar scores
+    }
+    return scoreDiff;
+  });
+  
+  availableFoods = scoredFoods.map(s => s.food);
   
   const selected: { food: Food; quantity: number }[] = [];
   let currentCalories = 0;
   let currentProtein = 0;
   let currentCarbs = 0;
   let currentFat = 0;
+  const usedFoodIds = new Set<string>();
   
-  // Select protein source first
-  const proteinFoods = availableFoods.filter(f => 
-    f.category === 'proteina' || f.protein > 15
-  );
-  if (proteinFoods.length > 0) {
-    const protein = proteinFoods[Math.floor(Math.random() * Math.min(5, proteinFoods.length))];
-    const quantity = Math.max(0.5, Math.min(2, targetProtein / protein.protein));
-    selected.push({ food: protein, quantity });
-    currentCalories += protein.calories * quantity;
-    currentProtein += protein.protein * quantity;
-    currentCarbs += protein.carbs * quantity;
-    currentFat += protein.fat * quantity;
-  }
+  // Helper to add food and track usage
+  const addFood = (food: Food, quantity: number) => {
+    if (usedFoodIds.has(food.id)) return false;
+    usedFoodIds.add(food.id);
+    selected.push({ food, quantity });
+    currentCalories += food.calories * quantity;
+    currentProtein += food.protein * quantity;
+    currentCarbs += food.carbs * quantity;
+    currentFat += food.fat * quantity;
+    return true;
+  };
   
-  // Add carbs source
-  const carbFoods = availableFoods.filter(f => 
-    f.category === 'carboidrato' || f.carbs > 20
-  );
-  if (carbFoods.length > 0 && currentCarbs < targetCarbs * 0.8) {
-    const carb = carbFoods[Math.floor(Math.random() * Math.min(5, carbFoods.length))];
-    const quantity = Math.max(0.5, Math.min(2, (targetCarbs - currentCarbs) / carb.carbs));
-    selected.push({ food: carb, quantity });
-    currentCalories += carb.calories * quantity;
-    currentProtein += carb.protein * quantity;
-    currentCarbs += carb.carbs * quantity;
-    currentFat += carb.fat * quantity;
-  }
+  // For breakfast/snacks: focus on dairy, fruits, carbs
+  const isBreakfastOrSnack = ['Café da Manhã', 'Lanche da Manhã', 'Lanche da Tarde', 'Ceia'].includes(mealName);
   
-  // Add vegetables/fiber
-  const veggies = availableFoods.filter(f => 
-    f.category === 'vegetal' || f.category === 'legume'
-  );
-  if (veggies.length > 0) {
-    const veg = veggies[Math.floor(Math.random() * Math.min(5, veggies.length))];
-    selected.push({ food: veg, quantity: 1 });
-    currentCalories += veg.calories;
-    currentProtein += veg.protein;
-    currentCarbs += veg.carbs;
-    currentFat += veg.fat;
+  if (isBreakfastOrSnack) {
+    // Add dairy or protein source
+    const dairyFoods = availableFoods.filter(f => 
+      f.category?.toLowerCase().includes('laticínio') || 
+      f.name.toLowerCase().includes('iogurte') ||
+      f.name.toLowerCase().includes('leite') ||
+      f.name.toLowerCase().includes('queijo') ||
+      f.name.toLowerCase().includes('ovo')
+    );
+    if (dairyFoods.length > 0) {
+      const dairy = dairyFoods[Math.floor(Math.random() * Math.min(5, dairyFoods.length))];
+      const quantity = Math.max(0.5, Math.min(2, targetProtein * 0.5 / Math.max(dairy.protein, 1)));
+      addFood(dairy, quantity);
+    }
+    
+    // Add carb source (bread, cereal, etc)
+    const carbFoods = availableFoods.filter(f => 
+      !usedFoodIds.has(f.id) &&
+      (f.category?.toLowerCase().includes('cereais') || 
+       f.name.toLowerCase().includes('pão') ||
+       f.name.toLowerCase().includes('aveia') ||
+       f.name.toLowerCase().includes('tapioca') ||
+       f.carbs > 15)
+    );
+    if (carbFoods.length > 0 && currentCarbs < targetCarbs * 0.7) {
+      const carb = carbFoods[Math.floor(Math.random() * Math.min(5, carbFoods.length))];
+      const quantity = Math.max(0.3, Math.min(1.5, (targetCarbs - currentCarbs) * 0.6 / Math.max(carb.carbs, 1)));
+      addFood(carb, quantity);
+    }
+    
+    // Add fruit
+    const fruits = availableFoods.filter(f => 
+      !usedFoodIds.has(f.id) &&
+      (f.category?.toLowerCase().includes('fruta') || 
+       f.name.toLowerCase().includes('banana') ||
+       f.name.toLowerCase().includes('maçã') ||
+       f.name.toLowerCase().includes('mamão'))
+    );
+    if (fruits.length > 0) {
+      const fruit = fruits[Math.floor(Math.random() * Math.min(5, fruits.length))];
+      addFood(fruit, 1);
+    }
+  } else {
+    // For main meals (Almoço, Jantar): protein + carbs + veggies
+    
+    // Select protein source first
+    const proteinFoods = availableFoods.filter(f => 
+      f.category?.toLowerCase().includes('proteína') || 
+      f.category?.toLowerCase().includes('proteina') ||
+      f.protein > 15
+    );
+    if (proteinFoods.length > 0) {
+      const protein = proteinFoods[Math.floor(Math.random() * Math.min(5, proteinFoods.length))];
+      const quantity = Math.max(0.8, Math.min(2, targetProtein * 0.7 / Math.max(protein.protein, 1)));
+      addFood(protein, quantity);
+    }
+    
+    // Add carbs source (rice, pasta, potato)
+    const carbFoods = availableFoods.filter(f => 
+      !usedFoodIds.has(f.id) &&
+      (f.category?.toLowerCase().includes('cereais') || 
+       f.category?.toLowerCase().includes('tubérculo') ||
+       f.name.toLowerCase().includes('arroz') ||
+       f.name.toLowerCase().includes('macarrão') ||
+       f.name.toLowerCase().includes('batata') ||
+       f.carbs > 20)
+    );
+    if (carbFoods.length > 0 && currentCarbs < targetCarbs * 0.7) {
+      const carb = carbFoods[Math.floor(Math.random() * Math.min(5, carbFoods.length))];
+      const quantity = Math.max(0.5, Math.min(2, (targetCarbs - currentCarbs) * 0.5 / Math.max(carb.carbs, 1)));
+      addFood(carb, quantity);
+    }
+    
+    // Add legumes (beans, lentils)
+    const legumes = availableFoods.filter(f => 
+      !usedFoodIds.has(f.id) &&
+      (f.category?.toLowerCase().includes('leguminosa') ||
+       f.name.toLowerCase().includes('feijão') ||
+       f.name.toLowerCase().includes('lentilha') ||
+       f.name.toLowerCase().includes('grão de bico'))
+    );
+    if (legumes.length > 0 && currentProtein < targetProtein * 0.9) {
+      const legume = legumes[Math.floor(Math.random() * Math.min(3, legumes.length))];
+      addFood(legume, 0.8);
+    }
+    
+    // Add vegetables/salad
+    const veggies = availableFoods.filter(f => 
+      !usedFoodIds.has(f.id) &&
+      (f.category?.toLowerCase().includes('hortaliça') || 
+       f.category?.toLowerCase().includes('legume') ||
+       f.name.toLowerCase().includes('salada') ||
+       f.name.toLowerCase().includes('alface') ||
+       f.name.toLowerCase().includes('tomate'))
+    );
+    if (veggies.length > 0) {
+      const veg = veggies[Math.floor(Math.random() * Math.min(5, veggies.length))];
+      addFood(veg, 1);
+    }
   }
   
   // Add healthy fat if needed
-  if (currentFat < targetFat * 0.6) {
+  if (currentFat < targetFat * 0.5) {
     const fatFoods = availableFoods.filter(f => 
-      f.category === 'gordura' || f.fat > 10
+      !usedFoodIds.has(f.id) &&
+      (f.category?.toLowerCase().includes('óleo') || 
+       f.category?.toLowerCase().includes('oleaginosa') ||
+       f.fat > 10)
     );
     if (fatFoods.length > 0) {
       const fat = fatFoods[Math.floor(Math.random() * Math.min(3, fatFoods.length))];
-      const quantity = Math.max(0.3, Math.min(1, (targetFat - currentFat) / fat.fat));
-      selected.push({ food: fat, quantity });
+      const quantity = Math.max(0.2, Math.min(0.8, (targetFat - currentFat) / Math.max(fat.fat, 1)));
+      addFood(fat, quantity);
     }
   }
   
@@ -396,10 +554,10 @@ serve(async (req) => {
       });
     }
 
-    const body = await req.json();
+const body = await req.json();
     const { 
       userId, 
-      optionsPerMeal = 2, // 1-3 options per meal
+      optionsPerMeal = 3, // Default to 3 options per meal
       goal = "maintenance"
     } = body;
 
