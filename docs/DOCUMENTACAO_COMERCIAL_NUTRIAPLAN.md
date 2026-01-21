@@ -1,6 +1,6 @@
 # DOCUMENTAÇÃO COMERCIAL E INSTITUCIONAL — NUTRIAPLAN
 
-## Versão do Documento: 2.1
+## Versão do Documento: 2.2
 ## Data de Geração: 18 de Janeiro de 2026
 ## Última Atualização: 21 de Janeiro de 2026
 
@@ -10,6 +10,7 @@
 
 | Versão | Data | Alterações |
 |--------|------|------------|
+| 2.2 | 21/01/2026 | Sincronização com documentação técnica v2.4. Atualização de limites do plano gratuito (1 dieta inicial, 3 substituições, 1 ajuste). Correção de tabelas de recursos por plano. |
 | 2.1 | 21/01/2026 | Alinhamento com documentação técnica v2.2. Atualização de recursos e limites. Clarificação de funcionalidades do rebalanceador de macros. |
 | 2.0 | 18/01/2026 | Versão consolidada e alinhada com documentação técnica v2.0, detalhamento de funcionalidades por perfil, clarificação de limites |
 | 1.0 | 18/01/2026 | Versão inicial |
@@ -344,16 +345,18 @@ CADASTRO → CRIAR ALUNOS → GERAR PLANOS → ACOMPANHAR ADESÃO → AJUSTAR �
 
 # 10. PLANOS E PREÇOS
 
-## 10.1 Tabela Comparativa
+## 10.1 Tabela Comparativa (v2.2 - sincronizado com BD)
 
 | Recurso | Gratuito | Premium | Pessoal | Profissional |
 |---------|----------|---------|---------|--------------|
 | **Preço/mês** | R$ 0 | R$ 4,90 | R$ 14,90 | R$ 99,00 |
 | Visualizar plano | ✓ | ✓ | ✓ | ✓ |
 | Confirmar refeições | ✓ | ✓ | ✓ | ✓ |
-| Criar planos | - | - | 5/mês | Ilimitado |
-| Substituições | - | - | 20/mês | Ilimitado |
-| Chat IA/dia | 3 | 10 | 30 | 100 |
+| Criar planos | 1 inicial | 1/mês | 1/mês | Ilimitado |
+| Substituições | 3/mês | - | 100/mês | Ilimitado |
+| Ajustes de macros | 1/mês | - | 3/mês | Ilimitado |
+| Opções por refeição | 1 | 3 | 3 | Ilimitado |
+| Chat IA/dia | Sim (básico) | 5 mensagens | 3 mensagens | 100 mensagens |
 | Histórico | 7 dias | 30 dias | 90 dias | Ilimitado |
 | Gerenciar alunos | - | - | - | Até 50 |
 

@@ -1,6 +1,6 @@
 # DOCUMENTAÇÃO TÉCNICA OFICIAL — NUTRIAPLAN
 
-## Versão do Documento: 2.3
+## Versão do Documento: 2.4
 ## Data de Geração: 18 de Janeiro de 2026
 ## Última Atualização: 21 de Janeiro de 2026
 
@@ -10,6 +10,7 @@
 
 | Versão | Data | Alterações |
 |--------|------|------------|
+| 2.4 | 21/01/2026 | Auditoria completa de fluxos de usuário. Atualização de limites do plano gratuito (1 dieta, 3 substituições, 1 ajuste). Sincronização de permissões com banco de dados v2. Verificação de can_substitute no MealDetail. Correção de contagem de uso para ajustes no MacroRebalancer. |
 | 2.3 | 21/01/2026 | Adicionado CHECK constraint `foods_category_check` para validar categorias canônicas no BD. Atualização da documentação para refletir schema v2 consolidado com 13 tabelas. Remoção de referências a tabelas legadas (plan_history, ai_suggestions, chat_messages). Detalhamento de campos v2 (quantity_grams, unit_locked, display_unit). |
 | 2.2 | 21/01/2026 | Incremento automático de uso de ajustes no rebalanceador de macros. Atualização de edge functions para contagem correta de features. Remoção de campos legados v1 (billing_cycle, account_type, user_type). Consolidação do esquema v2 com 13 tabelas principais. |
 | 2.1 | 21/01/2026 | Correção do constraint `profiles_sex_check` para aceitar valores 'male', 'female', 'other'. Atualização pós-auditoria de banco de dados v2. |
@@ -422,15 +423,15 @@ A tabela `user_roles` armazena os papéis de forma segura:
 | can_manage_students | ✗ | ✗ | ✗ | ✓ |
 | can_send_requests | ✓ (aluno) | ✓ (aluno) | ✗ | ✗ |
 
-### 5.4.2 Limites por Plano
+### 5.4.2 Limites por Plano (v2.4 - sincronizado com BD)
 
 | Limite | Gratuito | Premium | Pessoal Pago | Profissional |
 |--------|----------|---------|--------------|--------------|
-| Dietas/mês | 0 | 0 | 5 | ∞ |
-| Substituições/mês | 0 | 0 | 20 | ∞ |
-| Ajustes/mês | 0 | 0 | 10 | ∞ |
-| Mensagens chat/dia | 3 | 10 | 30 | 100 |
-| Pacientes | 0 | 0 | 0 | 50 |
+| Dietas/mês | 1 | 1 | 1 | ∞ |
+| Substituições/mês | 3 | 0 | 100 | ∞ |
+| Ajustes/mês | 1 | 0 | 3 | ∞ |
+| Mensagens chat/dia | 0 (has_chat=true) | 5 | 3 | 100 |
+| Opções por refeição | 1 | 3 | 3 | ∞ |
 | Histórico (dias) | 7 | 30 | 90 | 9999 |
 
 ## 5.5 Restrições por Perfil
