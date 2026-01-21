@@ -786,6 +786,22 @@ export function useAdminOperations() {
     }
   }, [invokeAdmin, toast]);
 
+  // Callback to update a single setting in state (for realtime updates)
+  const updateSettingInState = useCallback((updatedSetting: SystemSetting) => {
+    setSettings(prev => {
+      const exists = prev.some(s => s.id === updatedSetting.id);
+      if (exists) {
+        return prev.map(s => s.id === updatedSetting.id ? updatedSetting : s);
+      }
+      return [...prev, updatedSetting];
+    });
+  }, []);
+
+  // Callback to remove a setting from state (for realtime deletes)
+  const removeSettingFromState = useCallback((deletedSetting: { id: string }) => {
+    setSettings(prev => prev.filter(s => s.id !== deletedSetting.id));
+  }, []);
+
   return {
     loading,
     settingsLoading,
@@ -806,6 +822,8 @@ export function useAdminOperations() {
     foodsTotal,
     fetchSettings,
     updateSetting,
+    updateSettingInState,
+    removeSettingFromState,
     fetchFoodImports,
     validateFoodCSV,
     importFoods,
