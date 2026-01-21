@@ -580,6 +580,19 @@ export default function Admin() {
       );
     }
 
+    // AI model settings should be read-only (managed by system)
+    const isReadOnly = setting.key.startsWith('ai_model') || setting.key === 'ai_gateway_url';
+    
+    if (isReadOnly) {
+      return (
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-muted-foreground font-mono bg-muted px-2 py-1 rounded">
+            {String(currentValue)}
+          </span>
+        </div>
+      );
+    }
+
     return (
       <div className="space-y-2">
         <div className="flex gap-2">
