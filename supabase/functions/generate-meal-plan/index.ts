@@ -1,11 +1,45 @@
+// ============================================================
+// GERADOR DE PLANO ALIMENTAR - VERSÃO CANÔNICA
+// ============================================================
+// RESPONSABILIDADE: Criar a PRIMEIRA versão do plano.
+// NÃO otimiza continuamente (isso é do rebalanceador).
+// NÃO usa IA para cálculos - é puramente heurístico.
+// ============================================================
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { getCorsHeaders, CLIENT_ERRORS, validate, getErrorForLogging, createErrorResponse, createSuccessResponse } from "../_shared/security.ts";
+import { 
+  getCorsHeaders, 
+  CLIENT_ERRORS, 
+  validate, 
+  getErrorForLogging, 
+  createErrorResponse, 
+  createSuccessResponse 
+} from "../_shared/security.ts";
+import { 
+  CANONICAL_CATEGORIES, 
+  isValidCategory,
+  MEAL_CATEGORY_PRIORITIES,
+  EXCLUDED_FROM_AUTO_PLAN,
+  LOW_CALORIC_IMPACT,
+  SUBSTITUTABLE_PROCESSING_LEVELS,
+  isSubstitutableLevel,
+  type FoodCategory
+} from "../_shared/food-categories.ts";
+
+// ============================================================
+// LOGGING
+// ============================================================
 
 const logStep = (step: string, details?: unknown) => {
+  const timestamp = new Date().toISOString();
   const detailsStr = details ? ` - ${JSON.stringify(details)}` : '';
-  console.log(`[GENERATE-MEAL-PLAN] ${step}${detailsStr}`);
+  console.log(`[GENERATE-MEAL-PLAN] ${timestamp} | ${step}${detailsStr}`);
 };
+
+// ============================================================
+// INTERFACES (LINHAS 1-30 DA SPEC)
+// ============================================================
 
 interface Food {
   id: string;
@@ -17,17 +51,95 @@ interface Food {
   serving_size: string;
   category: string;
   processing_level: string;
+  status: string;
+  // Campos de conversão de unidades
+  unit_name: string | null;
+  unit_weight_grams: number | null;
+  unit_increment: number;
+  unit_enabled: boolean;
 }
 
-interface MealFood {
-  food_id: string;
-  quantity: number;
+interface FoodWithDisplay {
+  food: Food;
+  quantity_grams: number;
+  display_quantity: number;
+  display_unit: string;
+  calculated_grams: number;
+  unit_locked: boolean;
 }
 
-interface MealPlan {
+interface MealOption {
+  option_number: number;
   name: string;
-  foods: MealFood[];
+  foods: FoodWithDisplay[];
+  total_calories: number;
+  total_protein: number;
+  total_carbs: number;
+  total_fat: number;
 }
+
+interface MacroTargets {
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+}
+
+interface GeneratorInput {
+  targetUserId: string;
+  targets: MacroTargets;
+  mealsPerDay: number;
+  preferences: string[];
+  restrictions: string[];
+  goal: string;
+  mealOptionsLimit: number;
+}
+
+// ============================================================
+// VALIDAÇÕES INICIAIS (LINHAS 1-30 DA SPEC)
+// ============================================================
+
+interface ValidationResult {
+  valid: boolean;
+  error?: string;
+}
+
+function assertValidTargets(targets: MacroTargets): ValidationResult {
+  if (targets.calories <= 0 || targets.calories > 10000) {
+    return { valid: false, error: "Calorias devem estar entre 1 e 10000" };
+  }
+  if (targets.protein < 0 || targets.protein > 500) {
+    return { valid: false, error: "Proteína deve estar entre 0 e 500g" };
+  }
+  if (targets.carbs < 0 || targets.carbs > 1000) {
+    return { valid: false, error: "Carboidratos devem estar entre 0 e 1000g" };
+  }
+  if (targets.fat < 0 || targets.fat > 300) {
+    return { valid: false, error: "Gordura deve estar entre 0 e 300g" };
+  }
+  
+  // Coerência de macros (soma aproximada das calorias)
+  const calculatedCals = (targets.protein * 4) + (targets.carbs * 4) + (targets.fat * 9);
+  const tolerance = targets.calories * 0.15;
+  if (Math.abs(calculatedCals - targets.calories) > tolerance) {
+    logStep("Warning: macro sum doesn't match calories", { calculatedCals, targetCals: targets.calories });
+    // Não invalida, apenas avisa
+  }
+  
+  return { valid: true };
+}
+
+function assertValidPreferences(preferences: string[], restrictions: string[]): ValidationResult {
+  // Verifica se preferências e restrições são arrays de strings válidas
+  if (!Array.isArray(preferences) || !Array.isArray(restrictions)) {
+    return { valid: false, error: "Preferências e restrições devem ser arrays" };
+  }
+  return { valid: true };
+}
+
+// ============================================================
+// DEFINIÇÃO DA ESTRUTURA DO DIA (LINHAS 30-60 DA SPEC)
+// ============================================================
 
 const MEAL_TYPES = [
   'breakfast',
@@ -49,7 +161,7 @@ const MEAL_NAMES: Record<MealType, string> = {
   supper: 'Ceia',
 };
 
-function getMealsForCount(mealsPerDay: number): MealType[] {
+function buildMealSkeleton(mealsPerDay: number): MealType[] {
   switch (mealsPerDay) {
     case 2:
       return ['lunch', 'dinner'];
@@ -66,318 +178,375 @@ function getMealsForCount(mealsPerDay: number): MealType[] {
   }
 }
 
-function getMealCalorieDistribution(mealsPerDay: number): Record<MealType, number> {
-  switch (mealsPerDay) {
-    case 2:
-      return { breakfast: 0, morning_snack: 0, lunch: 0.5, afternoon_snack: 0, dinner: 0.5, supper: 0 };
-    case 3:
-      return { breakfast: 0.25, morning_snack: 0, lunch: 0.40, afternoon_snack: 0, dinner: 0.35, supper: 0 };
-    case 4:
-      return { breakfast: 0.25, morning_snack: 0, lunch: 0.35, afternoon_snack: 0.10, dinner: 0.30, supper: 0 };
-    case 5:
-      return { breakfast: 0.20, morning_snack: 0.10, lunch: 0.30, afternoon_snack: 0.10, dinner: 0.30, supper: 0 };
-    case 6:
-      return { breakfast: 0.20, morning_snack: 0.08, lunch: 0.28, afternoon_snack: 0.10, dinner: 0.26, supper: 0.08 };
-    default:
-      return { breakfast: 0.25, morning_snack: 0, lunch: 0.35, afternoon_snack: 0.10, dinner: 0.30, supper: 0 };
+// ============================================================
+// DISTRIBUIÇÃO DE MACROS POR REFEIÇÃO (LINHAS 60-90 DA SPEC)
+// Regras: soma = target total, proteína bem distribuída
+// ============================================================
+
+interface MealMacroDistribution {
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+}
+
+function distributeMacros(
+  targets: MacroTargets, 
+  meals: MealType[]
+): Record<MealType, MealMacroDistribution> {
+  // Percentuais fixos baseados no tipo de refeição
+  const percentages: Record<MealType, number> = {
+    breakfast: 0.20,
+    morning_snack: 0.08,
+    lunch: 0.30,
+    afternoon_snack: 0.10,
+    dinner: 0.25,
+    supper: 0.07,
+  };
+  
+  // Ajusta percentuais para somar 100% apenas para as refeições selecionadas
+  const activeMeals = meals.filter(m => percentages[m] > 0);
+  const totalPercent = activeMeals.reduce((sum, m) => sum + percentages[m], 0);
+  
+  const result: Partial<Record<MealType, MealMacroDistribution>> = {};
+  
+  for (const meal of meals) {
+    const adjustedPercent = percentages[meal] / totalPercent;
+    result[meal] = {
+      calories: Math.round(targets.calories * adjustedPercent),
+      protein: Math.round(targets.protein * adjustedPercent),
+      carbs: Math.round(targets.carbs * adjustedPercent),
+      fat: Math.round(targets.fat * adjustedPercent),
+    };
+  }
+  
+  return result as Record<MealType, MealMacroDistribution>;
+}
+
+// ============================================================
+// CONVERSÃO DETERMINÍSTICA DE UNIDADES
+// Princípio: Gramas são verdade nutricional, unidades são apresentação
+// ============================================================
+
+function convertGramsToUnit(
+  grams: number,
+  unitWeightGrams: number | null,
+  unitIncrement: number = 1,
+  tolerancePercent: number = 5
+): { success: boolean; displayQty: number; displayUnit: string; calculatedGrams: number } {
+  if (!unitWeightGrams || unitWeightGrams <= 0) {
+    return {
+      success: false,
+      displayQty: Math.round(grams),
+      displayUnit: 'g',
+      calculatedGrams: grams,
+    };
+  }
+
+  const rawUnits = grams / unitWeightGrams;
+  let roundedUnits = Math.round(rawUnits / (unitIncrement || 1)) * (unitIncrement || 1);
+
+  if (roundedUnits < (unitIncrement || 1)) {
+    roundedUnits = unitIncrement || 1;
+  }
+
+  const finalGrams = roundedUnits * unitWeightGrams;
+  const errorPercent = grams > 0 ? Math.abs(finalGrams - grams) / grams * 100 : 0;
+
+  if (errorPercent <= tolerancePercent) {
+    return {
+      success: true,
+      displayQty: roundedUnits,
+      displayUnit: '', // Será preenchido com unit_name
+      calculatedGrams: finalGrams,
+    };
+  } else {
+    return {
+      success: false,
+      displayQty: Math.round(grams),
+      displayUnit: 'g',
+      calculatedGrams: grams,
+    };
   }
 }
 
-// Categorias canônicas oficiais
-const VALID_CATEGORIES = [
-  'carboidratos',
-  'proteinas',
-  'gorduras',
-  'vegetais',
-  'frutas',
-  'laticinios',
-  'leguminosas',
-  'suplementos',
-  'mistos',
-];
+function applyUnitConversion(food: Food, quantityGrams: number): FoodWithDisplay {
+  if (!food.unit_enabled || !food.unit_name) {
+    return {
+      food,
+      quantity_grams: quantityGrams,
+      display_quantity: Math.round(quantityGrams),
+      display_unit: 'g',
+      calculated_grams: quantityGrams,
+      unit_locked: true,
+    };
+  }
 
-const ALLOWED_PROCESSING_LEVELS = ['in_natura', 'minimamente_processado'];
+  const result = convertGramsToUnit(
+    quantityGrams,
+    food.unit_weight_grams,
+    food.unit_increment,
+    5
+  );
 
-// Prioridades de categoria por tipo de refeição (categorias canônicas)
-const MEAL_CATEGORY_PRIORITIES: Record<MealType, string[]> = {
-  breakfast: ['carboidratos', 'frutas', 'laticinios', 'gorduras'],
-  morning_snack: ['frutas', 'gorduras', 'laticinios'],
-  lunch: ['proteinas', 'carboidratos', 'leguminosas', 'vegetais'],
-  afternoon_snack: ['frutas', 'laticinios', 'gorduras'],
-  dinner: ['proteinas', 'vegetais', 'carboidratos'],
-  supper: ['laticinios', 'frutas', 'gorduras'],
-};
+  return {
+    food,
+    quantity_grams: quantityGrams,
+    display_quantity: result.displayQty,
+    display_unit: result.success ? food.unit_name : 'g',
+    calculated_grams: result.calculatedGrams,
+    unit_locked: true,
+  };
+}
 
-// Goal-based macro priorities
-const GOAL_MACRO_WEIGHTS: Record<string, { protein: number; carbs: number; fat: number }> = {
-  lose_weight: { protein: 1.3, carbs: 0.7, fat: 0.9 },
-  gain_muscle: { protein: 1.4, carbs: 1.1, fat: 0.8 },
-  maintain: { protein: 1.0, carbs: 1.0, fat: 1.0 },
-};
+// ============================================================
+// SELEÇÃO DE ALIMENTOS (LINHAS 90-130 DA SPEC)
+// REGRA CRÍTICA: Apenas categorias canônicas, apenas approved + active
+// ============================================================
 
-// Intelligent food selection based on goal, macros, and categories
-function selectFoodsIntelligently(
+function fetchEligibleFoods(
   allFoods: Food[],
-  goal: string,
-  targetProtein: number,
-  targetCarbs: number,
-  targetFat: number,
-  preferences: string[],
-  restrictions: string[],
-  maxFoods: number = 80
+  restrictions: string[]
 ): Food[] {
-  const weights = GOAL_MACRO_WEIGHTS[goal] || GOAL_MACRO_WEIGHTS.maintain;
-  
-// Filter out supplements and ultra-processed
-  const eligibleFoods = allFoods.filter((f: Food) => {
-    // Usar categoria canônica diretamente
+  return allFoods.filter((f: Food) => {
+    // 1. Status deve ser approved ou active
+    const status = (f.status || '').toLowerCase();
+    if (status !== 'approved' && status !== 'active' && status !== '') {
+      return false;
+    }
+    
+    // 2. Categoria deve ser canônica (exceto suplementos)
     const category = (f.category || '').toLowerCase();
-    if (category === 'suplementos') return false;
+    if (!isValidCategory(category) || EXCLUDED_FROM_AUTO_PLAN.includes(category as FoodCategory)) {
+      return false;
+    }
     
-    // Normalizar nível de processamento
-    const level = (f.processing_level || 'in_natura').toLowerCase().replace(/ /g, '_');
-    if (!['in_natura', 'minimamente_processado'].includes(level)) return false;
+    // 3. Nível de processamento deve ser in_natura ou minimamente_processado
+    if (!isSubstitutableLevel(f.processing_level)) {
+      return false;
+    }
     
-    // Check restrictions
+    // 4. Aplicar restrições do usuário
     const foodName = f.name.toLowerCase();
     const isRestricted = restrictions.some(r => {
       const restriction = r.toLowerCase();
       if (restriction.includes('lactose') && category === 'laticinios') return true;
-      if (restriction.includes('gluten') && (foodName.includes('trigo') || foodName.includes('aveia') || foodName.includes('pão'))) return true;
-      if (restriction.includes('vegetariano') && category === 'proteinas') return true;
+      if (restriction.includes('gluten') && (foodName.includes('trigo') || foodName.includes('aveia') || foodName.includes('pão') || foodName.includes('macarrão'))) return true;
+      if (restriction.includes('vegetariano') && category === 'proteinas' && !foodName.includes('ovo')) return true;
       if (restriction.includes('vegano') && (category === 'proteinas' || category === 'laticinios')) return true;
       return foodName.includes(restriction);
     });
     
     return !isRestricted;
   });
-  
-  // Score each food based on goal alignment and macro density
-  const scoredFoods = eligibleFoods.map((f: Food) => {
-    let score = 0;
-    const servingGrams = parseServingGrams(f.serving_size);
-    
-    // Macro density per 100g (normalized)
-    const proteinDensity = (Number(f.protein) / servingGrams) * 100;
-    const carbsDensity = (Number(f.carbs) / servingGrams) * 100;
-    const fatDensity = (Number(f.fat) / servingGrams) * 100;
-    
-    // Score based on goal-weighted macros
-    score += proteinDensity * weights.protein;
-    score += carbsDensity * weights.carbs * 0.3; // Carbs weighted less
-    score += fatDensity * weights.fat * 0.5;
-    
-    // Bonus for preferences
-    const foodName = f.name.toLowerCase();
-    if (preferences.some(p => foodName.includes(p.toLowerCase()))) {
-      score *= 1.5;
-    }
-    
-    // Category diversity bonus (handle both old and new category formats)
-    const normalizedCat = (f.category || '').toLowerCase();
-    let categoryMultiplier = 1;
-    
-    if (normalizedCat.includes('prote')) {
-      categoryMultiplier = goal === 'gain_muscle' ? 2 : 1.2;
-    } else if (normalizedCat.includes('vegeta') || normalizedCat.includes('hortali') || normalizedCat.includes('folhos')) {
-      categoryMultiplier = goal === 'lose_weight' ? 1.8 : 1.2;
-    } else if (normalizedCat.includes('legum')) {
-      categoryMultiplier = 1.4;
-    } else if (normalizedCat.includes('frut')) {
-      categoryMultiplier = 1.2;
-    } else if (normalizedCat.includes('carbo') || normalizedCat.includes('cerea') || normalizedCat.includes('tubér')) {
-      categoryMultiplier = goal === 'gain_muscle' ? 1.5 : 1;
-    } else if (normalizedCat.includes('latic')) {
-      categoryMultiplier = 1.2;
-    } else if (normalizedCat.includes('gordur') || normalizedCat.includes('óleo') || normalizedCat.includes('oleagin')) {
-      categoryMultiplier = 1.1;
-    }
-    
-    score *= categoryMultiplier;
-    
-    return { food: f, score };
+}
+
+// ============================================================
+// MONTAGEM DA REFEIÇÃO (LINHAS 130-180 DA SPEC)
+// Proteína quase sempre presente, gordura opcional, vegetais livres
+// ============================================================
+
+function pickFoodFromCategory(
+  foods: Food[],
+  category: FoodCategory,
+  usedIds: Set<string>,
+  preferences: string[]
+): Food | null {
+  const candidates = foods.filter(f => {
+    const cat = (f.category || '').toLowerCase();
+    return cat === category && !usedIds.has(f.id);
   });
   
-  // Sort by score descending
-  scoredFoods.sort((a, b) => b.score - a.score);
+  if (candidates.length === 0) return null;
   
-  // Ensure category diversity - pick foods from each category
-  // Category quotas (use normalized matching for actual DB categories)
-  const categoryQuotaRules: Array<{ match: string; quota: number }> = [
-    { match: 'prote', quota: Math.ceil(maxFoods * 0.2) },
-    { match: 'carbo', quota: Math.ceil(maxFoods * 0.15) },
-    { match: 'vegeta', quota: Math.ceil(maxFoods * 0.15) },
-    { match: 'frut', quota: Math.ceil(maxFoods * 0.15) },
-    { match: 'legum', quota: Math.ceil(maxFoods * 0.1) },
-    { match: 'latic', quota: Math.ceil(maxFoods * 0.1) },
-    { match: 'gordur', quota: Math.ceil(maxFoods * 0.1) },
-  ];
+  // Priorizar preferências do usuário
+  const preferred = candidates.filter(f => 
+    preferences.some(p => f.name.toLowerCase().includes(p.toLowerCase()))
+  );
   
-  const getQuota = (category: string): number => {
-    const normalized = category.toLowerCase();
-    for (const rule of categoryQuotaRules) {
-      if (normalized.includes(rule.match)) return rule.quota;
-    }
-    return 3;
+  const pool = preferred.length > 0 ? preferred : candidates;
+  
+  // Adicionar aleatoriedade para variedade
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
+function calculateDefaultPortion(food: Food, targetMacro: MealMacroDistribution): number {
+  // Porções médias e plausíveis por categoria (em gramas)
+  const defaultPortions: Record<string, number> = {
+    proteinas: 120,
+    carboidratos: 150,
+    gorduras: 15,
+    vegetais: 100,
+    frutas: 120,
+    laticinios: 200,
+    leguminosas: 100,
+    mistos: 150,
   };
   
-  const selectedFoods: Food[] = [];
-  const categoryCount: Record<string, number> = {};
+  const category = (food.category || '').toLowerCase();
+  let portion = defaultPortions[category] || 100;
   
-  for (const { food } of scoredFoods) {
-    const cat = food.category || '';
-    const quota = getQuota(cat);
-    const current = categoryCount[cat] || 0;
+  // Ajuste grosso baseado na meta calórica (não tentar fechar exato)
+  // Isso é heurístico, não preciso - o rebalanceador fará o ajuste fino
+  const foodCalPerGram = food.calories > 0 ? food.calories / 100 : 1;
+  const targetCalsForThis = targetMacro.calories * 0.25; // ~25% da refeição
+  const suggestedPortion = targetCalsForThis / foodCalPerGram;
+  
+  // Clamp para valores razoáveis
+  portion = Math.round(Math.min(Math.max(suggestedPortion, portion * 0.5), portion * 2) / 10) * 10;
+  portion = Math.min(500, Math.max(20, portion));
+  
+  return portion;
+}
+
+function buildMealOption(
+  foods: Food[],
+  mealType: MealType,
+  targetMacro: MealMacroDistribution,
+  preferences: string[],
+  usedFoodIds: Set<string>,
+  optionNumber: number
+): MealOption {
+  const categoryPriorities = MEAL_CATEGORY_PRIORITIES[mealType] || 
+                             MEAL_CATEGORY_PRIORITIES[MEAL_NAMES[mealType]] || 
+                             ['proteinas', 'carboidratos', 'vegetais'];
+  
+  const mealFoods: FoodWithDisplay[] = [];
+  let totalCalories = 0;
+  let totalProtein = 0;
+  let totalCarbs = 0;
+  let totalFat = 0;
+  
+  // Para almoço e jantar, proteína é obrigatória
+  const isMainMeal = mealType === 'lunch' || mealType === 'dinner';
+  
+  for (const category of categoryPriorities) {
+    if (!isValidCategory(category)) continue;
     
-    if (current < quota) {
-      selectedFoods.push(food);
-      categoryCount[cat] = current + 1;
+    const food = pickFoodFromCategory(foods, category, usedFoodIds, preferences);
+    if (!food) continue;
+    
+    usedFoodIds.add(food.id);
+    
+    const portion = calculateDefaultPortion(food, targetMacro);
+    const converted = applyUnitConversion(food, portion);
+    
+    // Calcular macros baseado em gramas calculados
+    const multiplier = converted.calculated_grams / 100;
+    totalCalories += food.calories * multiplier;
+    totalProtein += Number(food.protein) * multiplier;
+    totalCarbs += Number(food.carbs) * multiplier;
+    totalFat += Number(food.fat) * multiplier;
+    
+    mealFoods.push(converted);
+  }
+  
+  // Garantir que refeições principais tenham proteína
+  if (isMainMeal && !mealFoods.some(f => (f.food.category || '').toLowerCase() === 'proteinas')) {
+    const protein = pickFoodFromCategory(foods, 'proteinas', usedFoodIds, preferences);
+    if (protein) {
+      usedFoodIds.add(protein.id);
+      const portion = calculateDefaultPortion(protein, targetMacro);
+      const converted = applyUnitConversion(protein, portion);
       
-      if (selectedFoods.length >= maxFoods) break;
+      const multiplier = converted.calculated_grams / 100;
+      totalCalories += protein.calories * multiplier;
+      totalProtein += Number(protein.protein) * multiplier;
+      totalCarbs += Number(protein.carbs) * multiplier;
+      totalFat += Number(protein.fat) * multiplier;
+      
+      mealFoods.unshift(converted); // Proteína primeiro
     }
   }
   
-  // If we haven't filled the quota, add more high-scoring foods
-  if (selectedFoods.length < maxFoods) {
-    for (const { food } of scoredFoods) {
-      if (!selectedFoods.includes(food)) {
-        selectedFoods.push(food);
-        if (selectedFoods.length >= maxFoods) break;
+  return {
+    option_number: optionNumber,
+    name: optionNumber === 1 ? 'Opção Principal' : `Opção ${optionNumber}`,
+    foods: mealFoods,
+    total_calories: Math.round(totalCalories),
+    total_protein: Math.round(totalProtein * 10) / 10,
+    total_carbs: Math.round(totalCarbs * 10) / 10,
+    total_fat: Math.round(totalFat * 10) / 10,
+  };
+}
+
+// ============================================================
+// VALIDAÇÃO GERAL DO PLANO (LINHAS 270-300 DA SPEC)
+// ============================================================
+
+interface PlanValidation {
+  valid: boolean;
+  errors: string[];
+  warnings: string[];
+}
+
+function validatePlan(
+  meals: Array<{ name: string; options: MealOption[] }>,
+  targets: MacroTargets
+): PlanValidation {
+  const errors: string[] = [];
+  const warnings: string[] = [];
+  
+  // 1. Todas as refeições devem ter pelo menos uma opção
+  for (const meal of meals) {
+    if (meal.options.length === 0) {
+      errors.push(`Refeição ${meal.name} sem opções`);
+    }
+    
+    // 2. Nenhuma porção zero
+    for (const option of meal.options) {
+      for (const food of option.foods) {
+        if (food.quantity_grams <= 0) {
+          errors.push(`Porção zero em ${meal.name}: ${food.food.name}`);
+        }
+      }
+    }
+    
+    // 3. Refeições principais devem ter proteína
+    const mealType = meal.name.toLowerCase();
+    const isMainMeal = mealType.includes('almoço') || mealType.includes('jantar') || 
+                       mealType === 'lunch' || mealType === 'dinner';
+    
+    if (isMainMeal) {
+      const hasProtein = meal.options[0]?.foods.some(f => 
+        (f.food.category || '').toLowerCase() === 'proteinas'
+      );
+      if (!hasProtein) {
+        warnings.push(`${meal.name} sem fonte de proteína`);
       }
     }
   }
   
-  return selectedFoods;
-}
-
-function parseServingGrams(servingSize: string): number {
-  const match = servingSize.match(/(\d+)\s*(g|ml)/i);
-  if (match) return parseInt(match[1], 10);
-  const parenMatch = servingSize.match(/\((\d+)(g|ml)\)/i);
-  if (parenMatch) return parseInt(parenMatch[1], 10);
-  return 100;
-}
-
-function calcNutrients(food: Food, gramsQty: number) {
-  const baseGrams = parseServingGrams(food.serving_size);
-  const multiplier = gramsQty / baseGrams;
+  // 4. Calorias totais aproximadas (±15%)
+  const totalCalories = meals.reduce((sum, m) => sum + (m.options[0]?.total_calories || 0), 0);
+  const calorieError = Math.abs(totalCalories - targets.calories) / targets.calories;
+  
+  if (calorieError > 0.15) {
+    warnings.push(`Calorias totais (${totalCalories}) diferem ${Math.round(calorieError * 100)}% da meta (${targets.calories})`);
+  }
+  
+  // 5. Verificar categorias canônicas
+  for (const meal of meals) {
+    for (const option of meal.options) {
+      for (const food of option.foods) {
+        const category = (food.food.category || '').toLowerCase();
+        if (!isValidCategory(category)) {
+          errors.push(`Categoria inválida: ${category} em ${food.food.name}`);
+        }
+      }
+    }
+  }
+  
   return {
-    calories: food.calories * multiplier,
-    protein: Number(food.protein) * multiplier,
-    carbs: Number(food.carbs) * multiplier,
-    fat: Number(food.fat) * multiplier,
+    valid: errors.length === 0,
+    errors,
+    warnings,
   };
 }
 
-// Generate an equivalent meal option with different foods but similar macros
-function generateEquivalentOption(
-  originalFoods: Array<{ food_id: string; quantity: number }>,
-  allFoods: Food[],
-  targetCalories: number,
-  targetProtein: number,
-  targetCarbs: number,
-  targetFat: number,
-  restrictions: string[],
-  mealType: MealType
-): Array<{ food_id: string; quantity: number }> {
-  const usedFoodIds = new Set(originalFoods.map(f => f.food_id));
-  const categoryPriorities = MEAL_CATEGORY_PRIORITIES[mealType] || [];
-  
-  // Group available foods by category (excluding already used)
-  const availableByCategory: Record<string, Food[]> = {};
-  
-  for (const food of allFoods) {
-    if (usedFoodIds.has(food.id)) continue;
-    
-    // Check processing level
-    const level = (food.processing_level || 'in_natura').toLowerCase().replace(/ /g, '_');
-    const allowedNormalized = ['in_natura', 'minimamente_processado'];
-    if (!allowedNormalized.some(allowed => level.includes(allowed.replace('_', ' ')) || level.includes(allowed))) continue;
-    
-    // Skip supplements
-    const normalizedCategory = (food.category || '').toLowerCase();
-    if (normalizedCategory === 'suplementos' || normalizedCategory.includes('suplemento')) continue;
-    
-    // Check restrictions
-    const foodName = food.name.toLowerCase();
-    const isRestricted = restrictions.some(r => {
-      const restriction = r.toLowerCase();
-      if (restriction.includes('lactose') && normalizedCategory.includes('latic')) return true;
-      if (restriction.includes('gluten') && (foodName.includes('trigo') || foodName.includes('aveia') || foodName.includes('pão'))) return true;
-      return false;
-    });
-    if (isRestricted) continue;
-    
-    const cat = food.category || 'outros';
-    if (!availableByCategory[cat]) availableByCategory[cat] = [];
-    availableByCategory[cat].push(food);
-  }
-  
-  const equivalentFoods: Array<{ food_id: string; quantity: number }> = [];
-  let currentCalories = 0;
-  let currentProtein = 0;
-  let currentCarbs = 0;
-  let currentFat = 0;
-  
-  // For each original food, try to find an equivalent from the same category
-  for (const origFood of originalFoods) {
-    const originalFoodData = allFoods.find(f => f.id === origFood.food_id);
-    if (!originalFoodData) continue;
-    
-    const origCategory = originalFoodData.category || 'outros';
-    const origNutrients = calcNutrients(originalFoodData, origFood.quantity);
-    
-    // Get alternatives from the same category
-    const alternatives = availableByCategory[origCategory] || [];
-    
-    if (alternatives.length > 0) {
-      // Pick a random alternative from the category
-      const randomIndex = Math.floor(Math.random() * alternatives.length);
-      const altFood = alternatives[randomIndex];
-      
-      // Calculate quantity to match original calories
-      const baseGrams = parseServingGrams(altFood.serving_size);
-      const caloriesPerGram = altFood.calories / baseGrams;
-      let targetQty = caloriesPerGram > 0 
-        ? origNutrients.calories / caloriesPerGram 
-        : origFood.quantity;
-      
-      // Round and clamp
-      targetQty = Math.round(targetQty / 5) * 5;
-      targetQty = Math.min(500, Math.max(10, targetQty));
-      
-      const altNutrients = calcNutrients(altFood, targetQty);
-      
-      equivalentFoods.push({ food_id: altFood.id, quantity: targetQty });
-      currentCalories += altNutrients.calories;
-      currentProtein += altNutrients.protein;
-      currentCarbs += altNutrients.carbs;
-      currentFat += altNutrients.fat;
-      
-      // Remove from available to avoid duplicates
-      const idx = alternatives.findIndex(f => f.id === altFood.id);
-      if (idx > -1) alternatives.splice(idx, 1);
-    } else {
-      // If no alternative found, use the original
-      equivalentFoods.push(origFood);
-      currentCalories += origNutrients.calories;
-      currentProtein += origNutrients.protein;
-      currentCarbs += origNutrients.carbs;
-      currentFat += origNutrients.fat;
-    }
-  }
-  
-  // Fine-tune to match target calories (scale proportionally)
-  if (currentCalories > 0 && Math.abs(currentCalories - targetCalories) > 50) {
-    const scaleFactor = targetCalories / currentCalories;
-    for (const ef of equivalentFoods) {
-      const scaledQty = Math.round((ef.quantity * scaleFactor) / 5) * 5;
-      ef.quantity = Math.min(500, Math.max(10, scaledQty));
-    }
-  }
-  
-  return equivalentFoods;
-}
+// ============================================================
+// HANDLER PRINCIPAL
+// ============================================================
 
 serve(async (req) => {
   const corsHeaders = getCorsHeaders(req);
@@ -389,7 +558,7 @@ serve(async (req) => {
   try {
     logStep("Function started");
     
-    // Parse and validate input
+    // Parse e validação do input
     let body: unknown;
     try {
       body = await req.json();
@@ -401,7 +570,11 @@ serve(async (req) => {
       return createErrorResponse(CLIENT_ERRORS.INVALID_REQUEST, 400, corsHeaders);
     }
     
-    const { profile, studentId, isInitialPlan } = body as { profile: unknown; studentId?: unknown; isInitialPlan?: boolean };
+    const { profile, studentId, isInitialPlan } = body as { 
+      profile: unknown; 
+      studentId?: unknown; 
+      isInitialPlan?: boolean 
+    };
     
     if (!validate.isObject(profile)) {
       logStep("Invalid profile: not an object");
@@ -410,40 +583,65 @@ serve(async (req) => {
     
     const profileData = profile as Record<string, unknown>;
     
-    // Validate and sanitize profile fields with safe defaults
-    const targetCalories = validate.isInRange(profileData.daily_calories, 500, 10000) 
-      ? profileData.daily_calories as number 
-      : 2000;
-    const targetProtein = validate.isInRange(profileData.protein_target, 0, 500) 
-      ? profileData.protein_target as number 
-      : 150;
-    const targetCarbs = validate.isInRange(profileData.carbs_target, 0, 1000) 
-      ? profileData.carbs_target as number 
-      : 250;
-    const targetFat = validate.isInRange(profileData.fat_target, 0, 300) 
-      ? profileData.fat_target as number 
-      : 70;
+    // ============================================================
+    // VALIDAÇÕES INICIAIS (LINHAS 1-30 DA SPEC)
+    // ============================================================
+    
+    const targets: MacroTargets = {
+      calories: validate.isInRange(profileData.daily_calories, 500, 10000) 
+        ? profileData.daily_calories as number 
+        : 0, // Zero para falhar validação se não informado
+      protein: validate.isInRange(profileData.protein_target, 0, 500) 
+        ? profileData.protein_target as number 
+        : 0,
+      carbs: validate.isInRange(profileData.carbs_target, 0, 1000) 
+        ? profileData.carbs_target as number 
+        : 0,
+      fat: validate.isInRange(profileData.fat_target, 0, 300) 
+        ? profileData.fat_target as number 
+        : 0,
+    };
+    
+    const targetValidation = assertValidTargets(targets);
+    if (!targetValidation.valid) {
+      logStep("Invalid targets", { error: targetValidation.error });
+      return createErrorResponse(
+        targetValidation.error || "Metas nutricionais inválidas",
+        400,
+        corsHeaders
+      );
+    }
+    
     const mealsPerDay = validate.isInRange(profileData.meals_per_day, 2, 6) 
       ? profileData.meals_per_day as number 
       : 4;
     
-    // Validate preferences and restrictions
     const preferences = validate.isArray(profileData.preferences)
       ? (profileData.preferences as unknown[]).filter(validate.isString).slice(0, 20) as string[]
       : [];
     const restrictions = validate.isArray(profileData.restrictions)
       ? (profileData.restrictions as unknown[]).filter(validate.isString).slice(0, 20) as string[]
       : [];
-    const goal = validate.isString(profileData.goal) ? profileData.goal : 'maintain';
     
-    // Validate studentId if provided (must be UUID format)
-    const validStudentId = validate.isString(studentId) && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(studentId as string)
+    const prefValidation = assertValidPreferences(preferences, restrictions);
+    if (!prefValidation.valid) {
+      logStep("Invalid preferences", { error: prefValidation.error });
+      return createErrorResponse(CLIENT_ERRORS.INVALID_REQUEST, 400, corsHeaders);
+    }
+    
+    const goal = validate.isString(profileData.goal) ? profileData.goal as string : 'maintain';
+    
+    const validStudentId = validate.isString(studentId) && 
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(studentId as string)
       ? studentId as string
       : null;
     
-    logStep("Profile validated", { targetCalories, mealsPerDay, goal, studentId: validStudentId });
+    logStep("Input validated", { calories: targets.calories, mealsPerDay, goal, studentId: validStudentId });
     
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    // ============================================================
+    // AUTENTICAÇÃO E PERMISSÕES
+    // ============================================================
+    
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     
@@ -462,12 +660,10 @@ serve(async (req) => {
     }
     
     logStep("User authenticated", { userId: user.id });
-
-    // Determine target user ID (student or self)
+    
     let targetUserId = user.id;
     
     if (validStudentId) {
-      // If studentId is provided, verify professional has access to this student
       const { data: linkData, error: linkError } = await supabase
         .from('professional_students')
         .select('id')
@@ -481,7 +677,6 @@ serve(async (req) => {
         return createErrorResponse(CLIENT_ERRORS.FORBIDDEN, 403, corsHeaders);
       }
       
-      // Also verify the user has professional role
       const { data: hasRole } = await supabase.rpc('has_role', {
         _user_id: user.id,
         _role: 'professional',
@@ -495,13 +690,11 @@ serve(async (req) => {
       targetUserId = validStudentId;
       logStep("Creating plan for student", { studentId: validStudentId, professionalId: user.id });
     }
-
-    // Skip validations for initial plan (onboarding) - rule: create immediately after data collection
+    
+    // Skip validações para plano inicial (onboarding)
     const skipValidation = isInitialPlan === true;
     
     if (!skipValidation) {
-
-      // Validate usage limit (use professional's quota when creating for student)
       const { data: canUse } = await supabase.rpc('can_use_feature', {
         _user_id: user.id,
         _feature: 'diet',
@@ -519,360 +712,226 @@ serve(async (req) => {
     } else {
       logStep("Skipping validation - initial plan creation");
     }
-
-    // Get user's plan limits for meal options
+    
+    // Buscar limite de opções do plano
     const { data: userPlanData } = await supabase.rpc('get_user_plan', {
       _user_id: user.id,
     });
     
     const mealOptionsLimit = userPlanData?.[0]?.meal_options_limit ?? 1;
     logStep("User plan meal options limit", { mealOptionsLimit });
-
-    // Fetch all foods from database
-    const { data: allFoods, error: foodsError } = await supabase.from("foods").select("*");
+    
+    // ============================================================
+    // BUSCAR ALIMENTOS (LINHAS 90-130 DA SPEC)
+    // ============================================================
+    
+    const { data: allFoods, error: foodsError } = await supabase
+      .from("foods")
+      .select("*");
+    
     if (foodsError) {
       logStep("Failed to load foods", { error: foodsError.message });
       return createErrorResponse(CLIENT_ERRORS.SERVER_ERROR, 500, corsHeaders);
     }
+    
     if (!allFoods || allFoods.length === 0) {
       logStep("No foods available");
       return createErrorResponse(CLIENT_ERRORS.SERVER_ERROR, 500, corsHeaders);
     }
-
-    // Use intelligent food selection instead of fixed slice
-    const foods = selectFoodsIntelligently(
-      allFoods as Food[],
-      goal,
-      targetProtein,
-      targetCarbs,
-      targetFat,
-      preferences,
-      restrictions,
-      80 // Select up to 80 diverse foods
-    );
-
-    logStep("Foods selected intelligently", { 
-      totalAvailable: allFoods.length, 
-      selected: foods.length,
-      goal,
-    });
-
-    if (foods.length === 0) {
-      logStep("No suitable foods available");
-      return createErrorResponse(CLIENT_ERRORS.SERVER_ERROR, 500, corsHeaders);
-    }
-
-    const mealTypes = getMealsForCount(mealsPerDay);
-    const calorieDistribution = getMealCalorieDistribution(mealsPerDay);
-
-    const mealDistributionText = mealTypes.map(m => 
-      `${MEAL_NAMES[m]} (${m}): ${Math.round(calorieDistribution[m] * 100)}%`
-    ).join(', ');
-
-    const categoryList = VALID_CATEGORIES.filter(c => c !== 'suplementos').join(', ');
-
-    // Group foods by category for better AI context
-    const foodsByCategory: Record<string, string[]> = {};
-    for (const f of foods) {
-      const cat = f.category || 'outros';
-      if (!foodsByCategory[cat]) foodsByCategory[cat] = [];
-      foodsByCategory[cat].push(`${f.id}: ${f.name} (${f.calories}kcal/${f.serving_size})`);
-    }
-
-    const foodsContextText = Object.entries(foodsByCategory)
-      .map(([cat, items]) => `\n### ${cat}:\n${items.join('\n')}`)
-      .join('\n');
-
-    const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
-        messages: [
-          { 
-            role: "system", 
-            content: `Você é um nutricionista. Crie um plano alimentar diário em JSON. 
-A meta EXATA do usuário é: ${targetCalories} calorias, ${targetProtein}g proteína, ${targetCarbs}g carboidratos, ${targetFat}g gordura.
-Preferências: ${preferences.join(", ") || "nenhuma"}. 
-Restrições: ${restrictions.join(", ") || "nenhuma"}. 
-Objetivo: ${goal === 'lose_weight' ? 'perder peso' : goal === 'gain_muscle' ? 'ganhar massa muscular' : 'manter peso'}.
-
-CATEGORIAS VÁLIDAS: ${categoryList}
-TAXONOMIA NUTRICIONAL:
-- cereais_tubérculos: inclui cereais (arroz, milho, trigo, aveia, quinoa) E tubérculos/raízes (batata, mandioca, inhame, cará)
-- proteínas_animais: carnes, peixes, ovos
-- leguminosas: feijões, lentilhas, grão-de-bico, ervilhas, favas
-- óleos_oleaginosas: azeite, óleo de coco, castanhas, nozes, amendoim
-
-REGRAS IMPORTANTES:
-1. As quantidades devem ser em GRAMAS ou ML (não porções).
-2. O total de calorias do plano DEVE ser EXATAMENTE ${targetCalories} calorias (margem de ±10 kcal).
-3. O usuário quer ${mealsPerDay} refeições por dia: ${mealDistributionText}.
-4. Use quantidades realistas (ex: 150g de arroz, 200ml de leite, 120g de frango).
-5. NÃO use suplementos - apenas alimentos naturais ou minimamente processados.
-6. Tipos de refeição válidos: ${mealTypes.join(', ')}.
-7. GARANTA VARIEDADE: use alimentos diferentes em cada refeição, não repita o mesmo alimento.
-8. PRIORIZE proteínas no objetivo ${goal === 'gain_muscle' ? 'ganhar massa' : goal === 'lose_weight' ? 'perder peso' : 'manter peso'}.` 
-          },
-          { 
-            role: "user", 
-            content: `Alimentos disponíveis organizados por categoria:
-${foodsContextText}
-
-Retorne APENAS JSON válido com EXATAMENTE ${mealsPerDay} refeições:
-{ "meals": [{ "name": "${mealTypes[0]}|${mealTypes[1]}|...", "foods": [{ "food_id": "uuid", "quantity": 150 }] }] }
-
-Use os tipos de refeição: ${mealTypes.join(', ')}.
-Lembre-se: quantity em gramas/ml, total EXATO de ${targetCalories} calorias, sem suplementos, VARIEDADE de alimentos!` 
-          }
-        ],
-      }),
-    });
-
-    const aiData = await aiResponse.json();
-    let mealPlan: { meals: MealPlan[] };
     
-    try {
-      const content = aiData.choices[0].message.content.replace(/```json|```/g, "").trim();
-      mealPlan = JSON.parse(content);
-    } catch {
-      // Fallback: create meals based on user's meals_per_day preference
-      // Use normalized category matching for actual DB values
-      const normalizeCategory = (cat: string) => (cat || '').toLowerCase();
-      
-      const breakfastFoods = foods.filter((f: Food) => {
-        const cat = normalizeCategory(f.category);
-        return cat.includes('carbo') || cat.includes('frut') || cat.includes('latic');
-      });
-      const mainFoods = foods.filter((f: Food) => {
-        const cat = normalizeCategory(f.category);
-        return cat.includes('prote') || cat.includes('carbo') || cat.includes('vegeta') || cat.includes('legum');
-      });
-      const snackFoods = foods.filter((f: Food) => {
-        const cat = normalizeCategory(f.category);
-        return cat.includes('frut') || cat.includes('latic') || cat.includes('gordur');
-      });
-      
-      const fallbackMeals: MealPlan[] = mealTypes.map(mealType => {
-        let selectedFoods: Food[];
-        let quantity: number;
-        
-        switch (mealType) {
-          case 'breakfast':
-            selectedFoods = breakfastFoods.slice(0, 3);
-            quantity = 100;
-            break;
-          case 'morning_snack':
-          case 'afternoon_snack':
-            selectedFoods = snackFoods.slice(0, 2);
-            quantity = 80;
-            break;
-          case 'lunch':
-            selectedFoods = mainFoods.slice(0, 4);
-            quantity = 150;
-            break;
-          case 'dinner':
-            selectedFoods = mainFoods.slice(2, 5);
-            quantity = 120;
-            break;
-          case 'supper':
-            selectedFoods = snackFoods.slice(1, 3);
-            quantity = 60;
-            break;
-          default:
-            selectedFoods = mainFoods.slice(0, 3);
-            quantity = 100;
-        }
-        
-        return {
-          name: mealType,
-          foods: selectedFoods.map((f: Food) => ({ food_id: f.id, quantity }))
-        };
-      });
-      
-      mealPlan = { meals: fallbackMeals };
+    const eligibleFoods = fetchEligibleFoods(allFoods as Food[], restrictions);
+    
+    logStep("Eligible foods filtered", { 
+      total: allFoods.length, 
+      eligible: eligibleFoods.length,
+    });
+    
+    if (eligibleFoods.length < 10) {
+      logStep("Too few eligible foods");
+      return createErrorResponse(
+        "Poucos alimentos disponíveis após aplicar restrições",
+        400,
+        corsHeaders
+      );
     }
-
-    // Calculate initial totals
-    let totalCalories = 0;
-    const mealsWithNutrients = mealPlan.meals.map((meal) => {
-      let mealCal = 0, mealP = 0, mealC = 0, mealF = 0;
-      const mealFoods: Array<{ food_id: string; quantity: number; nutrients: ReturnType<typeof calcNutrients> }> = [];
+    
+    // ============================================================
+    // DEFINIÇÃO DA ESTRUTURA DO DIA (LINHAS 30-60 DA SPEC)
+    // ============================================================
+    
+    const mealSkeleton = buildMealSkeleton(mealsPerDay);
+    const mealTargets = distributeMacros(targets, mealSkeleton);
+    
+    logStep("Meal skeleton built", { 
+      meals: mealSkeleton.map(m => MEAL_NAMES[m]), 
+      distribution: mealTargets 
+    });
+    
+    // ============================================================
+    // MONTAGEM DAS REFEIÇÕES (LINHAS 130-270 DA SPEC)
+    // ============================================================
+    
+    const generatedMeals: Array<{ 
+      name: string; 
+      mealType: MealType;
+      options: MealOption[];
+      sortOrder: number;
+    }> = [];
+    
+    for (let sortOrder = 0; sortOrder < mealSkeleton.length; sortOrder++) {
+      const mealType = mealSkeleton[sortOrder];
+      const mealTarget = mealTargets[mealType];
       
-      for (const f of meal.foods || []) {
-        const food = foods.find((fd: Food) => fd.id === f.food_id);
-        if (!food) continue;
-        
-        const qty = Math.min(500, Math.max(10, f.quantity || 100));
-        const nutrients = calcNutrients(food, qty);
-        
-        mealCal += nutrients.calories;
-        mealP += nutrients.protein;
-        mealC += nutrients.carbs;
-        mealF += nutrients.fat;
-        
-        mealFoods.push({ food_id: f.food_id, quantity: qty, nutrients });
+      const options: MealOption[] = [];
+      const usedFoodIds = new Set<string>();
+      
+      // Opção 1 (principal)
+      const option1 = buildMealOption(
+        eligibleFoods,
+        mealType,
+        mealTarget,
+        preferences,
+        usedFoodIds,
+        1
+      );
+      options.push(option1);
+      
+      // Opções 2+ (equivalentes)
+      for (let optNum = 2; optNum <= mealOptionsLimit; optNum++) {
+        const optionN = buildMealOption(
+          eligibleFoods,
+          mealType,
+          mealTarget,
+          preferences,
+          usedFoodIds,
+          optNum
+        );
+        options.push(optionN);
       }
       
-      totalCalories += mealCal;
-      return { ...meal, foods: mealFoods, total_calories: mealCal, total_protein: mealP, total_carbs: mealC, total_fat: mealF };
-    });
-
-    // Scale adjustment
-    const scaleFactor = totalCalories > 0 ? targetCalories / totalCalories : 1;
-    
-    let finalTotalCal = 0, finalTotalP = 0, finalTotalC = 0, finalTotalF = 0;
-    
-    const adjustedMeals = mealsWithNutrients.map((meal) => {
-      let mealCal = 0, mealP = 0, mealC = 0, mealF = 0;
-      const adjustedFoods = meal.foods.map((f) => {
-        const food = foods.find((fd: Food) => fd.id === f.food_id);
-        if (!food) return f;
-        
-        const scaledQty = Math.round((f.quantity * scaleFactor) / 5) * 5;
-        const finalQty = Math.min(500, Math.max(10, scaledQty));
-        const nutrients = calcNutrients(food, finalQty);
-        
-        mealCal += nutrients.calories;
-        mealP += nutrients.protein;
-        mealC += nutrients.carbs;
-        mealF += nutrients.fat;
-        
-        return { food_id: f.food_id, quantity: finalQty };
+      generatedMeals.push({
+        name: MEAL_NAMES[mealType],
+        mealType,
+        options,
+        sortOrder,
       });
-      
-      finalTotalCal += mealCal;
-      finalTotalP += mealP;
-      finalTotalC += mealC;
-      finalTotalF += mealF;
-      
-      return {
-        name: meal.name,
-        foods: adjustedFoods,
-        total_calories: Math.round(mealCal),
-        total_protein: Math.round(mealP * 10) / 10,
-        total_carbs: Math.round(mealC * 10) / 10,
-        total_fat: Math.round(mealF * 10) / 10,
-      };
-    });
-
-    if (!adjustedMeals.length) {
-      logStep("Failed to generate meals");
-      return createErrorResponse(CLIENT_ERRORS.SERVER_ERROR, 500, corsHeaders);
     }
-
-    // Save diet plan - use targetUserId (student or self)
+    
+    // ============================================================
+    // VALIDAÇÃO GERAL (LINHAS 270-300 DA SPEC)
+    // ============================================================
+    
+    const planValidation = validatePlan(generatedMeals, targets);
+    
+    if (!planValidation.valid) {
+      logStep("Plan validation failed", { errors: planValidation.errors });
+      return createErrorResponse(
+        `Falha na validação do plano: ${planValidation.errors.join("; ")}`,
+        500,
+        corsHeaders
+      );
+    }
+    
+    if (planValidation.warnings.length > 0) {
+      logStep("Plan validation warnings", { warnings: planValidation.warnings });
+    }
+    
+    // ============================================================
+    // SALVAR NO BANCO (STATUS = 'draft')
+    // ============================================================
+    
+    const totalCalories = generatedMeals.reduce((sum, m) => sum + (m.options[0]?.total_calories || 0), 0);
+    const totalProtein = generatedMeals.reduce((sum, m) => sum + (m.options[0]?.total_protein || 0), 0);
+    const totalCarbs = generatedMeals.reduce((sum, m) => sum + (m.options[0]?.total_carbs || 0), 0);
+    const totalFat = generatedMeals.reduce((sum, m) => sum + (m.options[0]?.total_fat || 0), 0);
+    
+    // STATUS = 'draft' conforme spec (linha 11: plano nasce editável)
     const { data: plan, error: planError } = await supabase.from("diet_plans").insert({
       user_id: targetUserId,
-      total_calories: Math.round(finalTotalCal),
-      total_protein: Math.round(finalTotalP * 10) / 10,
-      total_carbs: Math.round(finalTotalC * 10) / 10,
-      total_fat: Math.round(finalTotalF * 10) / 10,
-      status: 'active',
+      total_calories: Math.round(totalCalories),
+      total_protein: Math.round(totalProtein * 10) / 10,
+      total_carbs: Math.round(totalCarbs * 10) / 10,
+      total_fat: Math.round(totalFat * 10) / 10,
+      status: 'draft', // REGRA: plano nasce como draft, não active
+      is_initial_plan: isInitialPlan || false,
     }).select().single();
 
     if (planError || !plan) {
       logStep("Failed to create diet plan", { error: planError?.message });
       return createErrorResponse(CLIENT_ERRORS.SERVER_ERROR, 500, corsHeaders);
     }
+    
+    logStep("Diet plan created", { planId: plan.id, status: 'draft' });
 
-    // Increment usage after successful plan creation
-    await supabase.rpc('increment_usage', {
-      _user_id: user.id,
-      _feature: 'diet',
-    });
+    // Incrementar uso após criação bem-sucedida
+    if (!skipValidation) {
+      await supabase.rpc('increment_usage', {
+        _user_id: user.id,
+        _feature: 'diet',
+      });
+    }
 
-    // Use the plan's meal options limit (fetched earlier)
-    // Free plan = 1 option, Paid plans = 3 options (configurable via plans.meal_options_limit)
-    const OPTIONS_PER_MEAL = mealOptionsLimit;
-    // Save meals with v2 schema (meal_options and meal_option_foods)
-    for (let sortOrder = 0; sortOrder < adjustedMeals.length; sortOrder++) {
-      const meal = adjustedMeals[sortOrder];
+    // Salvar refeições com schema v2
+    for (const meal of generatedMeals) {
       const { data: savedMeal, error: mealError } = await supabase.from("meals").insert({
         diet_plan_id: plan.id,
         name: meal.name,
-        sort_order: sortOrder,
-        total_calories: meal.total_calories,
-        total_protein: meal.total_protein,
-        total_carbs: meal.total_carbs,
-        total_fat: meal.total_fat,
+        sort_order: meal.sortOrder,
+        total_calories: meal.options[0]?.total_calories || 0,
+        total_protein: meal.options[0]?.total_protein || 0,
+        total_carbs: meal.options[0]?.total_carbs || 0,
+        total_fat: meal.options[0]?.total_fat || 0,
       }).select().single();
       
       if (mealError || !savedMeal) {
-        logStep("Failed to create meal", { error: mealError?.message });
+        logStep("Failed to create meal", { error: mealError?.message, mealName: meal.name });
         continue;
       }
 
-      // Create multiple meal options (nutritionally equivalent)
-      for (let optionNum = 1; optionNum <= OPTIONS_PER_MEAL; optionNum++) {
-        let optionFoods = meal.foods;
-        let optionCalories = meal.total_calories;
-        let optionProtein = meal.total_protein;
-        let optionCarbs = meal.total_carbs;
-        let optionFat = meal.total_fat;
-        
-        // For option 2+, generate equivalent alternatives
-        if (optionNum > 1) {
-          const equivalentFoods = generateEquivalentOption(
-            meal.foods,
-            foods,
-            meal.total_calories,
-            meal.total_protein,
-            meal.total_carbs,
-            meal.total_fat,
-            restrictions,
-            meal.name as MealType
-          );
-          
-          // Recalculate macros for the equivalent option
-          let eqCal = 0, eqP = 0, eqC = 0, eqF = 0;
-          for (const ef of equivalentFoods) {
-            const food = foods.find((fd: Food) => fd.id === ef.food_id);
-            if (food) {
-              const nutrients = calcNutrients(food, ef.quantity);
-              eqCal += nutrients.calories;
-              eqP += nutrients.protein;
-              eqC += nutrients.carbs;
-              eqF += nutrients.fat;
-            }
-          }
-          
-          optionFoods = equivalentFoods;
-          optionCalories = Math.round(eqCal);
-          optionProtein = Math.round(eqP * 10) / 10;
-          optionCarbs = Math.round(eqC * 10) / 10;
-          optionFat = Math.round(eqF * 10) / 10;
-        }
-        
+      // Salvar opções da refeição
+      for (const option of meal.options) {
         const { data: savedOption, error: optionError } = await supabase.from("meal_options").insert({
           meal_id: savedMeal.id,
-          option_number: optionNum,
-          name: optionNum === 1 ? 'Opção Principal' : `Opção ${optionNum}`,
-          total_calories: optionCalories,
-          total_protein: optionProtein,
-          total_carbs: optionCarbs,
-          total_fat: optionFat,
+          option_number: option.option_number,
+          name: option.name,
+          total_calories: option.total_calories,
+          total_protein: option.total_protein,
+          total_carbs: option.total_carbs,
+          total_fat: option.total_fat,
         }).select().single();
 
         if (optionError || !savedOption) {
-          logStep("Failed to create meal option", { error: optionError?.message, optionNum });
+          logStep("Failed to create meal option", { error: optionError?.message, optionNum: option.option_number });
           continue;
         }
 
-        // Insert foods into meal_option_foods (v2 schema)
-        for (const food of optionFoods) {
-          if (food.food_id) {
-            await supabase.from("meal_option_foods").insert({ 
-              meal_option_id: savedOption.id, 
-              food_id: food.food_id, 
-              quantity_grams: food.quantity,
-            });
-          }
+        // Salvar alimentos da opção (schema v2: meal_option_foods)
+        for (const foodItem of option.foods) {
+          await supabase.from("meal_option_foods").insert({ 
+            meal_option_id: savedOption.id, 
+            food_id: foodItem.food.id, 
+            quantity_grams: foodItem.quantity_grams,
+            display_quantity: foodItem.display_quantity,
+            display_unit: foodItem.display_unit,
+            calculated_grams: foodItem.calculated_grams,
+            unit_locked: foodItem.unit_locked,
+          });
         }
       }
     }
+    
+    logStep("Plan saved successfully", { 
+      planId: plan.id, 
+      meals: generatedMeals.length,
+      totalCalories,
+    });
 
-    return createSuccessResponse({ success: true, plan }, corsHeaders);
+    return createSuccessResponse({ 
+      success: true, 
+      plan,
+      validation: planValidation,
+    }, corsHeaders);
+    
   } catch (error) {
     logStep("ERROR", { message: getErrorForLogging(error) });
     return createErrorResponse(CLIENT_ERRORS.SERVER_ERROR, 500, corsHeaders);
