@@ -90,6 +90,7 @@ export interface UserUsage {
   period_start: string;
   period_end: string;
   last_chat_reset: string;
+  meal_options_override?: number | null;
 }
 
 export interface Plan {
@@ -641,7 +642,7 @@ export function useAdminOperations() {
 
   const updateUserUsage = useCallback(async (
     targetUserId: string,
-    updates: Partial<Pick<UserUsage, 'diets_used' | 'substitutions_used' | 'adjustments_used' | 'chat_messages_today'>>
+    updates: Partial<Pick<UserUsage, 'diets_used' | 'substitutions_used' | 'adjustments_used' | 'chat_messages_today' | 'meal_options_override'>>
   ): Promise<boolean> => {
     setSavingKeys(prev => new Set(prev).add(`usage_${targetUserId}`));
     try {

@@ -557,7 +557,7 @@ serve(async (req) => {
 const body = await req.json();
     const { 
       userId, 
-      optionsPerMeal = 3, // Default to 3 options per meal
+      optionsPerMeal: requestedOptions, // Pode ser undefined
       goal = "maintenance"
     } = body;
 
@@ -580,6 +580,32 @@ const body = await req.json();
         });
       }
     }
+
+    // Buscar limite de opções do plano do usuário
+    const { data: planInfo } = await supabase.rpc("get_user_plan", {
+      _user_id: user.id,
+    });
+
+    let mealOptionsLimit = 3; // Default
+    if (planInfo && planInfo.length > 0) {
+      mealOptionsLimit = planInfo[0].meal_options_limit || 3;
+    }
+
+    // Verificar override por usuário
+    const { data: userUsage } = await supabase
+      .from("user_usage")
+      .select("meal_options_override")
+      .eq("user_id", user.id)
+      .single();
+
+    if (userUsage?.meal_options_override !== null && userUsage?.meal_options_override !== undefined) {
+      mealOptionsLimit = userUsage.meal_options_override;
+    }
+
+    // Usar o limite calculado (plano + override), limitado ao que foi requisitado se informado
+    const optionsPerMeal = requestedOptions 
+      ? Math.min(requestedOptions, mealOptionsLimit)
+      : mealOptionsLimit;
 
     // Get user profile
     const { data: profile, error: profileError } = await supabase

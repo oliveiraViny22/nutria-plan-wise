@@ -985,6 +985,7 @@ export default function Admin() {
                                           substitutions_used: usage.substitutions_used,
                                           adjustments_used: usage.adjustments_used,
                                           chat_messages_today: usage.chat_messages_today,
+                                          meal_options_override: usage.meal_options_override,
                                         });
                                       }
                                     } finally {
@@ -2007,10 +2008,51 @@ export default function Admin() {
                 </div>
               </div>
 
+              {/* Opções por Refeição Override */}
+              <div className="space-y-2 pt-4 border-t">
+                <Label className="flex items-center gap-2">
+                  Opções por Refeição (Override)
+                  <Badge variant="outline" className="text-xs font-normal">Individual</Badge>
+                </Label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="number"
+                    min={1}
+                    max={10}
+                    placeholder="Usar limite do plano"
+                    value={editedQuotas.meal_options_override ?? ''}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      if (value === '') {
+                        setEditedQuotas(prev => ({ ...prev, meal_options_override: null }));
+                      } else {
+                        const num = parseInt(value) || 1;
+                        setEditedQuotas(prev => ({ ...prev, meal_options_override: Math.max(1, Math.min(10, num)) }));
+                      }
+                    }}
+                    className="flex-1"
+                  />
+                  <Button 
+                    variant="ghost" 
+                    size="sm"
+                    onClick={() => setEditedQuotas(prev => ({ ...prev, meal_options_override: null }))}
+                    disabled={editedQuotas.meal_options_override === null || editedQuotas.meal_options_override === undefined}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Deixe vazio para usar o limite definido no plano. Defina um valor para sobrescrever individualmente.
+                </p>
+              </div>
+
               {userUsage && (
                 <div className="text-xs text-muted-foreground pt-2 border-t">
                   <p>Período: {new Date(userUsage.period_start).toLocaleDateString('pt-BR')} - {new Date(userUsage.period_end).toLocaleDateString('pt-BR')}</p>
                   <p>Último reset de chat: {new Date(userUsage.last_chat_reset).toLocaleDateString('pt-BR')}</p>
+                  {userUsage.meal_options_override !== null && userUsage.meal_options_override !== undefined && (
+                    <p className="text-primary mt-1">Override de opções ativo: {userUsage.meal_options_override} opções</p>
+                  )}
                 </div>
               )}
 

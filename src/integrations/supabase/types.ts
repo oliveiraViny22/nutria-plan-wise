@@ -793,6 +793,7 @@ export type Database = {
           diets_used: number
           id: string
           last_chat_reset: string
+          meal_options_override: number | null
           period_end: string
           period_start: string
           substitutions_used: number
@@ -806,6 +807,7 @@ export type Database = {
           diets_used?: number
           id?: string
           last_chat_reset?: string
+          meal_options_override?: number | null
           period_end?: string
           period_start?: string
           substitutions_used?: number
@@ -819,6 +821,7 @@ export type Database = {
           diets_used?: number
           id?: string
           last_chat_reset?: string
+          meal_options_override?: number | null
           period_end?: string
           period_start?: string
           substitutions_used?: number
