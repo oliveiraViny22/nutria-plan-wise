@@ -173,7 +173,18 @@ serve(async (req) => {
     );
 
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
+    // Handle various error formats (Error, Supabase error object, string, etc.)
+    let message: string;
+    if (error instanceof Error) {
+      message = error.message;
+    } else if (typeof error === 'object' && error !== null) {
+      // Supabase errors have a 'message' property
+      message = (error as { message?: string; error?: string }).message 
+        || (error as { message?: string; error?: string }).error 
+        || JSON.stringify(error);
+    } else {
+      message = String(error);
+    }
     logStep("ERROR", { message });
     return new Response(
       JSON.stringify({ error: message }),
