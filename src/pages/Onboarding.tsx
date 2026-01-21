@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Logo } from '@/components/Logo';
 import { useAuth } from '@/contexts/AuthContext';
-import { useUserRole } from '@/hooks/useUserRole';
+
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { OnboardingTutorial } from '@/components/OnboardingTutorial';
@@ -38,7 +38,7 @@ export default function Onboarding() {
   const [currentStep, setCurrentStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const { user, refreshProfile } = useAuth();
-  const { isProfessional } = useUserRole();
+  
   const navigate = useNavigate();
   const { showTutorial, markTutorialComplete, closeTutorial } = useTutorial();
 
@@ -110,18 +110,7 @@ export default function Onboarding() {
     try {
       const targets = calculateTargets();
       
-      // 1. Check for existing active plan
-      const { data: existingPlans, error: plansError } = await supabase
-        .from('diet_plans')
-        .select('id')
-        .eq('user_id', user?.id)
-        .eq('status', 'active');
-      
-      if (plansError) throw plansError;
-      
-      const hasActivePlan = existingPlans && existingPlans.length > 0;
-      
-      // 2. Update profile
+      // Update profile only - no automatic plan generation
       const { error } = await supabase
         .from('profiles')
         .update({
@@ -144,41 +133,7 @@ export default function Onboarding() {
 
       if (error) throw error;
 
-      // 3. Generate automatic plan if:
-      // - Not a professional
-      // - No active plan exists
-      if (!isProfessional && !hasActivePlan) {
-        toast.info('Gerando seu plano alimentar inicial...');
-        
-        const planResponse = await supabase.functions.invoke('generate-meal-plan', {
-          body: {
-            profile: {
-              daily_calories: targets.calories,
-              protein_target: targets.protein,
-              carbs_target: targets.carbs,
-              fat_target: targets.fat,
-              preferences: formData.preferences,
-              restrictions: formData.restrictions,
-              goal: formData.goal,
-              meals_per_day: formData.meals_per_day,
-            },
-            isInitialPlan: true,
-          },
-        });
-
-        if (planResponse.error) {
-          console.error('Error generating initial plan:', planResponse.error);
-          toast.error('Erro ao gerar plano, mas seu perfil foi salvo');
-        } else {
-          toast.success(
-            'Seu plano alimentar inicial foi criado com sucesso. Você já pode visualizar seu plano e acompanhar seu progresso.'
-          );
-        }
-      } else if (isProfessional) {
-        toast.success('Perfil configurado com sucesso! Você pode gerenciar seus alunos.');
-      } else {
-        toast.success('Perfil configurado com sucesso!');
-      }
+      toast.success('Perfil configurado com sucesso! Clique em "Gerar Plano" para criar seu plano alimentar.');
 
       await refreshProfile();
       navigate('/dashboard');
