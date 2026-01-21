@@ -1,6 +1,6 @@
 # DOCUMENTAÇÃO TÉCNICA OFICIAL — NUTRIAPLAN
 
-## Versão do Documento: 2.2
+## Versão do Documento: 2.3
 ## Data de Geração: 18 de Janeiro de 2026
 ## Última Atualização: 21 de Janeiro de 2026
 
@@ -10,6 +10,7 @@
 
 | Versão | Data | Alterações |
 |--------|------|------------|
+| 2.3 | 21/01/2026 | Adicionado CHECK constraint `foods_category_check` para validar categorias canônicas no BD. Atualização da documentação para refletir schema v2 consolidado com 13 tabelas. Remoção de referências a tabelas legadas (plan_history, ai_suggestions, chat_messages). Detalhamento de campos v2 (quantity_grams, unit_locked, display_unit). |
 | 2.2 | 21/01/2026 | Incremento automático de uso de ajustes no rebalanceador de macros. Atualização de edge functions para contagem correta de features. Remoção de campos legados v1 (billing_cycle, account_type, user_type). Consolidação do esquema v2 com 13 tabelas principais. |
 | 2.1 | 21/01/2026 | Correção do constraint `profiles_sex_check` para aceitar valores 'male', 'female', 'other'. Atualização pós-auditoria de banco de dados v2. |
 | 2.0 | 18/01/2026 | Versão consolidada: adicionados fluxos completos por perfil (Admin, Profissional, Aluno), detalhamento de gestão de alimentos, estrutura completa do banco de dados com cardinalidades, aprofundamento da IA, seção de auditoria administrativa, edge functions recentes |
@@ -1305,9 +1306,9 @@ Após gatilho: pode dobrar limite, máximo 20 frases.
 
 # 11. ESTRUTURA COMPLETA DO BANCO DE DADOS
 
-*[Definição Complementar / Inferida: Esta seção foi significativamente expandida]*
+*[Schema v2 Consolidado — 13 Tabelas Principais]*
 
-## 11.1 Diagrama ER Completo
+## 11.1 Diagrama ER Completo (Schema v2)
 
 ```mermaid
 erDiagram
@@ -1318,22 +1319,13 @@ erDiagram
     PROFILES ||--o{ PROFESSIONAL_STUDENTS : "aluno 1:1"
     PROFILES ||--o{ SUBSCRIPTIONS : "1:N"
     PROFILES ||--o{ USER_USAGE : "1:1"
-    PROFILES ||--o{ WEIGHT_LOGS : "1:N"
-    PROFILES ||--o{ CHAT_MESSAGES : "1:N"
     
-    %% Planos Alimentares
+    %% Planos Alimentares (Hierarquia v2)
     PROFILES ||--o{ DIET_PLANS : "1:N"
     DIET_PLANS ||--o{ MEALS : "1:N"
-    DIET_PLANS ||--o{ PLAN_HISTORY : "1:N"
-    DIET_PLANS ||--o{ PLAN_VERSIONS : "1:N"
-    DIET_PLANS ||--o{ AI_SUGGESTIONS : "1:N"
-    DIET_PLANS ||--o{ ADHERENCE_METRICS : "1:N"
-    
     MEALS ||--o{ MEAL_OPTIONS : "1:N"
-    MEALS ||--o{ MEAL_FOODS : "1:N (legacy)"
     MEAL_OPTIONS ||--o{ MEAL_OPTION_FOODS : "1:N"
     MEAL_OPTION_FOODS }o--|| FOODS : "N:1"
-    MEAL_FOODS }o--|| FOODS : "N:1 (legacy)"
     
     %% Logs e Adesão
     PROFILES ||--o{ DAILY_LOGS : "1:N"
@@ -1341,23 +1333,50 @@ erDiagram
     MEAL_LOGS }o--|| MEALS : "N:1"
     MEAL_LOGS }o--o| MEAL_OPTIONS : "N:0-1"
     
-    %% Alertas e Relatórios
-    PROFILES ||--o{ ADHERENCE_ALERT_CONFIGS : "profissional 1:1"
-    PROFILES ||--o{ ADHERENCE_ALERTS : "profissional 1:N"
-    PROFILES ||--o{ ADHERENCE_REPORT_FILES : "1:N"
-    
-    %% Solicitações
-    PROFILES ||--o{ STUDENT_REQUESTS : "aluno 1:N"
-    PROFILES ||--o{ STUDENT_REQUESTS : "profissional 1:N"
-    
     %% Comercial
     SUBSCRIPTIONS }o--|| PLANS : "N:1"
-    PROFILES ||--o{ PROFESSIONAL_LICENSES : "1:N"
     
     %% Administração
     PROFILES ||--o{ ADMIN_AUDIT_LOG : "1:N"
     PROFILES ||--o{ FOOD_IMPORTS : "1:N"
+    PROFILES ||--o{ AI_USAGE_LOGS : "1:N"
 ```
+
+## 11.1.1 Tabelas do Schema v2 (13 tabelas principais)
+
+| Tabela | Propósito |
+|--------|-----------|
+| `profiles` | Dados do usuário, targets nutricionais, preferências |
+| `user_roles` | Papéis do sistema (admin, professional, student) |
+| `user_usage` | Contadores de uso de features por período |
+| `subscriptions` | Assinaturas vinculadas a planos comerciais |
+| `plans` | Definição dos planos comerciais (Gratuito, Pessoal, Profissional) |
+| `diet_plans` | Planos alimentares com totais de macros |
+| `meals` | Refeições dentro de um plano (2-6 por dia) |
+| `meal_options` | Opções equivalentes por refeição (1-3) |
+| `meal_option_foods` | Alimentos específicos de cada opção |
+| `foods` | Base global de alimentos com dados nutricionais |
+| `daily_logs` | Logs diários de consumo |
+| `meal_logs` | Logs de refeições confirmadas |
+| `professional_students` | Vínculos profissional-aluno |
+| `admin_audit_log` | Auditoria de ações administrativas |
+| `food_imports` | Registro de importações de alimentos |
+| `ai_usage_logs` | Logs de uso de IA |
+| `system_settings` | Configurações do sistema |
+| `webhook_events` | Eventos de webhook para idempotência |
+
+**Tabelas REMOVIDAS no v2** (legadas):
+- ~~plan_history~~ (substituído por snapshots se necessário)
+- ~~ai_suggestions~~ (removido)
+- ~~chat_messages~~ (removido)
+- ~~weight_logs~~ (removido)
+- ~~adherence_metrics~~ (calculado dinamicamente)
+- ~~adherence_alerts~~ (removido)
+- ~~adherence_alert_configs~~ (removido)
+- ~~adherence_report_files~~ (removido)
+- ~~student_requests~~ (removido)
+- ~~professional_licenses~~ (removido)
+- ~~plan_versions~~ (removido)
 
 ## 11.2 Tabelas Detalhadas
 
@@ -1449,15 +1468,24 @@ erDiagram
 
 **Trigger**: `validate_meal_option_equivalence` valida equivalência com opção 1
 
-### 11.2.5 meal_option_foods
+### 11.2.5 meal_option_foods (Schema v2)
 
 | Coluna | Tipo | Nullable | Default | FK | Descrição |
 |--------|------|----------|---------|-----|-----------|
 | id | UUID | NOT NULL | gen_random_uuid() | PK | |
 | meal_option_id | UUID | NOT NULL | | meal_options | Opção pai |
 | food_id | UUID | NOT NULL | | foods | Alimento |
-| quantity | NUMERIC | NOT NULL | 1 | | Multiplicador da porção |
+| **quantity_grams** | NUMERIC | NOT NULL | | | **Quantidade em gramas (campo primário v2)** |
+| display_quantity | NUMERIC | NULL | | | Quantidade para exibição (ex: 2 unidades) |
+| display_unit | TEXT | NULL | | | Unidade de exibição (ex: "unidade", "fatia") |
+| **unit_locked** | BOOLEAN | NULL | false | | **Se true, impede conversão automática de unidade** |
+| calculated_grams | NUMERIC | NULL | | | Gramas calculadas a partir de display |
 | created_at | TIMESTAMPTZ | NOT NULL | now() | | |
+
+**Campos v2 importantes**:
+- `quantity_grams`: Fonte primária de verdade para cálculos nutricionais
+- `unit_locked`: Indica se o usuário travou a conversão de unidade
+- `display_quantity` + `display_unit`: Valores amigáveis para UI
 
 ### 11.2.6 subscriptions
 
@@ -1957,21 +1985,35 @@ Todas as ações administrativas são registradas em `admin_audit_log`:
 ## A. Categorias de Alimentos (Canônicas v2)
 
 > **IMPORTANTE**: Estas são as ÚNICAS categorias válidas no sistema.
-> Qualquer categoria fora desta lista será rejeitada pelo constraint `foods_category_check`.
+> O constraint `foods_category_check` no banco de dados garante que apenas estas categorias sejam aceitas.
 
-| Categoria       | Descrição                                          |
-|-----------------|---------------------------------------------------|
-| `carboidratos`  | Arroz, pão, massas, tubérculos, cereais           |
-| `proteinas`     | Carnes, peixes, ovos, frango                      |
-| `gorduras`      | Óleos, azeites, oleaginosas, castanhas            |
-| `vegetais`      | Folhas, verduras, legumes                         |
-| `frutas`        | Frutas frescas e secas                            |
-| `laticinios`    | Leite, queijos, iogurtes                          |
-| `leguminosas`   | Feijões, lentilha, grão-de-bico, soja             |
-| `suplementos`   | Whey, creatina, vitaminas                         |
-| `mistos`        | Preparações mistas, pratos prontos                |
+```sql
+-- Constraint ativo no banco de dados:
+ALTER TABLE public.foods ADD CONSTRAINT foods_category_check 
+CHECK (category IN (
+  'carboidratos', 'proteinas', 'gorduras', 'vegetais', 
+  'frutas', 'laticinios', 'leguminosas', 'suplementos', 'mistos'
+));
+```
 
-**Categorias LEGADAS (não usar)**:
+| Categoria       | Descrição                                          | Cor (UI)     |
+|-----------------|---------------------------------------------------|--------------|
+| `carboidratos`  | Arroz, pão, massas, tubérculos, cereais           | amber-500    |
+| `proteinas`     | Carnes, peixes, ovos, frango                      | red-500      |
+| `gorduras`      | Óleos, azeites, oleaginosas, castanhas            | yellow-500   |
+| `vegetais`      | Folhas, verduras, legumes                         | green-500    |
+| `frutas`        | Frutas frescas e secas                            | orange-500   |
+| `laticinios`    | Leite, queijos, iogurtes                          | blue-400     |
+| `leguminosas`   | Feijões, lentilha, grão-de-bico, soja             | emerald-600  |
+| `suplementos`   | Whey, creatina, vitaminas                         | purple-500   |
+| `mistos`        | Preparações mistas, pratos prontos                | gray-500     |
+
+**Fonte de Verdade**:
+- Frontend: `src/lib/food-categories.ts`
+- Backend: `supabase/functions/_shared/food-categories.ts`
+- Banco: CHECK constraint `foods_category_check`
+
+**Categorias LEGADAS (rejeitadas pelo constraint)**:
 - ~~proteinas_animais~~ → use `proteinas`
 - ~~cereais_tuberculos~~ → use `carboidratos`
 - ~~hortalicas_folhosas~~ → use `vegetais`
