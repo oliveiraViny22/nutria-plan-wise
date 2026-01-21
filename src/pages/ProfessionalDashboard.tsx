@@ -21,7 +21,7 @@ import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Logo } from '@/components/Logo';
 import { MobileNav } from '@/components/MobileNav';
-import { ThemeToggle } from '@/components/ThemeToggle';
+
 import { useUserRole } from '@/hooks/useUserRole';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -147,7 +147,6 @@ export default function ProfessionalDashboard() {
           </div>
           <h1 className="text-sm sm:text-lg font-semibold truncate hidden xs:block">Painel Profissional</h1>
           <div className="flex items-center gap-1 sm:gap-2">
-            <ThemeToggle />
             <Button size="sm" className="text-xs sm:text-sm h-8 sm:h-9" onClick={() => navigate('/students')}>
               <UserPlus className="h-3.5 w-3.5 sm:h-4 sm:w-4 sm:mr-2" />
               <span className="hidden sm:inline">Gerenciar</span>

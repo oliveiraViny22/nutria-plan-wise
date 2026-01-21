@@ -48,6 +48,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Logo } from '@/components/Logo';
 import { MobileNav } from '@/components/MobileNav';
+import { ThemeToggleSimple } from '@/components/ThemeToggle';
 import { CreateStudentForm } from '@/components/CreateStudentForm';
 import { useProfessionalStudents } from '@/hooks/useProfessionalStudents';
 import { useUserRole } from '@/hooks/useUserRole';
@@ -123,7 +124,7 @@ export default function Students() {
             <Logo size="sm" />
           </div>
           <h1 className="text-sm sm:text-lg font-semibold truncate">Gestão de Alunos</h1>
-          <div className="w-9 sm:w-10" /> {/* Spacer for alignment */}
+          <ThemeToggleSimple />
         </div>
       </header>
 

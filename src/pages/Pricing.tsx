@@ -11,6 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { Plan, PLAN_DESCRIPTIONS, PLAN_DISPLAY_NAMES } from '@/lib/subscription-types';
 import { MobileNav } from '@/components/MobileNav';
+import { ThemeToggleSimple } from '@/components/ThemeToggle';
 import { CommercialPlan } from '@/lib/types';
 
 export default function Pricing() {
@@ -153,12 +154,14 @@ export default function Pricing() {
       {/* Header */}
       <header className="border-b bg-card/50 backdrop-blur-sm sticky top-0 z-50">
         <div className="container mx-auto px-3 sm:px-4 py-3 sm:py-4 flex items-center justify-between">
-          <Button variant="ghost" size="icon" className="w-9 h-9 sm:w-10 sm:h-10" onClick={() => navigate(-1)}>
-            <ArrowLeft className="h-4 w-4 sm:h-5 sm:w-5" />
-          </Button>
+          <div className="flex items-center gap-2">
+            <MobileNav />
+            <Button variant="ghost" size="icon" className="hidden md:flex w-9 h-9 sm:w-10 sm:h-10" onClick={() => navigate(-1)}>
+              <ArrowLeft className="h-4 w-4 sm:h-5 sm:w-5" />
+            </Button>
+          </div>
           <h1 className="text-lg sm:text-xl font-bold">Planos e Preços</h1>
-          <MobileNav />
-          <div className="w-9 sm:w-10 hidden md:block" />
+          <ThemeToggleSimple />
         </div>
       </header>
 

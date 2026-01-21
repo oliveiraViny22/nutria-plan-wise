@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Logo } from '@/components/Logo';
+import { ThemeToggleSimple } from '@/components/ThemeToggle';
 import { useAuth } from '@/contexts/AuthContext';
 
 import { supabase } from '@/integrations/supabase/client';
@@ -187,8 +188,9 @@ export default function Onboarding() {
 
       <div className="min-h-screen gradient-hero flex flex-col pt-safe">
         {/* Header */}
-        <header className="p-4 sm:p-6">
+        <header className="p-4 sm:p-6 flex items-center justify-between">
           <Logo />
+          <ThemeToggleSimple />
         </header>
 
       {/* Progress */}
