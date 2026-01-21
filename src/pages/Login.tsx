@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Logo } from '@/components/Logo';
 import { useAuth } from '@/contexts/AuthContext';
+import { useUserRole } from '@/hooks/useUserRole';
 import { toast } from 'sonner';
 
 export default function Login() {
@@ -15,17 +16,23 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const { signIn, user, loading: authLoading } = useAuth();
+  const { isAdmin, loading: roleLoading } = useUserRole();
   const navigate = useNavigate();
   const location = useLocation();
 
   // If already authenticated, leave /login immediately
   useEffect(() => {
-    if (authLoading) return;
+    if (authLoading || roleLoading) return;
     if (!user) return;
 
-    const from = (location.state as any)?.from?.pathname as string | undefined;
-    navigate(from ?? '/dashboard', { replace: true });
-  }, [authLoading, user, navigate, location.state]);
+    // Admins go to /admin, others go to dashboard or previous location
+    if (isAdmin) {
+      navigate('/admin', { replace: true });
+    } else {
+      const from = (location.state as any)?.from?.pathname as string | undefined;
+      navigate(from ?? '/dashboard', { replace: true });
+    }
+  }, [authLoading, roleLoading, user, isAdmin, navigate, location.state]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

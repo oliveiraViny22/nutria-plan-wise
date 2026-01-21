@@ -59,8 +59,13 @@ export function ProtectedRoute({
     return <Navigate to="/dashboard" replace />;
   }
 
-  // Check if onboarding is required but not completed
-  if (requireOnboarding && profile && !profile.onboarding_completed && location.pathname !== '/onboarding') {
+  // Admins skip onboarding entirely
+  if (isAdmin && location.pathname === '/onboarding') {
+    return <Navigate to="/admin" replace />;
+  }
+
+  // Check if onboarding is required but not completed (skip for admins)
+  if (requireOnboarding && profile && !profile.onboarding_completed && !isAdmin && location.pathname !== '/onboarding') {
     return <Navigate to="/onboarding" replace />;
   }
 
