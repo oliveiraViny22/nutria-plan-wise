@@ -97,6 +97,11 @@ export interface Plan {
   chat_messages_per_day: number;
 }
 
+export interface AISettings {
+  enabled: boolean;
+  modelDefault: string;
+}
+
 export interface DeleteUserPreview {
   user: {
     name: string | null;
@@ -509,6 +514,68 @@ export function useAdminOperations() {
     }
   }, [invokeAdmin, toast]);
 
+  const [plans, setPlans] = useState<Plan[]>([]);
+  const [plansLoading, setPlansLoading] = useState(false);
+
+  const fetchPlans = useCallback(async () => {
+    setPlansLoading(true);
+    try {
+      const data = await invokeAdmin('get_plans');
+      setPlans(data.plans || []);
+      return data.plans;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erro ao carregar planos';
+      toast({ title: 'Erro', description: message, variant: 'destructive' });
+      return [];
+    } finally {
+      setPlansLoading(false);
+    }
+  }, [invokeAdmin, toast]);
+
+  const updatePlan = useCallback(async (
+    planId: string,
+    updates: Partial<Pick<Plan, 'diet_limit' | 'substitution_limit' | 'adjustment_limit' | 'chat_messages_per_day' | 'has_chat' | 'is_active'>>
+  ) => {
+    setSavingKeys(prev => new Set(prev).add(`plan_${planId}`));
+    try {
+      const data = await invokeAdmin('update_plan', { planId, updates });
+      
+      setPlans(prev => prev.map(p => 
+        p.id === planId ? { ...p, ...updates } : p
+      ));
+
+      setSavedKeys(prev => new Set(prev).add(`plan_${planId}`));
+      setTimeout(() => {
+        setSavedKeys(prev => {
+          const next = new Set(prev);
+          next.delete(`plan_${planId}`);
+          return next;
+        });
+      }, 2000);
+      
+      toast({ title: 'Plano atualizado' });
+      return data.plan;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erro ao atualizar plano';
+      toast({ title: 'Erro', description: message, variant: 'destructive' });
+      setErrorKeys(prev => new Set(prev).add(`plan_${planId}`));
+      setTimeout(() => {
+        setErrorKeys(prev => {
+          const next = new Set(prev);
+          next.delete(`plan_${planId}`);
+          return next;
+        });
+      }, 3000);
+      throw error;
+    } finally {
+      setSavingKeys(prev => {
+        const next = new Set(prev);
+        next.delete(`plan_${planId}`);
+        return next;
+      });
+    }
+  }, [invokeAdmin, toast]);
+
   return {
     loading,
     settingsLoading,
@@ -522,6 +589,8 @@ export function useAdminOperations() {
     users,
     usersLoading,
     usersTotal,
+    plans,
+    plansLoading,
     fetchSettings,
     updateSetting,
     fetchFoodImports,
@@ -536,5 +605,7 @@ export function useAdminOperations() {
     toggleUserRole,
     deleteUser,
     previewDeleteUser,
+    fetchPlans,
+    updatePlan,
   };
 }

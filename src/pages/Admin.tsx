@@ -28,6 +28,9 @@ import {
   RefreshCw,
   BookOpen,
   Briefcase,
+  CreditCard,
+  Sparkles,
+  Bot,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -44,7 +47,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { useUserRole } from '@/hooks/useUserRole';
-import { useAdminOperations, UserProfile, DeleteUserPreview } from '@/hooks/useAdminOperations';
+import { useAdminOperations, UserProfile, DeleteUserPreview, Plan } from '@/hooks/useAdminOperations';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { FoodImportValidator, ValidationResult as FoodValidationResult, FoodRow } from '@/components/FoodImportValidator';
@@ -95,6 +98,8 @@ export default function Admin() {
     users,
     usersLoading,
     usersTotal,
+    plans,
+    plansLoading,
     fetchSettings, 
     updateSetting,
     fetchFoodImports,
@@ -107,6 +112,8 @@ export default function Admin() {
     toggleUserRole,
     previewDeleteUser,
     deleteUser,
+    fetchPlans,
+    updatePlan,
   } = useAdminOperations();
 
   const [activeTab, setActiveTab] = useState('metrics');
@@ -153,8 +160,9 @@ export default function Admin() {
       fetchAuditLogs();
       fetchMetrics();
       fetchTimeSeriesData();
+      fetchPlans();
     }
-  }, [isAdmin, fetchSettings, fetchFoodImports, fetchAuditLogs]);
+  }, [isAdmin, fetchSettings, fetchFoodImports, fetchAuditLogs, fetchPlans]);
 
   const fetchMetrics = async () => {
     setMetricsLoading(true);
@@ -591,6 +599,10 @@ export default function Admin() {
             <TabsTrigger value="audit" className="flex items-center gap-2">
               <History className="h-4 w-4" />
               Auditoria
+            </TabsTrigger>
+            <TabsTrigger value="plans" className="flex items-center gap-2">
+              <CreditCard className="h-4 w-4" />
+              Planos & IA
             </TabsTrigger>
             <TabsTrigger value="docs" className="flex items-center gap-2">
               <BookOpen className="h-4 w-4" />
@@ -1079,6 +1091,239 @@ export default function Admin() {
                 )}
               </CardContent>
             </Card>
+          </TabsContent>
+
+          {/* Plans & AI Tab */}
+          <TabsContent value="plans">
+            <div className="space-y-6">
+              {/* AI Settings */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Bot className="h-5 w-5 text-primary" />
+                    Configurações de IA
+                  </CardTitle>
+                  <CardDescription>
+                    Habilite ou desabilite recursos de inteligência artificial do sistema.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid gap-4 md:grid-cols-2">
+                    {/* AI Chat Enable/Disable */}
+                    {settings.filter(s => s.key === 'enable_chat_feature').map(setting => (
+                      <div key={setting.key} className="flex items-center justify-between p-4 border rounded-lg">
+                        <div className="space-y-1">
+                          <Label className="font-medium">Chat com IA</Label>
+                          <p className="text-sm text-muted-foreground">
+                            {setting.description || 'Habilitar funcionalidade de chat com IA para usuários'}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Switch
+                            checked={setting.value as boolean}
+                            onCheckedChange={(checked) => updateSetting(setting.key, checked)}
+                            disabled={savingKeys.has(setting.key)}
+                          />
+                          {savingKeys.has(setting.key) && <Loader2 className="h-4 w-4 animate-spin" />}
+                          {savedKeys.has(setting.key) && <CheckCircle className="h-4 w-4 text-green-600" />}
+                        </div>
+                      </div>
+                    ))}
+
+                    {/* AI Model Selection */}
+                    {settings.filter(s => s.key === 'ai_model_default').map(setting => (
+                      <div key={setting.key} className="flex items-center justify-between p-4 border rounded-lg">
+                        <div className="space-y-1">
+                          <Label className="font-medium">Modelo de IA Padrão</Label>
+                          <p className="text-sm text-muted-foreground">
+                            {setting.description || 'Modelo usado para geração de planos e chat'}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-mono bg-muted px-2 py-1 rounded">
+                            {String(setting.value)}
+                          </span>
+                          {savedKeys.has(setting.key) && <CheckCircle className="h-4 w-4 text-green-600" />}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Plans Management */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <CreditCard className="h-5 w-5 text-primary" />
+                    Limites por Plano
+                  </CardTitle>
+                  <CardDescription>
+                    Configure os limites de dietas, substituições e ajustes para cada tipo de plano.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {plansLoading ? (
+                    <div className="flex items-center justify-center py-12">
+                      <Loader2 className="h-8 w-8 animate-spin" />
+                    </div>
+                  ) : plans.length === 0 ? (
+                    <div className="py-12 text-center text-muted-foreground">
+                      <CreditCard className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                      <p>Nenhum plano encontrado.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-6">
+                      {plans.map((plan) => (
+                        <motion.div
+                          key={plan.id}
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="border rounded-lg p-4 space-y-4"
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <div className="flex flex-col">
+                                <span className="font-semibold text-lg">{plan.name}</span>
+                                <span className="text-sm text-muted-foreground capitalize">{plan.type}</span>
+                              </div>
+                              <Badge variant={plan.is_active ? 'default' : 'secondary'}>
+                                {plan.is_active ? 'Ativo' : 'Inativo'}
+                              </Badge>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Switch
+                                checked={plan.is_active}
+                                onCheckedChange={(checked) => updatePlan(plan.id, { is_active: checked })}
+                                disabled={savingKeys.has(`plan_${plan.id}`)}
+                              />
+                              {savingKeys.has(`plan_${plan.id}`) && <Loader2 className="h-4 w-4 animate-spin" />}
+                              {savedKeys.has(`plan_${plan.id}`) && <CheckCircle className="h-4 w-4 text-green-600" />}
+                            </div>
+                          </div>
+
+                          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                            <div className="space-y-2">
+                              <Label className="text-sm">Limite de Dietas</Label>
+                              <Input
+                                type="number"
+                                min={0}
+                                value={plan.diet_limit}
+                                onChange={(e) => {
+                                  const value = parseInt(e.target.value) || 0;
+                                  updatePlan(plan.id, { diet_limit: value });
+                                }}
+                                disabled={savingKeys.has(`plan_${plan.id}`)}
+                                className="w-full"
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label className="text-sm">Limite de Substituições</Label>
+                              <Input
+                                type="number"
+                                min={0}
+                                value={plan.substitution_limit}
+                                onChange={(e) => {
+                                  const value = parseInt(e.target.value) || 0;
+                                  updatePlan(plan.id, { substitution_limit: value });
+                                }}
+                                disabled={savingKeys.has(`plan_${plan.id}`)}
+                                className="w-full"
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label className="text-sm">Limite de Ajustes</Label>
+                              <Input
+                                type="number"
+                                min={0}
+                                value={plan.adjustment_limit}
+                                onChange={(e) => {
+                                  const value = parseInt(e.target.value) || 0;
+                                  updatePlan(plan.id, { adjustment_limit: value });
+                                }}
+                                disabled={savingKeys.has(`plan_${plan.id}`)}
+                                className="w-full"
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label className="text-sm">Mensagens Chat/Dia</Label>
+                              <Input
+                                type="number"
+                                min={0}
+                                value={plan.chat_messages_per_day}
+                                onChange={(e) => {
+                                  const value = parseInt(e.target.value) || 0;
+                                  updatePlan(plan.id, { chat_messages_per_day: value });
+                                }}
+                                disabled={savingKeys.has(`plan_${plan.id}`) || !plan.has_chat}
+                                className="w-full"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-4 pt-2 border-t">
+                            <div className="flex items-center gap-2">
+                              <Switch
+                                id={`chat-${plan.id}`}
+                                checked={plan.has_chat}
+                                onCheckedChange={(checked) => updatePlan(plan.id, { has_chat: checked })}
+                                disabled={savingKeys.has(`plan_${plan.id}`)}
+                              />
+                              <Label htmlFor={`chat-${plan.id}`} className="text-sm cursor-pointer">
+                                Chat com IA habilitado
+                              </Label>
+                            </div>
+                          </div>
+                        </motion.div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Max Diets Per User Setting */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Sparkles className="h-5 w-5 text-primary" />
+                    Limites Globais
+                  </CardTitle>
+                  <CardDescription>
+                    Configurações que se aplicam a todos os usuários, independente do plano.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {settings.filter(s => s.key === 'max_diet_plans_per_user').map(setting => (
+                    <div key={setting.key} className="flex items-center justify-between p-4 border rounded-lg">
+                      <div className="space-y-1">
+                        <Label className="font-medium">Máximo de Planos por Usuário</Label>
+                        <p className="text-sm text-muted-foreground">
+                          {setting.description || 'Número máximo de planos alimentares que um usuário pode ter simultaneamente'}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Input
+                          type="number"
+                          min={1}
+                          max={100}
+                          value={editedSettings[setting.key] !== undefined ? Number(editedSettings[setting.key]) : Number(setting.value)}
+                          onChange={(e) => handleSettingChange(setting.key, parseInt(e.target.value) || 1)}
+                          onBlur={() => {
+                            if (editedSettings[setting.key] !== undefined) {
+                              handleSaveSetting(setting.key);
+                            }
+                          }}
+                          disabled={savingKeys.has(setting.key)}
+                          className="w-20"
+                        />
+                        {savingKeys.has(setting.key) && <Loader2 className="h-4 w-4 animate-spin" />}
+                        {savedKeys.has(setting.key) && <CheckCircle className="h-4 w-4 text-green-600" />}
+                      </div>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
 
           {/* Documentation Tab */}
