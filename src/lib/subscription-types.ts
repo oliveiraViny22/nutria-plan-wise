@@ -9,6 +9,7 @@ export interface Plan {
   substitution_limit: number;
   adjustment_limit: number;
   chat_messages_per_day: number;
+  meal_options_limit: number;
   patients_limit: number;
   has_chat: boolean;
   history_days: number;
@@ -83,6 +84,7 @@ export interface SubscriptionInfo {
     substitutions_used: number;
     adjustments_used: number;
     chat_messages_today: number;
+    meal_options_override?: number | null;
   };
   accountType: 'personal' | 'professional';
   isLinkedToProfessional?: boolean;

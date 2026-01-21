@@ -17,6 +17,9 @@ export function UsageLimits() {
     return null;
   }
 
+  // Calcula o limite efetivo de opções de refeição (override ou padrão do plano)
+  const effectiveMealOptionsLimit = usage?.meal_options_override ?? currentPlan.meal_options_limit ?? 3;
+
   const limits = [
     {
       name: 'Dietas',
@@ -35,6 +38,13 @@ export function UsageLimits() {
       used: usage?.adjustments_used || 0,
       limit: currentPlan.adjustment_limit,
       key: 'adjustment',
+    },
+    {
+      name: 'Opções por refeição',
+      used: effectiveMealOptionsLimit,
+      limit: effectiveMealOptionsLimit,
+      key: 'meal_options',
+      isStatic: true, // Não é um contador de uso, é um limite
     },
   ];
 
@@ -76,9 +86,10 @@ export function UsageLimits() {
       </CardHeader>
       <CardContent className="space-y-4">
         {limits.map((item) => {
-          const percentage = getPercentage(item.used, item.limit);
-          const isAtLimit = percentage >= 100;
-          const isNearLimit = percentage >= 80;
+          const isStatic = 'isStatic' in item && item.isStatic;
+          const percentage = isStatic ? 100 : getPercentage(item.used, item.limit);
+          const isAtLimit = !isStatic && percentage >= 100;
+          const isNearLimit = !isStatic && percentage >= 80;
 
           return (
             <motion.div
@@ -97,14 +108,16 @@ export function UsageLimits() {
                     <AlertTriangle className="h-3 w-3 text-yellow-500" />
                   )}
                 </span>
-                <span className={getStatusColor(percentage)}>
-                  {item.used}/{item.limit}
+                <span className={isStatic ? 'text-primary' : getStatusColor(percentage)}>
+                  {isStatic ? item.limit : `${item.used}/${item.limit}`}
                 </span>
               </div>
-              <Progress 
-                value={percentage} 
-                className={`h-2 ${getProgressColor(percentage)}`}
-              />
+              {!isStatic && (
+                <Progress 
+                  value={percentage} 
+                  className={`h-2 ${getProgressColor(percentage)}`}
+                />
+              )}
             </motion.div>
           );
         })}

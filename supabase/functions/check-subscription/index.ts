@@ -164,11 +164,18 @@ serve(async (req) => {
         cancelAtPeriodEnd: subscription.cancel_at_period_end,
       },
       plan: subscription.plan,
-      usage: usage || {
+      usage: usage ? {
+        diets_used: usage.diets_used || 0,
+        substitutions_used: usage.substitutions_used || 0,
+        adjustments_used: usage.adjustments_used || 0,
+        chat_messages_today: usage.chat_messages_today || 0,
+        meal_options_override: usage.meal_options_override,
+      } : {
         diets_used: 0,
         substitutions_used: 0,
         adjustments_used: 0,
         chat_messages_today: 0,
+        meal_options_override: null,
       },
       accountType: planType,
       isLinkedToProfessional: false, // V2: professional features dormant
