@@ -901,6 +901,11 @@ export type Database = {
         Args: { _feature: string; _user_id: string }
         Returns: boolean
       }
+      can_view_food: {
+        Args: { _food_id: string; _user_id: string }
+        Returns: boolean
+      }
+      can_view_supplements: { Args: { _user_id: string }; Returns: boolean }
       confirm_meal_consumption: {
         Args: {
           _log_date?: string
@@ -949,6 +954,40 @@ export type Database = {
           subscription_status: Database["public"]["Enums"]["subscription_status"]
           substitution_limit: number
         }[]
+      }
+      get_visible_foods_for_user: {
+        Args: { _user_id: string }
+        Returns: {
+          calories: number
+          canonical_name: string | null
+          carbs: number
+          category: string | null
+          confidence_level: string | null
+          created_at: string
+          created_by_id: string | null
+          created_by_type: string | null
+          fat: number
+          id: string
+          is_active: boolean | null
+          is_optional: boolean | null
+          name: string
+          origin: string | null
+          processing_level: string | null
+          protein: number
+          review_status: string | null
+          serving_size: string | null
+          type: string | null
+          unit_enabled: boolean | null
+          unit_increment: number | null
+          unit_name: string | null
+          unit_weight_grams: number | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "foods"
+          isOneToOne: false
+          isSetofReturn: true
+        }
       }
       has_role: {
         Args: {
