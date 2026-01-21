@@ -1487,6 +1487,7 @@ async function getUserUsage(supabase: any, targetUserId: string) {
         period_start: new Date().toISOString().split('T')[0],
         period_end: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
         last_chat_reset: new Date().toISOString().split('T')[0],
+        meal_options_override: null,
       }
     };
   }
@@ -1504,6 +1505,7 @@ async function updateUserUsage(
     substitutions_used?: number;
     adjustments_used?: number;
     chat_messages_today?: number;
+    meal_options_override?: number | null;
   },
   headers: Headers
 ) {
@@ -1525,6 +1527,7 @@ async function updateUserUsage(
       substitutions_used: existingUsage.substitutions_used,
       adjustments_used: existingUsage.adjustments_used,
       chat_messages_today: existingUsage.chat_messages_today,
+      meal_options_override: existingUsage.meal_options_override,
     };
 
     const { data, error } = await supabase
@@ -1551,6 +1554,7 @@ async function updateUserUsage(
         substitutions_used: updates.substitutions_used ?? 0,
         adjustments_used: updates.adjustments_used ?? 0,
         chat_messages_today: updates.chat_messages_today ?? 0,
+        meal_options_override: updates.meal_options_override ?? null,
       })
       .select()
       .single();
