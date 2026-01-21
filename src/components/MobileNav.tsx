@@ -31,6 +31,7 @@ import { Logo } from '@/components/Logo';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useSubscription } from '@/hooks/useSubscription';
+import { useAccountPermissions } from '@/hooks/useAccountPermissions';
 import { useTheme } from '@/contexts/ThemeContext';
 import { cn } from '@/lib/utils';
 
@@ -48,6 +49,8 @@ export function MobileNav() {
   const { signOut } = useAuth();
   const { isProfessional, isAdmin, loading: roleLoading } = useUserRole();
   const { accountType, isSubscribed } = useSubscription();
+  const permissions = useAccountPermissions();
+  const isPaidUser = permissions.plan_name !== 'gratuito';
 
   const showProfessionalLinks = 
     (isSubscribed && accountType === 'professional') || 
@@ -81,7 +84,7 @@ export function MobileNav() {
       label: 'Registro Diário',
       href: '/daily-log',
       icon: <ClipboardCheck className="h-5 w-5" />,
-      show: true,
+      show: isPaidUser,
     },
     {
       label: 'Painel Profissional',
