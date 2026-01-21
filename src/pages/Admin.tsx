@@ -701,10 +701,6 @@ export default function Admin() {
               <History className="h-4 w-4" />
               Auditoria
             </TabsTrigger>
-            <TabsTrigger value="curation" className="flex items-center gap-2">
-              <Bot className="h-4 w-4" />
-              Curadoria IA
-            </TabsTrigger>
             <TabsTrigger value="docs" className="flex items-center gap-2">
               <BookOpen className="h-4 w-4" />
               Documentação
@@ -1268,6 +1264,9 @@ export default function Admin() {
               </div>
 
 
+              {/* Food Curation Section */}
+              <FoodCuration />
+
               {/* Foods Management Table */}
               <Card>
                 <CardHeader>
@@ -1465,11 +1464,6 @@ export default function Admin() {
               loading={loading}
               fetchAuditLogs={fetchAuditLogs}
             />
-          </TabsContent>
-
-          {/* Food Curation Tab */}
-          <TabsContent value="curation">
-            <FoodCuration />
           </TabsContent>
 
           <TabsContent value="plans">
