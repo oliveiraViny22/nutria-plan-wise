@@ -1027,6 +1027,13 @@ serve(async (req: Request) => {
           }
         }
       }
+
+      // Increment adjustment usage counter for the target user
+      const adjustmentTargetUserId = dietPlan?.user_id || user.id;
+      await supabaseAdmin.rpc('increment_usage', { 
+        _user_id: adjustmentTargetUserId, 
+        _feature: 'adjustment' 
+      });
     }
 
     const result: RebalanceResult = {
