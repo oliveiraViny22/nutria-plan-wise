@@ -10,7 +10,7 @@ const corsHeaders = {
 // Hardcoded documentation content (generated from docs/ files)
 const TECHNICAL_DOC = `# DOCUMENTAÇÃO TÉCNICA OFICIAL — NUTRIAPLAN
 
-## Versão do Documento: 2.2
+## Versão do Documento: 2.4
 ## Data de Geração: 18 de Janeiro de 2026
 ## Última Atualização: 21 de Janeiro de 2026
 
@@ -20,6 +20,8 @@ const TECHNICAL_DOC = `# DOCUMENTAÇÃO TÉCNICA OFICIAL — NUTRIAPLAN
 
 | Versão | Data | Alterações |
 |--------|------|------------|
+| 2.4 | 21/01/2026 | Auditoria completa de fluxos de usuário. Atualização de limites do plano gratuito (1 dieta, 3 substituições, 1 ajuste). Sincronização de permissões com banco de dados v2. Verificação de can_substitute no MealDetail. |
+| 2.3 | 21/01/2026 | Adicionado CHECK constraint foods_category_check para validar categorias canônicas no BD. Atualização da documentação para refletir schema v2 consolidado com 13 tabelas. |
 | 2.2 | 21/01/2026 | Incremento automático de uso de ajustes no rebalanceador de macros. Atualização de edge functions para contagem correta de features. Remoção de campos legados v1 (billing_cycle, account_type, user_type). Consolidação do esquema v2 com 13 tabelas principais. |
 | 2.1 | 21/01/2026 | Correção do constraint profiles_sex_check para aceitar valores male, female, other. Atualização pós-auditoria de banco de dados v2. |
 | 2.0 | 18/01/2026 | Versão consolidada: adicionados fluxos completos por perfil (Admin, Profissional, Aluno), detalhamento de gestão de alimentos, estrutura completa do banco de dados com cardinalidades, aprofundamento da IA, seção de auditoria administrativa, edge functions recentes |
@@ -491,7 +493,7 @@ Versão 2.0 - NutriaPlan
 
 const COMMERCIAL_DOC = `# DOCUMENTAÇÃO COMERCIAL E INSTITUCIONAL — NUTRIAPLAN
 
-## Versão do Documento: 2.1
+## Versão do Documento: 2.2
 ## Data de Geração: 18 de Janeiro de 2026
 ## Última Atualização: 21 de Janeiro de 2026
 
@@ -552,14 +554,18 @@ Ser a plataforma líder em nutrição inteligente na América Latina.
 
 ---
 
-# 4. TIPOS DE USUÁRIO
+# 4. TIPOS DE USUÁRIO (v2.2 - sincronizado com BD)
 
-## 4.1 Aluno Gratuito
+## 4.1 Aluno/Usuário Gratuito
 
-Para: Pessoa vinculada a um nutricionista
+Para: Novos usuários e pessoas vinculadas a um nutricionista
+- Criar 1 plano alimentar inicial ✓
 - Visualizar plano ✓
 - Confirmar refeições ✓
-- Chat educacional básico (3 msgs/dia) ✓
+- Substituir alimentos (3/mês) ✓
+- Ajustar macros (1/mês) ✓
+- Chat IA básico ✓
+- Opções por refeição: 1
 - Histórico: 7 dias
 Custo: Gratuito
 
@@ -567,18 +573,19 @@ Custo: Gratuito
 
 Para: Alunos que querem mais recursos
 - Tudo do Gratuito ✓
-- Chat IA ampliado (10 msgs/dia) ✓
-- Simulações nutricionais ✓
+- Chat IA ampliado (5 msgs/dia) ✓
+- Opções por refeição: 3
 - Histórico: 30 dias
 Custo: R$ 4,90/mês
 
 ## 4.3 Usuário Pessoal (Plano Pessoal Pago)
 
 Para: Pessoas com autonomia total
-- Criar planos personalizados (5/mês) ✓
-- Editar e ajustar planos ✓
-- Substituição de alimentos (20/mês) ✓
-- Chat IA completo (30 msgs/dia) ✓
+- Criar planos personalizados (1/mês) ✓
+- Substituição de alimentos (100/mês) ✓
+- Ajustes de macros (3/mês) ✓
+- Chat IA (3 msgs/dia) ✓
+- Opções por refeição: 3
 - Histórico: 90 dias
 Custo: R$ 14,90/mês
 
@@ -590,6 +597,7 @@ Para: Nutricionistas e profissionais de saúde
 - IA como assistente clínico ✓
 - Alertas de adesão configuráveis ✓
 - Relatórios PDF de adesão ✓
+- Chat (100 msgs/dia) ✓
 - Histórico: Ilimitado
 Custo: R$ 99,00/mês
 
@@ -645,16 +653,18 @@ O NutriaPlan não pergunta "o que você vai comer", mas sim "o que você comeu".
 
 ---
 
-# 7. PLANOS E PREÇOS
+# 7. PLANOS E PREÇOS (v2.2 - sincronizado com BD)
 
 | Recurso | Gratuito | Premium | Pessoal | Profissional |
 |---------|----------|---------|---------|--------------|
 | Preço/mês | R$ 0 | R$ 4,90 | R$ 14,90 | R$ 99,00 |
 | Visualizar plano | ✓ | ✓ | ✓ | ✓ |
 | Confirmar refeições | ✓ | ✓ | ✓ | ✓ |
-| Criar planos | - | - | 5/mês | Ilimitado |
-| Substituições | - | - | 20/mês | Ilimitado |
-| Chat IA/dia | 3 | 10 | 30 | 100 |
+| Criar planos | 1 inicial | 1/mês | 1/mês | Ilimitado |
+| Substituições | 3/mês | - | 100/mês | Ilimitado |
+| Ajustes de macros | 1/mês | - | 3/mês | Ilimitado |
+| Opções por refeição | 1 | 3 | 3 | Ilimitado |
+| Chat IA/dia | Básico | 5 | 3 | 100 |
 | Histórico | 7 dias | 30 dias | 90 dias | Ilimitado |
 | Gerenciar alunos | - | - | - | Até 50 |
 
