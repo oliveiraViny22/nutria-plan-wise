@@ -14,7 +14,6 @@ import { Button } from '@/components/ui/button';
 import { MobileNav } from '@/components/MobileNav';
 import { MacroChart } from '@/components/MacroChart';
 import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/contexts/AuthContext';
 import { useLinkedStudent } from '@/hooks/useLinkedStudent';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useAccountPermissions } from '@/hooks/useAccountPermissions';
@@ -58,7 +57,7 @@ function getUnit(servingSize: string): string {
 }
 
 // Calculate total grams for display
-function getTotalGrams(_food: Food, quantityGrams: number): number {
+function getTotalGrams(quantityGrams: number): number {
   return Math.round(quantityGrams);
 }
 
@@ -78,7 +77,6 @@ export default function MealDetail() {
   const { mealId } = useParams();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { profile } = useAuth();
   const { isLinkedStudent } = useLinkedStudent();
   const { isProfessional } = useUserRole();
   
@@ -343,7 +341,7 @@ export default function MealDetail() {
                   {option.foods?.map((optionFood: MealOptionFood) => {
                     const food = optionFood.food as Food;
                     if (!food) return null;
-                    const qty = getTotalGrams(food, optionFood.quantity_grams);
+                    const qty = getTotalGrams(optionFood.quantity_grams);
                     const nutrients = calcNutrients(food, qty);
                     const canSub = canShowSubstituteButton && checkCanSubstitute(food);
                     
@@ -399,7 +397,7 @@ export default function MealDetail() {
                 <p className="text-sm text-muted-foreground">Substituindo:</p>
                 <p className="font-medium">{(selectedMealOptionFood.food as Food).name}</p>
                 <p className="text-sm text-muted-foreground">
-                  {getTotalGrams(selectedMealOptionFood.food as Food, selectedMealOptionFood.quantity_grams)}{getUnit((selectedMealOptionFood.food as Food).serving_size)}
+                  {getTotalGrams(selectedMealOptionFood.quantity_grams)}{getUnit((selectedMealOptionFood.food as Food).serving_size)}
                 </p>
               </div>
 
