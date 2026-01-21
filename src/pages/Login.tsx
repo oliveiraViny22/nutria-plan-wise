@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Logo } from '@/components/Logo';
+import { ThemeToggleSimple } from '@/components/ThemeToggle';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserRole } from '@/hooks/useUserRole';
 import { toast } from 'sonner';
@@ -69,9 +70,12 @@ export default function Login() {
           transition={{ duration: 0.5 }}
           className="w-full max-w-md mx-auto"
         >
-          <Link to="/" className="inline-block mb-6 sm:mb-8">
-            <Logo size="lg" />
-          </Link>
+          <div className="flex items-center justify-between mb-6 sm:mb-8">
+            <Link to="/">
+              <Logo size="lg" />
+            </Link>
+            <ThemeToggleSimple />
+          </div>
 
           <h1 className="text-2xl sm:text-3xl font-bold text-foreground mb-2">
             Bem-vindo de volta

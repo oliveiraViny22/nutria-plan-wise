@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Logo } from '@/components/Logo';
+import { ThemeToggleSimple } from '@/components/ThemeToggle';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 
@@ -39,9 +40,12 @@ export default function ForgotPassword() {
         className="w-full max-w-md"
       >
         <div className="card-elevated rounded-xl sm:rounded-2xl p-5 sm:p-8">
-          <Link to="/" className="inline-block mb-4 sm:mb-6">
-            <Logo />
-          </Link>
+          <div className="flex items-center justify-between mb-4 sm:mb-6">
+            <Link to="/">
+              <Logo />
+            </Link>
+            <ThemeToggleSimple />
+          </div>
 
           {!sent ? (
             <>
