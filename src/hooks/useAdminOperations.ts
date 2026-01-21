@@ -81,6 +81,17 @@ export interface UserProfile {
   plan_name?: string;
 }
 
+export interface UserUsage {
+  user_id: string;
+  diets_used: number;
+  substitutions_used: number;
+  adjustments_used: number;
+  chat_messages_today: number;
+  period_start: string;
+  period_end: string;
+  last_chat_reset: string;
+}
+
 export interface Plan {
   id: string;
   name: string;
@@ -576,6 +587,57 @@ export function useAdminOperations() {
     }
   }, [invokeAdmin, toast]);
 
+  const getUserUsage = useCallback(async (targetUserId: string): Promise<UserUsage | null> => {
+    try {
+      const data = await invokeAdmin('get_user_usage', { userId: targetUserId });
+      return data.usage as UserUsage;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erro ao buscar uso';
+      toast({ title: 'Erro', description: message, variant: 'destructive' });
+      return null;
+    }
+  }, [invokeAdmin, toast]);
+
+  const updateUserUsage = useCallback(async (
+    targetUserId: string,
+    updates: Partial<Pick<UserUsage, 'diets_used' | 'substitutions_used' | 'adjustments_used' | 'chat_messages_today'>>
+  ): Promise<boolean> => {
+    setSavingKeys(prev => new Set(prev).add(`usage_${targetUserId}`));
+    try {
+      await invokeAdmin('update_user_usage', { targetUserId, updates });
+      
+      setSavedKeys(prev => new Set(prev).add(`usage_${targetUserId}`));
+      setTimeout(() => {
+        setSavedKeys(prev => {
+          const next = new Set(prev);
+          next.delete(`usage_${targetUserId}`);
+          return next;
+        });
+      }, 2000);
+      
+      toast({ title: 'Cotas atualizadas' });
+      return true;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erro ao atualizar cotas';
+      toast({ title: 'Erro', description: message, variant: 'destructive' });
+      setErrorKeys(prev => new Set(prev).add(`usage_${targetUserId}`));
+      setTimeout(() => {
+        setErrorKeys(prev => {
+          const next = new Set(prev);
+          next.delete(`usage_${targetUserId}`);
+          return next;
+        });
+      }, 3000);
+      return false;
+    } finally {
+      setSavingKeys(prev => {
+        const next = new Set(prev);
+        next.delete(`usage_${targetUserId}`);
+        return next;
+      });
+    }
+  }, [invokeAdmin, toast]);
+
   return {
     loading,
     settingsLoading,
@@ -607,5 +669,7 @@ export function useAdminOperations() {
     previewDeleteUser,
     fetchPlans,
     updatePlan,
+    getUserUsage,
+    updateUserUsage,
   };
 }

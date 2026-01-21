@@ -161,6 +161,14 @@ serve(async (req) => {
         result = await normalizeFoodNames(supabaseAdmin, userId, req.headers);
         break;
 
+      case 'get_user_usage':
+        result = await getUserUsage(supabaseAdmin, params.userId);
+        break;
+
+      case 'update_user_usage':
+        result = await updateUserUsage(supabaseAdmin, userId, params.targetUserId, params.updates, req.headers);
+        break;
+
       default:
         throw new Error(`Ação desconhecida: ${action}`);
     }
@@ -1451,4 +1459,119 @@ async function normalizeFoodNames(
 
   logStep('Food names normalization completed', results);
   return results;
+}
+
+// deno-lint-ignore no-explicit-any
+async function getUserUsage(supabase: any, targetUserId: string) {
+  logStep('Getting user usage', { targetUserId });
+
+  const { data: usage, error } = await supabase
+    .from('user_usage')
+    .select('*')
+    .eq('user_id', targetUserId)
+    .single();
+
+  if (error && error.code !== 'PGRST116') { // PGRST116 = no rows returned
+    throw new Error(`Erro ao buscar uso: ${error.message}`);
+  }
+
+  // If no usage record exists, return default values
+  if (!usage) {
+    return {
+      usage: {
+        user_id: targetUserId,
+        diets_used: 0,
+        substitutions_used: 0,
+        adjustments_used: 0,
+        chat_messages_today: 0,
+        period_start: new Date().toISOString().split('T')[0],
+        period_end: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        last_chat_reset: new Date().toISOString().split('T')[0],
+      }
+    };
+  }
+
+  return { usage };
+}
+
+// deno-lint-ignore no-explicit-any
+async function updateUserUsage(
+  supabase: any,
+  adminId: string,
+  targetUserId: string,
+  updates: {
+    diets_used?: number;
+    substitutions_used?: number;
+    adjustments_used?: number;
+    chat_messages_today?: number;
+  },
+  headers: Headers
+) {
+  logStep('Updating user usage', { targetUserId, updates });
+
+  // First check if usage record exists
+  const { data: existingUsage } = await supabase
+    .from('user_usage')
+    .select('*')
+    .eq('user_id', targetUserId)
+    .single();
+
+  let result;
+  let oldValue = null;
+
+  if (existingUsage) {
+    oldValue = {
+      diets_used: existingUsage.diets_used,
+      substitutions_used: existingUsage.substitutions_used,
+      adjustments_used: existingUsage.adjustments_used,
+      chat_messages_today: existingUsage.chat_messages_today,
+    };
+
+    const { data, error } = await supabase
+      .from('user_usage')
+      .update({
+        ...updates,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('user_id', targetUserId)
+      .select()
+      .single();
+
+    if (error) {
+      throw new Error(`Erro ao atualizar uso: ${error.message}`);
+    }
+    result = data;
+  } else {
+    // Create new usage record
+    const { data, error } = await supabase
+      .from('user_usage')
+      .insert({
+        user_id: targetUserId,
+        diets_used: updates.diets_used ?? 0,
+        substitutions_used: updates.substitutions_used ?? 0,
+        adjustments_used: updates.adjustments_used ?? 0,
+        chat_messages_today: updates.chat_messages_today ?? 0,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      throw new Error(`Erro ao criar registro de uso: ${error.message}`);
+    }
+    result = data;
+  }
+
+  // Audit log
+  await supabase.from('admin_audit_log').insert({
+    user_id: adminId,
+    action: 'update_user_usage',
+    entity_type: 'user_usage',
+    entity_id: targetUserId,
+    old_value: oldValue,
+    new_value: updates,
+    user_agent: headers.get('user-agent'),
+  });
+
+  logStep('User usage updated', { targetUserId });
+  return { usage: result };
 }
