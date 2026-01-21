@@ -224,15 +224,15 @@ export function FoodCuration() {
 
   const getCategoryLabel = (category: string) => {
     const labels: Record<string, string> = {
-      'proteinas_animais': 'Proteínas Animais',
-      'leguminosas': 'Leguminosas',
-      'cereais_tuberculos': 'Cereais e Tubérculos',
-      'hortalicas_folhosas': 'Hortaliças Folhosas',
-      'legumes': 'Legumes',
+      'carboidratos': 'Carboidratos',
+      'proteinas': 'Proteínas',
+      'gorduras': 'Gorduras',
+      'vegetais': 'Vegetais',
       'frutas': 'Frutas',
       'laticinios': 'Laticínios',
-      'oleos_oleaginosas': 'Óleos e Oleaginosas',
-      'suplementos': 'Suplementos'
+      'leguminosas': 'Leguminosas',
+      'suplementos': 'Suplementos',
+      'mistos': 'Mistos',
     };
     return labels[category] || category;
   };

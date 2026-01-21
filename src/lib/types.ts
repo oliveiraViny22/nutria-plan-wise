@@ -75,37 +75,28 @@ export interface StudentRequest {
   updated_at: string;
 }
 
-// Valid food categories (new taxonomy)
-export const FOOD_CATEGORIES = [
-  'frutas',
-  'hortaliças_folhosas',
-  'legumes',
-  'cereais_tubérculos',
-  'leguminosas',
-  'proteínas_animais',
-  'laticínios',
-  'óleos_oleaginosas',
-  'suplementos',
-] as const;
+// =====================================================
+// CATEGORIAS CANÔNICAS - Re-exportadas de food-categories.ts
+// =====================================================
+import { 
+  CANONICAL_CATEGORIES,
+  type FoodCategory as FoodCategoryType,
+  CATEGORY_LABELS,
+  PROCESSING_LEVELS as PROC_LEVELS,
+  type ProcessingLevel as ProcessingLevelType,
+  SUBSTITUTABLE_PROCESSING_LEVELS as SUBST_PROC_LEVELS,
+  isValidCategory,
+  getCategoryLabel,
+  getProcessingLabel,
+} from './food-categories';
 
-export type FoodCategory = typeof FOOD_CATEGORIES[number];
-
-// Processing levels for food classification
-export const PROCESSING_LEVELS = [
-  'in_natura',
-  'minimamente_processado',
-  'processado',
-  'ultraprocessado',
-  'suplemento',
-] as const;
-
-export type ProcessingLevel = typeof PROCESSING_LEVELS[number];
-
-// Processing levels allowed for automatic substitutions
-export const SUBSTITUTABLE_PROCESSING_LEVELS: ProcessingLevel[] = [
-  'in_natura',
-  'minimamente_processado',
-];
+export const FOOD_CATEGORIES = CANONICAL_CATEGORIES;
+export type FoodCategory = FoodCategoryType;
+export { CATEGORY_LABELS };
+export const PROCESSING_LEVELS = PROC_LEVELS;
+export type ProcessingLevel = ProcessingLevelType;
+export const SUBSTITUTABLE_PROCESSING_LEVELS = SUBST_PROC_LEVELS;
+export { isValidCategory, getCategoryLabel, getProcessingLabel };
 
 export interface Food {
   id: string;

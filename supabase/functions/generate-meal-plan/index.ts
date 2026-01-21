@@ -83,28 +83,29 @@ function getMealCalorieDistribution(mealsPerDay: number): Record<MealType, numbe
   }
 }
 
+// Categorias canônicas oficiais
 const VALID_CATEGORIES = [
+  'carboidratos',
+  'proteinas',
+  'gorduras',
+  'vegetais',
   'frutas',
-  'hortaliças_folhosas',
-  'legumes',
-  'cereais_tubérculos',
+  'laticinios',
   'leguminosas',
-  'proteínas_animais',
-  'laticínios',
-  'óleos_oleaginosas',
   'suplementos',
+  'mistos',
 ];
 
-const ALLOWED_PROCESSING_LEVELS = ['in_natura', 'minimamente_processado', 'In natura', 'Minimamente processado'];
+const ALLOWED_PROCESSING_LEVELS = ['in_natura', 'minimamente_processado'];
 
-// Category priorities by meal type
+// Prioridades de categoria por tipo de refeição (categorias canônicas)
 const MEAL_CATEGORY_PRIORITIES: Record<MealType, string[]> = {
-  breakfast: ['cereais_tubérculos', 'frutas', 'laticínios', 'óleos_oleaginosas'],
-  morning_snack: ['frutas', 'óleos_oleaginosas', 'laticínios'],
-  lunch: ['proteínas_animais', 'cereais_tubérculos', 'leguminosas', 'hortaliças_folhosas', 'legumes'],
-  afternoon_snack: ['frutas', 'laticínios', 'óleos_oleaginosas'],
-  dinner: ['proteínas_animais', 'hortaliças_folhosas', 'legumes', 'cereais_tubérculos'],
-  supper: ['laticínios', 'frutas', 'óleos_oleaginosas'],
+  breakfast: ['carboidratos', 'frutas', 'laticinios', 'gorduras'],
+  morning_snack: ['frutas', 'gorduras', 'laticinios'],
+  lunch: ['proteinas', 'carboidratos', 'leguminosas', 'vegetais'],
+  afternoon_snack: ['frutas', 'laticinios', 'gorduras'],
+  dinner: ['proteinas', 'vegetais', 'carboidratos'],
+  supper: ['laticinios', 'frutas', 'gorduras'],
 };
 
 // Goal-based macro priorities
@@ -127,25 +128,24 @@ function selectFoodsIntelligently(
 ): Food[] {
   const weights = GOAL_MACRO_WEIGHTS[goal] || GOAL_MACRO_WEIGHTS.maintain;
   
-  // Filter out supplements and ultra-processed
+// Filter out supplements and ultra-processed
   const eligibleFoods = allFoods.filter((f: Food) => {
-    // Normalize category for comparison (handle both old and new formats)
-    const normalizedCategory = (f.category || '').toLowerCase();
-    if (normalizedCategory === 'suplementos' || normalizedCategory.includes('suplemento')) return false;
+    // Usar categoria canônica diretamente
+    const category = (f.category || '').toLowerCase();
+    if (category === 'suplementos') return false;
     
-    // Normalize processing level for comparison
+    // Normalizar nível de processamento
     const level = (f.processing_level || 'in_natura').toLowerCase().replace(/ /g, '_');
-    const allowedNormalized = ['in_natura', 'minimamente_processado'];
-    if (!allowedNormalized.some(allowed => level.includes(allowed.replace('_', ' ')) || level.includes(allowed))) return false;
+    if (!['in_natura', 'minimamente_processado'].includes(level)) return false;
     
     // Check restrictions
     const foodName = f.name.toLowerCase();
     const isRestricted = restrictions.some(r => {
       const restriction = r.toLowerCase();
-      if (restriction.includes('lactose') && normalizedCategory.includes('latic')) return true;
+      if (restriction.includes('lactose') && category === 'laticinios') return true;
       if (restriction.includes('gluten') && (foodName.includes('trigo') || foodName.includes('aveia') || foodName.includes('pão'))) return true;
-      if (restriction.includes('vegetariano') && (normalizedCategory.includes('prote') && !normalizedCategory.includes('vegetal'))) return true;
-      if (restriction.includes('vegano') && (normalizedCategory.includes('prote') || normalizedCategory.includes('latic'))) return true;
+      if (restriction.includes('vegetariano') && category === 'proteinas') return true;
+      if (restriction.includes('vegano') && (category === 'proteinas' || category === 'laticinios')) return true;
       return foodName.includes(restriction);
     });
     

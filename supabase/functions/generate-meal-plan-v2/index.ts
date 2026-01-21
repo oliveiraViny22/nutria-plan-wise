@@ -193,40 +193,40 @@ function validateEquivalence(options: MealOption[]): { valid: boolean; errors: s
   return { valid: errors.length === 0, errors };
 }
 
-// Foods appropriate for each meal type
+// Foods appropriate for each meal type (categorias canônicas)
 const MEAL_FOOD_PREFERENCES: Record<string, { 
   preferCategories: string[]; 
   avoidCategories: string[];
   preferKeywords: string[];
 }> = {
   "Café da Manhã": {
-    preferCategories: ['laticínios', 'frutas', 'cereais_tubérculos'],
+    preferCategories: ['laticinios', 'frutas', 'carboidratos'],
     avoidCategories: [],
     preferKeywords: ['pão', 'queijo', 'leite', 'iogurte', 'ovo', 'aveia', 'granola', 'café', 'banana', 'maçã', 'mamão', 'tapioca', 'mel', 'manteiga']
   },
   "Lanche da Manhã": {
-    preferCategories: ['frutas', 'oleaginosas', 'laticínios'],
+    preferCategories: ['frutas', 'gorduras', 'laticinios'],
     avoidCategories: [],
     preferKeywords: ['fruta', 'castanha', 'nozes', 'iogurte', 'barrinha', 'biscoito', 'banana', 'maçã']
   },
   "Almoço": {
-    preferCategories: ['proteínas_animais', 'cereais_tubérculos', 'legumes', 'hortaliças_folhosas', 'leguminosas'],
+    preferCategories: ['proteinas', 'carboidratos', 'vegetais', 'leguminosas'],
     avoidCategories: [],
     preferKeywords: ['arroz', 'feijão', 'frango', 'carne', 'peixe', 'salada', 'legume', 'batata', 'macarrão']
   },
   "Lanche da Tarde": {
-    preferCategories: ['frutas', 'oleaginosas', 'laticínios'],
+    preferCategories: ['frutas', 'gorduras', 'laticinios'],
     avoidCategories: [],
     preferKeywords: ['fruta', 'iogurte', 'sanduíche', 'pão', 'queijo', 'castanha', 'barrinha']
   },
   "Jantar": {
-    preferCategories: ['proteínas_animais', 'hortaliças_folhosas', 'legumes'],
+    preferCategories: ['proteinas', 'vegetais', 'carboidratos'],
     avoidCategories: [],
     preferKeywords: ['frango', 'peixe', 'carne', 'salada', 'legume', 'ovo', 'sopa']
   },
   "Ceia": {
-    preferCategories: ['laticínios', 'frutas'],
-    avoidCategories: ['proteínas_animais'],
+    preferCategories: ['laticinios', 'frutas'],
+    avoidCategories: ['proteinas'],
     preferKeywords: ['chá', 'iogurte', 'leite', 'fruta', 'biscoito', 'queijo']
   }
 };

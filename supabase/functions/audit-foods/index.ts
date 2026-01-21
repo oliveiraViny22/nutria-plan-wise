@@ -39,14 +39,14 @@ interface MigrationResult {
   suggestions: MigrationSuggestion[];
 }
 
-// New categories that indicate food is already migrated
+// Categorias canônicas oficiais
 const NEW_CATEGORIES = new Set([
-  'Carboidratos', 'Proteínas', 'Gorduras', 'Frutas', 'Vegetais',
-  'Leguminosas', 'Laticínios', 'Suplementos', 'Mistos'
+  'carboidratos', 'proteinas', 'gorduras', 'vegetais', 'frutas',
+  'laticinios', 'leguminosas', 'suplementos', 'mistos'
 ]);
 
 const NEW_PROCESSING_LEVELS = new Set([
-  'In natura', 'Minimamente processado', 'Processado', 'Ultraprocessado', 'Suplemento'
+  'in_natura', 'minimamente_processado', 'processado', 'ultraprocessado', 'suplemento'
 ]);
 
 // Check if food is already migrated to new format
@@ -84,52 +84,47 @@ Cada alimento possui:
 CATEGORIAS E PROCESSAMENTO (BASE CONCEITUAL)
 --------------------------------------------------
 
-Categorias nutricionais válidas (conceitos):
-- Carboidratos
-- Proteínas
-- Gorduras
-- Frutas
-- Vegetais
-- Leguminosas
-- Laticínios
-- Suplementos
-- Mistos
+Categorias nutricionais válidas (ÚNICAS PERMITIDAS):
+- carboidratos (arroz, pão, massas, tubérculos, cereais)
+- proteinas (carnes, peixes, ovos, frango)
+- gorduras (óleos, azeites, oleaginosas, castanhas)
+- vegetais (folhas, verduras, legumes)
+- frutas (frutas frescas e secas)
+- laticinios (leite, queijos, iogurtes)
+- leguminosas (feijões, lentilha, grão-de-bico, soja)
+- suplementos (whey, creatina, vitaminas)
+- mistos (preparações mistas, pratos prontos)
 
-Níveis de processamento (conceitos):
-- In natura
-- Minimamente processado
-- Processado
-- Ultraprocessado
-- Suplemento
+⚠️ NÃO USE NENHUMA OUTRA CATEGORIA!
+Categorias antigas como proteinas_animais, cereais_tuberculos, hortalicas_folhosas são INVÁLIDAS.
 
-⚠️ OBSERVAÇÃO IMPORTANTE
-Os valores finais serão resolvidos pelo backend com base
-em normalização semântica. Use sempre esses conceitos,
-sem criar sinônimos ou variações.
+Níveis de processamento (ÚNICOS PERMITIDOS):
+- in_natura
+- minimamente_processado
+- processado
+- ultraprocessado
+- suplemento
 
 --------------------------------------------------
 OBJETIVO
 --------------------------------------------------
 
-Reclassificar TODOS os alimentos do banco para o modelo
-nutricional correto, de forma consistente e defensável,
-preparando o sistema para reprocessar TODOS os planos
-alimentares já existentes.
+Reclassificar TODOS os alimentos para as categorias canônicas acima.
 
 --------------------------------------------------
-REGRAS DE CLASSIFICAÇÃO (DETERMINÍSTICAS)
+REGRAS DE CLASSIFICAÇÃO
 --------------------------------------------------
 
 CATEGORIA (ordem de prioridade):
-1. Se for suplemento nutricional → Suplementos
-2. Se ≥60% das kcal vierem de carboidratos → Carboidratos
-3. Se ≥20g de proteína por 100g ou porção → Proteínas
-4. Se ≥15g de gordura por 100g → Gorduras
-5. Frutas naturais → Frutas
-6. Hortaliças e verduras → Vegetais
-7. Feijões, lentilhas, grão-de-bico, soja → Leguminosas
-8. Leite, queijos, iogurtes → Laticínios
-9. Se não houver dominância clara → Mistos
+1. Se for suplemento nutricional → suplementos
+2. Se ≥60% das kcal vierem de carboidratos → carboidratos
+3. Se ≥20g de proteína por 100g ou porção → proteinas
+4. Se ≥15g de gordura por 100g → gorduras
+5. Frutas naturais → frutas
+6. Hortaliças, verduras, legumes → vegetais
+7. Feijões, lentilhas, grão-de-bico, soja → leguminosas
+8. Leite, queijos, iogurtes → laticinios
+9. Se não houver dominância clara → mistos
 
 PROCESSAMENTO:
 - Cru ou fresco, sem preparo → In natura

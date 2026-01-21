@@ -243,7 +243,7 @@ export type Database = {
           calories: number
           canonical_name: string | null
           carbs: number
-          category: string | null
+          category: string
           confidence_level: string | null
           created_at: string
           created_by_id: string | null
@@ -268,7 +268,7 @@ export type Database = {
           calories: number
           canonical_name?: string | null
           carbs: number
-          category?: string | null
+          category: string
           confidence_level?: string | null
           created_at?: string
           created_by_id?: string | null
@@ -293,7 +293,7 @@ export type Database = {
           calories?: number
           canonical_name?: string | null
           carbs?: number
-          category?: string | null
+          category?: string
           confidence_level?: string | null
           created_at?: string
           created_by_id?: string | null
@@ -961,7 +961,7 @@ export type Database = {
           calories: number
           canonical_name: string | null
           carbs: number
-          category: string | null
+          category: string
           confidence_level: string | null
           created_at: string
           created_by_id: string | null
