@@ -307,16 +307,34 @@ async function generateAIRebalanceSuggestions(
   targetMacros: { calories: number; protein: number; carbs: number; fat: number },
   adherence: AdherenceMetrics,
   permissions: ReturnType<typeof getProfilePermissions>,
-  availableFoods: FoodItem[]
-): Promise<{ adjustments: Adjustment[]; justification: string; adherence_impact: string }> {
+  availableFoods: FoodItem[],
+  profileType: UserProfile
+): Promise<{ adjustments: Adjustment[]; justification: string; adherence_impact: string; warnings: string[] }> {
   const apiKey = Deno.env.get('LOVABLE_API_KEY');
   
-  if (!apiKey) {
-    // Fallback to rule-based rebalancing
-    return generateRuleBasedAdjustments(meals, currentMacros, targetMacros, permissions, availableFoods);
+  // Return explanation only for free users
+  if (profileType === 'free') {
+    return {
+      adjustments: [],
+      justification: `Seu plano atual apresenta as seguintes diferenças em relação às metas:
+- Calorias: ${currentMacros.calories} kcal (meta: ${targetMacros.calories} kcal)
+- Proteína: ${currentMacros.protein}g (meta: ${targetMacros.protein}g)
+- Carboidrato: ${currentMacros.carbs}g (meta: ${targetMacros.carbs}g)
+- Gordura: ${currentMacros.fat}g (meta: ${targetMacros.fat}g)
+
+Para ajustar automaticamente seu plano e atingir suas metas, faça upgrade para o plano Premium ou Pessoal Pago.`,
+      adherence_impact: 'Nenhum ajuste aplicado - plano gratuito.',
+      warnings: ['Plano gratuito não permite ajustes automáticos. Apenas explicações são fornecidas.']
+    };
   }
 
-  const prompt = buildRebalancePrompt(profile, meals, currentMacros, targetMacros, adherence, permissions);
+  if (!apiKey) {
+    // Fallback to rule-based rebalancing
+    const result = generateRuleBasedAdjustments(meals, currentMacros, targetMacros, permissions, availableFoods);
+    return { ...result, warnings: [] };
+  }
+
+  const prompt = buildRebalancePrompt(profile, meals, currentMacros, targetMacros, adherence, permissions, profileType);
   
   try {
     const response = await fetch('https://api.lovable.dev/v1/chat/completions', {
@@ -330,12 +348,7 @@ async function generateAIRebalanceSuggestions(
         messages: [
           {
             role: 'system',
-            content: `Você é o Rebalanceador Automático do NutriaPlan. Analise o plano e sugira ajustes respeitando:
-- Regras de equivalência: Proteína ±5g, Carboidrato ±10g, Gordura ±3g, Calorias ±10%
-- Permissões do perfil do usuário
-- Nunca inferir doenças ou usar lógica clínica
-- Manter alimentos in natura e minimamente processados
-Responda APENAS em JSON válido.`
+            content: buildSystemPrompt(profileType)
           },
           { role: 'user', content: prompt }
         ],
@@ -346,7 +359,8 @@ Responda APENAS em JSON válido.`
 
     if (!response.ok) {
       console.error('AI API error:', await response.text());
-      return generateRuleBasedAdjustments(meals, currentMacros, targetMacros, permissions, availableFoods);
+      const result = generateRuleBasedAdjustments(meals, currentMacros, targetMacros, permissions, availableFoods);
+      return { ...result, warnings: [] };
     }
 
     const data = await response.json();
@@ -359,14 +373,68 @@ Responda APENAS em JSON válido.`
       return {
         adjustments: parsed.adjustments || [],
         justification: parsed.justification || 'Ajustes calculados com base nos objetivos nutricionais.',
-        adherence_impact: parsed.adherence_impact || 'Impacto neutro esperado na adesão.'
+        adherence_impact: parsed.adherence_impact || 'Impacto neutro esperado na adesão.',
+        warnings: parsed.warnings || []
       };
     }
   } catch (error) {
     console.error('AI rebalance error:', error);
   }
   
-  return generateRuleBasedAdjustments(meals, currentMacros, targetMacros, permissions, availableFoods);
+  const result = generateRuleBasedAdjustments(meals, currentMacros, targetMacros, permissions, availableFoods);
+  return { ...result, warnings: [] };
+}
+
+function buildSystemPrompt(profileType: UserProfile): string {
+  const baseRules = `Você é o Rebalanceador Automático do NutriaPlan.
+
+REGRAS DE EQUIVALÊNCIA OBRIGATÓRIAS:
+- Proteína: ±5g
+- Carboidrato: ±10g
+- Gordura: ±3g
+- Calorias: ±10%
+NUNCA quebrar equivalência sem permissão explícita.
+
+REGRAS DE SEGURANÇA:
+- Se dados insuficientes, conflito de permissões ou risco clínico → ABORTAR
+- Nunca inferir doenças ou usar lógica clínica
+- Nunca executar sem dados suficientes
+- Manter alimentos in natura e minimamente processados
+
+Responda APENAS em JSON válido com o formato:
+{
+  "adjustments": [...],
+  "justification": "string",
+  "adherence_impact": "string",
+  "warnings": ["string"]
+}`;
+
+  const profileRules: Record<UserProfile, string> = {
+    free: `
+PERFIL: GRATUITO
+- NÃO rebalancear macros
+- NÃO alterar calorias
+- APENAS explicar a situação atual`,
+    premium: `
+PERFIL: PREMIUM
+- PODE ajustar distribuição de refeições
+- PODE ajustar escolhas alimentares
+- NÃO PODE alterar target calórico total`,
+    usuario_pessoal_pago: `
+PERFIL: USUÁRIO PESSOAL PAGO
+- PODE ajustar calorias
+- PODE ajustar macros
+- PODE substituir alimentos
+- PODE reorganizar refeições
+- PROIBIDO: usar lógica clínica, inferir doenças, interpretar dados médicos`,
+    profissional_vinculado: `
+PERFIL: PROFISSIONAL VINCULADO
+- NÃO executar automaticamente
+- GERAR sugestão técnica detalhada
+- AGUARDAR aprovação do profissional`
+  };
+
+  return baseRules + profileRules[profileType];
 }
 
 function buildRebalancePrompt(
@@ -375,7 +443,8 @@ function buildRebalancePrompt(
   currentMacros: { calories: number; protein: number; carbs: number; fat: number },
   targetMacros: { calories: number; protein: number; carbs: number; fat: number },
   adherence: AdherenceMetrics,
-  permissions: ReturnType<typeof getProfilePermissions>
+  permissions: ReturnType<typeof getProfilePermissions>,
+  profileType: UserProfile
 ): string {
   const deficits = {
     calories: targetMacros.calories - currentMacros.calories,
@@ -385,7 +454,7 @@ function buildRebalancePrompt(
   };
 
   return `
-PERFIL DO USUÁRIO:
+PERFIL DO USUÁRIO (${profileType}):
 - Objetivo: ${profile.goal || 'não definido'}
 - Meta calórica: ${targetMacros.calories} kcal
 - Meta proteína: ${targetMacros.protein}g
@@ -406,11 +475,12 @@ ADESÃO (últimos 30 dias):
 - Refeições puladas: ${adherence.skipped_meals}
 - Fora do plano: ${adherence.out_of_plan}
 
-PERMISSÕES:
+PERMISSÕES DO PERFIL:
 - Pode ajustar macros: ${permissions.canAdjustMacros ? 'Sim' : 'Não'}
 - Pode ajustar calorias: ${permissions.canAdjustCalories ? 'Sim' : 'Não'}
 - Pode substituir alimentos: ${permissions.canSubstituteFoods ? 'Sim' : 'Não'}
 - Pode reorganizar refeições: ${permissions.canReorganizeMeals ? 'Sim' : 'Não'}
+- Requer aprovação: ${permissions.requiresApproval ? 'Sim' : 'Não'}
 
 REFEIÇÕES ATUAIS:
 ${meals.map(m => `
@@ -418,7 +488,9 @@ ${m.name}:
 ${m.options[0]?.foods.map(f => `  - ${f.food.name}: ${f.quantity_grams}g (${f.food.calories} kcal, P:${f.food.protein}g, C:${f.food.carbs}g, G:${f.food.fat}g)`).join('\n') || '  Sem alimentos'}
 `).join('\n')}
 
-Gere um JSON com:
+Com base nas permissões do perfil "${profileType}", gere ajustes respeitando as regras de equivalência.
+
+Responda em JSON:
 {
   "adjustments": [
     {
@@ -434,7 +506,8 @@ Gere um JSON com:
     }
   ],
   "justification": "justificativa nutricional geral",
-  "adherence_impact": "impacto esperado na adesão"
+  "adherence_impact": "impacto esperado na adesão",
+  "warnings": ["avisos de limitação, se houver"]
 }`;
 }
 
@@ -761,15 +834,18 @@ serve(async (req: Request) => {
       .in('processing_level', ['in_natura', 'minimamente_processado']);
 
     // Generate rebalance suggestions
-    const { adjustments, justification, adherence_impact } = await generateAIRebalanceSuggestions(
+    const { adjustments, justification, adherence_impact, warnings: aiWarnings } = await generateAIRebalanceSuggestions(
       profileData,
       meals,
       currentMacros,
       targetMacros,
       adherence,
       permissions,
-      availableFoods || []
+      availableFoods || [],
+      profileType
     );
+    
+    warnings.push(...aiWarnings);
 
     // Calculate proposed macros after adjustments
     let proposedMacros = { ...currentMacros };
