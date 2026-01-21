@@ -52,6 +52,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { FoodImportValidator, ValidationResult as FoodValidationResult, FoodRow } from '@/components/FoodImportValidator';
 import SystemAudit from '@/components/SystemAudit';
+import { useRealtimeSettings } from '@/hooks/useRealtimeSettings';
 
 const CHART_COLORS = [
   'hsl(var(--primary))',
@@ -119,6 +120,8 @@ export default function Admin() {
     foodsTotal,
     fetchSettings, 
     updateSetting,
+    updateSettingInState,
+    removeSettingFromState,
     fetchFoodImports,
     importFoods,
     fetchAuditLogs,
@@ -138,6 +141,14 @@ export default function Admin() {
     deleteFood,
     normalizeFoodNames,
   } = useAdminOperations();
+  
+  // Real-time settings updates
+  useRealtimeSettings({
+    onSettingChange: updateSettingInState,
+    onSettingInsert: updateSettingInState,
+    onSettingDelete: removeSettingFromState,
+    showNotifications: true,
+  });
 
   const [activeTab, setActiveTab] = useState('metrics');
   const [editedSettings, setEditedSettings] = useState<Record<string, unknown>>({});
