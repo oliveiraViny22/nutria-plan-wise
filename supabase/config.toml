@@ -35,3 +35,6 @@ verify_jwt = false
 
 [functions.audit-foods]
 verify_jwt = false
+
+[functions.rebalance-meal-plan]
+verify_jwt = false
