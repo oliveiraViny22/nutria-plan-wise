@@ -320,7 +320,7 @@ export default function Dashboard() {
         </motion.section>
 
         {/* Adherence Widget - only for paid users with a plan */}
-        {currentDietPlan && subscriptionPlan && subscriptionPlan.name !== 'gratuito' && (
+        {currentDietPlan && subscriptionPlan && subscriptionPlan.type !== 'gratuito' && (
           <motion.section
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -433,7 +433,7 @@ export default function Dashboard() {
                 Plano de Hoje
               </h2>
               {/* Only show daily log button for paid users */}
-              {subscriptionPlan && subscriptionPlan.name !== 'gratuito' && (
+              {subscriptionPlan && subscriptionPlan.type !== 'gratuito' && (
                 <Link to="/daily-log">
                   <Button variant="outline" size="sm" className="gap-2">
                     <ClipboardCheck className="h-4 w-4" />
