@@ -1,6 +1,6 @@
 # DOCUMENTAÇÃO TÉCNICA OFICIAL — NUTRIAPLAN
 
-## Versão do Documento: 2.1
+## Versão do Documento: 2.2
 ## Data de Geração: 18 de Janeiro de 2026
 ## Última Atualização: 21 de Janeiro de 2026
 
@@ -10,6 +10,7 @@
 
 | Versão | Data | Alterações |
 |--------|------|------------|
+| 2.2 | 21/01/2026 | Incremento automático de uso de ajustes no rebalanceador de macros. Atualização de edge functions para contagem correta de features. Remoção de campos legados v1 (billing_cycle, account_type, user_type). Consolidação do esquema v2 com 13 tabelas principais. |
 | 2.1 | 21/01/2026 | Correção do constraint `profiles_sex_check` para aceitar valores 'male', 'female', 'other'. Atualização pós-auditoria de banco de dados v2. |
 | 2.0 | 18/01/2026 | Versão consolidada: adicionados fluxos completos por perfil (Admin, Profissional, Aluno), detalhamento de gestão de alimentos, estrutura completa do banco de dados com cardinalidades, aprofundamento da IA, seção de auditoria administrativa, edge functions recentes |
 | 1.1 | 18/01/2026 | Versão inicial com estrutura base |
@@ -181,11 +182,15 @@ O sistema foi projetado para:
 | `validate-email` | Validação de formato de email |
 | `validate-food-import` | Validação de importação de alimentos via IA |
 | `audit-foods` | Auditoria e normalização de alimentos via IA |
+| `rebalance-meal-plan` | Rebalanceamento de macros com contagem de uso |
+| `create-admin` | Criação de usuários administradores |
+| `cleanup-orphan-users` | Limpeza de usuários órfãos no Auth |
+| `delete-account` | Exclusão completa de conta de usuário |
 
 ### 3.2.3 Banco de Dados (PostgreSQL)
-- 27+ tabelas principais
+- 13 tabelas principais no esquema v2 consolidado
 - Row Level Security (RLS) habilitado em todas as tabelas
-- Funções RPC para operações complexas
+- Funções RPC para operações complexas (confirm_meal_consumption, can_use_feature, increment_usage, get_user_plan)
 - Triggers para automações e validações
 
 ## 3.3 Diagrama de Arquitetura (Mermaid)
@@ -1099,21 +1104,24 @@ O Edge Function `audit-foods` analisa alimentos existentes para:
 7. Frontend atualiza estado e exibe plano
 ```
 
-## 9.4 Fluxo de Atualização de Plano (MacroRebalancer)
+## 9.4 Fluxo de Atualização de Plano (MacroRebalancer/Rebalance-Meal-Plan)
 
 ```
 1. Usuário ajusta sliders de macros no MacroRebalancer
-2. Ao confirmar, chama hook useMacroRebalancer
-3. MacroRebalancerService.rebalance():
-   a. Cria snapshot do plano atual (plan_versions)
-   b. Ajusta quantidades de alimentos proporcionalmente
-   c. Recalcula totais de cada meal_option
-   d. Recalcula totais de cada meal
-   e. Atualiza meal_option_foods
-   f. Atualiza meal_options
-   g. Atualiza meals
-   h. Atualiza diet_plan
-   i. Registra em plan_history
+2. Ao confirmar, chama hook useMacroRebalancer ou Edge Function rebalance-meal-plan
+3. Edge Function rebalance-meal-plan:
+   a. Valida autenticação e permissões
+   b. Verifica can_use_feature('adjustment')
+   c. Cria snapshot do plano atual (plan_versions)
+   d. Ajusta quantidades de alimentos proporcionalmente
+   e. Recalcula totais de cada meal_option
+   f. Recalcula totais de cada meal
+   g. Atualiza meal_option_foods
+   h. Atualiza meal_options
+   i. Atualiza meals
+   j. Atualiza diet_plan
+   k. Registra em plan_history
+   l. **NOVO**: Incrementa contador de ajustes via increment_usage('adjustment')
 4. Frontend recarrega plano
 ```
 
@@ -2027,4 +2035,5 @@ TMB = 10 × peso(kg) + 6.25 × altura(cm) - 5 × idade - 161
 ---
 
 *Documento consolidado em 18 de Janeiro de 2026*
-*Versão 2.0 - NutriaPlan*
+*Atualizado em 21 de Janeiro de 2026*
+*Versão 2.2 - NutriaPlan*
