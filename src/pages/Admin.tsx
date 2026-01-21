@@ -71,14 +71,27 @@ interface PlanDistributionData {
   percentage: number;
 }
 
+interface UserTypeMetrics {
+  freeUsers: number;
+  paidPersonal: number;
+  professionals: number;
+  linkedStudents: number;
+}
+
+interface FinancialMetrics {
+  mrr: number;
+  totalRevenue: number;
+  aiCostThisMonth: number;
+  aiCallsThisMonth: number;
+}
+
 interface DashboardMetrics {
   totalUsers: number;
   totalSubscriptions: number;
   subscriptionsByStatus: Record<string, number>;
-  totalDietPlans: number;
-  activeDietPlans: number;
-  dailyLogsLast7Days: number;
   planDistribution: PlanDistributionData[];
+  userTypes: UserTypeMetrics;
+  financial: FinancialMetrics;
 }
 
 export default function Admin() {
@@ -147,6 +160,8 @@ export default function Admin() {
   const [timeSeriesLoading, setTimeSeriesLoading] = useState(false);
   const [downloadingFoods, setDownloadingFoods] = useState(false);
   const [downloadingDoc, setDownloadingDoc] = useState<string | null>(null);
+  const [editingPlanPrice, setEditingPlanPrice] = useState<string | null>(null);
+  const [editedPrices, setEditedPrices] = useState<Record<string, number>>({});
 
   useEffect(() => {
     if (!roleLoading && !isAdmin) {
@@ -173,27 +188,49 @@ export default function Admin() {
   const fetchMetrics = async () => {
     setMetricsLoading(true);
     try {
+      // Início do mês atual para cálculos de MRR e custos IA
+      const startOfMonth = new Date();
+      startOfMonth.setDate(1);
+      startOfMonth.setHours(0, 0, 0, 0);
+
       const [
         { count: usersCount },
         { count: subsCount },
         { data: subsByStatus },
-        { count: dietPlansCount },
-        { data: activePlans },
-        { count: logsCount },
         { data: activeSubsForDistribution },
+        { count: linkedStudentsCount },
+        { data: aiUsageLogs },
       ] = await Promise.all([
         supabase.from('profiles').select('*', { count: 'exact', head: true }),
         supabase.from('subscriptions').select('*', { count: 'exact', head: true }),
-        supabase.from('subscriptions').select('status'),
-        supabase.from('diet_plans').select('*', { count: 'exact', head: true }),
-        supabase.from('diet_plans').select('id').eq('status', 'active'),
-        supabase.from('daily_logs').select('*', { count: 'exact', head: true }).gte('created_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()),
-        supabase.from('subscriptions').select('plan_id, plans(name)').eq('status', 'active'),
+        supabase.from('subscriptions').select('status, plan_id, plans(name, type, price_monthly)').eq('status', 'active'),
+        supabase.from('subscriptions').select('plan_id, plans(name, type, price_monthly)').eq('status', 'active'),
+        supabase.from('professional_students').select('*', { count: 'exact', head: true }).eq('status', 'active'),
+        supabase.from('ai_usage_logs').select('estimated_cost_usd').gte('created_at', startOfMonth.toISOString()),
       ]);
 
       const subsByStatusMap: Record<string, number> = {};
+      let freeUsers = 0;
+      let paidPersonal = 0;
+      let professionals = 0;
+      let mrr = 0;
+
       subsByStatus?.forEach((s) => {
-        subsByStatusMap[s.status] = (subsByStatusMap[s.status] || 0) + 1;
+        const status = s.status as string;
+        subsByStatusMap[status] = (subsByStatusMap[status] || 0) + 1;
+        
+        const plan = s.plans as { name: string; type: string; price_monthly: number | null } | null;
+        if (plan) {
+          if (plan.type === 'gratuito') {
+            freeUsers++;
+          } else if (plan.type === 'plano_pessoal_pago') {
+            paidPersonal++;
+            mrr += plan.price_monthly || 0;
+          } else if (plan.type === 'profissional') {
+            professionals++;
+            mrr += plan.price_monthly || 0;
+          }
+        }
       });
 
       const planCounts: Record<string, number> = {};
@@ -210,14 +247,27 @@ export default function Admin() {
         percentage: totalActiveSubs > 0 ? Math.round((value / totalActiveSubs) * 100) : 0,
       }));
 
+      // Calcular custos de IA do mês
+      const aiCostThisMonth = aiUsageLogs?.reduce((sum, log) => sum + (Number(log.estimated_cost_usd) || 0), 0) || 0;
+      const aiCallsThisMonth = aiUsageLogs?.length || 0;
+
       setMetrics({
         totalUsers: usersCount || 0,
         totalSubscriptions: subsCount || 0,
         subscriptionsByStatus: subsByStatusMap,
-        totalDietPlans: dietPlansCount || 0,
-        activeDietPlans: activePlans?.length || 0,
-        dailyLogsLast7Days: logsCount || 0,
         planDistribution,
+        userTypes: {
+          freeUsers,
+          paidPersonal,
+          professionals,
+          linkedStudents: linkedStudentsCount || 0,
+        },
+        financial: {
+          mrr,
+          totalRevenue: mrr, // Simplificado - pode ser expandido
+          aiCostThisMonth,
+          aiCallsThisMonth,
+        },
       });
     } catch (error) {
       console.error('Error fetching metrics:', error);
@@ -619,7 +669,7 @@ export default function Admin() {
           {/* Metrics Tab */}
           <TabsContent value="metrics">
             <div className="space-y-6">
-              {/* Quick Stats */}
+              {/* Métricas de Usuários */}
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -628,39 +678,93 @@ export default function Admin() {
                   </CardHeader>
                   <CardContent>
                     <div className="text-2xl font-bold">{metrics?.totalUsers || 0}</div>
+                    <p className="text-xs text-muted-foreground">
+                      {metrics?.subscriptionsByStatus?.active || 0} com assinatura ativa
+                    </p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between pb-2">
+                    <CardTitle className="text-sm font-medium">Usuários Free</CardTitle>
+                    <Users className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{metrics?.userTypes?.freeUsers || 0}</div>
+                    <p className="text-xs text-muted-foreground">Plano gratuito</p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between pb-2">
+                    <CardTitle className="text-sm font-medium">Pessoal Pago</CardTitle>
+                    <CreditCard className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{metrics?.userTypes?.paidPersonal || 0}</div>
+                    <p className="text-xs text-muted-foreground">Plano pessoal</p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between pb-2">
+                    <CardTitle className="text-sm font-medium">Profissionais</CardTitle>
+                    <Briefcase className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{metrics?.userTypes?.professionals || 0}</div>
+                    <p className="text-xs text-muted-foreground">
+                      {metrics?.userTypes?.linkedStudents || 0} alunos vinculados
+                    </p>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Métricas Financeiras */}
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                <Card className="border-green-500/30 bg-green-500/5">
+                  <CardHeader className="flex flex-row items-center justify-between pb-2">
+                    <CardTitle className="text-sm font-medium">MRR</CardTitle>
+                    <TrendingUp className="h-4 w-4 text-green-600" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold text-green-600">
+                      R$ {(metrics?.financial?.mrr || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </div>
+                    <p className="text-xs text-muted-foreground">Receita recorrente mensal</p>
+                  </CardContent>
+                </Card>
+                <Card className="border-orange-500/30 bg-orange-500/5">
+                  <CardHeader className="flex flex-row items-center justify-between pb-2">
+                    <CardTitle className="text-sm font-medium">Custo IA (Mês)</CardTitle>
+                    <Bot className="h-4 w-4 text-orange-600" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold text-orange-600">
+                      $ {(metrics?.financial?.aiCostThisMonth || 0).toFixed(4)}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {metrics?.financial?.aiCallsThisMonth || 0} chamadas
+                    </p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between pb-2">
+                    <CardTitle className="text-sm font-medium">Alunos Vinculados</CardTitle>
+                    <Users className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{metrics?.userTypes?.linkedStudents || 0}</div>
+                    <p className="text-xs text-muted-foreground">Atribuídos a profissionais</p>
                   </CardContent>
                 </Card>
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between pb-2">
                     <CardTitle className="text-sm font-medium">Assinaturas</CardTitle>
-                    <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                    <Activity className="h-4 w-4 text-muted-foreground" />
                   </CardHeader>
                   <CardContent>
                     <div className="text-2xl font-bold">{metrics?.totalSubscriptions || 0}</div>
                     <p className="text-xs text-muted-foreground">
                       {metrics?.subscriptionsByStatus?.active || 0} ativas
                     </p>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between pb-2">
-                    <CardTitle className="text-sm font-medium">Planos Alimentares</CardTitle>
-                    <FileText className="h-4 w-4 text-muted-foreground" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold">{metrics?.totalDietPlans || 0}</div>
-                    <p className="text-xs text-muted-foreground">
-                      {metrics?.activeDietPlans || 0} ativos
-                    </p>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between pb-2">
-                    <CardTitle className="text-sm font-medium">Logs (7 dias)</CardTitle>
-                    <Activity className="h-4 w-4 text-muted-foreground" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold">{metrics?.dailyLogsLast7Days || 0}</div>
                   </CardContent>
                 </Card>
               </div>
@@ -1243,10 +1347,10 @@ export default function Admin() {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <CreditCard className="h-5 w-5 text-primary" />
-                    Limites por Plano
+                    Planos e Preços
                   </CardTitle>
                   <CardDescription>
-                    Configure os limites de dietas, substituições e ajustes para cada tipo de plano.
+                    Configure limites, preços e recursos de cada plano. Alterações em preços afetam novos pagamentos.
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -1277,6 +1381,11 @@ export default function Admin() {
                               <Badge variant={plan.is_active ? 'default' : 'secondary'}>
                                 {plan.is_active ? 'Ativo' : 'Inativo'}
                               </Badge>
+                              {plan.price_monthly && plan.price_monthly > 0 && (
+                                <Badge variant="outline" className="text-green-600 border-green-600">
+                                  R$ {plan.price_monthly.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}/mês
+                                </Badge>
+                              )}
                             </div>
                             <div className="flex items-center gap-2">
                               <Switch
@@ -1289,7 +1398,29 @@ export default function Admin() {
                             </div>
                           </div>
 
-                          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                          {/* Preço Mensal */}
+                          <div className="grid gap-4 md:grid-cols-5">
+                            <div className="space-y-2">
+                              <Label className="text-sm font-medium text-green-700">Preço Mensal (R$)</Label>
+                              <Input
+                                type="number"
+                                min={0}
+                                step={0.01}
+                                value={editedPrices[plan.id] ?? plan.price_monthly ?? 0}
+                                onChange={(e) => {
+                                  const value = parseFloat(e.target.value) || 0;
+                                  setEditedPrices(prev => ({ ...prev, [plan.id]: value }));
+                                }}
+                                onBlur={() => {
+                                  const newPrice = editedPrices[plan.id];
+                                  if (newPrice !== undefined && newPrice !== plan.price_monthly) {
+                                    updatePlan(plan.id, { price_monthly: newPrice });
+                                  }
+                                }}
+                                disabled={savingKeys.has(`plan_${plan.id}`) || plan.type === 'gratuito'}
+                                className={`w-full ${plan.type === 'gratuito' ? 'bg-muted' : ''}`}
+                              />
+                            </div>
                             <div className="space-y-2">
                               <Label className="text-sm">Limite de Dietas</Label>
                               <Input
@@ -1360,6 +1491,11 @@ export default function Admin() {
                                 Chat com IA habilitado
                               </Label>
                             </div>
+                            {plan.stripe_price_monthly && (
+                              <Badge variant="outline" className="text-xs">
+                                Stripe: {plan.stripe_price_monthly}
+                              </Badge>
+                            )}
                           </div>
                         </motion.div>
                       ))}
