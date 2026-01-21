@@ -402,7 +402,10 @@ export default function MealDetail() {
 
       toast.success('Alimento substituído com sucesso!');
       setShowSubstituteModal(false);
-      setShowImpact(true);
+      // Clear impact explanation after closing modal so it doesn't persist
+      setImpactExplanation(null);
+      setShowImpact(false);
+      setSelectedNewFood(null);
       await fetchMealData();
     } catch (error: any) {
       console.error('Error substituting:', error);
