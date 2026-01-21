@@ -10,6 +10,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useUserRole } from '@/hooks/useUserRole';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { OnboardingTutorial } from '@/components/OnboardingTutorial';
+import { useTutorial } from '@/hooks/useTutorial';
 import {
   ACTIVITY_LEVELS,
   GOALS,
@@ -38,6 +40,7 @@ export default function Onboarding() {
   const { user, refreshProfile } = useAuth();
   const { isProfessional } = useUserRole();
   const navigate = useNavigate();
+  const { showTutorial, markTutorialComplete, closeTutorial } = useTutorial();
 
   // Form data - using v2 schema values
   const [formData, setFormData] = useState({
@@ -218,11 +221,20 @@ export default function Onboarding() {
   };
 
   return (
-    <div className="min-h-screen gradient-hero flex flex-col pt-safe">
-      {/* Header */}
-      <header className="p-4 sm:p-6">
-        <Logo />
-      </header>
+    <>
+      {/* Tutorial Modal */}
+      {showTutorial && (
+        <OnboardingTutorial 
+          onComplete={markTutorialComplete} 
+          onSkip={closeTutorial} 
+        />
+      )}
+
+      <div className="min-h-screen gradient-hero flex flex-col pt-safe">
+        {/* Header */}
+        <header className="p-4 sm:p-6">
+          <Logo />
+        </header>
 
       {/* Progress */}
       <div className="px-4 sm:px-6 mb-6 sm:mb-8">
@@ -556,6 +568,7 @@ export default function Onboarding() {
           </Button>
         </div>
       </footer>
-    </div>
+      </div>
+    </>
   );
 }

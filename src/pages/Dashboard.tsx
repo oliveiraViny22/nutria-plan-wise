@@ -20,6 +20,7 @@ import {
   Eye,
   ClipboardCheck,
   Shield,
+  HelpCircle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Logo } from '@/components/Logo';
@@ -30,6 +31,8 @@ import { MacroRebalancer } from '@/components/MacroRebalancer';
 import { UsageLimits } from '@/components/UsageLimits';
 import { UpgradeDialog } from '@/components/UpgradeDialog';
 import { AdherenceWidget } from '@/components/AdherenceWidget';
+import { OnboardingTutorial } from '@/components/OnboardingTutorial';
+import { useTutorial } from '@/hooks/useTutorial';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useSubscription } from '@/hooks/useSubscription';
@@ -44,6 +47,7 @@ export default function Dashboard() {
   const { isProfessional, isAdmin } = useUserRole();
   const { isLinkedStudent } = useLinkedStudent();
   const permissions = useAccountPermissions();
+  const { showTutorial, markTutorialComplete, closeTutorial, openTutorial } = useTutorial();
   const {
     refresh: refreshSubscription,
     currentPlan: subscriptionPlan,
@@ -158,6 +162,15 @@ export default function Dashboard() {
   const currentFat = currentDietPlan?.total_fat || 0;
 
   return (
+    <>
+      {/* Tutorial Modal */}
+      {showTutorial && (
+        <OnboardingTutorial 
+          onComplete={markTutorialComplete} 
+          onSkip={closeTutorial} 
+        />
+      )}
+
     <div className="min-h-screen bg-background overflow-x-hidden">
       {/* Header - Mobile responsive with hamburger concept via scrollable icons */}
       <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-md border-b border-border">
@@ -484,16 +497,25 @@ export default function Dashboard() {
           <UsageLimits />
         </motion.section>
 
-        {/* Disclaimer */}
+        {/* Disclaimer and Help */}
         <motion.section
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.5 }}
-          className="text-center text-xs text-muted-foreground px-4 py-6"
+          className="text-center px-4 py-6 space-y-3"
         >
-          Este aplicativo oferece educação nutricional e não substitui um
-          profissional de saúde. Consulte um nutricionista para orientação
-          personalizada.
+          <button
+            onClick={openTutorial}
+            className="inline-flex items-center gap-1.5 text-xs text-primary hover:underline"
+          >
+            <HelpCircle className="w-3.5 h-3.5" />
+            Ver tutorial do sistema
+          </button>
+          <p className="text-xs text-muted-foreground">
+            Este aplicativo oferece educação nutricional e não substitui um
+            profissional de saúde. Consulte um nutricionista para orientação
+            personalizada.
+          </p>
         </motion.section>
       </main>
 
@@ -505,6 +527,7 @@ export default function Dashboard() {
         currentPlan={subscriptionPlan?.name}
         limit={upgradeLimit}
       />
-    </div>
+      </div>
+    </>
   );
 }
