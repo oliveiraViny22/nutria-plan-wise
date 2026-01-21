@@ -17,10 +17,13 @@ export function UsageLimits() {
     return null;
   }
 
-  // Calcula o limite efetivo de opções de refeição (override ou padrão do plano)
-  const effectiveMealOptionsLimit = usage?.meal_options_override ?? currentPlan.meal_options_limit ?? 3;
   // Usa plan.type para comparação consistente (valor em lowercase no banco)
   const isFreePlan = currentPlan.type === 'gratuito';
+  // Calcula o limite efetivo de opções de refeição (override ou padrão do plano)
+  // Para plano gratuito, sempre força 1 opção independente do que venha do banco
+  const effectiveMealOptionsLimit = isFreePlan 
+    ? 1 
+    : (usage?.meal_options_override ?? currentPlan.meal_options_limit ?? 3);
   // Só exibe opções de refeição se o limite for maior que 1 (planos pagos permitem escolher entre opções)
   const showMealOptions = !isFreePlan && effectiveMealOptionsLimit > 1;
 
