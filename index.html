@@ -1,22 +1,68 @@
 <!doctype html>
-<html lang="en">
+<html lang="pt-BR">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <!-- TODO: Set the document title to the name of your application -->
-    <title>Lovable App</title>
-    <meta name="description" content="Lovable Generated Project" />
-    <meta name="author" content="Lovable" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes, viewport-fit=cover" />
+    
+    <!-- App Title & Description -->
+    <title>NutriPlan - Planejamento Alimentar Inteligente</title>
+    <meta name="description" content="Crie planos alimentares personalizados com IA. Substitua alimentos, acompanhe macros e alcance seus objetivos de saúde." />
+    <meta name="author" content="NutriPlan" />
+    <meta name="keywords" content="nutrição, dieta, planejamento alimentar, macros, saúde, fitness, IA" />
 
-    <!-- TODO: Update og:title to match your application name -->
-    <meta property="og:title" content="Lovable App" />
-    <meta property="og:description" content="Lovable Generated Project" />
+    <!-- Mobile & PWA Meta Tags -->
+    <meta name="theme-color" content="#f7faf9" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0a1210" media="(prefers-color-scheme: dark)" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="NutriPlan" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="format-detection" content="telephone=no" />
+    <meta name="msapplication-TileColor" content="#16a34a" />
+    <meta name="msapplication-tap-highlight" content="no" />
+
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/manifest.json" />
+
+    <!-- Favicon & Icons -->
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon.ico" />
+    <link rel="apple-touch-icon" href="/pwa-192x192.png" />
+    <link rel="apple-touch-icon" sizes="152x152" href="/pwa-192x192.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/pwa-192x192.png" />
+
+    <!-- Open Graph / Social -->
     <meta property="og:type" content="website" />
-    <meta property="og:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
+    <meta property="og:site_name" content="NutriPlan" />
+    <meta property="og:title" content="NutriPlan - Planejamento Alimentar Inteligente" />
+    <meta property="og:description" content="Crie planos alimentares personalizados com IA. Substitua alimentos, acompanhe macros e alcance seus objetivos de saúde." />
+    <meta property="og:image" content="https://nutria-plan-wise.lovable.app/og-image.png" />
+    <meta property="og:url" content="https://nutria-plan-wise.lovable.app" />
 
+    <!-- Twitter Card -->
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:site" content="@Lovable" />
-    <meta name="twitter:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
+    <meta name="twitter:title" content="NutriPlan - Planejamento Alimentar Inteligente" />
+    <meta name="twitter:description" content="Crie planos alimentares personalizados com IA." />
+    <meta name="twitter:image" content="https://nutria-plan-wise.lovable.app/og-image.png" />
+
+    <!-- Preconnect for performance -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    
+    <!-- Touch Icons for iOS -->
+    <link rel="apple-touch-startup-image" href="/pwa-512x512.png" />
+
+    <!-- Disable touch callout on iOS -->
+    <style>
+      * {
+        -webkit-touch-callout: none;
+        -webkit-tap-highlight-color: transparent;
+      }
+      /* Prevent pull-to-refresh on mobile */
+      html, body {
+        overscroll-behavior-y: contain;
+      }
+    </style>
   </head>
 
   <body>
