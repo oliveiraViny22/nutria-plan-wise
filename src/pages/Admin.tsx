@@ -55,6 +55,7 @@ import SystemAudit from '@/components/SystemAudit';
 import { FoodCuration } from '@/components/FoodCuration';
 import { PendingFoodsReview } from '@/components/PendingFoodsReview';
 import { useRealtimeSettings } from '@/hooks/useRealtimeSettings';
+import { ThemeToggle } from '@/components/ThemeToggle';
 
 const CHART_COLORS = [
   'hsl(var(--primary))',
@@ -668,10 +669,13 @@ export default function Admin() {
               <p className="text-sm text-muted-foreground">Gerenciamento do sistema</p>
             </div>
           </div>
-          <Button variant="outline" onClick={() => fetchMetrics()} disabled={metricsLoading}>
-            <RefreshCw className={`h-4 w-4 mr-2 ${metricsLoading ? 'animate-spin' : ''}`} />
-            Atualizar
-          </Button>
+          <div className="flex items-center gap-2">
+            <ThemeToggle />
+            <Button variant="outline" onClick={() => fetchMetrics()} disabled={metricsLoading}>
+              <RefreshCw className={`h-4 w-4 mr-2 ${metricsLoading ? 'animate-spin' : ''}`} />
+              Atualizar
+            </Button>
+          </div>
         </div>
       </header>
 

@@ -26,6 +26,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Logo } from '@/components/Logo';
 import { MobileNav } from '@/components/MobileNav';
+import { ThemeToggle } from '@/components/ThemeToggle';
 import { CalorieRing } from '@/components/CalorieRing';
 import { MacroChart } from '@/components/MacroChart';
 import { MacroRebalancer } from '@/components/MacroRebalancer';
@@ -242,6 +243,7 @@ export default function Dashboard() {
                 </Link>
               </>
             )}
+            <ThemeToggle />
             <Button variant="ghost" size="icon" className="w-10 h-10" onClick={handleSignOut}>
               <LogOut className="w-5 h-5" />
             </Button>
