@@ -584,7 +584,7 @@ async function deleteUser(
     .eq('user_id', targetUserId)
     .single();
 
-  if (targetProfile?.email === 'admin@nutriai.app') {
+  if (targetProfile?.email === 'admin@nutriaplan.com') {
     throw new Error('Não é possível excluir a conta de administrador do sistema');
   }
 
