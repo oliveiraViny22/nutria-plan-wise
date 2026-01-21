@@ -520,6 +520,14 @@ serve(async (req) => {
       logStep("Skipping validation - initial plan creation");
     }
 
+    // Get user's plan limits for meal options
+    const { data: userPlanData } = await supabase.rpc('get_user_plan', {
+      _user_id: user.id,
+    });
+    
+    const mealOptionsLimit = userPlanData?.[0]?.meal_options_limit ?? 1;
+    logStep("User plan meal options limit", { mealOptionsLimit });
+
     // Fetch all foods from database
     const { data: allFoods, error: foodsError } = await supabase.from("foods").select("*");
     if (foodsError) {
@@ -774,9 +782,9 @@ Lembre-se: quantity em gramas/ml, total EXATO de ${targetCalories} calorias, sem
       _feature: 'diet',
     });
 
-    // Generate equivalent options for each meal
-    const OPTIONS_PER_MEAL = 2;
-    
+    // Use the plan's meal options limit (fetched earlier)
+    // Free plan = 1 option, Paid plans = 3 options (configurable via plans.meal_options_limit)
+    const OPTIONS_PER_MEAL = mealOptionsLimit;
     // Save meals with v2 schema (meal_options and meal_option_foods)
     for (let sortOrder = 0; sortOrder < adjustedMeals.length; sortOrder++) {
       const meal = adjustedMeals[sortOrder];
