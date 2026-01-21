@@ -10,8 +10,10 @@ import { Logo } from '@/components/Logo';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { signupSchema, validatePassword } from '@/lib/password-validation';
+import { useTutorial } from '@/hooks/useTutorial';
 
 export default function Signup() {
+  const { triggerTutorialAfterSignup } = useTutorial();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -63,6 +65,7 @@ export default function Signup() {
 
     try {
       await signUp(email, password, name);
+      triggerTutorialAfterSignup(); // Trigger tutorial to show after signup
       toast.success('Conta criada com sucesso!');
       navigate('/onboarding');
     } catch (error: any) {
