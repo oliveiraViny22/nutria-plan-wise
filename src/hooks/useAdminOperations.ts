@@ -150,9 +150,17 @@ export function useAdminOperations() {
   const fetchSettings = useCallback(async (category?: string) => {
     setSettingsLoading(true);
     try {
-      const data = await invokeAdmin('get_settings', { category });
-      setSettings(data.settings || []);
-      return data.settings;
+      const { data, error } = await supabase.functions.invoke('admin-operations', {
+        body: { action: 'get_settings', category }
+      });
+      
+      if (error) {
+        throw new Error(error.message || 'Erro ao carregar configurações');
+      }
+      
+      console.log('[Admin] fetchSettings response:', data);
+      setSettings(data?.settings || []);
+      return data?.settings || [];
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Erro ao carregar configurações';
       toast({ title: 'Erro', description: message, variant: 'destructive' });
@@ -160,7 +168,7 @@ export function useAdminOperations() {
     } finally {
       setSettingsLoading(false);
     }
-  }, [invokeAdmin, toast]);
+  }, [toast]);
 
   const updateSetting = useCallback(async (key: string, value: unknown) => {
     setSavingKeys(prev => new Set(prev).add(key));
