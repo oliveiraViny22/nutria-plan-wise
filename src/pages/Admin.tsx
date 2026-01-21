@@ -680,13 +680,13 @@ export default function Admin() {
               <Database className="h-4 w-4" />
               Alimentos
             </TabsTrigger>
-            <TabsTrigger value="audit" className="flex items-center gap-2">
-              <History className="h-4 w-4" />
-              Auditoria
-            </TabsTrigger>
             <TabsTrigger value="plans" className="flex items-center gap-2">
               <CreditCard className="h-4 w-4" />
               Planos
+            </TabsTrigger>
+            <TabsTrigger value="audit" className="flex items-center gap-2">
+              <History className="h-4 w-4" />
+              Auditoria
             </TabsTrigger>
             <TabsTrigger value="docs" className="flex items-center gap-2">
               <BookOpen className="h-4 w-4" />
