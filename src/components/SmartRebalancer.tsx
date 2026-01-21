@@ -1,7 +1,3 @@
-// Re-export the SmartRebalancer as MacroRebalancer for backwards compatibility
-// The old implementation is preserved in useMacroRebalancer.ts for local-only calculations
-// The new SmartRebalancer uses the edge function with profile-aware permissions
-
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -15,7 +11,9 @@ import {
   Loader2,
   ArrowRight,
   AlertCircle,
-  Beaker,
+  Shield,
+  Lock,
+  Info,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -26,20 +24,20 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog';
+import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
-  useMacroRebalancer,
-  RebalanceProposal,
+  useRebalancer,
   MacroTargets,
-  FoodAdjustment,
-} from '@/hooks/useMacroRebalancer';
+  Adjustment,
+  UserProfile,
+} from '@/hooks/useRebalancer';
 
-// Export the new SmartRebalancer for use in new code
-export { SmartRebalancer } from './SmartRebalancer';
-
-interface MacroRebalancerProps {
+interface SmartRebalancerProps {
   planId: string;
-  targets: MacroTargets;
   currentMacros: MacroTargets;
+  targetMacros: MacroTargets;
+  targetUserId?: string;
   onComplete: () => void;
 }
 
@@ -74,11 +72,11 @@ function MacroComparisonCard({
         <div className="flex-1">
           <div className="text-xs text-muted-foreground mb-1">Atual</div>
           <div className="flex items-baseline gap-1">
-            <span className="text-lg font-bold text-foreground">{current}</span>
+            <span className="text-lg font-bold text-foreground">{Math.round(current)}</span>
             <span className="text-xs text-muted-foreground">{unit}</span>
             {currentDiff !== 0 && (
               <span className={`text-xs ${currentDiff < 0 ? 'text-destructive' : 'text-amber-500'}`}>
-                ({currentDiff > 0 ? '+' : ''}{currentDiff})
+                ({currentDiff > 0 ? '+' : ''}{Math.round(currentDiff)})
               </span>
             )}
           </div>
@@ -88,7 +86,7 @@ function MacroComparisonCard({
           <div className="text-xs text-muted-foreground mb-1">Proposto</div>
           <div className="flex items-baseline gap-1">
             <span className={`text-lg font-bold ${improved ? 'text-primary' : 'text-foreground'}`}>
-              {proposed}
+              {Math.round(proposed)}
             </span>
             <span className="text-xs text-muted-foreground">{unit}</span>
             {improved && <Check className="w-3 h-3 text-primary" />}
@@ -99,34 +97,48 @@ function MacroComparisonCard({
   );
 }
 
-function AdjustmentItem({ adjustment }: { adjustment: FoodAdjustment }) {
-  const isIncrease = adjustment.newQuantity > adjustment.originalQuantity;
-  const diff = adjustment.newQuantity - adjustment.originalQuantity;
+function AdjustmentItem({ adjustment }: { adjustment: Adjustment }) {
+  const isIncrease = (adjustment.new_quantity || 0) > (adjustment.original_quantity || 0);
+  const diff = (adjustment.new_quantity || 0) - (adjustment.original_quantity || 0);
+
+  const mealNameMap: Record<string, string> = {
+    breakfast: 'Café da Manhã',
+    morning_snack: 'Lanche da Manhã',
+    lunch: 'Almoço',
+    afternoon_snack: 'Lanche da Tarde',
+    dinner: 'Jantar',
+    supper: 'Ceia',
+  };
 
   return (
     <div className="flex items-center gap-3 py-2">
       <div className={`p-1.5 rounded-full ${isIncrease ? 'bg-primary/10' : 'bg-amber-500/10'}`}>
-        {adjustment.isNewItem ? (
-          <Plus className="w-3 h-3 text-primary" />
+        {adjustment.type === 'food_substitution' ? (
+          <ArrowRight className="w-3 h-3 text-blue-500" />
         ) : isIncrease ? (
-          <ChevronUp className="w-3 h-3 text-primary" />
+          <Plus className="w-3 h-3 text-primary" />
         ) : (
-          <ChevronDown className="w-3 h-3 text-amber-500" />
+          <Minus className="w-3 h-3 text-amber-500" />
         )}
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-foreground truncate">{adjustment.foodName}</p>
-        <p className="text-xs text-muted-foreground">{adjustment.mealName}</p>
+        <p className="text-sm font-medium text-foreground truncate">{adjustment.food_name}</p>
+        <p className="text-xs text-muted-foreground">
+          {mealNameMap[adjustment.meal_name] || adjustment.meal_name}
+        </p>
+        {adjustment.reason && (
+          <p className="text-xs text-muted-foreground italic mt-0.5">{adjustment.reason}</p>
+        )}
       </div>
       <div className="text-right">
-        {adjustment.isNewItem ? (
-          <span className="text-sm font-medium text-primary">+{adjustment.newQuantity}g</span>
+        {adjustment.type === 'food_substitution' ? (
+          <span className="text-sm font-medium text-blue-500">→ {adjustment.new_food_name}</span>
         ) : (
           <>
-            <span className="text-xs text-muted-foreground">{adjustment.originalQuantity}g</span>
+            <span className="text-xs text-muted-foreground">{adjustment.original_quantity}g</span>
             <span className="text-sm font-medium text-foreground mx-1">→</span>
             <span className={`text-sm font-medium ${isIncrease ? 'text-primary' : 'text-amber-500'}`}>
-              {adjustment.newQuantity}g
+              {adjustment.new_quantity}g
             </span>
             <span className={`text-xs ml-1 ${isIncrease ? 'text-primary' : 'text-amber-500'}`}>
               ({diff > 0 ? '+' : ''}{diff}g)
@@ -138,25 +150,58 @@ function AdjustmentItem({ adjustment }: { adjustment: FoodAdjustment }) {
   );
 }
 
-export function MacroRebalancer({
+function ProfileBadge({ 
+  profileType, 
+  getLabel, 
+  getColor 
+}: { 
+  profileType: UserProfile;
+  getLabel: (p: UserProfile) => string;
+  getColor: (p: UserProfile) => string;
+}) {
+  const icons: Record<UserProfile, React.ReactNode> = {
+    free: <Lock className="w-3 h-3" />,
+    premium: <Sparkles className="w-3 h-3" />,
+    usuario_pessoal_pago: <Check className="w-3 h-3" />,
+    profissional_vinculado: <Shield className="w-3 h-3" />,
+  };
+
+  return (
+    <Badge variant="outline" className={`${getColor(profileType)} gap-1`}>
+      {icons[profileType]}
+      {getLabel(profileType)}
+    </Badge>
+  );
+}
+
+export function SmartRebalancer({
   planId,
-  targets,
   currentMacros,
+  targetMacros,
+  targetUserId,
   onComplete,
-}: MacroRebalancerProps) {
+}: SmartRebalancerProps) {
   const [showDialog, setShowDialog] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
-  const { loading, proposal, calculateProposal, applyProposal, clearProposal } = useMacroRebalancer();
+  const { 
+    loading, 
+    result, 
+    calculateRebalance, 
+    applyRebalance, 
+    clearResult,
+    getProfileLabel,
+    getProfileColor 
+  } = useRebalancer();
 
   const handleOptimize = async () => {
-    const result = await calculateProposal(planId, targets);
-    if (result) {
+    const data = await calculateRebalance(planId, targetUserId);
+    if (data) {
       setShowDialog(true);
     }
   };
 
   const handleConfirm = async () => {
-    const success = await applyProposal(planId);
+    const success = await applyRebalance(planId, targetUserId);
     if (success) {
       setShowDialog(false);
       onComplete();
@@ -164,18 +209,14 @@ export function MacroRebalancer({
   };
 
   const handleCancel = () => {
-    clearProposal();
+    clearResult();
     setShowDialog(false);
     setShowDetails(false);
   };
 
-  const hasAdjustments = proposal && 
-    (proposal.adjustments.length > 0 || proposal.supplementsAdded.length > 0);
-
-  const needsOptimization = 
-    Math.abs(currentMacros.protein - targets.protein) > 5 ||
-    Math.abs(currentMacros.carbs - targets.carbs) > 10 ||
-    Math.abs(currentMacros.fat - targets.fat) > 5;
+  const hasAdjustments = result && result.adjustments.length > 0;
+  const isBlocked = result?.execution_blocked;
+  const requiresApproval = result?.requires_approval;
 
   return (
     <>
@@ -193,7 +234,7 @@ export function MacroRebalancer({
         ) : (
           <>
             <Sparkles className="w-4 h-4" />
-            Otimizar plano para atingir macros
+            Otimizar plano automaticamente
           </>
         )}
       </Button>
@@ -203,57 +244,119 @@ export function MacroRebalancer({
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Sparkles className="w-5 h-5 text-primary" />
-              Otimização de Macros
+              Rebalanceador Automático
             </DialogTitle>
             <DialogDescription>
-              Análise e proposta de ajustes para atingir suas metas diárias
+              Análise e proposta de ajustes baseada no seu perfil
             </DialogDescription>
           </DialogHeader>
 
-          {proposal && (
+          {result && (
             <div className="space-y-4">
+              {/* Profile Badge */}
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Seu perfil:</span>
+                <ProfileBadge 
+                  profileType={result.profile_type} 
+                  getLabel={getProfileLabel}
+                  getColor={getProfileColor}
+                />
+              </div>
+
+              {/* Warnings */}
+              {result.warnings.length > 0 && (
+                <Alert variant="destructive" className="bg-amber-500/10 border-amber-500/20">
+                  <AlertCircle className="h-4 w-4 text-amber-500" />
+                  <AlertDescription className="text-amber-700 dark:text-amber-300">
+                    {result.warnings.map((w, i) => (
+                      <p key={i} className="text-sm">{w}</p>
+                    ))}
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {/* Blocked Message */}
+              {isBlocked && (
+                <Alert className="bg-muted/50">
+                  <Lock className="h-4 w-4" />
+                  <AlertDescription>
+                    <p className="font-medium">{result.block_reason}</p>
+                    {result.profile_type === 'free' && (
+                      <p className="text-xs mt-1 text-muted-foreground">
+                        Faça upgrade para ter acesso ao rebalanceamento automático.
+                      </p>
+                    )}
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {/* Requires Approval */}
+              {requiresApproval && !isBlocked && (
+                <Alert className="bg-blue-500/10 border-blue-500/20">
+                  <Shield className="h-4 w-4 text-blue-500" />
+                  <AlertDescription className="text-blue-700 dark:text-blue-300">
+                    Os ajustes propostos requerem aprovação do profissional.
+                  </AlertDescription>
+                </Alert>
+              )}
+
               {/* Macro Comparison */}
               <div className="space-y-2">
                 <MacroComparisonCard
                   label="Proteína"
-                  current={proposal.currentMacros.protein}
-                  target={proposal.targetMacros.protein}
-                  proposed={proposal.proposedMacros.protein}
+                  current={result.current_macros.protein}
+                  target={result.target_macros.protein}
+                  proposed={result.proposed_macros.protein}
                   colorClass="text-protein"
                 />
                 <MacroComparisonCard
                   label="Carboidrato"
-                  current={proposal.currentMacros.carbs}
-                  target={proposal.targetMacros.carbs}
-                  proposed={proposal.proposedMacros.carbs}
+                  current={result.current_macros.carbs}
+                  target={result.target_macros.carbs}
+                  proposed={result.proposed_macros.carbs}
                   colorClass="text-carbs"
                 />
                 <MacroComparisonCard
                   label="Gordura"
-                  current={proposal.currentMacros.fat}
-                  target={proposal.targetMacros.fat}
-                  proposed={proposal.proposedMacros.fat}
+                  current={result.current_macros.fat}
+                  target={result.target_macros.fat}
+                  proposed={result.proposed_macros.fat}
                   colorClass="text-fat"
                 />
                 <MacroComparisonCard
                   label="Calorias"
-                  current={proposal.currentMacros.calories}
-                  target={proposal.targetMacros.calories}
-                  proposed={proposal.proposedMacros.calories}
+                  current={result.current_macros.calories}
+                  target={result.target_macros.calories}
+                  proposed={result.proposed_macros.calories}
                   unit="kcal"
                   colorClass="text-primary"
                 />
               </div>
 
+              {/* Justification */}
+              {result.justification && (
+                <div className="p-3 rounded-xl bg-muted/50">
+                  <div className="flex items-start gap-2">
+                    <Info className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                    <div>
+                      <p className="text-sm font-medium text-foreground mb-1">Justificativa</p>
+                      <p className="text-xs text-muted-foreground whitespace-pre-line">
+                        {result.justification}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Adjustments Summary */}
-              {hasAdjustments ? (
+              {hasAdjustments && !isBlocked ? (
                 <div className="space-y-3">
                   <button
                     onClick={() => setShowDetails(!showDetails)}
                     className="w-full flex items-center justify-between p-3 rounded-xl bg-muted/50 hover:bg-muted transition-colors"
                   >
                     <span className="text-sm font-medium text-foreground">
-                      {proposal.adjustments.length + proposal.supplementsAdded.length} alterações propostas
+                      {result.adjustments.length} alterações propostas
                     </span>
                     {showDetails ? (
                       <ChevronUp className="w-4 h-4 text-muted-foreground" />
@@ -270,41 +373,16 @@ export function MacroRebalancer({
                         exit={{ height: 0, opacity: 0 }}
                         className="overflow-hidden"
                       >
-                        <div className="space-y-4 pt-2">
-                          {/* Step 1: Food Adjustments */}
-                          {proposal.adjustments.length > 0 && (
-                            <div>
-                              <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-                                Etapa 1 — Ajuste de porções
-                              </h4>
-                              <div className="divide-y divide-border">
-                                {proposal.adjustments.map((adj, i) => (
-                                  <AdjustmentItem key={i} adjustment={adj} />
-                                ))}
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Step 2: Supplements */}
-                          {proposal.supplementsAdded.length > 0 && (
-                            <div>
-                              <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 flex items-center gap-1">
-                                <Beaker className="w-3 h-3" />
-                                Etapa 2 — Suplementação
-                              </h4>
-                              <div className="divide-y divide-border">
-                                {proposal.supplementsAdded.map((supp, i) => (
-                                  <AdjustmentItem key={i} adjustment={supp} />
-                                ))}
-                              </div>
-                            </div>
-                          )}
+                        <div className="divide-y divide-border">
+                          {result.adjustments.map((adj, i) => (
+                            <AdjustmentItem key={i} adjustment={adj} />
+                          ))}
                         </div>
                       </motion.div>
                     )}
                   </AnimatePresence>
                 </div>
-              ) : (
+              ) : !isBlocked && (
                 <div className="flex items-center gap-3 p-4 rounded-xl bg-primary/5 border border-primary/20">
                   <Check className="w-5 h-5 text-primary flex-shrink-0" />
                   <div>
@@ -318,21 +396,11 @@ export function MacroRebalancer({
                 </div>
               )}
 
-              {/* Remaining deficits warning */}
-              {(proposal.deficits.protein > 5 || proposal.deficits.carbs > 10 || proposal.deficits.fat > 5) && (
-                <div className="flex items-start gap-3 p-4 rounded-xl bg-amber-500/10 border border-amber-500/20">
-                  <AlertCircle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
-                  <div>
-                    <p className="text-sm font-medium text-foreground">
-                      Alguns déficits não puderam ser completamente corrigidos
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {proposal.deficits.protein > 5 && `Proteína: -${proposal.deficits.protein}g `}
-                      {proposal.deficits.carbs > 10 && `Carbs: -${proposal.deficits.carbs}g `}
-                      {proposal.deficits.fat > 5 && `Gordura: -${proposal.deficits.fat}g`}
-                    </p>
-                  </div>
-                </div>
+              {/* Adherence Impact */}
+              {result.adherence_impact && (
+                <p className="text-xs text-muted-foreground text-center">
+                  {result.adherence_impact}
+                </p>
               )}
             </div>
           )}
@@ -340,9 +408,9 @@ export function MacroRebalancer({
           <DialogFooter className="gap-2 sm:gap-0">
             <Button variant="outline" onClick={handleCancel} disabled={loading}>
               <X className="w-4 h-4 mr-2" />
-              Cancelar
+              {isBlocked ? 'Fechar' : 'Cancelar'}
             </Button>
-            {hasAdjustments && (
+            {hasAdjustments && !isBlocked && !requiresApproval && (
               <Button onClick={handleConfirm} disabled={loading}>
                 {loading ? (
                   <>
@@ -355,6 +423,12 @@ export function MacroRebalancer({
                     Confirmar alterações
                   </>
                 )}
+              </Button>
+            )}
+            {requiresApproval && !isBlocked && (
+              <Button disabled>
+                <Shield className="w-4 h-4 mr-2" />
+                Aguardando aprovação
               </Button>
             )}
           </DialogFooter>
