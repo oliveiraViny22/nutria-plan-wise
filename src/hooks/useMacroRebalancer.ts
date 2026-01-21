@@ -150,17 +150,24 @@ export function useMacroRebalancer() {
 
       const typedMeals = (meals || []) as unknown as Meal[];
 
-      // Flatten meal option foods for processing
+      // CORREÇÃO: Flatten APENAS a primeira opção (option_number = 1) de cada refeição
+      // O rebalanceamento deve considerar apenas os alimentos da opção principal de cada refeição
       const allMealOptionFoods: (MealOptionFood & { mealId: string; mealName: string; mealOptionId: string })[] = [];
       
       for (const meal of typedMeals) {
-        for (const option of meal.meal_options || []) {
-          for (const mof of option.meal_option_foods || []) {
+        // Encontra a primeira opção (option_number = 1 ou a menor disponível)
+        const sortedOptions = [...(meal.meal_options || [])].sort(
+          (a, b) => a.option_number - b.option_number
+        );
+        const firstOption = sortedOptions[0];
+        
+        if (firstOption) {
+          for (const mof of firstOption.meal_option_foods || []) {
             allMealOptionFoods.push({
               ...mof,
               mealId: meal.id,
               mealName: meal.name,
-              mealOptionId: option.id,
+              mealOptionId: firstOption.id,
             });
           }
         }
@@ -174,7 +181,7 @@ export function useMacroRebalancer() {
 
       const supplements = (supplementsData || []) as Food[];
 
-      // Calculate current macros from first option of each meal
+      // Calculate current macros APENAS da primeira opção de cada refeição
       let currentProtein = 0;
       let currentCarbs = 0;
       let currentFat = 0;
