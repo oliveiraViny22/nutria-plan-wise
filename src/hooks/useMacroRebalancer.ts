@@ -150,20 +150,45 @@ export function useMacroRebalancer() {
 
       const typedMeals = (meals || []) as unknown as Meal[];
 
-      // CORREÇÃO: Flatten APENAS a primeira opção (option_number = 1) de cada refeição
-      // O rebalanceamento deve considerar apenas os alimentos da opção principal de cada refeição
-      const allMealOptionFoods: (MealOptionFood & { mealId: string; mealName: string; mealOptionId: string })[] = [];
+      // Estrutura para armazenar alimentos de TODAS as opções (para rebalanceamento)
+      // Inclui informação de option_number para manter a equivalência
+      const allMealOptionFoods: (MealOptionFood & { 
+        mealId: string; 
+        mealName: string; 
+        mealOptionId: string;
+        optionNumber: number;
+      })[] = [];
+      
+      // Estrutura para armazenar alimentos apenas da PRIMEIRA opção (para cálculo de calorias diárias)
+      const firstOptionFoods: (MealOptionFood & { 
+        mealId: string; 
+        mealName: string; 
+        mealOptionId: string;
+      })[] = [];
       
       for (const meal of typedMeals) {
-        // Encontra a primeira opção (option_number = 1 ou a menor disponível)
         const sortedOptions = [...(meal.meal_options || [])].sort(
           (a, b) => a.option_number - b.option_number
         );
-        const firstOption = sortedOptions[0];
         
+        // Coleta TODAS as opções para rebalanceamento
+        for (const option of sortedOptions) {
+          for (const mof of option.meal_option_foods || []) {
+            allMealOptionFoods.push({
+              ...mof,
+              mealId: meal.id,
+              mealName: meal.name,
+              mealOptionId: option.id,
+              optionNumber: option.option_number,
+            });
+          }
+        }
+        
+        // Coleta apenas a primeira opção para cálculo de calorias diárias
+        const firstOption = sortedOptions[0];
         if (firstOption) {
           for (const mof of firstOption.meal_option_foods || []) {
-            allMealOptionFoods.push({
+            firstOptionFoods.push({
               ...mof,
               mealId: meal.id,
               mealName: meal.name,
@@ -182,12 +207,13 @@ export function useMacroRebalancer() {
       const supplements = (supplementsData || []) as Food[];
 
       // Calculate current macros APENAS da primeira opção de cada refeição
+      // (as opções são equivalentes, então basta usar uma)
       let currentProtein = 0;
       let currentCarbs = 0;
       let currentFat = 0;
       let currentCalories = 0;
 
-      for (const mof of allMealOptionFoods) {
+      for (const mof of firstOptionFoods) {
         const food = mof.food;
         const qty = mof.quantity_grams;
         const nutrients = calcNutrients(food, qty);
@@ -236,9 +262,10 @@ export function useMacroRebalancer() {
       };
 
       // STEP 1: Adjust existing food quantities
+      // Os ajustes são feitos em TODAS as opções para manter a equivalência
       const adjustForMacro = (
         deficit: number,
-        foods: (MealOptionFood & { mealId: string; mealName: string; mealOptionId: string })[],
+        foods: (MealOptionFood & { mealId: string; mealName: string; mealOptionId: string; optionNumber: number })[],
         macroKey: 'protein' | 'carbs' | 'fat',
         maxIncreasePct: number = 0.5
       ): number => {
@@ -246,7 +273,11 @@ export function useMacroRebalancer() {
 
         let remaining = deficit;
         
-        const sorted = [...foods].sort((a, b) => {
+        // Agrupar por food_id + mealId para ajustar o mesmo alimento em todas as opções
+        // Usamos apenas a primeira opção para calcular o déficit, mas aplicamos em todas
+        const firstOptionFoodsForAdjust = foods.filter(f => f.optionNumber === 1);
+        
+        const sorted = [...firstOptionFoodsForAdjust].sort((a, b) => {
           const baseA = parseServingGrams(a.food.serving_size);
           const baseB = parseServingGrams(b.food.serving_size);
           return (b.food[macroKey] / baseB) - (a.food[macroKey] / baseA);
@@ -273,7 +304,9 @@ export function useMacroRebalancer() {
 
           const oldNutrients = calcNutrients(food, currentQty);
           const newNutrients = calcNutrients(food, newQty);
+          const percentChange = newQty / currentQty;
 
+          // Adiciona ajuste para a opção 1 (para exibição)
           adjustments.push({
             mealOptionFoodId: mof.id,
             mealId: mof.mealId,
@@ -291,6 +324,37 @@ export function useMacroRebalancer() {
               calories: Math.round(newNutrients.calories - oldNutrients.calories),
             },
           });
+
+          // Propaga ajuste para as demais opções (mesma refeição, mesmo alimento)
+          const equivalentFoods = foods.filter(
+            f => f.mealId === mof.mealId && 
+                 f.food_id === mof.food_id && 
+                 f.optionNumber !== 1
+          );
+          
+          for (const eqFood of equivalentFoods) {
+            const eqNewQty = Math.round(eqFood.quantity_grams * percentChange);
+            const eqOldNutrients = calcNutrients(eqFood.food, eqFood.quantity_grams);
+            const eqNewNutrients = calcNutrients(eqFood.food, eqNewQty);
+            
+            adjustments.push({
+              mealOptionFoodId: eqFood.id,
+              mealId: eqFood.mealId,
+              mealOptionId: eqFood.mealOptionId,
+              mealName: mealNameMap[eqFood.mealName] || eqFood.mealName,
+              foodName: eqFood.food.name,
+              foodId: eqFood.food.id,
+              originalQuantity: Math.round(eqFood.quantity_grams),
+              newQuantity: eqNewQty,
+              isNewItem: false,
+              macroChange: {
+                protein: Math.round(eqNewNutrients.protein - eqOldNutrients.protein),
+                carbs: Math.round(eqNewNutrients.carbs - eqOldNutrients.carbs),
+                fat: Math.round(eqNewNutrients.fat - eqOldNutrients.fat),
+                calories: Math.round(eqNewNutrients.calories - eqOldNutrients.calories),
+              },
+            });
+          }
         }
 
         return Math.max(0, remaining);
@@ -304,7 +368,7 @@ export function useMacroRebalancer() {
       // Handle excesses
       const reduceForMacro = (
         excess: number,
-        foods: (MealOptionFood & { mealId: string; mealName: string; mealOptionId: string })[],
+        foods: (MealOptionFood & { mealId: string; mealName: string; mealOptionId: string; optionNumber: number })[],
         macroKey: 'protein' | 'carbs' | 'fat',
         maxDecreasePct: number = 0.3
       ): number => {
@@ -312,7 +376,10 @@ export function useMacroRebalancer() {
 
         let remaining = excess;
         
-        const sorted = [...foods].sort((a, b) => {
+        // Usar apenas a primeira opção para calcular a redução
+        const firstOptionFoodsForReduce = foods.filter(f => f.optionNumber === 1);
+        
+        const sorted = [...firstOptionFoodsForReduce].sort((a, b) => {
           const baseA = parseServingGrams(a.food.serving_size);
           const baseB = parseServingGrams(b.food.serving_size);
           return (a.food[macroKey] / baseA) - (b.food[macroKey] / baseB);
@@ -342,7 +409,9 @@ export function useMacroRebalancer() {
 
           const oldNutrients = calcNutrients(food, currentQty);
           const newNutrients = calcNutrients(food, newQty);
+          const percentChange = newQty / currentQty;
 
+          // Adiciona ajuste para a opção 1 (para exibição)
           adjustments.push({
             mealOptionFoodId: mof.id,
             mealId: mof.mealId,
@@ -360,6 +429,37 @@ export function useMacroRebalancer() {
               calories: Math.round(newNutrients.calories - oldNutrients.calories),
             },
           });
+
+          // Propaga ajuste para as demais opções (mesma refeição, mesmo alimento)
+          const equivalentFoods = foods.filter(
+            f => f.mealId === mof.mealId && 
+                 f.food_id === mof.food_id && 
+                 f.optionNumber !== 1
+          );
+          
+          for (const eqFood of equivalentFoods) {
+            const eqNewQty = Math.max(10, Math.round(eqFood.quantity_grams * percentChange));
+            const eqOldNutrients = calcNutrients(eqFood.food, eqFood.quantity_grams);
+            const eqNewNutrients = calcNutrients(eqFood.food, eqNewQty);
+            
+            adjustments.push({
+              mealOptionFoodId: eqFood.id,
+              mealId: eqFood.mealId,
+              mealOptionId: eqFood.mealOptionId,
+              mealName: mealNameMap[eqFood.mealName] || eqFood.mealName,
+              foodName: eqFood.food.name,
+              foodId: eqFood.food.id,
+              originalQuantity: Math.round(eqFood.quantity_grams),
+              newQuantity: eqNewQty,
+              isNewItem: false,
+              macroChange: {
+                protein: Math.round(eqNewNutrients.protein - eqOldNutrients.protein),
+                carbs: Math.round(eqNewNutrients.carbs - eqOldNutrients.carbs),
+                fat: Math.round(eqNewNutrients.fat - eqOldNutrients.fat),
+                calories: Math.round(eqNewNutrients.calories - eqOldNutrients.calories),
+              },
+            });
+          }
         }
 
         return Math.max(0, remaining);
@@ -391,10 +491,38 @@ export function useMacroRebalancer() {
         (s.fat > 80 && s.protein < 5 && s.carbs < 5)
       );
 
-      // Get a snack meal option for supplements
+      // Get a snack meal option for supplements - adicionar em TODAS as opções da refeição
       const snackMeal = typedMeals.find((m) => m.name === 'snack');
       const targetMealForSupplements = snackMeal || typedMeals[typedMeals.length - 1];
-      const targetOption = targetMealForSupplements?.meal_options?.[0];
+      const allTargetOptions = targetMealForSupplements?.meal_options || [];
+      const targetOption = allTargetOptions[0]; // Primeira opção para cálculo
+
+      // Helper para adicionar suplemento em todas as opções
+      const addSupplementToAllOptions = (
+        supplement: Food,
+        roundedGrams: number,
+        nutrients: { calories: number; protein: number; carbs: number; fat: number }
+      ) => {
+        for (const option of allTargetOptions) {
+          supplementsAdded.push({
+            mealOptionFoodId: '',
+            mealId: targetMealForSupplements.id,
+            mealOptionId: option.id,
+            mealName: mealNameMap[targetMealForSupplements.name] || targetMealForSupplements.name,
+            foodName: supplement.name,
+            foodId: supplement.id,
+            originalQuantity: 0,
+            newQuantity: roundedGrams,
+            isNewItem: true,
+            macroChange: {
+              protein: Math.round(nutrients.protein),
+              carbs: Math.round(nutrients.carbs),
+              fat: Math.round(nutrients.fat),
+              calories: Math.round(nutrients.calories),
+            },
+          });
+        }
+      };
 
       if (proteinDeficit > 5 && wheyProtein && targetOption) {
         const baseGrams = parseServingGrams(wheyProtein.serving_size);
@@ -405,23 +533,7 @@ export function useMacroRebalancer() {
         const nutrients = calcNutrients(wheyProtein, roundedGrams);
         proteinDeficit -= nutrients.protein;
 
-        supplementsAdded.push({
-          mealOptionFoodId: '',
-          mealId: targetMealForSupplements.id,
-          mealOptionId: targetOption.id,
-          mealName: mealNameMap[targetMealForSupplements.name] || targetMealForSupplements.name,
-          foodName: wheyProtein.name,
-          foodId: wheyProtein.id,
-          originalQuantity: 0,
-          newQuantity: roundedGrams,
-          isNewItem: true,
-          macroChange: {
-            protein: Math.round(nutrients.protein),
-            carbs: Math.round(nutrients.carbs),
-            fat: Math.round(nutrients.fat),
-            calories: Math.round(nutrients.calories),
-          },
-        });
+        addSupplementToAllOptions(wheyProtein, roundedGrams, nutrients);
       }
 
       if (carbsDeficit > 10 && maltodextrin && targetOption) {
@@ -433,23 +545,7 @@ export function useMacroRebalancer() {
         const nutrients = calcNutrients(maltodextrin, roundedGrams);
         carbsDeficit -= nutrients.carbs;
 
-        supplementsAdded.push({
-          mealOptionFoodId: '',
-          mealId: targetMealForSupplements.id,
-          mealOptionId: targetOption.id,
-          mealName: mealNameMap[targetMealForSupplements.name] || targetMealForSupplements.name,
-          foodName: maltodextrin.name,
-          foodId: maltodextrin.id,
-          originalQuantity: 0,
-          newQuantity: roundedGrams,
-          isNewItem: true,
-          macroChange: {
-            protein: Math.round(nutrients.protein),
-            carbs: Math.round(nutrients.carbs),
-            fat: Math.round(nutrients.fat),
-            calories: Math.round(nutrients.calories),
-          },
-        });
+        addSupplementToAllOptions(maltodextrin, roundedGrams, nutrients);
       }
 
       if (fatDeficit > 5 && mctoil && targetOption) {
@@ -461,32 +557,32 @@ export function useMacroRebalancer() {
         const nutrients = calcNutrients(mctoil, roundedGrams);
         fatDeficit -= nutrients.fat;
 
-        supplementsAdded.push({
-          mealOptionFoodId: '',
-          mealId: targetMealForSupplements.id,
-          mealOptionId: targetOption.id,
-          mealName: mealNameMap[targetMealForSupplements.name] || targetMealForSupplements.name,
-          foodName: mctoil.name,
-          foodId: mctoil.id,
-          originalQuantity: 0,
-          newQuantity: roundedGrams,
-          isNewItem: true,
-          macroChange: {
-            protein: Math.round(nutrients.protein),
-            carbs: Math.round(nutrients.carbs),
-            fat: Math.round(nutrients.fat),
-            calories: Math.round(nutrients.calories),
-          },
-        });
+        addSupplementToAllOptions(mctoil, roundedGrams, nutrients);
       }
 
-      // Calculate proposed macros
+      // Calculate proposed macros - usar apenas ajustes da PRIMEIRA OPÇÃO (optionNumber = 1)
+      // para evitar somar macros de todas as opções equivalentes
       let proposedProtein = currentProtein;
       let proposedCarbs = currentCarbs;
       let proposedFat = currentFat;
       let proposedCalories = currentCalories;
 
-      for (const adj of [...adjustments, ...supplementsAdded]) {
+      // Filtrar ajustes apenas da primeira opção de cada refeição para cálculo de macros propostos
+      const firstOptionAdjustments = adjustments.filter(adj => {
+        const meal = typedMeals.find(m => m.id === adj.mealId);
+        if (!meal) return false;
+        const sortedOpts = [...(meal.meal_options || [])].sort((a, b) => a.option_number - b.option_number);
+        return sortedOpts[0]?.id === adj.mealOptionId;
+      });
+
+      const firstOptionSupplements = supplementsAdded.filter(supp => {
+        const meal = typedMeals.find(m => m.id === supp.mealId);
+        if (!meal) return false;
+        const sortedOpts = [...(meal.meal_options || [])].sort((a, b) => a.option_number - b.option_number);
+        return sortedOpts[0]?.id === supp.mealOptionId;
+      });
+
+      for (const adj of [...firstOptionAdjustments, ...firstOptionSupplements]) {
         proposedProtein += adj.macroChange.protein;
         proposedCarbs += adj.macroChange.carbs;
         proposedFat += adj.macroChange.fat;
