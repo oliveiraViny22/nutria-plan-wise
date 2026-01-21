@@ -1142,40 +1142,89 @@ export default function Admin() {
           {/* Aba Alimentos */}
           <TabsContent value="foods">
             <div className="space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Upload className="h-5 w-5 text-primary" />
-                    Importar Alimentos
-                  </CardTitle>
-                  <CardDescription>
-                    Importe alimentos de arquivos Excel (.xls, .xlsx) ou texto (.csv, .txt).
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex flex-wrap items-center gap-4">
-                    <Input
-                      ref={fileInputRef}
-                      type="file"
-                      accept=".xls,.xlsx,.csv,.txt"
-                      onChange={handleFileUpload}
-                      className="max-w-md"
-                    />
-                    <Button variant="outline" onClick={downloadTemplate}>
-                      <Download className="h-4 w-4 mr-2" />
-                      Baixar Modelo
-                    </Button>
-                    <Button variant="outline" onClick={handleDownloadFoods} disabled={downloadingFoods}>
-                      {downloadingFoods ? (
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      ) : (
-                        <Download className="h-4 w-4 mr-2" />
-                      )}
-                      Exportar Banco de Alimentos
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
+              {/* Import and History Cards Side by Side */}
+              <div className="grid gap-6 lg:grid-cols-2">
+                <Card className="h-fit">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Upload className="h-5 w-5 text-primary" />
+                      Importar Alimentos
+                    </CardTitle>
+                    <CardDescription>
+                      Importe alimentos de arquivos Excel (.xls, .xlsx) ou texto (.csv, .txt).
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="flex flex-col gap-3">
+                      <Input
+                        ref={fileInputRef}
+                        type="file"
+                        accept=".xls,.xlsx,.csv,.txt"
+                        onChange={handleFileUpload}
+                        className="w-full"
+                      />
+                      <div className="flex flex-wrap gap-2">
+                        <Button variant="outline" size="sm" onClick={downloadTemplate}>
+                          <Download className="h-4 w-4 mr-2" />
+                          Baixar Modelo
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={handleDownloadFoods} disabled={downloadingFoods}>
+                          {downloadingFoods ? (
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          ) : (
+                            <Download className="h-4 w-4 mr-2" />
+                          )}
+                          Exportar Banco
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Food Imports History */}
+                <Card className="h-fit">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <History className="h-5 w-5 text-primary" />
+                      Histórico de Importações
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {foodImports.length === 0 ? (
+                      <p className="text-muted-foreground text-center py-6">
+                        Nenhuma importação registrada.
+                      </p>
+                    ) : (
+                      <ScrollArea className="h-[180px]">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="w-[40%]">Arquivo</TableHead>
+                              <TableHead className="w-[20%]">Status</TableHead>
+                              <TableHead className="w-[20%] text-right">Qtd.</TableHead>
+                              <TableHead className="w-[20%] text-right">Data</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {foodImports.map((imp) => (
+                              <TableRow key={imp.id}>
+                                <TableCell className="font-medium truncate max-w-[150px]">{imp.filename}</TableCell>
+                                <TableCell>
+                                  <Badge variant={imp.status === 'completed' ? 'default' : 'secondary'} className="text-xs">
+                                    {imp.status}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell className="text-right text-sm">{imp.imported_rows}/{imp.total_rows}</TableCell>
+                                <TableCell className="text-right text-sm">{new Date(imp.created_at).toLocaleDateString('pt-BR')}</TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </ScrollArea>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
 
 
               {/* Foods Management Table */}
@@ -1253,38 +1302,39 @@ export default function Admin() {
                   ) : (
                     <>
                       <ScrollArea className="h-[400px]">
-                        <Table>
+                        <Table className="table-fixed">
                           <TableHeader>
                             <TableRow>
-                              <TableHead className="w-[250px]">Nome</TableHead>
-                              <TableHead>Categoria</TableHead>
-                              <TableHead>Processamento</TableHead>
-                              <TableHead className="text-right">Calorias</TableHead>
-                              <TableHead className="text-right">Proteína</TableHead>
-                              <TableHead className="text-right">Carbos</TableHead>
-                              <TableHead className="text-right">Gordura</TableHead>
-                              <TableHead className="text-center">Ações</TableHead>
+                              <TableHead className="w-[22%]">Nome</TableHead>
+                              <TableHead className="w-[15%]">Categoria</TableHead>
+                              <TableHead className="w-[15%]">Processamento</TableHead>
+                              <TableHead className="w-[10%] text-right">Calorias</TableHead>
+                              <TableHead className="w-[10%] text-right">Prot.</TableHead>
+                              <TableHead className="w-[10%] text-right">Carbs</TableHead>
+                              <TableHead className="w-[10%] text-right">Gord.</TableHead>
+                              <TableHead className="w-[8%] text-center">Ações</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
                             {foods.map((food) => (
                               <TableRow key={food.id}>
-                                <TableCell className="font-medium">{food.name}</TableCell>
+                                <TableCell className="font-medium truncate" title={food.name}>{food.name}</TableCell>
                                 <TableCell>
-                                  <Badge variant="outline">{food.category || 'Sem categoria'}</Badge>
+                                  <Badge variant="outline" className="text-xs truncate max-w-full">{food.category || '-'}</Badge>
                                 </TableCell>
                                 <TableCell>
-                                  <Badge variant="secondary">{food.processing_level || 'N/A'}</Badge>
+                                  <Badge variant="secondary" className="text-xs truncate max-w-full">{food.processing_level || '-'}</Badge>
                                 </TableCell>
-                                <TableCell className="text-right">{food.calories} kcal</TableCell>
-                                <TableCell className="text-right">{food.protein}g</TableCell>
-                                <TableCell className="text-right">{food.carbs}g</TableCell>
-                                <TableCell className="text-right">{food.fat}g</TableCell>
-                                <TableCell className="text-center">
-                                  <div className="flex items-center justify-center gap-1">
+                                <TableCell className="text-right tabular-nums">{food.calories}</TableCell>
+                                <TableCell className="text-right tabular-nums">{food.protein}g</TableCell>
+                                <TableCell className="text-right tabular-nums">{food.carbs}g</TableCell>
+                                <TableCell className="text-right tabular-nums">{food.fat}g</TableCell>
+                                <TableCell>
+                                  <div className="flex items-center justify-center gap-0.5">
                                     <Button
                                       variant="ghost"
                                       size="icon"
+                                      className="h-8 w-8"
                                       onClick={() => {
                                         setEditingFood(food);
                                         setEditedFoodData({
@@ -1304,6 +1354,7 @@ export default function Admin() {
                                     <Button
                                       variant="ghost"
                                       size="icon"
+                                      className="h-8 w-8"
                                       onClick={() => setDeletingFoodId(food.id)}
                                       disabled={savingKeys.has(`food_${food.id}`)}
                                     >
@@ -1359,48 +1410,6 @@ export default function Admin() {
                         </div>
                       </div>
                     </>
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* Food Imports History */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <History className="h-5 w-5 text-primary" />
-                    Histórico de Importações
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {foodImports.length === 0 ? (
-                    <p className="text-muted-foreground text-center py-8">
-                      Nenhuma importação registrada.
-                    </p>
-                  ) : (
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Arquivo</TableHead>
-                          <TableHead>Status</TableHead>
-                          <TableHead>Importados</TableHead>
-                          <TableHead>Data</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {foodImports.map((imp) => (
-                          <TableRow key={imp.id}>
-                            <TableCell>{imp.filename}</TableCell>
-                            <TableCell>
-                              <Badge variant={imp.status === 'completed' ? 'default' : 'secondary'}>
-                                {imp.status}
-                              </Badge>
-                            </TableCell>
-                            <TableCell>{imp.imported_rows}/{imp.total_rows}</TableCell>
-                            <TableCell>{new Date(imp.created_at).toLocaleDateString('pt-BR')}</TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
                   )}
                 </CardContent>
               </Card>
