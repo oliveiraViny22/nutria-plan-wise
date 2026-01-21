@@ -515,58 +515,43 @@ serve(async (req) => {
       );
     }
 
-    // Get user permissions and plan info
-    const { data: permissionsData } = await supabase.rpc('get_user_permissions', { _user_id: user.id });
-    const permissions = permissionsData?.[0] || { plan_name: 'gratuito', is_linked_to_professional: false, user_type: 'usuario', can_use_ai: false };
-    const planName = permissions.plan_name || 'gratuito';
-    const userType = permissions.user_type || 'usuario';
-    const isLinkedToProfessional = permissions.is_linked_to_professional || false;
-    const canUseAI = permissions.can_use_ai || false;
+    // Get user plan info using v2 RPC
+    const { data: planData } = await supabase.rpc('get_user_plan', { _user_id: user.id });
+    const plan = planData?.[0] || { 
+      plan_name: 'Gratuito', 
+      plan_type: 'gratuito', 
+      has_chat: true,
+      chat_messages_per_day: 3,
+    };
+    const planName = plan.plan_name?.toLowerCase() || 'gratuito';
+    const planType = plan.plan_type || 'gratuito';
+    
+    // Determine user type based on plan
+    const userType = planType === 'profissional' ? 'profissional' : 'usuario';
+    const isLinkedToProfessional = false; // V2: professional features dormant
 
-    logStep("User permissions fetched", { planName, userType, isLinkedToProfessional, canUseAI });
+    logStep("User plan fetched", { planName, planType, userType, hasChat: plan.has_chat });
 
-    // Block AI access if user doesn't have permission (includes checking grace period for linked students)
-    if (!canUseAI) {
+    // Check if chat is available for this plan
+    if (!plan.has_chat) {
       return createErrorResponse(
-        "Você não tem acesso à IA neste momento. Verifique seu plano ou entre em contato com seu nutricionista.",
+        "O chat não está disponível no seu plano atual.",
         403,
         corsHeaders,
         { upgradeRequired: true, planName }
       );
     }
 
-    // For linked students, also check student access level (handles grace period/suspended states)
-    if (isLinkedToProfessional) {
-      const { data: accessData } = await supabase.rpc('get_student_access_level', { _student_id: user.id });
-      const access = accessData?.[0];
-      
-      if (access && !access.can_use_chat) {
-        const message = access.access_level === 'suspended'
-          ? "Seu acesso está suspenso. Entre em contato com seu nutricionista."
-          : "O chat está temporariamente indisponível. Você pode continuar visualizando seu plano alimentar.";
-        
-        return createErrorResponse(
-          message,
-          403,
-          corsHeaders,
-          { 
-            accessLevel: access.access_level,
-            professionalStatus: access.professional_status
-          }
-        );
-      }
-    }
-
-    // Validate chat usage limit
-    const { data: limitData } = await supabase.rpc('check_feature_limit', {
+    // Validate chat usage limit using v2 RPC
+    const { data: usageData } = await supabase.rpc('get_usage_info', {
       _user_id: user.id,
       _feature: 'chat',
     });
     
-    const limitInfo = limitData?.[0];
+    const usageInfo = usageData?.[0];
     
-    if (limitInfo && !limitInfo.allowed) {
-      const limitMessage = LIMIT_MESSAGES[planName] || LIMIT_MESSAGES.gratuito;
+    if (usageInfo && !usageInfo.allowed) {
+      const limitMessage = LIMIT_MESSAGES[planType] || LIMIT_MESSAGES.gratuito;
       
       return createErrorResponse(
         limitMessage,
@@ -574,8 +559,8 @@ serve(async (req) => {
         corsHeaders,
         { 
           upgradeRequired: true,
-          currentUsage: limitInfo.current_usage,
-          maxLimit: limitInfo.max_limit,
+          currentUsage: usageInfo.current_usage,
+          maxLimit: usageInfo.max_limit,
           planName
         }
       );
@@ -657,17 +642,17 @@ serve(async (req) => {
     });
 
     // Get updated usage for response
-    const { data: updatedLimitData } = await supabase.rpc('check_feature_limit', {
+    const { data: updatedUsageData } = await supabase.rpc('get_usage_info', {
       _user_id: user.id,
       _feature: 'chat',
     });
-    const updatedLimit = updatedLimitData?.[0];
+    const updatedUsage = updatedUsageData?.[0];
 
     return createSuccessResponse({ 
       message: assistantMessage,
       usage: {
-        current: updatedLimit?.current_usage || 0,
-        limit: updatedLimit?.max_limit || 0,
+        current: updatedUsage?.current_usage || 0,
+        limit: updatedUsage?.max_limit || 0,
       },
       planName,
       userType,
