@@ -1119,11 +1119,21 @@ export default function Admin() {
                       <CardContent className="flex-1 space-y-4">
                         {categorySettings.map((setting) => {
                           const settingLabels: Record<string, string> = {
-                            'enable_chat_feature': 'Chat com IA',
+                            'enable_chat_feature': 'Chat com IA (Legado)',
                             'ai_model_default': 'Modelo de IA Padrão',
                             'max_diet_plans_per_user': 'Máx. Planos por Usuário',
                             'enable_meal_substitution': 'Substituição de Refeições',
                             'enable_macro_adjustment': 'Ajuste de Macros',
+                            'enable_professional_signup': 'Cadastro de Profissionais',
+                            'maintenance_mode': 'Modo de Manutenção',
+                            'site_name': 'Nome do Site',
+                            // AI Features
+                            'ai_meal_plan_enabled': 'Geração de Plano Alimentar',
+                            'ai_substitution_explanation_enabled': 'Explicação de Substituições',
+                            'ai_plan_suggestions_enabled': 'Sugestões de Ajustes de Plano',
+                            'ai_food_validation_enabled': 'Validação de Importação de Alimentos',
+                            'ai_food_audit_enabled': 'Auditoria de Classificação de Alimentos',
+                            'ai_nutritional_chat_enabled': 'Chat Nutricional',
                           };
                           
                           return (
