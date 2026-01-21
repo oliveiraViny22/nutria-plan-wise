@@ -2,18 +2,22 @@ import { Link } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Logo } from '@/components/Logo';
+import { ThemeToggleSimple } from '@/components/ThemeToggle';
 
 export default function PrivacyPolicy() {
   return (
     <div className="min-h-screen bg-background">
       <header className="container mx-auto px-4 py-6 flex items-center justify-between">
         <Logo size="lg" />
-        <Link to="/">
-          <Button variant="ghost" size="sm">
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Voltar
-          </Button>
-        </Link>
+        <div className="flex items-center gap-2">
+          <ThemeToggleSimple />
+          <Link to="/">
+            <Button variant="ghost" size="sm">
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Voltar
+            </Button>
+          </Link>
+        </div>
       </header>
 
       <main className="container mx-auto px-4 py-8 max-w-3xl">

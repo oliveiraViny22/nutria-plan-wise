@@ -7,6 +7,7 @@ import { ArrowLeft, Eye, EyeOff, Lock, CheckCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Logo } from '@/components/Logo';
+import { ThemeToggleSimple } from '@/components/ThemeToggle';
 
 const ResetPassword = () => {
   const navigate = useNavigate();
@@ -93,8 +94,11 @@ const ResetPassword = () => {
           className="w-full max-w-md"
         >
           <div className="bg-card rounded-xl sm:rounded-2xl shadow-xl p-5 sm:p-8 text-center">
-            <Logo />
-            <h1 className="text-xl sm:text-2xl font-bold text-foreground mb-3 sm:mb-4 mt-4">
+            <div className="flex items-center justify-between mb-4">
+              <Logo />
+              <ThemeToggleSimple />
+            </div>
+            <h1 className="text-xl sm:text-2xl font-bold text-foreground mb-3 sm:mb-4">
               Link inválido ou expirado
             </h1>
             <p className="text-sm sm:text-base text-muted-foreground mb-4 sm:mb-6">
@@ -154,9 +158,12 @@ const ResetPassword = () => {
         className="w-full max-w-md"
       >
         <div className="bg-card rounded-xl sm:rounded-2xl shadow-xl p-5 sm:p-8">
-          <div className="text-center mb-6 sm:mb-8">
+          <div className="flex items-center justify-between mb-6 sm:mb-8">
             <Logo />
-            <h1 className="text-xl sm:text-2xl font-bold text-foreground mt-4">
+            <ThemeToggleSimple />
+          </div>
+          <div className="text-center">
+            <h1 className="text-xl sm:text-2xl font-bold text-foreground">
               Criar nova senha
             </h1>
             <p className="text-sm sm:text-base text-muted-foreground mt-1.5 sm:mt-2">
