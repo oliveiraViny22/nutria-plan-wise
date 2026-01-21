@@ -1,26 +1,50 @@
 import { useState, useCallback, useEffect } from 'react';
 import { Progress } from '@/components/ui/progress';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { CheckCircle, AlertCircle, XCircle, Loader2 } from 'lucide-react';
+import * as XLSX from 'xlsx';
 
-// Valid food categories and processing levels (must match backend)
+// Categorias válidas de alimentos (deve corresponder ao backend)
 const VALID_CATEGORIES = [
   'frutas', 'hortaliças_folhosas', 'legumes', 'cereais_tubérculos',
   'leguminosas', 'proteínas_animais', 'laticínios', 'óleos_oleaginosas', 'suplementos'
 ];
 
+// Níveis de processamento válidos
 const VALID_PROCESSING_LEVELS = [
   'in_natura', 'minimamente_processado', 'processado', 'ultraprocessado', 'suplemento'
 ];
 
-// Average nutritional values for estimating missing data
+// Valores nutricionais médios para estimar dados ausentes
 const AVERAGE_NUTRITIONAL_VALUES = {
   calories: 150,
   protein: 8,
   carbs: 20,
   fat: 5,
+};
+
+// Mapeamento de cabeçalhos em pt-BR para campos internos
+const HEADER_MAP: Record<string, string> = {
+  'nome': 'name',
+  'name': 'name',
+  'calorias': 'calories',
+  'calories': 'calories',
+  'proteína': 'protein',
+  'proteina': 'protein',
+  'protein': 'protein',
+  'carboidratos': 'carbs',
+  'carbs': 'carbs',
+  'gordura': 'fat',
+  'fat': 'fat',
+  'porção': 'serving_size',
+  'porcao': 'serving_size',
+  'serving_size': 'serving_size',
+  'categoria': 'category',
+  'category': 'category',
+  'nível de processamento': 'processing_level',
+  'nivel de processamento': 'processing_level',
+  'processing_level': 'processing_level',
 };
 
 export interface FoodRow {
@@ -54,10 +78,68 @@ interface FoodImportValidatorProps {
   onCancel: () => void;
 }
 
-function getDelimiterForFile(filename: string): string {
-  const ext = filename.toLowerCase().split('.').pop();
-  if (ext === 'csv') return ',';
-  return '\t';
+function normalizeHeader(header: string): string {
+  const normalized = header.toLowerCase().trim().replace(/[()]/g, '');
+  return HEADER_MAP[normalized] || normalized;
+}
+
+async function parseXlsFile(file: File): Promise<Record<string, unknown>[]> {
+  const arrayBuffer = await file.arrayBuffer();
+  const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+  const firstSheetName = workbook.SheetNames[0];
+  const worksheet = workbook.Sheets[firstSheetName];
+  const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as unknown[][];
+  
+  if (jsonData.length < 2) return [];
+  
+  const headers = (jsonData[0] as string[]).map(h => normalizeHeader(String(h || '')));
+  const rows: Record<string, unknown>[] = [];
+  
+  for (let i = 1; i < jsonData.length; i++) {
+    const rowData = jsonData[i] as unknown[];
+    if (!rowData || rowData.every(cell => cell === null || cell === undefined || cell === '')) continue;
+    
+    const row: Record<string, unknown> = {};
+    headers.forEach((header, index) => {
+      row[header] = rowData[index] ?? '';
+    });
+    rows.push(row);
+  }
+  
+  return rows;
+}
+
+async function parseCsvFile(file: File): Promise<Record<string, unknown>[]> {
+  const text = await file.text();
+  const delimiter = file.name.toLowerCase().endsWith('.csv') ? ';' : '\t';
+  const lines = text.trim().split(/\r?\n/);
+  
+  if (lines.length < 2) return [];
+  
+  const headers = lines[0].split(delimiter).map(h => normalizeHeader(h.trim()));
+  const rows: Record<string, unknown>[] = [];
+  
+  for (let i = 1; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line) continue;
+    
+    const values = line.split(delimiter).map(v => v.trim());
+    const row: Record<string, unknown> = {};
+    headers.forEach((header, index) => {
+      row[header] = values[index] || '';
+    });
+    rows.push(row);
+  }
+  
+  return rows;
+}
+
+async function parseFile(file: File): Promise<Record<string, unknown>[]> {
+  const ext = file.name.toLowerCase().split('.').pop();
+  if (ext === 'xls' || ext === 'xlsx') {
+    return parseXlsFile(file);
+  }
+  return parseCsvFile(file);
 }
 
 export function FoodImportValidator({ file, onValidationComplete, onCancel }: FoodImportValidatorProps) {
@@ -172,11 +254,9 @@ export function FoodImportValidator({ file, onValidationComplete, onCancel }: Fo
     setErrorCount(0);
 
     try {
-      const text = await file.text();
-      const delimiter = getDelimiterForFile(file.name);
-      const lines = text.trim().split(/\r?\n/);
+      const allRows = await parseFile(file);
       
-      if (lines.length < 2) {
+      if (allRows.length === 0) {
         onValidationComplete({
           valid: false,
           errors: ['Arquivo vazio ou sem dados'],
@@ -186,42 +266,32 @@ export function FoodImportValidator({ file, onValidationComplete, onCancel }: Fo
         return;
       }
 
-      const headers = lines[0].split(delimiter).map(h => h.trim().toLowerCase());
-      
-      // Check if name column exists
-      if (!headers.includes('name')) {
+      // Verificar se a coluna name existe
+      const firstRow = allRows[0];
+      if (!('name' in firstRow)) {
         onValidationComplete({
           valid: false,
-          errors: ['Coluna "name" é obrigatória'],
+          errors: ['Coluna "Nome" é obrigatória'],
           validRows: [],
           warnings: []
         }, []);
         return;
       }
 
-      const dataLines = lines.slice(1).filter(line => line.trim() !== '');
-      setTotalLines(dataLines.length);
+      setTotalLines(allRows.length);
 
       const results: LineValidationResult[] = [];
       const validRows: FoodRow[] = [];
-      const allRows: Record<string, unknown>[] = [];
       const allWarnings: string[] = [];
       const allErrors: string[] = [];
       let validC = 0, warnC = 0, errC = 0;
 
-      // Process lines with visual delay for UX
+      // Processar linhas com delay visual para UX
       const batchSize = 50;
       
-      for (let i = 0; i < dataLines.length; i++) {
-        const line = dataLines[i].trim();
-        const values = line.split(delimiter).map(v => v.trim());
-        const row: Record<string, unknown> = {};
-        headers.forEach((header, index) => {
-          row[header] = values[index] || '';
-        });
-        allRows.push(row);
-
-        const lineNumber = i + 2; // +2 for header and 1-indexing
+      for (let i = 0; i < allRows.length; i++) {
+        const row = allRows[i];
+        const lineNumber = i + 2; // +2 para cabeçalho e indexação a partir de 1
         const result = validateLine(row, lineNumber);
         results.push(result);
 
@@ -245,28 +315,28 @@ export function FoodImportValidator({ file, onValidationComplete, onCancel }: Fo
           }
         }
 
-        // Update progress in batches for performance
-        if (i % batchSize === 0 || i === dataLines.length - 1) {
+        // Atualizar progresso em lotes para performance
+        if (i % batchSize === 0 || i === allRows.length - 1) {
           setCurrentLine(i + 1);
-          setProgress(((i + 1) / dataLines.length) * 100);
+          setProgress(((i + 1) / allRows.length) * 100);
           setLineResults([...results]);
           setValidCount(validC);
           setWarningCount(warnC);
           setErrorCount(errC);
           
-          // Small delay for visual feedback
+          // Pequeno delay para feedback visual
           await new Promise(resolve => setTimeout(resolve, 10));
         }
       }
 
-      // Final update
+      // Atualização final
       setLineResults(results);
       setValidCount(validC);
       setWarningCount(warnC);
       setErrorCount(errC);
       setProgress(100);
 
-      // Complete validation
+      // Validação completa
       onValidationComplete({
         valid: errC === 0,
         errors: allErrors.slice(0, 20),

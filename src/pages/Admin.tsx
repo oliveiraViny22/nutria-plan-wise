@@ -120,8 +120,8 @@ export default function Admin() {
 
   const [activeTab, setActiveTab] = useState('metrics');
   const [editedSettings, setEditedSettings] = useState<Record<string, unknown>>({});
-  const [csvFile, setCsvFile] = useState<File | null>(null);
-  const [csvPreview, setCsvPreview] = useState<{ rows: Record<string, unknown>[]; validation: FoodValidationResult | null }>({ rows: [], validation: null });
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importPreview, setImportPreview] = useState<{ rows: Record<string, unknown>[]; validation: FoodValidationResult | null }>({ rows: [], validation: null });
   const [showPreview, setShowPreview] = useState(false);
   const [showValidating, setShowValidating] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -302,40 +302,40 @@ export default function Admin() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    setCsvFile(file);
+    setImportFile(file);
     setShowValidating(true);
     setShowPreview(false);
-    setCsvPreview({ rows: [], validation: null });
+    setImportPreview({ rows: [], validation: null });
   }, []);
 
   const handleValidationComplete = useCallback((validation: FoodValidationResult, rows: Record<string, unknown>[]) => {
-    setCsvPreview({ rows, validation });
+    setImportPreview({ rows, validation });
     setShowValidating(false);
     setShowPreview(true);
   }, []);
 
   const handleCancelValidation = useCallback(() => {
     setShowValidating(false);
-    setCsvFile(null);
-    setCsvPreview({ rows: [], validation: null });
+    setImportFile(null);
+    setImportPreview({ rows: [], validation: null });
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
   }, []);
 
   const handleImport = async () => {
-    if (!csvFile || !csvPreview.validation?.validRows.length) return;
+    if (!importFile || !importPreview.validation?.validRows.length) return;
 
     try {
-      await importFoods(csvFile.name, csvPreview.validation.validRows as FoodRow[]);
+      await importFoods(importFile.name, importPreview.validation.validRows as FoodRow[]);
       setShowPreview(false);
-      setCsvFile(null);
-      setCsvPreview({ rows: [], validation: null });
+      setImportFile(null);
+      setImportPreview({ rows: [], validation: null });
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
     } catch {
-      // Error handled in hook
+      // Erro tratado no hook
     }
   };
 
@@ -929,7 +929,7 @@ export default function Admin() {
             </Card>
           </TabsContent>
 
-          {/* Settings Tab */}
+          {/* Aba Configurações */}
           <TabsContent value="settings">
             {settingsLoading ? (
               <div className="flex items-center justify-center py-12">
@@ -943,30 +943,84 @@ export default function Admin() {
                 </CardContent>
               </Card>
             ) : (
-              <div className="space-y-6">
-                {Object.entries(groupedSettings).map(([category, categorySettings]) => (
-                  <Card key={category}>
-                    <CardHeader>
-                      <CardTitle className="capitalize">{category}</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      {categorySettings.map((setting) => (
-                        <div key={setting.key} className="space-y-2">
-                          <Label>{setting.key}</Label>
-                          {setting.description && (
-                            <p className="text-sm text-muted-foreground">{setting.description}</p>
-                          )}
-                          {renderSettingEditor(setting)}
-                        </div>
-                      ))}
-                    </CardContent>
-                  </Card>
-                ))}
+              <div className="grid gap-6 lg:grid-cols-2">
+                {Object.entries(groupedSettings).map(([category, categorySettings]) => {
+                  const categoryLabels: Record<string, { label: string; icon: React.ReactNode; description: string }> = {
+                    'general': { 
+                      label: 'Geral', 
+                      icon: <Settings className="h-5 w-5" />,
+                      description: 'Configurações gerais do sistema'
+                    },
+                    'ai': { 
+                      label: 'Inteligência Artificial', 
+                      icon: <Bot className="h-5 w-5" />,
+                      description: 'Configurações de modelos e recursos de IA'
+                    },
+                    'limits': { 
+                      label: 'Limites', 
+                      icon: <Activity className="h-5 w-5" />,
+                      description: 'Limites de uso do sistema'
+                    },
+                    'features': { 
+                      label: 'Recursos', 
+                      icon: <Sparkles className="h-5 w-5" />,
+                      description: 'Ativar ou desativar funcionalidades'
+                    },
+                  };
+                  
+                  const categoryInfo = categoryLabels[category.toLowerCase()] || { 
+                    label: category.charAt(0).toUpperCase() + category.slice(1), 
+                    icon: <Settings className="h-5 w-5" />,
+                    description: `Configurações de ${category}`
+                  };
+
+                  return (
+                    <Card key={category} className="flex flex-col">
+                      <CardHeader className="pb-4">
+                        <CardTitle className="flex items-center gap-2 text-lg">
+                          <span className="text-primary">{categoryInfo.icon}</span>
+                          {categoryInfo.label}
+                        </CardTitle>
+                        <CardDescription>{categoryInfo.description}</CardDescription>
+                      </CardHeader>
+                      <CardContent className="flex-1 space-y-4">
+                        {categorySettings.map((setting) => {
+                          const settingLabels: Record<string, string> = {
+                            'enable_chat_feature': 'Chat com IA',
+                            'ai_model_default': 'Modelo de IA Padrão',
+                            'max_diet_plans_per_user': 'Máx. Planos por Usuário',
+                            'enable_meal_substitution': 'Substituição de Refeições',
+                            'enable_macro_adjustment': 'Ajuste de Macros',
+                          };
+                          
+                          return (
+                            <div 
+                              key={setting.key} 
+                              className="flex items-center justify-between p-4 rounded-lg border bg-card hover:bg-accent/50 transition-colors"
+                            >
+                              <div className="space-y-1 flex-1 mr-4">
+                                <Label className="font-medium text-sm">
+                                  {settingLabels[setting.key] || setting.key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                                </Label>
+                                {setting.description && (
+                                  <p className="text-xs text-muted-foreground line-clamp-2">{setting.description}</p>
+                                )}
+                              </div>
+                              <div className="shrink-0">
+                                {renderSettingEditor(setting)}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </CardContent>
+                    </Card>
+                  );
+                })}
               </div>
             )}
           </TabsContent>
 
-          {/* Foods Tab */}
+          {/* Aba Alimentos */}
           <TabsContent value="foods">
             <div className="space-y-6">
               <Card>
@@ -976,15 +1030,15 @@ export default function Admin() {
                     Importar Alimentos
                   </CardTitle>
                   <CardDescription>
-                    Importe alimentos de arquivos CSV, TXT ou XLS.
+                    Importe alimentos de arquivos Excel (.xls, .xlsx) ou texto (.csv, .txt).
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="flex items-center gap-4">
+                  <div className="flex flex-wrap items-center gap-4">
                     <Input
                       ref={fileInputRef}
                       type="file"
-                      accept=".csv,.txt,.xls"
+                      accept=".xls,.xlsx,.csv,.txt"
                       onChange={handleFileUpload}
                       className="max-w-md"
                     />
@@ -1457,15 +1511,15 @@ export default function Admin() {
         </Tabs>
       </main>
 
-      {/* Validation Dialog */}
-      {showValidating && csvFile && (
+      {/* Diálogo de Validação */}
+      {showValidating && importFile && (
         <Dialog open={showValidating} onOpenChange={(open) => !open && handleCancelValidation()}>
           <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>Validando arquivo: {csvFile.name}</DialogTitle>
+              <DialogTitle>Validando arquivo: {importFile.name}</DialogTitle>
             </DialogHeader>
             <FoodImportValidator
-              file={csvFile}
+              file={importFile}
               onValidationComplete={handleValidationComplete}
               onCancel={handleCancelValidation}
             />
@@ -1473,7 +1527,7 @@ export default function Admin() {
         </Dialog>
       )}
 
-      {/* Preview Dialog */}
+      {/* Diálogo de Prévia */}
       <Dialog open={showPreview} onOpenChange={(open) => !open && setShowPreview(false)}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -1482,17 +1536,17 @@ export default function Admin() {
               Prévia da Importação
             </DialogTitle>
             <DialogDescription>
-              {csvPreview.validation?.validRows.length || 0} alimentos válidos encontrados
+              {importPreview.validation?.validRows.length || 0} alimentos válidos encontrados
             </DialogDescription>
           </DialogHeader>
           
-          {csvPreview.validation && (
+          {importPreview.validation && (
             <div className="space-y-4">
-              {csvPreview.validation.errors.length > 0 && (
+              {importPreview.validation.errors.length > 0 && (
                 <Alert variant="destructive">
                   <AlertCircle className="h-4 w-4" />
                   <AlertDescription>
-                    {csvPreview.validation.errors.length} erro(s) encontrado(s)
+                    {importPreview.validation.errors.length} erro(s) encontrado(s)
                   </AlertDescription>
                 </Alert>
               )}
@@ -1509,7 +1563,7 @@ export default function Admin() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {csvPreview.validation.validRows.slice(0, 20).map((row, i) => (
+                    {importPreview.validation.validRows.slice(0, 20).map((row, i) => (
                       <TableRow key={i}>
                         <TableCell>{row.name}</TableCell>
                         <TableCell>{row.calories}</TableCell>
@@ -1528,9 +1582,9 @@ export default function Admin() {
             <Button variant="outline" onClick={() => setShowPreview(false)}>
               Cancelar
             </Button>
-            <Button onClick={handleImport} disabled={loading || !csvPreview.validation?.validRows.length}>
+            <Button onClick={handleImport} disabled={loading || !importPreview.validation?.validRows.length}>
               {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Upload className="h-4 w-4 mr-2" />}
-              Importar {csvPreview.validation?.validRows.length || 0} alimentos
+              Importar {importPreview.validation?.validRows.length || 0} alimentos
             </Button>
           </DialogFooter>
         </DialogContent>

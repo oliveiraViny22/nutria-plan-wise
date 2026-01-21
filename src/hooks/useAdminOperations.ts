@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import type { Database } from '@/integrations/supabase/types';
+import * as XLSX from 'xlsx';
 
 type AppRole = Database['public']['Enums']['app_role'];
 
@@ -67,7 +68,6 @@ interface FoodTemplate {
   exampleRow: string[];
   validCategories: string[];
   validProcessingLevels: string[];
-  csvContent: string;
 }
 
 export interface UserProfile {
@@ -301,12 +301,21 @@ export function useAdminOperations() {
     const template = await getFoodTemplate();
     if (!template) return;
 
-    const blob = new Blob([template.csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = 'modelo_alimentos.csv';
-    link.click();
-    URL.revokeObjectURL(link.href);
+    // Criar planilha Excel
+    const wb = XLSX.utils.book_new();
+    const wsData = [
+      template.headers,
+      template.exampleRow,
+    ];
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+    
+    // Ajustar larguras das colunas
+    ws['!cols'] = template.headers.map(() => ({ wch: 20 }));
+    
+    XLSX.utils.book_append_sheet(wb, ws, 'Alimentos');
+    
+    // Baixar arquivo
+    XLSX.writeFile(wb, 'modelo_alimentos.xlsx');
   }, [getFoodTemplate]);
 
   const seedTestData = useCallback(async (): Promise<Record<string, unknown>> => {
