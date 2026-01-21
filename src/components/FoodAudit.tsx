@@ -319,21 +319,18 @@ export function FoodAudit({ onApplySuggestion, onApplyBatch, onApplyAll }: FoodA
 
   const getCategoryLabel = (cat: string | null) => {
     if (!cat) return '—';
-    // Normalize and display
     const labels: Record<string, string> = {
       'carboidratos': 'Carboidratos',
       'proteinas': 'Proteínas',
       'gorduras': 'Gorduras',
-      'frutas': 'Frutas',
       'vegetais': 'Vegetais',
-      'leguminosas': 'Leguminosas',
+      'frutas': 'Frutas',
       'laticinios': 'Laticínios',
+      'leguminosas': 'Leguminosas',
       'suplementos': 'Suplementos',
       'mistos': 'Mistos',
-      'bebidas': 'Bebidas',
-      'outros': 'Outros',
     };
-    const normalized = cat.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const normalized = cat.toLowerCase();
     return labels[normalized] || cat;
   };
 

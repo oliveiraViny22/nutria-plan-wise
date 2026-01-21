@@ -102,7 +102,7 @@ SCHEMA OBRIGATÓRIO
 Todo alimento deve respeitar:
 - name (Nome padronizado PT-BR)
 - canonical_name (lowercase, sem acentos, underscore separador)
-- category (frutas | hortalicas_folhosas | legumes | cereais_tuberculos | leguminosas | proteinas_animais | laticinios | oleos_oleaginosas | suplementos)
+- category (APENAS: carboidratos | proteinas | gorduras | vegetais | frutas | laticinios | leguminosas | suplementos | mistos)
 - calories (kcal por porção)
 - protein (g)
 - carbs (g)

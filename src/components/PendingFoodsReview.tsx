@@ -26,15 +26,15 @@ interface PendingFood {
 }
 
 const CATEGORY_LABELS: Record<string, string> = {
+  'carboidratos': 'Carboidratos',
+  'proteinas': 'Proteínas',
+  'gorduras': 'Gorduras',
+  'vegetais': 'Vegetais',
   'frutas': 'Frutas',
-  'hortalicas_folhosas': 'Hortaliças Folhosas',
-  'legumes': 'Legumes',
-  'cereais_tuberculos': 'Cereais e Tubérculos',
-  'leguminosas': 'Leguminosas',
-  'proteinas_animais': 'Proteínas Animais',
   'laticinios': 'Laticínios',
-  'oleos_oleaginosas': 'Óleos e Oleaginosas',
+  'leguminosas': 'Leguminosas',
   'suplementos': 'Suplementos',
+  'mistos': 'Mistos',
 };
 
 const PROCESSING_LABELS: Record<string, string> = {
