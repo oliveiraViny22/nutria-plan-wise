@@ -19,6 +19,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Logo } from '@/components/Logo';
 import { MobileNav } from '@/components/MobileNav';
+import { ThemeToggleSimple } from '@/components/ThemeToggle';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -144,7 +145,7 @@ export default function Progress() {
             <Logo size="sm" />
           </div>
           <h1 className="text-base sm:text-lg font-semibold">Progresso</h1>
-          <div className="w-9 sm:w-10" />
+          <ThemeToggleSimple />
         </div>
       </header>
 

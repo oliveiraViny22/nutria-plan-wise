@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { MobileNav } from '@/components/MobileNav';
+import { ThemeToggleSimple } from '@/components/ThemeToggle';
 import { useSubscription } from '@/hooks/useSubscription';
 import { useToast } from '@/hooks/use-toast';
 import { useUserRole } from '@/hooks/useUserRole';
@@ -72,7 +73,7 @@ export default function Subscription() {
             </Button>
           </div>
           <h1 className="text-base sm:text-xl font-bold">Minha Assinatura</h1>
-          <div className="w-9 sm:w-10" />
+          <ThemeToggleSimple />
         </div>
       </header>
 

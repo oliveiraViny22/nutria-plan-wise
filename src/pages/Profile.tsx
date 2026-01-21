@@ -33,6 +33,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Logo } from '@/components/Logo';
 import { MobileNav } from '@/components/MobileNav';
+import { ThemeToggleSimple } from '@/components/ThemeToggle';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -264,15 +265,18 @@ export default function Profile() {
             <Logo size="sm" />
           </div>
           <h1 className="text-base sm:text-lg font-semibold hidden xs:block">Meu Perfil</h1>
-          <Button 
-            size="sm" 
-            onClick={handleSave} 
-            disabled={loading || !hasChanges}
-            className="text-xs sm:text-sm h-8 sm:h-9"
-          >
-            {loading ? <Loader2 className="h-3 w-3 sm:h-4 sm:w-4 animate-spin" /> : <Save className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />}
-            <span className="hidden xs:inline">Salvar</span>
-          </Button>
+          <div className="flex items-center gap-2">
+            <ThemeToggleSimple />
+            <Button 
+              size="sm" 
+              onClick={handleSave} 
+              disabled={loading || !hasChanges}
+              className="text-xs sm:text-sm h-8 sm:h-9"
+            >
+              {loading ? <Loader2 className="h-3 w-3 sm:h-4 sm:w-4 animate-spin" /> : <Save className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />}
+              <span className="hidden xs:inline">Salvar</span>
+            </Button>
+          </div>
         </div>
       </header>
 

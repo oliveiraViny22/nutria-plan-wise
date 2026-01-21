@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Logo } from '@/components/Logo';
 import { MobileNav } from '@/components/MobileNav';
+import { ThemeToggleSimple } from '@/components/ThemeToggle';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSubscription } from '@/hooks/useSubscription';
 import { supabase } from '@/integrations/supabase/client';
@@ -100,7 +101,7 @@ export default function BecomeProfessional() {
             <Logo size="sm" />
           </div>
           <h1 className="text-base sm:text-lg font-semibold truncate">Seja Profissional</h1>
-          <div className="w-9 sm:w-10" />
+          <ThemeToggleSimple />
         </div>
       </header>
 

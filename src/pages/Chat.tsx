@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ArrowLeft, Send, Loader2, AlertTriangle, Bot, User, Lock } from 'lucide-react';
+import { ThemeToggleSimple } from '@/components/ThemeToggle';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { MobileNav } from '@/components/MobileNav';
@@ -232,6 +233,7 @@ export default function Chat() {
                planName === 'premium' ? 'IA Educacional' : 'IA Básica'}
             </p>
           </div>
+          <ThemeToggleSimple />
         </div>
       </header>
 
