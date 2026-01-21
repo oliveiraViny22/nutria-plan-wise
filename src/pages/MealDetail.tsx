@@ -86,11 +86,14 @@ export default function MealDetail() {
   const isProfessionalViewingStudent = isProfessional && !!studentIdFromQuery;
   
   // Use account permissions to check if user can add/remove foods
-  const { plan_name, can_edit_plan } = useAccountPermissions();
+  const { plan_name, can_substitute } = useAccountPermissions();
   const isPaidPlan = plan_name !== 'gratuito';
   
   // Only restrict editing for linked students (not for professionals or regular users)
   const canEdit = !isLinkedStudent || isProfessionalViewingStudent;
+  
+  // Can substitute foods if user has permission (canEdit) - limit is checked when action is performed
+  const canShowSubstituteButton = canEdit;
   
   // Can add/remove foods if professional or paid plan
   const canAddRemoveFoods = canEdit && (isProfessional || isPaidPlan);
@@ -600,7 +603,7 @@ export default function MealDetail() {
                         const qty = getTotalGrams(food, optionFood.quantity_grams);
                         const nutrients = calcNutrients(food, qty);
                         const unit = getUnit(food.serving_size);
-                        const canSubstitute = canEdit && canBeSubstituted(food);
+                        const canSubstitute = canShowSubstituteButton && canBeSubstituted(food);
                         
                         return (
                           <motion.div
