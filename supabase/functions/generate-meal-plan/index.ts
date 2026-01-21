@@ -390,15 +390,6 @@ serve(async (req) => {
     const skipValidation = isInitialPlan === true;
     
     if (!skipValidation) {
-      // Verificar permissão para criar plano (usa função do banco)
-      const { data: canCreate } = await supabase.rpc('can_create_plan', {
-        _user_id: targetUserId,
-      });
-
-      if (!canCreate && !validStudentId) {
-        logStep("User cannot create plan - limit reached or restricted account type");
-        return createErrorResponse('Limite de planos atingido ou conta sem permissão', 403, corsHeaders);
-      }
 
       // Validate usage limit (use professional's quota when creating for student)
       const { data: canUse } = await supabase.rpc('can_use_feature', {
