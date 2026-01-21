@@ -280,6 +280,7 @@ async function calculateAdherenceMetrics(
     switch (status) {
       case 'confirmed':
         stats.confirmed_meals++;
+        break;
       case 'skipped':
         stats.skipped_meals++;
         break;
@@ -388,6 +389,18 @@ Para ajustar automaticamente seu plano e atingir suas metas, faça upgrade para 
 function buildSystemPrompt(profileType: UserProfile): string {
   const baseRules = `Você é o Rebalanceador Automático do NutriaPlan.
 
+SUA FUNÇÃO:
+- Ajustar planos alimentares existentes respeitando perfil, permissões e governança clínica
+- Melhorar adesão e corrigir desvios de peso/macros
+- Manter plano seguro, explicável e nutricionalmente equivalente
+
+ETAPAS OBRIGATÓRIAS:
+1. Identificar perfil (free/premium/usuario_pessoal_pago/profissional_vinculado)
+2. Validar permissões do perfil
+3. Avaliar objetivo, adesão e comportamento alimentar
+4. Aplicar apenas ajustes permitidos
+5. Gerar justificativa clara e impacto na adesão
+
 REGRAS DE EQUIVALÊNCIA OBRIGATÓRIAS:
 - Proteína: ±5g
 - Carboidrato: ±10g
@@ -398,8 +411,11 @@ NUNCA quebrar equivalência sem permissão explícita.
 REGRAS DE SEGURANÇA:
 - Se dados insuficientes, conflito de permissões ou risco clínico → ABORTAR
 - Nunca inferir doenças ou usar lógica clínica
+- Nunca interpretar dados médicos
 - Nunca executar sem dados suficientes
-- Manter alimentos in natura e minimamente processados
+- Priorizar alimentos in natura e minimamente processados
+- Se adesão < 50%, considerar simplificar refeições
+- Se adesão > 80%, manter estrutura e fazer ajustes mínimos
 
 Responda APENAS em JSON válido com o formato:
 {
@@ -411,27 +427,39 @@ Responda APENAS em JSON válido com o formato:
 
   const profileRules: Record<UserProfile, string> = {
     free: `
-PERFIL: GRATUITO
-- NÃO rebalancear macros
-- NÃO alterar calorias
-- APENAS explicar a situação atual`,
+PERFIL: GRATUITO (🟢)
+LIMITES ESTRITOS:
+❌ NÃO rebalancear macros
+❌ NÃO alterar calorias
+❌ NÃO substituir alimentos
+❌ NÃO reorganizar refeições
+✅ APENAS explicar a situação atual e recomendar upgrade`,
     premium: `
-PERFIL: PREMIUM
-- PODE ajustar distribuição de refeições
-- PODE ajustar escolhas alimentares
-- NÃO PODE alterar target calórico total`,
+PERFIL: PREMIUM (🟡)
+PERMISSÕES:
+✅ Ajustar distribuição de refeições
+✅ Ajustar escolhas alimentares dentro das opções
+❌ NÃO alterar target calórico total
+❌ NÃO modificar macros targets`,
     usuario_pessoal_pago: `
-PERFIL: USUÁRIO PESSOAL PAGO
-- PODE ajustar calorias
-- PODE ajustar macros
-- PODE substituir alimentos
-- PODE reorganizar refeições
-- PROIBIDO: usar lógica clínica, inferir doenças, interpretar dados médicos`,
+PERFIL: USUÁRIO PESSOAL PAGO (🟠)
+PERMISSÕES:
+✅ Ajustar calorias totais
+✅ Ajustar macros
+✅ Substituir alimentos
+✅ Reorganizar refeições
+❌ PROIBIDO: usar lógica clínica
+❌ PROIBIDO: inferir doenças
+❌ PROIBIDO: interpretar dados médicos
+❌ PROIBIDO: recomendar suplementos terapêuticos`,
     profissional_vinculado: `
-PERFIL: PROFISSIONAL VINCULADO
-- NÃO executar automaticamente
-- GERAR sugestão técnica detalhada
-- AGUARDAR aprovação do profissional`
+PERFIL: PROFISSIONAL VINCULADO (🔵)
+COMPORTAMENTO ESPECIAL:
+❌ NÃO executar automaticamente
+✅ GERAR sugestão técnica detalhada
+✅ Incluir justificativa clínica para revisão
+✅ AGUARDAR aprovação do profissional
+✅ Marcar requires_approval = true`
   };
 
   return baseRules + profileRules[profileType];
@@ -453,6 +481,9 @@ function buildRebalancePrompt(
     fat: targetMacros.fat - currentMacros.fat
   };
 
+  // Analyze adherence behavior
+  const adherenceBehavior = analyzeAdherenceBehavior(adherence);
+
   return `
 PERFIL DO USUÁRIO (${profileType}):
 - Objetivo: ${profile.goal || 'não definido'}
@@ -469,11 +500,19 @@ MACROS ATUAIS:
 - Carboidrato: ${currentMacros.carbs}g (déficit/excesso: ${deficits.carbs > 0 ? '+' : ''}${deficits.carbs})
 - Gordura: ${currentMacros.fat}g (déficit/excesso: ${deficits.fat > 0 ? '+' : ''}${deficits.fat})
 
-ADESÃO (últimos 30 dias):
+ANÁLISE DE ADESÃO (últimos 30 dias):
 - Taxa de adesão: ${adherence.adherence_rate.toFixed(1)}%
+- Classificação: ${adherenceBehavior.classification}
 - Refeições confirmadas: ${adherence.confirmed_meals}
 - Refeições puladas: ${adherence.skipped_meals}
+- Confirmações tardias: ${adherence.late_confirmed}
 - Fora do plano: ${adherence.out_of_plan}
+
+COMPORTAMENTO ALIMENTAR DETECTADO:
+${adherenceBehavior.insights.map(i => `- ${i}`).join('\n')}
+
+RECOMENDAÇÕES BASEADAS NA ADESÃO:
+${adherenceBehavior.recommendations.map(r => `- ${r}`).join('\n')}
 
 PERMISSÕES DO PERFIL:
 - Pode ajustar macros: ${permissions.canAdjustMacros ? 'Sim' : 'Não'}
@@ -488,7 +527,12 @@ ${m.name}:
 ${m.options[0]?.foods.map(f => `  - ${f.food.name}: ${f.quantity_grams}g (${f.food.calories} kcal, P:${f.food.protein}g, C:${f.food.carbs}g, G:${f.food.fat}g)`).join('\n') || '  Sem alimentos'}
 `).join('\n')}
 
-Com base nas permissões do perfil "${profileType}", gere ajustes respeitando as regras de equivalência.
+INSTRUÇÕES:
+Com base nas permissões do perfil "${profileType}" e no comportamento alimentar detectado:
+1. Gere ajustes que respeitem as regras de equivalência
+2. Priorize a manutenção da adesão (não fazer mudanças drásticas se adesão está boa)
+3. Se adesão baixa, simplifique o plano em vez de adicionar complexidade
+4. Justifique cada ajuste com foco no impacto prático
 
 Responda em JSON:
 {
@@ -505,10 +549,76 @@ Responda em JSON:
       "reason": "motivo do ajuste"
     }
   ],
-  "justification": "justificativa nutricional geral",
-  "adherence_impact": "impacto esperado na adesão",
+  "justification": "justificativa nutricional geral focada no objetivo e comportamento",
+  "adherence_impact": "impacto esperado na adesão com base no comportamento atual",
   "warnings": ["avisos de limitação, se houver"]
 }`;
+}
+
+function analyzeAdherenceBehavior(adherence: AdherenceMetrics): {
+  classification: string;
+  insights: string[];
+  recommendations: string[];
+} {
+  const rate = adherence.adherence_rate;
+  const totalRecords = adherence.confirmed_meals + adherence.skipped_meals + 
+                       adherence.late_confirmed + adherence.out_of_plan;
+  
+  let classification: string;
+  const insights: string[] = [];
+  const recommendations: string[] = [];
+
+  // Classify adherence level
+  if (rate >= 80) {
+    classification = 'EXCELENTE';
+    insights.push('Usuário demonstra alta disciplina alimentar');
+    recommendations.push('Manter estrutura atual - fazer apenas ajustes finos');
+    recommendations.push('Evitar mudanças drásticas que possam afetar a rotina');
+  } else if (rate >= 60) {
+    classification = 'BOA';
+    insights.push('Adesão moderada com espaço para otimização');
+    recommendations.push('Focar em tornar refeições mais práticas');
+    recommendations.push('Considerar simplificar opções menos aderidas');
+  } else if (rate >= 40) {
+    classification = 'REGULAR';
+    insights.push('Dificuldade em manter o plano');
+    recommendations.push('Simplificar significativamente as refeições');
+    recommendations.push('Reduzir número de alimentos por refeição');
+    recommendations.push('Priorizar alimentos de fácil preparo');
+  } else {
+    classification = 'BAIXA';
+    insights.push('Adesão muito baixa - plano pode estar inadequado');
+    recommendations.push('Reconsiderar completamente a estrutura');
+    recommendations.push('Verificar se restrições estão sendo respeitadas');
+    recommendations.push('Priorizar refeições simples e rápidas');
+  }
+
+  // Analyze specific behaviors
+  if (adherence.skipped_meals > adherence.confirmed_meals) {
+    insights.push('Mais refeições puladas do que confirmadas - possível falta de tempo');
+    recommendations.push('Sugerir preparos antecipados ou refeições rápidas');
+  }
+
+  if (adherence.late_confirmed > adherence.confirmed_meals * 0.3) {
+    insights.push('Muitas confirmações tardias - problema de rotina');
+    recommendations.push('Ajustar horários das refeições ao estilo de vida');
+  }
+
+  if (adherence.out_of_plan > totalRecords * 0.2) {
+    insights.push('Alto índice de refeições fora do plano - preferências não atendidas');
+    recommendations.push('Incluir mais alimentos preferidos do usuário');
+    recommendations.push('Revisar restrições que podem estar limitando opções');
+  }
+
+  if (totalRecords === 0) {
+    classification = 'SEM DADOS';
+    insights.length = 0;
+    recommendations.length = 0;
+    insights.push('Nenhum registro de adesão encontrado');
+    recommendations.push('Aguardar dados de consumo antes de ajustes significativos');
+  }
+
+  return { classification, insights, recommendations };
 }
 
 function generateRuleBasedAdjustments(
