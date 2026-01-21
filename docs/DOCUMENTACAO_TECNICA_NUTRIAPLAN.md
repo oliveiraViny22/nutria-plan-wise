@@ -1954,19 +1954,29 @@ Todas as ações administrativas são registradas em `admin_audit_log`:
 
 # APÊNDICES
 
-## A. Categorias de Alimentos
+## A. Categorias de Alimentos (Canônicas v2)
 
-```
-frutas
-hortaliças_folhosas
-legumes
-cereais_tubérculos
-leguminosas
-proteínas_animais
-laticínios
-óleos_oleaginosas
-suplementos
-```
+> **IMPORTANTE**: Estas são as ÚNICAS categorias válidas no sistema.
+> Qualquer categoria fora desta lista será rejeitada pelo constraint `foods_category_check`.
+
+| Categoria       | Descrição                                          |
+|-----------------|---------------------------------------------------|
+| `carboidratos`  | Arroz, pão, massas, tubérculos, cereais           |
+| `proteinas`     | Carnes, peixes, ovos, frango                      |
+| `gorduras`      | Óleos, azeites, oleaginosas, castanhas            |
+| `vegetais`      | Folhas, verduras, legumes                         |
+| `frutas`        | Frutas frescas e secas                            |
+| `laticinios`    | Leite, queijos, iogurtes                          |
+| `leguminosas`   | Feijões, lentilha, grão-de-bico, soja             |
+| `suplementos`   | Whey, creatina, vitaminas                         |
+| `mistos`        | Preparações mistas, pratos prontos                |
+
+**Categorias LEGADAS (não usar)**:
+- ~~proteinas_animais~~ → use `proteinas`
+- ~~cereais_tuberculos~~ → use `carboidratos`
+- ~~hortalicas_folhosas~~ → use `vegetais`
+- ~~legumes~~ → use `vegetais`
+- ~~oleos_oleaginosas~~ → use `gorduras`
 
 ## B. Níveis de Processamento
 

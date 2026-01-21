@@ -2164,15 +2164,15 @@ export default function Admin() {
                     onChange={(e) => setEditedFoodData(prev => ({ ...prev, category: e.target.value || null }))}
                   >
                     <option value="">Selecionar...</option>
-                    <option value="Carboidratos">Carboidratos</option>
-                    <option value="Proteínas">Proteínas</option>
-                    <option value="Gorduras">Gorduras</option>
-                    <option value="Frutas">Frutas</option>
-                    <option value="Vegetais">Vegetais</option>
-                    <option value="Leguminosas">Leguminosas</option>
-                    <option value="Laticínios">Laticínios</option>
-                    <option value="Suplementos">Suplementos</option>
-                    <option value="Mistos">Mistos</option>
+                    <option value="carboidratos">Carboidratos</option>
+                    <option value="proteinas">Proteínas</option>
+                    <option value="gorduras">Gorduras</option>
+                    <option value="frutas">Frutas</option>
+                    <option value="vegetais">Vegetais</option>
+                    <option value="leguminosas">Leguminosas</option>
+                    <option value="laticinios">Laticínios</option>
+                    <option value="suplementos">Suplementos</option>
+                    <option value="mistos">Mistos</option>
                   </select>
                 </div>
                 <div className="space-y-2">
@@ -2183,11 +2183,11 @@ export default function Admin() {
                     onChange={(e) => setEditedFoodData(prev => ({ ...prev, processing_level: e.target.value || null }))}
                   >
                     <option value="">Selecionar...</option>
-                    <option value="In natura">In natura</option>
-                    <option value="Minimamente processado">Minimamente processado</option>
-                    <option value="Processado">Processado</option>
-                    <option value="Ultraprocessado">Ultraprocessado</option>
-                    <option value="Suplemento">Suplemento</option>
+                    <option value="in_natura">In natura</option>
+                    <option value="minimamente_processado">Minimamente processado</option>
+                    <option value="processado">Processado</option>
+                    <option value="ultraprocessado">Ultraprocessado</option>
+                    <option value="suplemento">Suplemento</option>
                   </select>
                 </div>
               </div>
