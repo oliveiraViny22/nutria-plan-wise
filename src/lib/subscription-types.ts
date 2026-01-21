@@ -1,9 +1,9 @@
-import { CommercialPlan } from './types';
+import { CommercialPlan, PlanType } from './types';
 
 export interface Plan {
   id: string;
-  name: CommercialPlan;
-  type: 'personal' | 'professional';
+  name: string;
+  type: PlanType;
   description: string | null;
   diet_limit: number;
   substitution_limit: number;

@@ -91,7 +91,7 @@ export default function Subscription() {
               <CardDescription>
                 {currentPlan ? (
                   <span className="capitalize text-lg font-medium text-foreground">
-                    {currentPlan.name} ({currentPlan.type === 'personal' ? 'Pessoal' : 'Profissional'})
+                    {currentPlan.name} ({currentPlan.type === 'profissional' ? 'Profissional' : 'Pessoal'})
                   </span>
                 ) : (
                   'Nenhum plano ativo'
@@ -263,7 +263,7 @@ export default function Subscription() {
         )}
 
         {/* Professional Quick Actions */}
-        {isProfessional && currentPlan?.type === 'professional' && (
+        {isProfessional && currentPlan?.type === 'profissional' && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}

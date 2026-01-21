@@ -34,7 +34,11 @@ export default function Pricing() {
     }
     
     // Filter by account type tab for all other plans
-    if (p.type !== accountTab) return false;
+    // Map tab to plan types: 'personal' tab shows gratuito + plano_pessoal_pago, 'professional' tab shows profissional
+    const personalTypes = ['gratuito', 'plano_pessoal_pago'];
+    const isPersonalPlan = personalTypes.includes(p.type);
+    if (accountTab === 'personal' && !isPersonalPlan) return false;
+    if (accountTab === 'professional' && p.type !== 'profissional') return false;
     
     return true;
   });
