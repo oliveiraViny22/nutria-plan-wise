@@ -53,92 +53,162 @@ function MacroComparisonCard({
   target,
   proposed,
   unit = 'g',
-  colorClass,
+  colorVar,
 }: {
   label: string;
   current: number;
   target: number;
   proposed: number;
   unit?: string;
-  colorClass: string;
+  colorVar: 'protein' | 'carbs' | 'fat' | 'primary';
 }) {
   const currentDiff = current - target;
   const proposedDiff = proposed - target;
   const improved =
     Math.abs(proposedDiff) < Math.abs(currentDiff) || 
     (proposedDiff >= 0 && currentDiff < 0);
+  
+  // Calculate percentages for progress bars
+  const maxValue = Math.max(current, target, proposed) * 1.1;
+  const targetPercent = (target / maxValue) * 100;
+  const currentPercent = Math.min((current / maxValue) * 100, 100);
+  const proposedPercent = Math.min((proposed / maxValue) * 100, 100);
+  
+  // Color mapping using CSS variables
+  const colorClasses = {
+    protein: 'bg-protein text-protein',
+    carbs: 'bg-carbs text-carbs',
+    fat: 'bg-fat text-fat',
+    primary: 'bg-primary text-primary',
+  };
+  
+  const bgColorClasses = {
+    protein: 'bg-protein-soft',
+    carbs: 'bg-carbs-soft',
+    fat: 'bg-fat-soft',
+    primary: 'bg-primary/15',
+  };
 
   return (
-    <div className="p-3 rounded-xl bg-muted/50">
-      <div className="flex items-center justify-between mb-2">
-        <span className="text-sm font-medium text-foreground">{label}</span>
-        <span className={`text-xs font-medium ${colorClass}`}>Meta: {target}{unit}</span>
+    <div className="p-4 rounded-xl bg-card border border-border/50 shadow-sm">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-3">
+        <span className="text-sm font-semibold text-foreground">{label}</span>
+        <span className={`text-xs font-semibold ${colorClasses[colorVar].split(' ')[1]}`}>
+          Meta: {target}{unit}
+        </span>
       </div>
-      <div className="flex items-center gap-2">
+      
+      {/* Values Row */}
+      <div className="flex items-center gap-3 mb-3">
         <div className="flex-1">
-          <div className="text-xs text-muted-foreground mb-1">Atual</div>
+          <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-0.5">Atual</div>
           <div className="flex items-baseline gap-1">
-            <span className="text-lg font-bold text-foreground">{current}</span>
+            <span className="text-xl font-bold text-foreground">{current}</span>
             <span className="text-xs text-muted-foreground">{unit}</span>
             {currentDiff !== 0 && (
-              <span className={`text-xs ${currentDiff < 0 ? 'text-destructive' : 'text-amber-500'}`}>
+              <span className={`text-xs font-medium ${currentDiff < 0 ? 'text-destructive' : 'text-amber-500'}`}>
                 ({currentDiff > 0 ? '+' : ''}{currentDiff})
               </span>
             )}
           </div>
         </div>
-        <ArrowRight className="w-4 h-4 text-muted-foreground" />
-        <div className="flex-1">
-          <div className="text-xs text-muted-foreground mb-1">Proposto</div>
-          <div className="flex items-baseline gap-1">
-            <span className={`text-lg font-bold ${improved ? 'text-primary' : 'text-foreground'}`}>
+        
+        <div className="flex items-center justify-center w-8">
+          <ArrowRight className="w-4 h-4 text-muted-foreground/60" />
+        </div>
+        
+        <div className="flex-1 text-right">
+          <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-0.5">Proposto</div>
+          <div className="flex items-baseline gap-1 justify-end">
+            <span className={`text-xl font-bold ${improved ? 'text-primary' : 'text-foreground'}`}>
               {proposed}
             </span>
             <span className="text-xs text-muted-foreground">{unit}</span>
-            {improved && <Check className="w-3 h-3 text-primary" />}
+            {improved && <Check className="w-4 h-4 text-primary ml-1" />}
           </div>
         </div>
+      </div>
+      
+      {/* Progress Bar */}
+      <div className="relative h-2 rounded-full overflow-hidden bg-muted/60">
+        {/* Target marker */}
+        <div 
+          className="absolute top-0 bottom-0 w-0.5 bg-foreground/40 z-10"
+          style={{ left: `${targetPercent}%` }}
+        />
+        {/* Current value bar (faded) */}
+        <motion.div
+          className={`absolute top-0 bottom-0 left-0 ${bgColorClasses[colorVar]} opacity-60`}
+          initial={{ width: 0 }}
+          animate={{ width: `${currentPercent}%` }}
+          transition={{ duration: 0.4, ease: 'easeOut' }}
+        />
+        {/* Proposed value bar */}
+        <motion.div
+          className={`absolute top-0 bottom-0 left-0 ${colorClasses[colorVar].split(' ')[0]} rounded-full`}
+          initial={{ width: 0 }}
+          animate={{ width: `${proposedPercent}%` }}
+          transition={{ duration: 0.6, ease: 'easeOut', delay: 0.2 }}
+        />
       </div>
     </div>
   );
 }
 
-function AdjustmentItem({ adjustment }: { adjustment: FoodAdjustment }) {
+function AdjustmentItem({ adjustment, index }: { adjustment: FoodAdjustment; index: number }) {
   const isIncrease = adjustment.newQuantity > adjustment.originalQuantity;
   const diff = adjustment.newQuantity - adjustment.originalQuantity;
 
   return (
-    <div className="flex items-center gap-3 py-2">
-      <div className={`p-1.5 rounded-full ${isIncrease ? 'bg-primary/10' : 'bg-amber-500/10'}`}>
+    <motion.div 
+      initial={{ opacity: 0, x: -10 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ duration: 0.2, delay: index * 0.03 }}
+      className="flex items-center gap-3 py-2.5 px-3 rounded-lg hover:bg-muted/50 transition-colors"
+    >
+      <div className={`p-2 rounded-lg ${
+        adjustment.isNewItem 
+          ? 'bg-primary/15 ring-1 ring-primary/20' 
+          : isIncrease 
+            ? 'bg-primary/10' 
+            : 'bg-amber-500/10'
+      }`}>
         {adjustment.isNewItem ? (
-          <Plus className="w-3 h-3 text-primary" />
+          <Plus className="w-3.5 h-3.5 text-primary" />
         ) : isIncrease ? (
-          <ChevronUp className="w-3 h-3 text-primary" />
+          <ChevronUp className="w-3.5 h-3.5 text-primary" />
         ) : (
-          <ChevronDown className="w-3 h-3 text-amber-500" />
+          <ChevronDown className="w-3.5 h-3.5 text-amber-500" />
         )}
       </div>
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium text-foreground truncate">{adjustment.foodName}</p>
         <p className="text-xs text-muted-foreground">{adjustment.mealName}</p>
       </div>
-      <div className="text-right">
+      <div className="text-right flex-shrink-0">
         {adjustment.isNewItem ? (
-          <span className="text-sm font-medium text-primary">+{adjustment.newQuantity}g</span>
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/15 text-sm font-semibold text-primary">
+            <Plus className="w-3 h-3" />
+            {adjustment.newQuantity}g
+          </span>
         ) : (
-          <>
-            <span className="text-xs text-muted-foreground">{adjustment.originalQuantity}g</span>
-            <span className="text-sm font-medium text-foreground mx-1">→</span>
-            <span className={`text-sm font-medium ${isIncrease ? 'text-primary' : 'text-amber-500'}`}>
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground line-through">{adjustment.originalQuantity}g</span>
+            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-sm font-semibold ${
+              isIncrease 
+                ? 'bg-primary/15 text-primary' 
+                : 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
+            }`}>
               {adjustment.newQuantity}g
+              <span className="text-xs opacity-80">
+                ({diff > 0 ? '+' : ''}{diff})
+              </span>
             </span>
-            <span className={`text-xs ml-1 ${isIncrease ? 'text-primary' : 'text-amber-500'}`}>
-              ({diff > 0 ? '+' : ''}{diff}g)
-            </span>
-          </>
+          </div>
         )}
       </div>
-    </div>
+    </motion.div>
   );
 }
 
@@ -227,28 +297,28 @@ export function MacroRebalancer({
                 </Alert>
               )}
 
-              {/* Macro Comparison */}
-              <div className="space-y-2">
+              {/* Macro Comparison Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <MacroComparisonCard
                   label="Proteína"
                   current={proposal.currentMacros.protein}
                   target={proposal.targetMacros.protein}
                   proposed={proposal.proposedMacros.protein}
-                  colorClass="text-red-500"
+                  colorVar="protein"
                 />
                 <MacroComparisonCard
                   label="Carboidrato"
                   current={proposal.currentMacros.carbs}
                   target={proposal.targetMacros.carbs}
                   proposed={proposal.proposedMacros.carbs}
-                  colorClass="text-amber-500"
+                  colorVar="carbs"
                 />
                 <MacroComparisonCard
                   label="Gordura"
                   current={proposal.currentMacros.fat}
                   target={proposal.targetMacros.fat}
                   proposed={proposal.proposedMacros.fat}
-                  colorClass="text-yellow-500"
+                  colorVar="fat"
                 />
                 <MacroComparisonCard
                   label="Calorias"
@@ -256,7 +326,7 @@ export function MacroRebalancer({
                   target={proposal.targetMacros.calories}
                   proposed={proposal.proposedMacros.calories}
                   unit="kcal"
-                  colorClass="text-primary"
+                  colorVar="primary"
                 />
               </div>
 
@@ -292,9 +362,9 @@ export function MacroRebalancer({
                               <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
                                 Ajuste de porções
                               </h4>
-                              <div className="divide-y divide-border">
+                              <div className="space-y-1">
                                 {proposal.adjustments.map((adj, i) => (
-                                  <AdjustmentItem key={i} adjustment={adj} />
+                                  <AdjustmentItem key={i} adjustment={adj} index={i} />
                                 ))}
                               </div>
                             </div>
