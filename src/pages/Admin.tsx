@@ -31,6 +31,7 @@ import {
   CreditCard,
   Sparkles,
   Bot,
+  Code,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -522,6 +523,42 @@ export default function Admin() {
       console.error('Error downloading documentation:', error);
       toast({
         title: 'Erro ao baixar documentação',
+        description: error instanceof Error ? error.message : 'Erro desconhecido',
+        variant: 'destructive'
+      });
+    } finally {
+      setDownloadingDoc(null);
+    }
+  };
+
+  const handleDownloadCode = async () => {
+    setDownloadingDoc('code');
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Não autenticado');
+
+      const response = await supabase.functions.invoke('generate-code-export');
+
+      if (response.error) throw response.error;
+
+      const content = response.data;
+      const filename = 'CODIGO_NUTRIAPLAN.txt';
+
+      const blob = new Blob([content], { type: 'text/plain;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      toast({ title: 'Download concluído', description: 'Código fonte exportado com sucesso.' });
+    } catch (error) {
+      console.error('Error downloading code:', error);
+      toast({
+        title: 'Erro ao baixar código',
         description: error instanceof Error ? error.message : 'Erro desconhecido',
         variant: 'destructive'
       });
@@ -1719,6 +1756,33 @@ export default function Admin() {
                             <Download className="h-4 w-4 mr-2" />
                           )}
                           Baixar Documentação Comercial
+                        </Button>
+                      </CardContent>
+                    </Card>
+
+                    <Card className="border-2 md:col-span-2">
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-lg flex items-center gap-2">
+                          <Code className="h-5 w-5 text-purple-500" />
+                          Código Fonte
+                        </CardTitle>
+                        <CardDescription>
+                          Estrutura completa do projeto, componentes, hooks, páginas e edge functions.
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <Button 
+                          onClick={handleDownloadCode}
+                          disabled={downloadingDoc === 'code'}
+                          variant="outline"
+                          className="w-full"
+                        >
+                          {downloadingDoc === 'code' ? (
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          ) : (
+                            <Download className="h-4 w-4 mr-2" />
+                          )}
+                          Baixar Código Fonte (TXT)
                         </Button>
                       </CardContent>
                     </Card>
