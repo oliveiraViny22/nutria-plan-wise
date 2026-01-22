@@ -1,6 +1,6 @@
 import { useLocation } from "react-router-dom";
 import { useEffect } from "react";
-import { ThemeToggleSimple } from "@/components/ThemeToggle";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 const NotFound = () => {
   const location = useLocation();
@@ -12,7 +12,7 @@ const NotFound = () => {
   return (
     <div className="flex min-h-screen items-center justify-center bg-muted p-4 relative">
       <div className="absolute top-4 right-4">
-        <ThemeToggleSimple />
+        <ThemeToggle />
       </div>
       <div className="text-center">
         <h1 className="mb-3 sm:mb-4 text-3xl sm:text-4xl font-bold">404</h1>

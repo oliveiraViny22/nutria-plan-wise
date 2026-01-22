@@ -12,7 +12,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { MobileNav } from '@/components/MobileNav';
-import { ThemeToggleSimple } from '@/components/ThemeToggle';
+import { ThemeToggle } from '@/components/ThemeToggle';
 import { MacroChart } from '@/components/MacroChart';
 import { supabase } from '@/integrations/supabase/client';
 import { useLinkedStudent } from '@/hooks/useLinkedStudent';
@@ -312,7 +312,7 @@ export default function MealDetail() {
               {visibleMealOptions.length} {visibleMealOptions.length === 1 ? 'opção' : 'opções'}
             </p>
           </div>
-          <ThemeToggleSimple />
+          <ThemeToggle />
         </div>
       </header>
 

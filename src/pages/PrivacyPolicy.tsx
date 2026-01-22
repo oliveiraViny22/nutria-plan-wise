@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Logo } from '@/components/Logo';
-import { ThemeToggleSimple } from '@/components/ThemeToggle';
+import { ThemeToggle } from '@/components/ThemeToggle';
 
 export default function PrivacyPolicy() {
   return (
@@ -10,7 +10,7 @@ export default function PrivacyPolicy() {
       <header className="container mx-auto px-4 py-6 flex items-center justify-between">
         <Logo size="lg" />
         <div className="flex items-center gap-2">
-          <ThemeToggleSimple />
+          <ThemeToggle />
           <Link to="/">
             <Button variant="ghost" size="sm">
               <ArrowLeft className="w-4 h-4 mr-2" />

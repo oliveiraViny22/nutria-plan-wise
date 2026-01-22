@@ -33,7 +33,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Logo } from '@/components/Logo';
 import { MobileNav } from '@/components/MobileNav';
-import { ThemeToggleSimple } from '@/components/ThemeToggle';
+import { ThemeToggle } from '@/components/ThemeToggle';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -266,7 +266,7 @@ export default function Profile() {
           </div>
           <h1 className="text-base sm:text-lg font-semibold hidden xs:block">Meu Perfil</h1>
           <div className="flex items-center gap-2">
-            <ThemeToggleSimple />
+            <ThemeToggle />
             <Button 
               size="sm" 
               onClick={handleSave} 
