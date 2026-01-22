@@ -300,10 +300,10 @@ export function useMacroRebalancer() {
       const plan = transformToCorePlan(typedMeals, planId);
       setCorePlan(plan);
 
-      // Chamar função pura de rebalanceamento
+      // Chamar função pura de rebalanceamento com limites mais flexíveis
       const snapshot = rebalancePlan(plan, targets, {
         tolerancePercent: 2,
-        maxAdjustmentPercent: 0.5,
+        maxAdjustmentPercent: 0.75, // Permitir até 75% de ajuste por alimento
         minQuantityGrams: 10,
         allowSupplements: true,
       });
@@ -347,7 +347,7 @@ export function useMacroRebalancer() {
       // Recalcular ajustes propagados para todas as opções
       const snapshot = rebalancePlan(corePlan, proposal.targetMacros, {
         tolerancePercent: 2,
-        maxAdjustmentPercent: 0.5,
+        maxAdjustmentPercent: 0.75, // Manter consistente com calculateProposal
         minQuantityGrams: 10,
         allowSupplements: true,
       });
