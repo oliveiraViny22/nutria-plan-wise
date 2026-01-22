@@ -572,109 +572,108 @@ export function rebalancePlan(
   const significantCarbItems = filterBySignificantMacro(firstOptionItems, 'carbs')
     .filter(item => item.food.category?.toLowerCase() !== 'suplementos');
   
+  // ===== ESTRATÉGIA DE AJUSTE =====
+  // Se o atual está ACIMA da meta (delta negativo), precisamos REDUZIR
+  // Se o atual está ABAIXO da meta (delta positivo), precisamos AUMENTAR
+  
   // 1. PROTEÍNAS (primeira prioridade)
-  let proteinDeficit = deltas.protein;
-  if (proteinDeficit > 0) {
-    // Primeira passada: itens com proteína dominante
-    let result = adjustForDeficit(proteinItems, proteinDeficit, 'protein', opts);
-    proteinDeficit = result.remainingDeficit;
+  let proteinDelta = deltas.protein;
+  if (proteinDelta > 0) {
+    // Déficit: precisamos AUMENTAR proteína
+    let result = adjustForDeficit(proteinItems, proteinDelta, 'protein', opts);
+    proteinDelta = result.remainingDeficit;
     allAdjustments.push(...result.adjustments);
     
-    // Segunda passada: itens com proteína significativa (se ainda houver déficit > 5g)
-    if (proteinDeficit > 5) {
+    if (proteinDelta > 5) {
       result = adjustForDeficit(significantProteinItems.filter(item => 
         !allAdjustments.some(a => a.itemId === item.id)
-      ), proteinDeficit, 'protein', opts);
-      proteinDeficit = result.remainingDeficit;
+      ), proteinDelta, 'protein', opts);
+      proteinDelta = result.remainingDeficit;
       allAdjustments.push(...result.adjustments);
     }
-  } else if (proteinDeficit < 0) {
-    // Primeira passada: itens com proteína dominante
-    let result = adjustForExcess(proteinItems, -proteinDeficit, 'protein', opts, allAdjustments);
-    proteinDeficit = -result.remainingExcess;
+  } else if (proteinDelta < 0) {
+    // Excesso: precisamos REDUZIR proteína
+    let result = adjustForExcess(proteinItems, -proteinDelta, 'protein', opts, allAdjustments);
     allAdjustments.push(...result.adjustments);
     
-    // Segunda passada: itens com proteína significativa (se ainda houver excesso > 5g)
-    if (-proteinDeficit > 5) {
-      result = adjustForExcess(significantProteinItems, -proteinDeficit, 'protein', opts, allAdjustments);
-      proteinDeficit = -result.remainingExcess;
+    if (result.remainingExcess > 5) {
+      result = adjustForExcess(significantProteinItems, result.remainingExcess, 'protein', opts, allAdjustments);
       allAdjustments.push(...result.adjustments);
     }
   }
   
   // 2. CARBOIDRATOS (segunda prioridade)
-  let carbsDeficit = deltas.carbs;
-  if (carbsDeficit > 0) {
-    // Primeira passada: itens com carbs dominante
-    let result = adjustForDeficit(carbItems, carbsDeficit, 'carbs', opts);
-    carbsDeficit = result.remainingDeficit;
+  let carbsDelta = deltas.carbs;
+  if (carbsDelta > 0) {
+    // Déficit: precisamos AUMENTAR carbs
+    let result = adjustForDeficit(carbItems, carbsDelta, 'carbs', opts);
+    carbsDelta = result.remainingDeficit;
     allAdjustments.push(...result.adjustments);
     
-    // Segunda passada: itens com carbs significativo
-    if (carbsDeficit > 10) {
+    if (carbsDelta > 10) {
       result = adjustForDeficit(significantCarbItems.filter(item => 
         !allAdjustments.some(a => a.itemId === item.id)
-      ), carbsDeficit, 'carbs', opts);
-      carbsDeficit = result.remainingDeficit;
+      ), carbsDelta, 'carbs', opts);
+      carbsDelta = result.remainingDeficit;
       allAdjustments.push(...result.adjustments);
     }
-  } else if (carbsDeficit < 0) {
-    // Primeira passada: itens com carbs dominante
-    let result = adjustForExcess(carbItems, -carbsDeficit, 'carbs', opts, allAdjustments);
-    carbsDeficit = -result.remainingExcess;
+  } else if (carbsDelta < 0) {
+    // Excesso: precisamos REDUZIR carbs
+    let result = adjustForExcess(carbItems, -carbsDelta, 'carbs', opts, allAdjustments);
     allAdjustments.push(...result.adjustments);
     
-    // Segunda passada: itens com carbs significativo
-    if (-carbsDeficit > 10) {
-      result = adjustForExcess(significantCarbItems, -carbsDeficit, 'carbs', opts, allAdjustments);
-      carbsDeficit = -result.remainingExcess;
+    if (result.remainingExcess > 10) {
+      result = adjustForExcess(significantCarbItems, result.remainingExcess, 'carbs', opts, allAdjustments);
       allAdjustments.push(...result.adjustments);
     }
   }
   
   // 3. GORDURAS (terceira prioridade - ajuste fino)
-  let fatDeficit = deltas.fat;
-  if (fatDeficit > 0) {
-    const result = adjustForDeficit(fatItems, fatDeficit, 'fat', opts);
-    fatDeficit = result.remainingDeficit;
+  let fatDelta = deltas.fat;
+  if (fatDelta > 0) {
+    // Déficit: precisamos AUMENTAR gordura
+    const result = adjustForDeficit(fatItems, fatDelta, 'fat', opts);
+    fatDelta = result.remainingDeficit;
     allAdjustments.push(...result.adjustments);
-  } else if (fatDeficit < 0) {
-    // Primeira passada: itens com gordura dominante
-    let result = adjustForExcess(fatItems, -fatDeficit, 'fat', opts, allAdjustments);
-    fatDeficit = -result.remainingExcess;
+  } else if (fatDelta < 0) {
+    // Excesso: precisamos REDUZIR gordura
+    let result = adjustForExcess(fatItems, -fatDelta, 'fat', opts, allAdjustments);
     allAdjustments.push(...result.adjustments);
     
-    // Segunda passada: itens com gordura significativa (se ainda houver excesso > 5g)
-    if (-fatDeficit > 5) {
-      result = adjustForExcess(significantFatItems, -fatDeficit, 'fat', opts, allAdjustments);
-      fatDeficit = -result.remainingExcess;
+    if (result.remainingExcess > 5) {
+      result = adjustForExcess(significantFatItems, result.remainingExcess, 'fat', opts, allAdjustments);
       allAdjustments.push(...result.adjustments);
     }
   }
+  
+  // Recalcular déficits finais para necessidade de suplementos
+  const finalProteinDeficit = Math.max(0, proteinDelta);
+  const finalCarbsDeficit = Math.max(0, carbsDelta);
+  const finalFatDeficit = Math.max(0, fatDelta);
   
   // ===== PASSO 7: SINALIZAR NECESSIDADE DE SUPLEMENTOS =====
   const supplementNeeds: SupplementNeed[] = [];
   
   if (opts.allowSupplements) {
-    if (proteinDeficit > 5) {
+    if (finalProteinDeficit > 5) {
       supplementNeeds.push({
         type: 'protein',
-        deficitGrams: Math.round(proteinDeficit),
-        message: `Déficit de ${Math.round(proteinDeficit)}g de proteína não pode ser coberto apenas com alimentos.`,
+        deficitGrams: Math.round(finalProteinDeficit),
+        message: `Déficit de ${Math.round(finalProteinDeficit)}g de proteína não pode ser coberto apenas com alimentos.`,
       });
     }
-    if (carbsDeficit > 10) {
+    if (finalCarbsDeficit > 10) {
       supplementNeeds.push({
         type: 'carbs',
-        deficitGrams: Math.round(carbsDeficit),
-        message: `Déficit de ${Math.round(carbsDeficit)}g de carboidrato não pode ser coberto apenas com alimentos.`,
+        deficitGrams: Math.round(finalCarbsDeficit),
+        message: `Déficit de ${Math.round(finalCarbsDeficit)}g de carboidrato não pode ser coberto apenas com alimentos.`,
       });
     }
-    if (fatDeficit > 5) {
+    if (finalFatDeficit > 5) {
       supplementNeeds.push({
         type: 'fat',
-        deficitGrams: Math.round(fatDeficit),
-        message: `Déficit de ${Math.round(fatDeficit)}g de gordura não pode ser coberto apenas com alimentos.`,
+        deficitGrams: Math.round(finalFatDeficit),
+        message: `Déficit de ${Math.round(finalFatDeficit)}g de gordura não pode ser coberto apenas com alimentos.`,
       });
     }
   }
