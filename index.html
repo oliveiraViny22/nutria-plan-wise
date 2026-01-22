@@ -66,6 +66,16 @@
   </head>
 
   <body>
+    <!-- Theme initialization script - runs before React to prevent flash -->
+    <script>
+      (function() {
+        var stored = localStorage.getItem('nutriplan-theme');
+        var theme = (stored === 'dark' || stored === 'light') ? stored : 'light';
+        document.documentElement.classList.add(theme);
+        var meta = document.querySelector('meta[name="theme-color"]');
+        if (meta) meta.setAttribute('content', theme === 'dark' ? '#0f1a17' : '#f7fbf9');
+      })();
+    </script>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
