@@ -286,6 +286,32 @@ export function filterByDominantMacro(
 }
 
 /**
+ * Filtra itens que têm quantidade significativa do macro especificado.
+ * Mais abrangente que filterByDominantMacro - inclui alimentos onde
+ * o macro representa pelo menos 15% das calorias do alimento.
+ */
+export function filterBySignificantMacro(
+  items: PlanItem[],
+  macro: 'protein' | 'carbs' | 'fat'
+): PlanItem[] {
+  return items.filter(item => {
+    const food = item.food;
+    const totalMacroGrams = food.protein + food.carbs + food.fat;
+    if (totalMacroGrams === 0) return false;
+    
+    // Calcular porcentagem de calorias do macro
+    // Proteína e carbs = 4 kcal/g, gordura = 9 kcal/g
+    const macroCalories = macro === 'fat' ? food.fat * 9 : food[macro] * 4;
+    const percentOfCalories = (macroCalories / food.calories) * 100;
+    
+    // Incluir se o macro representa pelo menos 15% das calorias
+    // OU se tem pelo menos 3g do macro por 100g
+    const macroValuePer100g = (food[macro] / food.servingGrams) * 100;
+    return percentOfCalories >= 15 || macroValuePer100g >= 3;
+  });
+}
+
+/**
  * Filtra itens por categoria canônica.
  */
 export function filterByCategory(items: PlanItem[], category: FoodCategory): PlanItem[] {
@@ -367,6 +393,9 @@ export function adjustForDeficit(
 /**
  * Reduz itens para corrigir um excesso de macro específico.
  * Retorna o excesso restante e os ajustes feitos.
+ * 
+ * MELHORADO: Usa limite de redução mais agressivo (até 50%) e
+ * prioriza itens com maior densidade do macro alvo.
  */
 export function adjustForExcess(
   items: PlanItem[],
@@ -382,22 +411,27 @@ export function adjustForExcess(
   const adjustments: QuantityAdjustment[] = [];
   let remaining = excess;
   
-  // Ordenar por densidade do macro (menor primeiro - priorizar reduzir os menos densos)
+  // Ordenar por MAIOR densidade do macro primeiro (reduzir os mais concentrados é mais eficiente)
   const sorted = [...items].sort((a, b) => {
     const densityA = a.food[macroKey] / a.food.servingGrams;
     const densityB = b.food[macroKey] / b.food.servingGrams;
-    return densityA - densityB;
+    return densityB - densityA; // Maior densidade primeiro
   });
   
   for (const item of sorted) {
     if (remaining <= 0) break;
     
-    // Não ajustar o mesmo item duas vezes
-    if (existingAdjustments.some(a => a.itemId === item.id)) continue;
+    // Verificar se já foi ajustado
+    const existingAdj = existingAdjustments.find(a => a.itemId === item.id);
+    const currentAdj = adjustments.find(a => a.itemId === item.id);
+    if (existingAdj || currentAdj) continue;
     
     const food = item.food;
     const currentQty = item.quantityGrams;
-    const maxDecrease = currentQty * 0.3; // Máximo 30% de redução
+    
+    // Usar limite de redução mais agressivo: até 50% ou conforme maxAdjustmentPercent
+    const maxReductionPercent = Math.max(0.5, options.maxAdjustmentPercent);
+    const maxDecrease = currentQty * maxReductionPercent;
     
     const macroPer100g = (food[macroKey] / food.servingGrams) * 100;
     if (macroPer100g === 0) continue;
@@ -405,10 +439,13 @@ export function adjustForExcess(
     const gramsToReduce = (remaining / macroPer100g) * 100;
     const actualDecrease = Math.min(gramsToReduce, maxDecrease);
     
-    if (actualDecrease < 5) continue;
+    if (actualDecrease < 3) continue; // Reduzir threshold mínimo de 5g para 3g
     
     const newQty = Math.max(options.minQuantityGrams, Math.round(currentQty - actualDecrease));
     const actualReduction = currentQty - newQty;
+    
+    if (actualReduction < 1) continue; // Ignorar se não há redução real
+    
     const macroLoss = (actualReduction / food.servingGrams) * food[macroKey];
     
     remaining -= macroLoss;
@@ -514,6 +551,14 @@ export function rebalancePlan(
   const fatItems = filterByDominantMacro(firstOptionItems, 'fat')
     .filter(item => item.food.category?.toLowerCase() !== 'suplementos');
   
+  // Filtrar alimentos por macro significativo (mais abrangente, para segunda passada)
+  const significantFatItems = filterBySignificantMacro(firstOptionItems, 'fat')
+    .filter(item => item.food.category?.toLowerCase() !== 'suplementos');
+  const significantProteinItems = filterBySignificantMacro(firstOptionItems, 'protein')
+    .filter(item => item.food.category?.toLowerCase() !== 'suplementos');
+  const significantCarbItems = filterBySignificantMacro(firstOptionItems, 'carbs')
+    .filter(item => item.food.category?.toLowerCase() !== 'suplementos');
+  
   // 1. PROTEÍNAS (primeira prioridade)
   let proteinDeficit = deltas.protein;
   if (proteinDeficit > 0) {
@@ -521,9 +566,17 @@ export function rebalancePlan(
     proteinDeficit = result.remainingDeficit;
     allAdjustments.push(...result.adjustments);
   } else if (proteinDeficit < 0) {
-    const result = adjustForExcess(proteinItems, -proteinDeficit, 'protein', opts, allAdjustments);
+    // Primeira passada: itens com proteína dominante
+    let result = adjustForExcess(proteinItems, -proteinDeficit, 'protein', opts, allAdjustments);
     proteinDeficit = -result.remainingExcess;
     allAdjustments.push(...result.adjustments);
+    
+    // Segunda passada: itens com proteína significativa (se ainda houver excesso > 5g)
+    if (-proteinDeficit > 5) {
+      result = adjustForExcess(significantProteinItems, -proteinDeficit, 'protein', opts, allAdjustments);
+      proteinDeficit = -result.remainingExcess;
+      allAdjustments.push(...result.adjustments);
+    }
   }
   
   // 2. CARBOIDRATOS (segunda prioridade)
@@ -533,9 +586,17 @@ export function rebalancePlan(
     carbsDeficit = result.remainingDeficit;
     allAdjustments.push(...result.adjustments);
   } else if (carbsDeficit < 0) {
-    const result = adjustForExcess(carbItems, -carbsDeficit, 'carbs', opts, allAdjustments);
+    // Primeira passada: itens com carbs dominante
+    let result = adjustForExcess(carbItems, -carbsDeficit, 'carbs', opts, allAdjustments);
     carbsDeficit = -result.remainingExcess;
     allAdjustments.push(...result.adjustments);
+    
+    // Segunda passada: itens com carbs significativo
+    if (-carbsDeficit > 10) {
+      result = adjustForExcess(significantCarbItems, -carbsDeficit, 'carbs', opts, allAdjustments);
+      carbsDeficit = -result.remainingExcess;
+      allAdjustments.push(...result.adjustments);
+    }
   }
   
   // 3. GORDURAS (terceira prioridade - ajuste fino)
@@ -545,9 +606,17 @@ export function rebalancePlan(
     fatDeficit = result.remainingDeficit;
     allAdjustments.push(...result.adjustments);
   } else if (fatDeficit < 0) {
-    const result = adjustForExcess(fatItems, -fatDeficit, 'fat', opts, allAdjustments);
+    // Primeira passada: itens com gordura dominante
+    let result = adjustForExcess(fatItems, -fatDeficit, 'fat', opts, allAdjustments);
     fatDeficit = -result.remainingExcess;
     allAdjustments.push(...result.adjustments);
+    
+    // Segunda passada: itens com gordura significativa (se ainda houver excesso > 5g)
+    if (-fatDeficit > 5) {
+      result = adjustForExcess(significantFatItems, -fatDeficit, 'fat', opts, allAdjustments);
+      fatDeficit = -result.remainingExcess;
+      allAdjustments.push(...result.adjustments);
+    }
   }
   
   // ===== PASSO 7: SINALIZAR NECESSIDADE DE SUPLEMENTOS =====
