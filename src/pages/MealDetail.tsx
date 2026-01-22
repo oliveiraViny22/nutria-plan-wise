@@ -18,6 +18,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useLinkedStudent } from '@/hooks/useLinkedStudent';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useAccountPermissions } from '@/hooks/useAccountPermissions';
+import { useSubscription } from '@/hooks/useSubscription';
 import { useSubstitution } from '@/hooks/useSubstitution';
 import { Meal, Food, MEAL_NAMES, MealType, MealOption, MealOptionFood } from '@/lib/types';
 import { toast } from 'sonner';
@@ -85,10 +86,16 @@ export default function MealDetail() {
   const isProfessionalViewingStudent = isProfessional && !!studentIdFromQuery;
   
   const { plan_name, meal_options_limit, can_substitute } = useAccountPermissions();
+  const { currentPlan, usage } = useSubscription();
   const isPaidPlan = plan_name !== 'gratuito';
   
+  // Check if substitution limit is reached
+  const substitutionLimitReached = usage && currentPlan 
+    ? usage.substitutions_used >= currentPlan.substitution_limit 
+    : false;
+  
   const canEdit = !isLinkedStudent || isProfessionalViewingStudent;
-  const canShowSubstituteButton = canEdit && can_substitute;
+  const canShowSubstituteButton = canEdit && can_substitute && !substitutionLimitReached;
   const canAddRemoveFoods = canEdit && (isProfessional || isPaidPlan);
   
   const [meal, setMeal] = useState<Meal | null>(null);
