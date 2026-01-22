@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Logo } from '@/components/Logo';
 import { MobileNav } from '@/components/MobileNav';
+import { ThemeToggle } from '@/components/ThemeToggle';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserRole } from '@/hooks/useUserRole';
 
@@ -61,7 +62,7 @@ export default function StudentView() {
           <h1 className="text-sm sm:text-lg font-semibold truncate max-w-[140px] sm:max-w-[200px]">
             Visualização de Aluno
           </h1>
-          <div className="w-9 sm:w-10" />
+          <ThemeToggle />
         </div>
       </header>
 
