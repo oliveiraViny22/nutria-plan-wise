@@ -5,9 +5,7 @@ import {
   ArrowLeft,
   RefreshCw,
   Loader2,
-  Sparkles,
-  Check,
-  Trash2,
+  ThumbsDown,
   AlertTriangle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -22,13 +20,7 @@ import { useSubscription } from '@/hooks/useSubscription';
 import { useSubstitution } from '@/hooks/useSubstitution';
 import { Meal, Food, MEAL_NAMES, MealType, MealOption, MealOptionFood } from '@/lib/types';
 import { toast } from 'sonner';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from '@/components/ui/dialog';
+import { SubstitutionModal } from '@/components/SubstitutionModal';
 import { UpgradeDialog } from '@/components/UpgradeDialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
@@ -42,6 +34,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 
 // Parse serving_size to extract base grams
 function parseServingGrams(servingSize: string): number {
@@ -96,7 +94,10 @@ export default function MealDetail() {
   
   const canEdit = !isLinkedStudent || isProfessionalViewingStudent;
   const canShowSubstituteButton = canEdit && can_substitute && !substitutionLimitReached;
-  const canAddRemoveFoods = canEdit && (isProfessional || isPaidPlan);
+  
+  // IMPORTANTE: Apenas profissionais podem remover alimentos diretamente
+  // Usuários comuns usam "Não gosto" que abre substituição
+  const canRemoveDirectly = isProfessional && isProfessionalViewingStudent;
   
   const [meal, setMeal] = useState<Meal | null>(null);
   const [mealOptions, setMealOptions] = useState<MealOption[]>([]);
@@ -108,6 +109,7 @@ export default function MealDetail() {
   const [currentOptionId, setCurrentOptionId] = useState<string | null>(null);
   const [showUpgradeDialog, setShowUpgradeDialog] = useState(false);
   
+  // Dialog de remoção (apenas para profissionais)
   const [showRemoveDialog, setShowRemoveDialog] = useState(false);
   const [foodToRemove, setFoodToRemove] = useState<{ optionFood: MealOptionFood; optionId: string } | null>(null);
   const [removingFood, setRemovingFood] = useState(false);
@@ -201,16 +203,29 @@ export default function MealDetail() {
     return mealOptions.filter(opt => opt.option_number <= meal_options_limit);
   }, [mealOptions, meal_options_limit]);
 
+  // Handler para abrir modal de substituição (usado tanto por "Trocar" quanto por "Não gosto")
   const openSubstituteModal = useCallback((optionFood: MealOptionFood, optionId: string) => {
     const food = optionFood.food as Food;
     if (!food) return;
+    
+    // Verificar se pode substituir
+    if (!can_substitute) {
+      setShowUpgradeDialog(true);
+      return;
+    }
+    
+    if (substitutionLimitReached) {
+      toast.error('Limite de substituições atingido. Faça upgrade do seu plano.');
+      setShowUpgradeDialog(true);
+      return;
+    }
     
     setSelectedMealOptionFood(optionFood);
     setCurrentOptionId(optionId);
     resetSubstitution();
     findCandidates(food, optionFood.quantity_grams, allFoods);
     setShowSubstituteModal(true);
-  }, [allFoods, findCandidates, resetSubstitution]);
+  }, [allFoods, findCandidates, resetSubstitution, can_substitute, substitutionLimitReached]);
 
   const handleSelectCandidate = useCallback((candidateId: string) => {
     selectCandidate(candidateId);
@@ -261,9 +276,11 @@ export default function MealDetail() {
     }).eq('id', optionId);
   };
 
+  // Handler para remoção direta (APENAS profissionais)
   const openRemoveDialog = (optionFood: MealOptionFood, optionId: string) => {
-    if (!canAddRemoveFoods) {
-      setShowUpgradeDialog(true);
+    if (!canRemoveDirectly) {
+      // Usuários comuns são redirecionados para substituição
+      openSubstituteModal(optionFood, optionId);
       return;
     }
     setFoodToRemove({ optionFood, optionId });
@@ -353,6 +370,7 @@ export default function MealDetail() {
                     const qty = getTotalGrams(optionFood.quantity_grams);
                     const nutrients = calcNutrients(food, qty);
                     const canSub = canShowSubstituteButton && checkCanSubstitute(food);
+                    const canShowDislike = canEdit && !canSub; // Mostrar "Não gosto" se não pode substituir diretamente
                     
                     return (
                       <div key={optionFood.id} className="card-elevated rounded-lg p-3">
@@ -368,15 +386,89 @@ export default function MealDetail() {
                             </div>
                           </div>
                           <div className="flex flex-col gap-1">
+                            {/* Botão de substituição para alimentos substituíveis */}
                             {canSub && (
-                              <Button variant="outline" size="sm" className="text-xs" onClick={() => openSubstituteModal(optionFood, option.id)}>
-                                <RefreshCw className="w-3 h-3 mr-1" />Trocar
-                              </Button>
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button 
+                                      variant="outline" 
+                                      size="sm" 
+                                      className="text-xs" 
+                                      onClick={() => openSubstituteModal(optionFood, option.id)}
+                                    >
+                                      <RefreshCw className="w-3 h-3 mr-1" />Trocar
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p className="text-xs">Substituir por alimento equivalente</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
                             )}
-                            {canAddRemoveFoods && (
-                              <Button variant="ghost" size="sm" className="text-xs text-destructive" onClick={() => openRemoveDialog(optionFood, option.id)}>
-                                <Trash2 className="w-3 h-3 mr-1" />Remover
-                              </Button>
+                            
+                            {/* Botão "Não gosto" para alimentos que não são diretamente substituíveis 
+                                OU para dar uma alternativa à remoção */}
+                            {canEdit && !canSub && can_substitute && !substitutionLimitReached && (
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button 
+                                      variant="ghost" 
+                                      size="sm" 
+                                      className="text-xs text-muted-foreground" 
+                                      onClick={() => openSubstituteModal(optionFood, option.id)}
+                                    >
+                                      <ThumbsDown className="w-3 h-3 mr-1" />Não gosto
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p className="text-xs">Encontrar alternativa equivalente</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            )}
+                            
+                            {/* Segundo botão "Não gosto" para alimentos substituíveis - alternativa à remoção */}
+                            {canSub && canEdit && (
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button 
+                                      variant="ghost" 
+                                      size="sm" 
+                                      className="text-xs text-muted-foreground" 
+                                      onClick={() => openSubstituteModal(optionFood, option.id)}
+                                    >
+                                      <ThumbsDown className="w-3 h-3 mr-1" />Não gosto
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p className="text-xs">Encontrar alternativa equivalente</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            )}
+
+                            {/* APENAS profissionais veem o botão de remoção direta */}
+                            {canRemoveDirectly && (
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button 
+                                      variant="ghost" 
+                                      size="sm" 
+                                      className="text-xs text-destructive" 
+                                      onClick={() => openRemoveDialog(optionFood, option.id)}
+                                    >
+                                      <AlertTriangle className="w-3 h-3 mr-1" />Remover
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p className="text-xs">⚠️ Remove sem compensar. Pode desequilibrar o plano.</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
                             )}
                           </div>
                         </div>
@@ -392,111 +484,53 @@ export default function MealDetail() {
         )}
       </main>
 
-      {/* Modal de Substituição */}
-      <Dialog open={showSubstituteModal} onOpenChange={handleCloseModal}>
-        <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Substituir Alimento</DialogTitle>
-            <DialogDescription>Selecione um equivalente para manter as calorias.</DialogDescription>
-          </DialogHeader>
-          
-          {selectedMealOptionFood?.food && (
-            <div className="space-y-4">
-              <div className="p-3 bg-muted rounded-lg">
-                <p className="text-sm text-muted-foreground">Substituindo:</p>
-                <p className="font-medium">{(selectedMealOptionFood.food as Food).name}</p>
-                <p className="text-sm text-muted-foreground">
-                  {getTotalGrams(selectedMealOptionFood.quantity_grams)}{getUnit((selectedMealOptionFood.food as Food).serving_size)}
-                </p>
-              </div>
+      {/* Modal de Substituição Inteligente */}
+      <SubstitutionModal
+        open={showSubstituteModal}
+        onOpenChange={handleCloseModal}
+        selectedFood={selectedMealOptionFood}
+        candidates={candidates}
+        proposal={proposal}
+        isLoading={substitutionLoading}
+        isConfirming={substituting}
+        error={substitutionError}
+        impact={getImpact()}
+        requiresRebalance={requiresRebalance()}
+        onSelectCandidate={handleSelectCandidate}
+        onConfirm={confirmSubstitution}
+        onBack={handleBackToCandidates}
+      />
 
-              {substitutionError && (
-                <div className="p-3 bg-destructive/10 rounded-lg flex items-start gap-2">
-                  <AlertTriangle className="w-4 h-4 text-destructive mt-0.5" />
-                  <p className="text-sm text-destructive">
-                    {substitutionError === 'SUPPLEMENT_NOT_SUBSTITUTABLE' ? 'Suplementos não podem ser substituídos automaticamente.' : 'Nenhum alimento disponível nesta categoria.'}
-                  </p>
-                </div>
-              )}
-
-              {!proposal ? (
-                <div className="space-y-2">
-                  <p className="text-sm font-medium">Selecione o novo alimento:</p>
-                  {substitutionLoading ? (
-                    <div className="flex items-center justify-center py-8">
-                      <Loader2 className="w-5 h-5 animate-spin text-primary" />
-                      <span className="ml-2 text-sm">Buscando...</span>
-                    </div>
-                  ) : candidates.length > 0 ? (
-                    <div className="max-h-60 overflow-y-auto space-y-1">
-                      {candidates.map((c) => (
-                        <button key={c.food.id} className="w-full text-left p-2 rounded-lg hover:bg-muted flex justify-between" onClick={() => handleSelectCandidate(c.food.id)}>
-                          <div>
-                            <p className="font-medium text-sm">{c.food.name}</p>
-                            <p className="text-xs text-muted-foreground">{c.newPortionGrams}g</p>
-                          </div>
-                          <Badge variant="outline" className="text-xs">{Math.round(c.score * 100)}%</Badge>
-                        </button>
-                      ))}
-                    </div>
-                  ) : !substitutionError && (
-                    <p className="text-sm text-muted-foreground text-center py-4">Nenhum alimento disponível</p>
-                  )}
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  <div className="p-3 bg-primary/10 rounded-lg">
-                    <p className="text-sm text-muted-foreground">Novo alimento:</p>
-                    <p className="font-medium">{proposal.to.food.name}</p>
-                    <p className="text-sm text-muted-foreground">{proposal.to.portionGrams}g</p>
-                  </div>
-
-                  <div className="p-3 bg-muted rounded-lg">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Sparkles className="w-4 h-4 text-primary" />
-                      <p className="text-sm font-medium">Impacto:</p>
-                      <Badge variant={getImpact() === 'low' ? 'secondary' : 'outline'} className="text-xs">
-                        {getImpact() === 'low' ? 'Baixo' : getImpact() === 'medium' ? 'Médio' : 'Alto'}
-                      </Badge>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2 text-xs">
-                      <div><span className="text-muted-foreground">Calorias:</span> {proposal.deltaMacros.calories > 0 ? '+' : ''}{proposal.deltaMacros.calories}</div>
-                      <div><span className="text-muted-foreground">Proteína:</span> {proposal.deltaMacros.protein > 0 ? '+' : ''}{proposal.deltaMacros.protein}g</div>
-                    </div>
-                    {requiresRebalance() && <p className="text-xs text-amber-600 mt-2">⚠️ Pode requerer ajuste.</p>}
-                  </div>
-
-                  <div className="flex gap-2">
-                    <Button variant="outline" className="flex-1" onClick={handleBackToCandidates} disabled={substituting}>Voltar</Button>
-                    <Button className="flex-1" onClick={confirmSubstitution} disabled={substituting}>
-                      {substituting ? <><Loader2 className="w-4 h-4 animate-spin mr-2" />Substituindo...</> : <><Check className="w-4 h-4 mr-2" />Confirmar</>}
-                    </Button>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
-
+      {/* Dialog de remoção - APENAS para profissionais */}
       <AlertDialog open={showRemoveDialog} onOpenChange={setShowRemoveDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Remover alimento?</AlertDialogTitle>
-            <AlertDialogDescription>
-              {foodToRemove?.optionFood.food && <>Remover <strong>{(foodToRemove.optionFood.food as Food).name}</strong>?</>}
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-destructive" />
+              Remover alimento?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-2">
+              <p>
+                {foodToRemove?.optionFood.food && (
+                  <>Remover <strong>{(foodToRemove.optionFood.food as Food).name}</strong>?</>
+                )}
+              </p>
+              <p className="text-amber-600 text-sm">
+                ⚠️ <strong>Atenção:</strong> Remover um alimento sem substituição pode desequilibrar 
+                o plano nutricional do paciente. Considere usar a substituição inteligente.
+              </p>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={removingFood}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleRemoveFood} disabled={removingFood} className="bg-destructive">
-              {removingFood ? 'Removendo...' : 'Remover'}
+            <AlertDialogAction onClick={handleRemoveFood} disabled={removingFood} className="bg-destructive hover:bg-destructive/90">
+              {removingFood ? 'Removendo...' : 'Remover mesmo assim'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
-      <UpgradeDialog open={showUpgradeDialog} onOpenChange={setShowUpgradeDialog} feature="gerenciamento de alimentos" />
+      <UpgradeDialog open={showUpgradeDialog} onOpenChange={setShowUpgradeDialog} feature="substituição de alimentos" />
     </div>
   );
 }

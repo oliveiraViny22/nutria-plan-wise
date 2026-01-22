@@ -573,3 +573,25 @@ export function getImpactLevel(proposal: SubstituteProposal): 'low' | 'medium' |
   if (percentChange <= 15) return 'medium';
   return 'high';
 }
+
+/**
+ * Retorna label amigável para o score de similaridade
+ * Usado para mostrar feedback visual ao usuário
+ */
+export function getSimilarityLabel(score: number): { 
+  label: string; 
+  quality: 'excellent' | 'good' | 'fair' | 'acceptable' 
+} {
+  const percentage = Math.round(score * 100);
+  
+  if (percentage >= 90) {
+    return { label: 'Excelente escolha', quality: 'excellent' };
+  }
+  if (percentage >= 75) {
+    return { label: 'Ótima escolha', quality: 'good' };
+  }
+  if (percentage >= 60) {
+    return { label: 'Boa opção', quality: 'fair' };
+  }
+  return { label: 'Opção viável', quality: 'acceptable' };
+}
