@@ -101,6 +101,27 @@ export interface SupplementNeed {
   message: string;
 }
 
+/**
+ * Razões para falha controlada do rebalanceador.
+ * Apenas estas razões acionam o fluxo de IA.
+ */
+export type ControlledFailureReason = 
+  | 'calorie_protein_impossible'  // Não é possível atingir calorias E proteína
+  | 'macro_distribution_blocked'  // Distribuição de macros bloqueada por regras
+  | 'insufficient_food_variety';  // Alimentos disponíveis não permitem ajuste
+
+/**
+ * Detalhes da falha controlada para análise da IA.
+ */
+export interface ControlledFailureDetails {
+  reason: ControlledFailureReason;
+  proteinGap: number;      // Diferença de proteína não resolvida
+  calorieGap: number;      // Diferença de calorias não resolvida
+  blockedBy: string[];     // Quais regras bloquearam o ajuste
+  attemptedAdjustments: number;
+  userMessage: string;
+}
+
 export interface RebalanceSnapshot {
   planId: string;
   version: number;
@@ -111,6 +132,9 @@ export interface RebalanceSnapshot {
   supplementNeeds: SupplementNeed[];
   isValid: boolean;
   validationErrors: string[];
+  
+  // NOVO: Indicador de falha controlada para fluxo híbrido
+  controlledFailure?: ControlledFailureDetails;
 }
 
 export interface RebalanceOptions {
@@ -1063,12 +1087,12 @@ export function rebalancePlan(
   
   // ===== PASSO 8: SINALIZAR NECESSIDADE DE SUPLEMENTOS (REGRA 6) =====
   const supplementNeeds: SupplementNeed[] = [];
+  const finalProteinDeficit = target.protein - proposedMacros.protein;
+  const finalCarbsDeficit = target.carbs - proposedMacros.carbs;
+  const finalFatDeficit = target.fat - proposedMacros.fat;
+  const finalCalorieGap = target.calories - proposedMacros.calories;
   
   if (opts.allowSupplements) {
-    const finalProteinDeficit = target.protein - proposedMacros.protein;
-    const finalCarbsDeficit = target.carbs - proposedMacros.carbs;
-    const finalFatDeficit = target.fat - proposedMacros.fat;
-    
     if (finalProteinDeficit > 5) {
       supplementNeeds.push({
         type: 'protein',
@@ -1092,7 +1116,47 @@ export function rebalancePlan(
     }
   }
   
-  // ===== PASSO 9: RETORNAR SNAPSHOT IMUTÁVEL =====
+  // ===== PASSO 9: DETECTAR FALHA CONTROLADA =====
+  // Falha controlada ocorre quando:
+  // - Há déficit significativo de proteína (>10g) E
+  // - Calorias não podem ser atingidas dentro da tolerância
+  // APENAS neste caso a IA deve ser acionada
+  let controlledFailure: ControlledFailureDetails | undefined;
+  
+  const hasSignificantProteinGap = finalProteinDeficit > 10;
+  const hasSignificantCalorieGap = Math.abs(finalCalorieGap) > target.calories * 0.05; // >5%
+  const hasValidationFailures = validationErrors.length > 0;
+  
+  if (hasValidationFailures && hasSignificantProteinGap && hasSignificantCalorieGap) {
+    // Determinar motivo específico
+    let reason: ControlledFailureReason = 'calorie_protein_impossible';
+    const blockedBy: string[] = [];
+    
+    if (validationErrors.some(e => e.includes('ESTOURO CALÓRICO'))) {
+      blockedBy.push('Teto calórico (±2%)');
+    }
+    if (validationErrors.some(e => e.includes('carbs') && e.includes('gordura'))) {
+      reason = 'macro_distribution_blocked';
+      blockedBy.push('Regra 4: carbs e gordura não podem subir juntos');
+    }
+    if (allAdjustments.length < 2 && firstOptionItems.length < 4) {
+      reason = 'insufficient_food_variety';
+      blockedBy.push('Poucos alimentos para redistribuição');
+    }
+    
+    controlledFailure = {
+      reason,
+      proteinGap: Math.round(finalProteinDeficit),
+      calorieGap: Math.round(finalCalorieGap),
+      blockedBy,
+      attemptedAdjustments: allAdjustments.length,
+      userMessage: `Não foi possível atingir a meta de proteína (${Math.round(finalProteinDeficit)}g faltando) sem ${
+        finalCalorieGap > 0 ? 'exceder' : 'ficar muito abaixo de'
+      } o limite calórico. Estratégias alternativas podem ajudar.`,
+    };
+  }
+  
+  // ===== PASSO 10: RETORNAR SNAPSHOT IMUTÁVEL =====
   return {
     planId: plan.id,
     version: plan.version + 1,
@@ -1103,6 +1167,7 @@ export function rebalancePlan(
     supplementNeeds,
     isValid: validationErrors.length === 0,
     validationErrors,
+    controlledFailure,
   };
 }
 
