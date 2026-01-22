@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Logo } from '@/components/Logo';
-import { ThemeToggleSimple } from '@/components/ThemeToggle';
+import { ThemeToggle } from '@/components/ThemeToggle';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { signupSchema, validatePassword } from '@/lib/password-validation';
@@ -106,7 +106,7 @@ export default function Signup() {
             <Link to="/">
               <Logo size="lg" />
             </Link>
-            <ThemeToggleSimple />
+            <ThemeToggle />
           </div>
 
           <h1 className="text-2xl sm:text-3xl font-bold text-foreground mb-1.5 sm:mb-2">

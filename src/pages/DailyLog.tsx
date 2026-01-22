@@ -24,7 +24,7 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Logo } from '@/components/Logo';
 import { MobileNav } from '@/components/MobileNav';
-import { ThemeToggleSimple } from '@/components/ThemeToggle';
+import { ThemeToggle } from '@/components/ThemeToggle';
 import {
   Dialog,
   DialogContent,
@@ -412,7 +412,7 @@ export default function DailyLog() {
             <Logo size="sm" />
           </div>
           <h1 className="text-sm sm:text-lg font-semibold">Registro Diário</h1>
-          <ThemeToggleSimple />
+          <ThemeToggle />
         </div>
       </header>
 

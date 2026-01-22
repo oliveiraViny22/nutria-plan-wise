@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Logo } from '@/components/Logo';
-import { ThemeToggleSimple } from '@/components/ThemeToggle';
+import { ThemeToggle } from '@/components/ThemeToggle';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserRole } from '@/hooks/useUserRole';
 import { toast } from 'sonner';
@@ -74,7 +74,7 @@ export default function Login() {
             <Link to="/">
               <Logo size="lg" />
             </Link>
-            <ThemeToggleSimple />
+            <ThemeToggle />
           </div>
 
           <h1 className="text-2xl sm:text-3xl font-bold text-foreground mb-2">

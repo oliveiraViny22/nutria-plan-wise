@@ -198,19 +198,19 @@ export function MobileNav() {
 }
 
 function ThemeToggleItem() {
-  const { resolvedTheme, toggleTheme } = useTheme();
+  const { theme, toggleTheme } = useTheme();
   
   return (
     <button
       onClick={toggleTheme}
       className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors w-full touch-manipulation"
     >
-      {resolvedTheme === 'dark' ? (
+      {theme === 'dark' ? (
         <Moon className="h-5 w-5" />
       ) : (
         <Sun className="h-5 w-5" />
       )}
-      <span className="flex-1 text-left">{resolvedTheme === 'dark' ? 'Modo Escuro' : 'Modo Claro'}</span>
+      <span className="flex-1 text-left">{theme === 'dark' ? 'Modo Escuro' : 'Modo Claro'}</span>
       <ChevronRight className="h-4 w-4 opacity-50" />
     </button>
   );

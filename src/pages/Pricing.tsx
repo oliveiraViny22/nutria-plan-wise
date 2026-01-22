@@ -11,7 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { Plan, PLAN_DESCRIPTIONS, PLAN_DISPLAY_NAMES } from '@/lib/subscription-types';
 import { MobileNav } from '@/components/MobileNav';
-import { ThemeToggleSimple } from '@/components/ThemeToggle';
+import { ThemeToggle } from '@/components/ThemeToggle';
 import { CommercialPlan } from '@/lib/types';
 
 export default function Pricing() {
@@ -161,7 +161,7 @@ export default function Pricing() {
             </Button>
           </div>
           <h1 className="text-lg sm:text-xl font-bold">Planos e Preços</h1>
-          <ThemeToggleSimple />
+          <ThemeToggle />
         </div>
       </header>
 

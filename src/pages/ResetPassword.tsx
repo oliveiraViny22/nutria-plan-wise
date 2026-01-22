@@ -7,7 +7,7 @@ import { ArrowLeft, Eye, EyeOff, Lock, CheckCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Logo } from '@/components/Logo';
-import { ThemeToggleSimple } from '@/components/ThemeToggle';
+import { ThemeToggle } from '@/components/ThemeToggle';
 
 const ResetPassword = () => {
   const navigate = useNavigate();
@@ -96,7 +96,7 @@ const ResetPassword = () => {
           <div className="bg-card rounded-xl sm:rounded-2xl shadow-xl p-5 sm:p-8 text-center">
             <div className="flex items-center justify-between mb-4">
               <Logo />
-              <ThemeToggleSimple />
+              <ThemeToggle />
             </div>
             <h1 className="text-xl sm:text-2xl font-bold text-foreground mb-3 sm:mb-4">
               Link inválido ou expirado
@@ -160,7 +160,7 @@ const ResetPassword = () => {
         <div className="bg-card rounded-xl sm:rounded-2xl shadow-xl p-5 sm:p-8">
           <div className="flex items-center justify-between mb-6 sm:mb-8">
             <Logo />
-            <ThemeToggleSimple />
+            <ThemeToggle />
           </div>
           <div className="text-center">
             <h1 className="text-xl sm:text-2xl font-bold text-foreground">
