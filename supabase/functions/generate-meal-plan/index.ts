@@ -304,6 +304,105 @@ function applyUnitConversion(food: Food, quantityGrams: number): FoodWithDisplay
 // REGRA CRÍTICA: Apenas categorias canônicas, apenas approved + active
 // ============================================================
 
+/**
+ * Definição de contexto de refeição para filtragem inteligente
+ * Alimentos são filtrados baseado em palavras-chave apropriadas para cada tipo de refeição
+ */
+interface MealContext {
+  preferred: string[];  // Palavras-chave que indicam alimentos preferidos
+  avoided: string[];    // Palavras-chave que indicam alimentos a evitar
+}
+
+const MEAL_CONTEXT_RULES: Record<string, MealContext> = {
+  // Café da manhã: pães, cereais, frutas, laticínios, ovos
+  breakfast: {
+    preferred: [
+      'pão', 'tapioca', 'aveia', 'granola', 'cereal', 'biscoito', 'torrada',
+      'ovo', 'queijo', 'iogurte', 'leite', 'manteiga', 'requeijão', 'cream cheese',
+      'banana', 'maçã', 'mamão', 'morango', 'laranja', 'melão', 'manga',
+      'mel', 'geleia', 'cuscuz', 'mingau', 'café', 'chocolate',
+      'presunto', 'peito de peru', 'cottage'
+    ],
+    avoided: [
+      'feijão', 'arroz', 'macarrão', 'lasanha', 'strogonoff', 'feijoada',
+      'bife', 'frango grelhado', 'carne moída', 'almôndega', 'file', 'costela',
+      'salada', 'alface', 'tomate', 'pepino', 'brócolis', 'couve',
+      'batata doce', 'mandioca', 'inhame', 'purê', 'farofa'
+    ]
+  },
+  // Lanche da manhã: frutas, oleaginosas, laticínios leves
+  morning_snack: {
+    preferred: [
+      'banana', 'maçã', 'pera', 'uva', 'morango', 'mamão', 'melão', 'laranja',
+      'castanha', 'amêndoa', 'nozes', 'amendoim', 'mix de nuts',
+      'iogurte', 'queijo', 'cottage', 'whey',
+      'barra de cereal', 'granola', 'aveia'
+    ],
+    avoided: [
+      'arroz', 'feijão', 'macarrão', 'carne', 'frango', 'peixe', 'bife',
+      'batata', 'mandioca', 'purê', 'salada completa'
+    ]
+  },
+  // Almoço: refeição completa com proteína, carboidrato, leguminosas, vegetais
+  lunch: {
+    preferred: [
+      'arroz', 'feijão', 'lentilha', 'grão-de-bico', 'macarrão', 'nhoque',
+      'frango', 'carne', 'peixe', 'bife', 'filé', 'costela', 'lombo', 'alcatra',
+      'tilápia', 'salmão', 'atum', 'sardinha', 'camarão',
+      'salada', 'alface', 'tomate', 'pepino', 'cenoura', 'brócolis', 'couve',
+      'batata doce', 'batata inglesa', 'mandioca', 'inhame', 'purê',
+      'farofa', 'vinagrete', 'legumes'
+    ],
+    avoided: [
+      'pão', 'tapioca', 'granola', 'cereal matinal', 'mingau',
+      'iogurte doce', 'mel', 'geleia', 'biscoito doce'
+    ]
+  },
+  // Lanche da tarde: similar ao lanche da manhã, com opções leves
+  afternoon_snack: {
+    preferred: [
+      'banana', 'maçã', 'pera', 'uva', 'morango', 'mamão', 'abacate',
+      'castanha', 'amêndoa', 'nozes', 'amendoim', 'pasta de amendoim',
+      'iogurte', 'queijo', 'cottage', 'whey',
+      'pão integral', 'tapioca', 'crepioca', 'wrap',
+      'sanduíche', 'vitamina', 'smoothie'
+    ],
+    avoided: [
+      'arroz', 'feijão', 'macarrão', 'carne grelhada', 'feijoada',
+      'batata doce', 'mandioca', 'purê'
+    ]
+  },
+  // Jantar: similar ao almoço, mas pode ser mais leve
+  dinner: {
+    preferred: [
+      'frango', 'peixe', 'carne', 'bife', 'filé', 'omelete', 'ovo',
+      'tilápia', 'salmão', 'atum',
+      'salada', 'alface', 'tomate', 'pepino', 'brócolis', 'abobrinha', 'legumes',
+      'arroz', 'batata doce', 'purê', 'quinoa',
+      'sopa', 'caldo', 'creme'
+    ],
+    avoided: [
+      'pão francês', 'tapioca', 'granola', 'cereal matinal',
+      'iogurte doce', 'mel', 'geleia', 'biscoito doce', 'mingau',
+      'feijão', 'feijoada' // jantar geralmente mais leve, sem feijão pesado
+    ]
+  },
+  // Ceia: leve, laticínios, frutas
+  supper: {
+    preferred: [
+      'iogurte', 'leite', 'queijo cottage', 'queijo branco',
+      'chá', 'chocolate quente', 'vitamina',
+      'banana', 'maçã', 'mamão', 'melão',
+      'aveia', 'granola', 'mel',
+      'castanha', 'amêndoa', 'nozes'
+    ],
+    avoided: [
+      'arroz', 'feijão', 'macarrão', 'carne', 'frango', 'peixe', 'bife',
+      'batata', 'mandioca', 'salada completa', 'legumes refogados'
+    ]
+  }
+};
+
 function fetchEligibleFoods(
   allFoods: Food[],
   restrictions: string[]
@@ -341,6 +440,49 @@ function fetchEligibleFoods(
   });
 }
 
+/**
+ * Filtra alimentos por contexto de refeição
+ * Retorna alimentos apropriados para o tipo de refeição específico
+ */
+function filterFoodsByMealContext(
+  foods: Food[],
+  mealType: MealType
+): Food[] {
+  const context = MEAL_CONTEXT_RULES[mealType];
+  if (!context) return foods;
+  
+  // Primeiro, tentar encontrar alimentos preferidos para esta refeição
+  const preferredFoods = foods.filter(f => {
+    const name = f.name.toLowerCase();
+    // Verificar se o alimento NÃO está na lista de evitados
+    const isAvoided = context.avoided.some(keyword => name.includes(keyword.toLowerCase()));
+    if (isAvoided) return false;
+    
+    // Verificar se o alimento está na lista de preferidos
+    const isPreferred = context.preferred.some(keyword => name.includes(keyword.toLowerCase()));
+    return isPreferred;
+  });
+  
+  // Se houver alimentos preferidos suficientes, usar apenas eles
+  if (preferredFoods.length >= 3) {
+    return preferredFoods;
+  }
+  
+  // Caso contrário, usar todos os alimentos que não são evitados
+  const notAvoidedFoods = foods.filter(f => {
+    const name = f.name.toLowerCase();
+    return !context.avoided.some(keyword => name.includes(keyword.toLowerCase()));
+  });
+  
+  // Se ainda não houver alimentos suficientes, incluir todos (fallback)
+  if (notAvoidedFoods.length < 3) {
+    logStep("Fallback: not enough context-filtered foods", { mealType, notAvoided: notAvoidedFoods.length });
+    return foods;
+  }
+  
+  return notAvoidedFoods;
+}
+
 // ============================================================
 // MONTAGEM DA REFEIÇÃO (LINHAS 130-180 DA SPEC)
 // Proteína quase sempre presente, gordura opcional, vegetais livres
@@ -350,14 +492,24 @@ function pickFoodFromCategory(
   foods: Food[],
   category: FoodCategory,
   usedIds: Set<string>,
-  preferences: string[]
+  preferences: string[],
+  mealType?: MealType
 ): Food | null {
-  const candidates = foods.filter(f => {
+  // Primeiro, filtrar por categoria
+  let candidates = foods.filter(f => {
     const cat = (f.category || '').toLowerCase();
     return cat === category && !usedIds.has(f.id);
   });
   
   if (candidates.length === 0) return null;
+  
+  // Aplicar filtro de contexto de refeição se disponível
+  if (mealType) {
+    const contextFiltered = filterFoodsByMealContext(candidates, mealType);
+    if (contextFiltered.length > 0) {
+      candidates = contextFiltered;
+    }
+  }
   
   // Priorizar preferências do usuário
   const preferred = candidates.filter(f => 
@@ -423,7 +575,8 @@ function buildMealOption(
   for (const category of categoryPriorities) {
     if (!isValidCategory(category)) continue;
     
-    const food = pickFoodFromCategory(foods, category, usedFoodIds, preferences);
+    // Passar mealType para filtrar alimentos por contexto de refeição
+    const food = pickFoodFromCategory(foods, category, usedFoodIds, preferences, mealType);
     if (!food) continue;
     
     usedFoodIds.add(food.id);
@@ -443,7 +596,8 @@ function buildMealOption(
   
   // Garantir que refeições principais tenham proteína
   if (isMainMeal && !mealFoods.some(f => (f.food.category || '').toLowerCase() === 'proteinas')) {
-    const protein = pickFoodFromCategory(foods, 'proteinas', usedFoodIds, preferences);
+    // Passar mealType para filtrar proteína apropriada
+    const protein = pickFoodFromCategory(foods, 'proteinas', usedFoodIds, preferences, mealType);
     if (protein) {
       usedFoodIds.add(protein.id);
       const portion = calculateDefaultPortion(protein, targetMacro);
