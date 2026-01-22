@@ -27,6 +27,12 @@ import { Button } from '@/components/ui/button';
 import { Logo } from '@/components/Logo';
 import { MobileNav } from '@/components/MobileNav';
 import { ThemeToggle } from '@/components/ThemeToggle';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 
 import { CalorieRing } from '@/components/CalorieRing';
 import { MacroChart } from '@/components/MacroChart';
@@ -183,65 +189,107 @@ export default function Dashboard() {
             <Logo />
           </div>
           {/* Desktop navigation - hidden on mobile */}
-          <div className="hidden md:flex items-center gap-1">
-            {/* Admin vê apenas o escudo */}
-            {isAdmin ? (
-              <>
-                <Link to="/admin">
-                  <Button variant="ghost" size="icon" className="w-10 h-10" title="Painel Admin">
-                    <Shield className="w-5 h-5 text-primary" />
+          <TooltipProvider delayDuration={300}>
+            <div className="hidden md:flex items-center gap-1">
+              {/* Admin vê apenas o escudo */}
+              {isAdmin ? (
+                <>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Link to="/admin">
+                        <Button variant="ghost" size="icon" className="w-10 h-10">
+                          <Shield className="w-5 h-5 text-primary" />
+                        </Button>
+                      </Link>
+                    </TooltipTrigger>
+                    <TooltipContent>Painel Admin</TooltipContent>
+                  </Tooltip>
+                </>
+              ) : (
+                <>
+                  {/* Profissionais */}
+                  {(isSubscribed && accountType === 'professional') || isProfessional ? (
+                    <>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Link to="/professional">
+                            <Button variant="ghost" size="icon" className="w-10 h-10 relative">
+                              <LayoutDashboard className="w-5 h-5" />
+                            </Button>
+                          </Link>
+                        </TooltipTrigger>
+                        <TooltipContent>Painel Profissional</TooltipContent>
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Link to="/students">
+                            <Button variant="ghost" size="icon" className="w-10 h-10">
+                              <Users className="w-5 h-5" />
+                            </Button>
+                          </Link>
+                        </TooltipTrigger>
+                        <TooltipContent>Gerenciar Alunos</TooltipContent>
+                      </Tooltip>
+                    </>
+                  ) : null}
+                  
+                  {/* Assinatura - Profissional não vê (já gerencia no painel), Aluno vinculado não vê (gerenciado pelo profissional) */}
+                  {!isProfessional && !isLinkedStudent && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Link to="/subscription">
+                          <Button variant="ghost" size="icon" className="w-10 h-10">
+                            <CreditCard className="w-5 h-5" />
+                          </Button>
+                        </Link>
+                      </TooltipTrigger>
+                      <TooltipContent>Assinatura</TooltipContent>
+                    </Tooltip>
+                  )}
+                  
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Link to="/progress">
+                        <Button variant="ghost" size="icon" className="w-10 h-10">
+                          <TrendingUp className="w-5 h-5" />
+                        </Button>
+                      </Link>
+                    </TooltipTrigger>
+                    <TooltipContent>Progresso</TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Link to="/profile">
+                        <Button variant="ghost" size="icon" className="w-10 h-10">
+                          <User className="w-5 h-5" />
+                        </Button>
+                      </Link>
+                    </TooltipTrigger>
+                    <TooltipContent>Meu Perfil</TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Link to="/chat">
+                        <Button variant="ghost" size="icon" className="w-10 h-10">
+                          <MessageCircle className="w-5 h-5" />
+                        </Button>
+                      </Link>
+                    </TooltipTrigger>
+                    <TooltipContent>Chat IA</TooltipContent>
+                  </Tooltip>
+                </>
+              )}
+              <ThemeToggle />
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon" className="w-10 h-10" onClick={handleSignOut}>
+                    <LogOut className="w-5 h-5" />
                   </Button>
-                </Link>
-              </>
-            ) : (
-              <>
-                {/* Profissionais */}
-                {(isSubscribed && accountType === 'professional') || isProfessional ? (
-                  <>
-                    <Link to="/professional">
-                      <Button variant="ghost" size="icon" className="w-10 h-10 relative" title="Painel Profissional">
-                        <LayoutDashboard className="w-5 h-5" />
-                      </Button>
-                    </Link>
-                    <Link to="/students">
-                      <Button variant="ghost" size="icon" className="w-10 h-10" title="Gerenciar Alunos">
-                        <Users className="w-5 h-5" />
-                      </Button>
-                    </Link>
-                  </>
-                ) : null}
-                
-                {/* Assinatura - Profissional não vê (já gerencia no painel), Aluno vinculado não vê (gerenciado pelo profissional) */}
-                {!isProfessional && !isLinkedStudent && (
-                  <Link to="/subscription">
-                    <Button variant="ghost" size="icon" className="w-10 h-10">
-                      <CreditCard className="w-5 h-5" />
-                    </Button>
-                  </Link>
-                )}
-                
-                <Link to="/progress">
-                  <Button variant="ghost" size="icon" className="w-10 h-10">
-                    <TrendingUp className="w-5 h-5" />
-                  </Button>
-                </Link>
-                <Link to="/profile">
-                  <Button variant="ghost" size="icon" className="w-10 h-10">
-                    <User className="w-5 h-5" />
-                  </Button>
-                </Link>
-                <Link to="/chat">
-                  <Button variant="ghost" size="icon" className="w-10 h-10">
-                    <MessageCircle className="w-5 h-5" />
-                  </Button>
-                </Link>
-              </>
-            )}
-            <ThemeToggle />
-            <Button variant="ghost" size="icon" className="w-10 h-10" onClick={handleSignOut}>
-              <LogOut className="w-5 h-5" />
-            </Button>
-          </div>
+                </TooltipTrigger>
+                <TooltipContent>Sair</TooltipContent>
+              </Tooltip>
+            </div>
+          </TooltipProvider>
         </div>
       </header>
 
