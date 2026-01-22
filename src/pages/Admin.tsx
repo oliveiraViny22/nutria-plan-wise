@@ -1786,6 +1786,28 @@ export default function Admin() {
                         </Button>
                       </CardContent>
                     </Card>
+
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-base flex items-center gap-2">
+                          <Sparkles className="h-4 w-4 text-amber-500" />
+                          Rebalanceador de Macros
+                        </CardTitle>
+                        <CardDescription>
+                          Código completo do serviço de rebalanceamento de macros (core, hooks, componentes e edge function).
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <a 
+                          href="/exports/rebalancer-service-code.txt"
+                          download="rebalancer-service-code.txt"
+                          className="inline-flex items-center justify-center w-full gap-2 px-4 py-2 text-sm font-medium border rounded-md hover:bg-muted transition-colors"
+                        >
+                          <Download className="h-4 w-4" />
+                          Baixar Código do Rebalanceador (TXT)
+                        </a>
+                      </CardContent>
+                    </Card>
                   </div>
                 </CardContent>
               </Card>
