@@ -5,24 +5,20 @@
 // Gerencia estado, validação e integração com UI
 // =====================================================
 
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/contexts/AuthContext';
 import { useAccountPermissions } from './useAccountPermissions';
 import { toast } from 'sonner';
-import { Food, MealOptionFood, DietPlan } from '@/lib/types';
+import { Food } from '@/lib/types';
 import {
   substituteItem,
-  findSubstituteCandidates,
   createSubstituteProposal,
-  validateGovernanceGates,
   canBeSubstituted,
   formatProposalMessage,
   getImpactLevel,
   needsRebalance,
   SubstituteProposal,
   SubstituteCandidate,
-  SubstituteResult,
   SubstituteError,
   GovernanceContext,
 } from '@/lib/substitution-service';
@@ -64,7 +60,6 @@ const ERROR_MESSAGES: Record<SubstituteError, string> = {
 };
 
 export function useSubstitution(options?: UseSubstitutionOptions): UseSubstitutionReturn {
-  const { profile } = useAuth();
   const { can_substitute } = useAccountPermissions();
   
   const [isLoading, setIsLoading] = useState(false);
@@ -145,6 +140,7 @@ export function useSubstitution(options?: UseSubstitutionOptions): UseSubstituti
   /**
    * Confirma e executa a substituição
    * Esta é a ÚNICA função que persiste dados
+   * IMPORTANTE: Valida limite de uso no backend ANTES de persistir
    */
   const confirmSubstitution = useCallback(async (
     mealOptionFoodId: string,
@@ -160,7 +156,24 @@ export function useSubstitution(options?: UseSubstitutionOptions): UseSubstituti
     try {
       const { to } = proposal;
       
-      // 1. Atualizar meal_option_food com novo alimento e quantidade
+      // 1. VALIDAR LIMITE NO BACKEND antes de persistir
+      const { data: session } = await supabase.auth.getSession();
+      if (!session?.session?.access_token) {
+        toast.error('Sessão expirada. Faça login novamente.');
+        return false;
+      }
+      
+      const validateResponse = await supabase.functions.invoke('validate-usage', {
+        body: { feature: 'substitution', increment: false },
+      });
+      
+      if (validateResponse.error || !validateResponse.data?.allowed) {
+        const errorMessage = validateResponse.data?.error || 'Limite de substituições atingido.';
+        toast.error(errorMessage);
+        return false;
+      }
+      
+      // 2. Atualizar meal_option_food com novo alimento e quantidade
       const { error: updateError } = await supabase
         .from('meal_option_foods')
         .update({
@@ -173,7 +186,7 @@ export function useSubstitution(options?: UseSubstitutionOptions): UseSubstituti
         throw updateError;
       }
       
-      // 2. Recalcular totais da opção
+      // 3. Recalcular totais da opção
       const { data: updatedOptionFoods, error: fetchError } = await supabase
         .from('meal_option_foods')
         .select(`*, food:foods(*)`)
@@ -183,7 +196,7 @@ export function useSubstitution(options?: UseSubstitutionOptions): UseSubstituti
         throw fetchError;
       }
       
-      // 3. Calcular novos totais
+      // 4. Calcular novos totais
       let totalCalories = 0;
       let totalProtein = 0;
       let totalCarbs = 0;
@@ -202,7 +215,7 @@ export function useSubstitution(options?: UseSubstitutionOptions): UseSubstituti
         }
       }
       
-      // 4. Atualizar meal_option com novos totais
+      // 5. Atualizar meal_option com novos totais
       const { error: optionError } = await supabase
         .from('meal_options')
         .update({
@@ -217,13 +230,10 @@ export function useSubstitution(options?: UseSubstitutionOptions): UseSubstituti
         throw optionError;
       }
       
-      // 5. Incrementar uso de substituição
-      if (profile?.user_id) {
-        await supabase.rpc('increment_usage', {
-          _user_id: profile.user_id,
-          _feature: 'substitution',
-        });
-      }
+      // 6. Incrementar uso de substituição via backend (mais seguro)
+      await supabase.functions.invoke('validate-usage', {
+        body: { feature: 'substitution', increment: true },
+      });
       
       toast.success('Alimento substituído com sucesso!');
       options?.onSuccess?.(proposal);
@@ -244,7 +254,7 @@ export function useSubstitution(options?: UseSubstitutionOptions): UseSubstituti
     } finally {
       setIsConfirming(false);
     }
-  }, [proposal, profile, options]);
+  }, [proposal, options]);
 
   /**
    * Reseta estado do hook
@@ -320,5 +330,4 @@ export type {
   SubstituteProposal, 
   SubstituteCandidate, 
   SubstituteError,
-  SubstituteResult 
 };
