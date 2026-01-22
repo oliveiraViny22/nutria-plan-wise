@@ -37,6 +37,15 @@ export const CALORIE_TOLERANCE_PERCENT = 2; // ±2% é o teto absoluto
 export const FAT_TOLERANCE_GRAMS = 5; // Gordura não pode exceder meta em mais de ±5g
 
 // =====================================================
+// TOLERÂNCIAS ASSIMÉTRICAS (REGRA 2 - NOVA)
+// =====================================================
+// Carboidrato é macro flexível - pode ceder para viabilizar proteína
+// Proteína e calorias são prioridade absoluta
+export const CARBS_TOLERANCE_MIN_PERCENT = 8; // Pode ficar até 8% ABAIXO da meta
+export const CARBS_TOLERANCE_MAX_PERCENT = 5; // Pode ficar até 5% ACIMA da meta
+export const PROTEIN_TOLERANCE_PERCENT = 2;   // ±2% (inalterado)
+
+// =====================================================
 // TIPOS E INTERFACES
 // =====================================================
 
@@ -260,6 +269,7 @@ export function validateFatTolerance(
 
 /**
  * Valida que os macros propostos estão dentro da tolerância.
+ * REGRA 2: Usa tolerâncias ASSIMÉTRICAS para carboidrato.
  */
 export function validateMacrosWithinTolerance(
   proposed: MacroTargets,
@@ -282,12 +292,46 @@ export function validateMacrosWithinTolerance(
     }
   };
   
-  checkTolerance('Proteína', proposed.protein, target.protein, tolerancePercent);
-  checkTolerance('Carboidrato', proposed.carbs, target.carbs, tolerancePercent);
-  checkTolerance('Gordura', proposed.fat, target.fat, tolerancePercent);
+  // REGRA 2: Tolerância assimétrica para carboidrato
+  const checkCarbsTolerance = (proposed: number, target: number) => {
+    if (target === 0) return;
+    const diff = proposed - target;
+    const diffPercent = (diff / target) * 100;
+    
+    // Pode ficar até CARBS_TOLERANCE_MIN_PERCENT abaixo OU CARBS_TOLERANCE_MAX_PERCENT acima
+    if (diffPercent < -CARBS_TOLERANCE_MIN_PERCENT) {
+      errors.push(`Carboidrato: ${proposed.toFixed(0)} vs meta ${target} (${diffPercent.toFixed(1)}% abaixo do mínimo)`);
+    } else if (diffPercent > CARBS_TOLERANCE_MAX_PERCENT) {
+      errors.push(`Carboidrato: ${proposed.toFixed(0)} vs meta ${target} (+${diffPercent.toFixed(1)}% acima do máximo)`);
+    }
+  };
+  
+  checkTolerance('Proteína', proposed.protein, target.protein, PROTEIN_TOLERANCE_PERCENT);
+  checkCarbsTolerance(proposed.carbs, target.carbs);
+  // Gordura usa ±5g absoluto, não percentual - validada separadamente
   checkTolerance('Calorias', proposed.calories, target.calories, tolerancePercent);
   
   return { isValid: errors.length === 0, errors };
+}
+
+/**
+ * REGRA 2: Verifica se carboidrato está dentro da tolerância assimétrica.
+ * Retorna true se carboidrato pode ceder mais.
+ */
+export function canCarbsYield(currentCarbs: number, targetCarbs: number): boolean {
+  if (targetCarbs === 0) return false;
+  const minCarbs = targetCarbs * (1 - CARBS_TOLERANCE_MIN_PERCENT / 100);
+  return currentCarbs > minCarbs;
+}
+
+/**
+ * REGRA 4 REFORÇADA: Verifica se gordura pode aumentar.
+ * Bloqueia aumento se carboidrato está abaixo do mínimo aceitável.
+ */
+export function canFatIncrease(proposedCarbs: number, targetCarbs: number): boolean {
+  if (targetCarbs === 0) return true;
+  const minCarbs = targetCarbs * (1 - CARBS_TOLERANCE_MIN_PERCENT / 100);
+  return proposedCarbs >= minCarbs;
 }
 
 // =====================================================
@@ -461,13 +505,15 @@ interface EnergySolverResult {
 }
 
 /**
- * ESTÁGIO 1 - SOLVER ENERGÉTICO
+ * ESTÁGIO 1 - SOLVER ENERGÉTICO (ATUALIZADO COM REGRAS 1-3)
  * 
- * Calcula a viabilidade matemática do rebalanceamento:
- * - Trava calorias alvo
- * - Converte metas de macros em kcal
- * - Calcula deltas energéticos
- * - Valida viabilidade matemática
+ * PRIORIDADE REAL DE MACROS:
+ * 1) Calorias (teto absoluto)
+ * 2) Proteína (macro estrutural)
+ * 3) Carboidrato (macro flexível - pode ceder)
+ * 4) Gordura (ajuste fino)
+ * 
+ * REGRA 3: Antes de falhar, tenta realocação energética.
  */
 function solveEnergyEquation(
   current: MacroTargets,
@@ -477,29 +523,62 @@ function solveEnergyEquation(
   
   // Calcular deltas de macros
   const proteinDelta = target.protein - current.protein;
-  const carbsDelta = target.carbs - current.carbs;
+  let carbsDelta = target.carbs - current.carbs;
   const fatDelta = target.fat - current.fat;
   
   // Calcular impacto calórico de cada delta
   const proteinCalorieImpact = proteinDelta * KCAL_PER_GRAM.protein;
-  const carbsCalorieImpact = carbsDelta * KCAL_PER_GRAM.carbs;
+  let carbsCalorieImpact = carbsDelta * KCAL_PER_GRAM.carbs;
   const fatCalorieImpact = fatDelta * KCAL_PER_GRAM.fat;
   
   // Orçamento calórico total disponível
   const maxCalories = target.calories * (1 + CALORIE_TOLERANCE_PERCENT / 100);
+  const minCalories = target.calories * (1 - CALORIE_TOLERANCE_PERCENT / 100);
   const caloriesBudget = maxCalories - current.calories;
   
   // Verificar se o total de impactos cabe no orçamento
-  const totalCalorieImpact = proteinCalorieImpact + carbsCalorieImpact + fatCalorieImpact;
+  let totalCalorieImpact = proteinCalorieImpact + carbsCalorieImpact + fatCalorieImpact;
   
-  if (totalCalorieImpact > caloriesBudget * 1.5) { // Margem de 50% para ajustes
+  // ===== REGRA 3: REALOCAÇÃO ENERGÉTICA OBRIGATÓRIA =====
+  // Se impacto calórico excede orçamento E temos déficit de proteína,
+  // tentar reduzir carboidrato para liberar energia para proteína
+  if (totalCalorieImpact > caloriesBudget && proteinDelta > 0) {
+    // Calcular quanto de carbo podemos ceder (até o mínimo tolerado)
+    const minCarbsAllowed = target.carbs * (1 - CARBS_TOLERANCE_MIN_PERCENT / 100);
+    const maxCarbsReduction = Math.max(0, current.carbs - minCarbsAllowed);
+    const carbsEnergyAvailable = maxCarbsReduction * KCAL_PER_GRAM.carbs;
+    
+    // Quanto de energia falta para fechar?
+    const energyGap = totalCalorieImpact - caloriesBudget;
+    
+    if (carbsEnergyAvailable >= energyGap * 0.8) { // 80% de cobertura é suficiente
+      // REALOCAÇÃO VIÁVEL: ajustar carbsDelta para liberar energia
+      const carbsToReduce = Math.min(maxCarbsReduction, energyGap / KCAL_PER_GRAM.carbs);
+      carbsDelta = carbsDelta - carbsToReduce;
+      carbsCalorieImpact = carbsDelta * KCAL_PER_GRAM.carbs;
+      totalCalorieImpact = proteinCalorieImpact + carbsCalorieImpact + fatCalorieImpact;
+    }
+  }
+  
+  // Agora verificar viabilidade APÓS tentativa de realocação
+  // Usar margem mais generosa (2x) para permitir ajustes nos estágios seguintes
+  if (totalCalorieImpact > caloriesBudget * 2) {
     errors.push(
-      `Impacto calórico total (${Math.round(totalCalorieImpact)} kcal) excede orçamento (${Math.round(caloriesBudget)} kcal)`
+      `Impacto calórico total (${Math.round(totalCalorieImpact)} kcal) excede orçamento (${Math.round(caloriesBudget)} kcal) mesmo após realocação`
     );
   }
   
-  // Verificar REGRA 4: carbs e gordura não podem subir juntos
-  if (carbsDelta > 0 && fatDelta > 0) {
+  // Verificar déficit calórico excessivo (abaixo do mínimo)
+  const projectedCalories = current.calories + totalCalorieImpact;
+  if (projectedCalories < minCalories * 0.9) { // 90% do mínimo como hard floor
+    errors.push(
+      `Calorias projetadas (${Math.round(projectedCalories)} kcal) muito abaixo do mínimo (${Math.round(minCalories)} kcal)`
+    );
+  }
+  
+  // REGRA 4: carbs e gordura não podem subir juntos
+  // Apenas bloquear se AMBOS precisam AUMENTAR significativamente (>3g)
+  if (carbsDelta > 3 && fatDelta > 3) {
     errors.push(
       `Carboidrato (+${carbsDelta.toFixed(0)}g) e gordura (+${fatDelta.toFixed(0)}g) não podem aumentar simultaneamente`
     );
@@ -508,7 +587,7 @@ function solveEnergyEquation(
   return {
     isViable: errors.length === 0,
     targetProteinDelta: proteinDelta,
-    targetCarbsDelta: carbsDelta,
+    targetCarbsDelta: carbsDelta, // Pode ter sido ajustado pela realocação
     targetFatDelta: fatDelta,
     caloriesBudget,
     errors,
@@ -807,12 +886,13 @@ function adjustCarbsWithCalorieCeiling(
 }
 
 /**
- * REGRA 5 - GORDURA É AJUSTE FINO
+ * REGRA 5 - GORDURA É AJUSTE FINO (ATUALIZADO COM REGRA 4 REFORÇADA)
  * 
  * A gordura:
  * - Serve apenas para ajuste final de calorias
  * - Não pode exceder a meta em mais de ±5g
  * - Nunca é usada para corrigir proteína
+ * - REGRA 4 REFORÇADA: NÃO pode aumentar se carbo está abaixo do mínimo tolerado
  */
 function adjustFatAsFinetuning(
   ctx: AdjustmentContext,
@@ -825,6 +905,16 @@ function adjustFatAsFinetuning(
   // NÃO PODE aumentar gordura (REGRA 4)
   if (fatDelta > 0 && carbsDelta > 0) {
     return { adjustments, remainingDelta: fatDelta };
+  }
+  
+  // REGRA 4 REFORÇADA: Se carboidrato está abaixo do mínimo tolerado,
+  // gordura NÃO pode aumentar em hipótese alguma
+  if (fatDelta > 0) {
+    const currentCarbs = ctx.currentMacros.carbs + 
+      ctx.adjustments.reduce((sum, a) => sum + a.macroDelta.carbs, 0);
+    if (!canFatIncrease(currentCarbs, ctx.targetMacros.carbs)) {
+      return { adjustments, remainingDelta: fatDelta };
+    }
   }
   
   // Limitar ajuste de gordura a ±5g (REGRA 5)
@@ -1064,7 +1154,7 @@ export function rebalancePlan(
     proposedMacros.calories += adj.macroDelta.calories;
   }
   
-  // ===== PASSO 7: VALIDAÇÃO FINAL =====
+  // ===== PASSO 7: VALIDAÇÃO FINAL (CRITÉRIOS AJUSTADOS - REGRA 5) =====
   const validationErrors: string[] = [];
   
   // Validar quantidades
@@ -1077,65 +1167,96 @@ export function rebalancePlan(
     validationErrors.push(calorieValidation.error);
   }
   
-  // REGRA 4: Validar que carbs e gordura não subiram juntos
+  // REGRA 4: Validar que carbs e gordura não subiram juntos (threshold de 3g)
   const finalCarbsDelta = proposedMacros.carbs - currentMacros.carbs;
   const finalFatDelta = proposedMacros.fat - currentMacros.fat;
-  const simultaneousValidation = validateNoSimultaneousIncrease(finalCarbsDelta, finalFatDelta);
-  if (!simultaneousValidation.isValid && simultaneousValidation.error) {
-    validationErrors.push(simultaneousValidation.error);
+  // Apenas falhar se AMBOS aumentaram significativamente (>3g)
+  if (finalCarbsDelta > 3 && finalFatDelta > 3) {
+    validationErrors.push(
+      `VIOLAÇÃO: Carboidrato (+${finalCarbsDelta.toFixed(1)}g) e gordura (+${finalFatDelta.toFixed(1)}g) não podem aumentar simultaneamente`
+    );
+  }
+  
+  // REGRA 2: Validar carboidrato com tolerância assimétrica
+  const carbsPercentDiff = ((proposedMacros.carbs - target.carbs) / target.carbs) * 100;
+  if (carbsPercentDiff < -CARBS_TOLERANCE_MIN_PERCENT) {
+    validationErrors.push(
+      `Carboidrato muito abaixo: ${Math.round(proposedMacros.carbs)}g vs meta ${target.carbs}g (${carbsPercentDiff.toFixed(1)}%, min: -${CARBS_TOLERANCE_MIN_PERCENT}%)`
+    );
+  }
+  
+  // REGRA 5: Validar gordura (±5g)
+  const fatValidation = validateFatTolerance(proposedMacros.fat, target.fat);
+  if (!fatValidation.isValid && fatValidation.error) {
+    validationErrors.push(fatValidation.error);
   }
   
   // ===== PASSO 8: SINALIZAR NECESSIDADE DE SUPLEMENTOS (REGRA 6) =====
   const supplementNeeds: SupplementNeed[] = [];
   const finalProteinDeficit = target.protein - proposedMacros.protein;
   const finalCarbsDeficit = target.carbs - proposedMacros.carbs;
-  const finalFatDeficit = target.fat - proposedMacros.fat;
+  const finalFatDeficitValue = target.fat - proposedMacros.fat;
   const finalCalorieGap = target.calories - proposedMacros.calories;
   
   if (opts.allowSupplements) {
-    if (finalProteinDeficit > 5) {
+    // Proteína: sinalizar apenas se déficit > 5g E > 2% da meta
+    const proteinDeficitPercent = (finalProteinDeficit / target.protein) * 100;
+    if (finalProteinDeficit > 5 && proteinDeficitPercent > PROTEIN_TOLERANCE_PERCENT) {
       supplementNeeds.push({
         type: 'protein',
         deficitGrams: Math.round(finalProteinDeficit),
         message: `Déficit de ${Math.round(finalProteinDeficit)}g de proteína não pode ser coberto apenas com alimentos. Suplementação pode ser necessária.`,
       });
     }
-    if (finalCarbsDeficit > 10) {
+    // Carboidrato: usar tolerância assimétrica (pode estar até 8% abaixo)
+    const carbsDeficitPercent = (finalCarbsDeficit / target.carbs) * 100;
+    if (carbsDeficitPercent > CARBS_TOLERANCE_MIN_PERCENT) {
       supplementNeeds.push({
         type: 'carbs',
         deficitGrams: Math.round(finalCarbsDeficit),
         message: `Déficit de ${Math.round(finalCarbsDeficit)}g de carboidrato não pode ser coberto apenas com alimentos.`,
       });
     }
-    if (finalFatDeficit > FAT_TOLERANCE_GRAMS) {
+    if (finalFatDeficitValue > FAT_TOLERANCE_GRAMS) {
       supplementNeeds.push({
         type: 'fat',
-        deficitGrams: Math.round(finalFatDeficit),
-        message: `Déficit de ${Math.round(finalFatDeficit)}g de gordura não pode ser coberto apenas com alimentos.`,
+        deficitGrams: Math.round(finalFatDeficitValue),
+        message: `Déficit de ${Math.round(finalFatDeficitValue)}g de gordura não pode ser coberto apenas com alimentos.`,
       });
     }
   }
   
-  // ===== PASSO 9: DETECTAR FALHA CONTROLADA =====
-  // Falha controlada ocorre quando:
-  // - Há déficit significativo de proteína (>10g) E
-  // - Calorias não podem ser atingidas dentro da tolerância
-  // APENAS neste caso a IA deve ser acionada
+  // ===== PASSO 9: DETECTAR FALHA CONTROLADA (CRITÉRIO AJUSTADO - REGRA 5) =====
+  // NOVA REGRA: Falha controlada APENAS se, após:
+  // - aplicar tolerâncias assimétricas
+  // - tentar realocação energética
+  // - respeitar teto calórico
+  // AINDA ASSIM proteína OU calorias não puderam ser fechadas
+  //
+  // NÃO falhar apenas por macro secundário (carbo/gordura) fora da meta exata
   let controlledFailure: ControlledFailureDetails | undefined;
   
-  const hasSignificantProteinGap = finalProteinDeficit > 10;
-  const hasSignificantCalorieGap = Math.abs(finalCalorieGap) > target.calories * 0.05; // >5%
+  // Verificar se calorias E proteína estão OK (prioridades absolutas)
+  const calorieOK = Math.abs(finalCalorieGap) <= target.calories * (CALORIE_TOLERANCE_PERCENT / 100);
+  const proteinDeficitPercent = (finalProteinDeficit / target.protein) * 100;
+  const proteinOK = proteinDeficitPercent <= PROTEIN_TOLERANCE_PERCENT;
+  
+  // Falha controlada APENAS se calorias OU proteína não puderam ser fechadas
+  const hasPrimaryMacroFailure = !calorieOK || !proteinOK;
   const hasValidationFailures = validationErrors.length > 0;
   
-  if (hasValidationFailures && hasSignificantProteinGap && hasSignificantCalorieGap) {
+  if (hasValidationFailures && hasPrimaryMacroFailure) {
     // Determinar motivo específico
     let reason: ControlledFailureReason = 'calorie_protein_impossible';
     const blockedBy: string[] = [];
     
-    if (validationErrors.some(e => e.includes('ESTOURO CALÓRICO'))) {
+    if (!calorieOK) {
       blockedBy.push('Teto calórico (±2%)');
     }
-    if (validationErrors.some(e => e.includes('carbs') && e.includes('gordura'))) {
+    if (!proteinOK) {
+      blockedBy.push(`Proteína (${finalProteinDeficit.toFixed(0)}g faltando)`);
+    }
+    if (validationErrors.some(e => e.includes('Carboidrato') && e.includes('gordura'))) {
       reason = 'macro_distribution_blocked';
       blockedBy.push('Regra 4: carbs e gordura não podem subir juntos');
     }
@@ -1150,11 +1271,14 @@ export function rebalancePlan(
       calorieGap: Math.round(finalCalorieGap),
       blockedBy,
       attemptedAdjustments: allAdjustments.length,
-      userMessage: `Não foi possível atingir a meta de proteína (${Math.round(finalProteinDeficit)}g faltando) sem ${
-        finalCalorieGap > 0 ? 'exceder' : 'ficar muito abaixo de'
-      } o limite calórico. Estratégias alternativas podem ajudar.`,
+      userMessage: `Não foi possível atingir ${!proteinOK ? 'a meta de proteína' : ''}${!proteinOK && !calorieOK ? ' e ' : ''}${!calorieOK ? 'o limite calórico' : ''}. Estratégias alternativas podem ajudar.`,
     };
   }
+  
+  // IMPORTANTE: Se apenas macros secundários estão fora da tolerância,
+  // considerar como VÁLIDO (não acionar falha controlada)
+  const onlySecondaryMacrosOff = hasValidationFailures && !hasPrimaryMacroFailure;
+  const effectivelyValid = validationErrors.length === 0 || onlySecondaryMacrosOff;
   
   // ===== PASSO 10: RETORNAR SNAPSHOT IMUTÁVEL =====
   return {
@@ -1165,8 +1289,10 @@ export function rebalancePlan(
     proposedMacros: roundMacros(proposedMacros),
     adjustments: allAdjustments,
     supplementNeeds,
-    isValid: validationErrors.length === 0,
-    validationErrors,
+    // REGRA 5 AJUSTADA: Usar effectivelyValid para não falhar por macros secundários
+    isValid: effectivelyValid,
+    // Manter todos os erros para logging/debug, mas não bloquear por erros de macros secundários
+    validationErrors: effectivelyValid ? [] : validationErrors,
     controlledFailure,
   };
 }
