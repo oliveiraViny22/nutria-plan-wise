@@ -853,7 +853,6 @@ serve(async (req) => {
       total_carbs: Math.round(totalCarbs * 10) / 10,
       total_fat: Math.round(totalFat * 10) / 10,
       status: 'draft', // REGRA: plano nasce como draft, não active
-      is_initial_plan: isInitialPlan || false,
     }).select().single();
 
     if (planError || !plan) {
