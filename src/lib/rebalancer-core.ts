@@ -323,6 +323,9 @@ export function filterByCategory(items: PlanItem[], category: FoodCategory): Pla
 /**
  * Ajusta itens para cobrir um déficit de macro específico.
  * Retorna o déficit restante e os ajustes feitos.
+ * 
+ * MELHORADO: Permite ajustes mais agressivos (até 100% de aumento)
+ * e faz múltiplas passadas até cobrir o déficit.
  */
 export function adjustForDeficit(
   items: PlanItem[],
@@ -344,12 +347,22 @@ export function adjustForDeficit(
     return densityB - densityA;
   });
   
+  // Para déficits grandes, usar limite de aumento mais agressivo (até 100%)
+  const deficitSeverity = remaining / (sorted[0]?.food[macroKey] || 1);
+  const effectiveMaxIncrease = deficitSeverity > 30 
+    ? Math.min(1.0, options.maxAdjustmentPercent * 2)  // 100% para déficits grandes
+    : options.maxAdjustmentPercent;
+  
   for (const item of sorted) {
-    if (remaining <= 0) break;
+    if (remaining <= 1) break; // Tolerância de 1g
+    
+    // Verificar se já foi ajustado
+    const existingAdj = adjustments.find(a => a.itemId === item.id);
+    if (existingAdj) continue;
     
     const food = item.food;
     const currentQty = item.quantityGrams;
-    const maxIncrease = currentQty * options.maxAdjustmentPercent;
+    const maxIncrease = currentQty * effectiveMaxIncrease;
     
     // Calcular quantos gramas são necessários para cobrir o déficit
     const macroPer100g = (food[macroKey] / food.servingGrams) * 100;
@@ -481,7 +494,7 @@ export function adjustForExcess(
 
 const DEFAULT_OPTIONS: Required<RebalanceOptions> = {
   tolerancePercent: 2,
-  maxAdjustmentPercent: 0.5,
+  maxAdjustmentPercent: 0.75, // Aumentado de 0.5 para 0.75 (75% de ajuste permitido)
   minQuantityGrams: 10,
   allowSupplements: false,
 };
@@ -562,9 +575,19 @@ export function rebalancePlan(
   // 1. PROTEÍNAS (primeira prioridade)
   let proteinDeficit = deltas.protein;
   if (proteinDeficit > 0) {
-    const result = adjustForDeficit(proteinItems, proteinDeficit, 'protein', opts);
+    // Primeira passada: itens com proteína dominante
+    let result = adjustForDeficit(proteinItems, proteinDeficit, 'protein', opts);
     proteinDeficit = result.remainingDeficit;
     allAdjustments.push(...result.adjustments);
+    
+    // Segunda passada: itens com proteína significativa (se ainda houver déficit > 5g)
+    if (proteinDeficit > 5) {
+      result = adjustForDeficit(significantProteinItems.filter(item => 
+        !allAdjustments.some(a => a.itemId === item.id)
+      ), proteinDeficit, 'protein', opts);
+      proteinDeficit = result.remainingDeficit;
+      allAdjustments.push(...result.adjustments);
+    }
   } else if (proteinDeficit < 0) {
     // Primeira passada: itens com proteína dominante
     let result = adjustForExcess(proteinItems, -proteinDeficit, 'protein', opts, allAdjustments);
@@ -582,9 +605,19 @@ export function rebalancePlan(
   // 2. CARBOIDRATOS (segunda prioridade)
   let carbsDeficit = deltas.carbs;
   if (carbsDeficit > 0) {
-    const result = adjustForDeficit(carbItems, carbsDeficit, 'carbs', opts);
+    // Primeira passada: itens com carbs dominante
+    let result = adjustForDeficit(carbItems, carbsDeficit, 'carbs', opts);
     carbsDeficit = result.remainingDeficit;
     allAdjustments.push(...result.adjustments);
+    
+    // Segunda passada: itens com carbs significativo
+    if (carbsDeficit > 10) {
+      result = adjustForDeficit(significantCarbItems.filter(item => 
+        !allAdjustments.some(a => a.itemId === item.id)
+      ), carbsDeficit, 'carbs', opts);
+      carbsDeficit = result.remainingDeficit;
+      allAdjustments.push(...result.adjustments);
+    }
   } else if (carbsDeficit < 0) {
     // Primeira passada: itens com carbs dominante
     let result = adjustForExcess(carbItems, -carbsDeficit, 'carbs', opts, allAdjustments);
