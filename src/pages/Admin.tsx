@@ -55,6 +55,7 @@ import SystemAudit from '@/components/SystemAudit';
 import { FoodCuration } from '@/components/FoodCuration';
 import { PendingFoodsReview } from '@/components/PendingFoodsReview';
 import { useRealtimeSettings } from '@/hooks/useRealtimeSettings';
+import { ThemeToggle } from '@/components/ThemeToggle';
 
 
 const CHART_COLORS = [
@@ -670,6 +671,7 @@ export default function Admin() {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <ThemeToggle />
             <Button variant="outline" onClick={() => fetchMetrics()} disabled={metricsLoading}>
               <RefreshCw className={`h-4 w-4 mr-2 ${metricsLoading ? 'animate-spin' : ''}`} />
               Atualizar
