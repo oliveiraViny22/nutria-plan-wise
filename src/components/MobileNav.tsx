@@ -99,12 +99,6 @@ export function MobileNav() {
       show: showProfessionalLinks,
     },
     {
-      label: 'Seja Profissional',
-      href: '/become-professional',
-      icon: <Crown className="h-5 w-5" />,
-      show: !showProfessionalLinks,
-    },
-    {
       label: 'Progresso',
       href: '/progress',
       icon: <TrendingUp className="h-5 w-5" />,
