@@ -19,6 +19,7 @@ import { useAccountPermissions } from '@/hooks/useAccountPermissions';
 import { useSubscription } from '@/hooks/useSubscription';
 import { useSubstitution } from '@/hooks/useSubstitution';
 import { Meal, Food, MEAL_NAMES, MealType, MealOption, MealOptionFood } from '@/lib/types';
+import { getCategoryLabel, getCategoryColor, isValidCategory } from '@/lib/food-categories';
 import { toast } from 'sonner';
 import { SubstitutionModal } from '@/components/SubstitutionModal';
 import { UpgradeDialog } from '@/components/UpgradeDialog';
@@ -376,8 +377,15 @@ export default function MealDetail() {
                       <div key={optionFood.id} className="card-elevated rounded-lg p-3">
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0 flex-1">
-                            <h3 className="font-medium text-sm truncate">{food.name}</h3>
-                            <p className="text-xs text-muted-foreground">{qty}{getUnit(food.serving_size)}</p>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <h3 className="font-medium text-sm truncate">{food.name}</h3>
+                              {isValidCategory(food.category) && (
+                                <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium text-white ${getCategoryColor(food.category)}`}>
+                                  {getCategoryLabel(food.category)}
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-0.5">{qty}{getUnit(food.serving_size)}</p>
                             <div className="flex flex-wrap gap-2 mt-2">
                               <Badge variant="outline" className="text-[10px]">{nutrients.calories} kcal</Badge>
                               <Badge variant="outline" className="text-[10px]">P: {nutrients.protein}g</Badge>
