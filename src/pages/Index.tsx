@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ArrowRight, Leaf, Target, RefreshCw, MessageCircle, Droplets } from 'lucide-react';
+import { ArrowRight, Leaf, Target, RefreshCw, MessageCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Logo } from '@/components/Logo';
 import { ThemeToggle } from '@/components/ThemeToggle';
@@ -51,38 +51,12 @@ export default function Index() {
           </Link>
         </motion.div>
 
-        {/* Hydration Tip - Highlighted Section */}
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ delay: 0.25 }}
-          className="mt-10 sm:mt-12 max-w-md mx-auto"
-        >
-          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-500/10 via-cyan-500/5 to-blue-600/10 border border-blue-500/20 p-4 sm:p-5">
-            <div className="absolute top-0 right-0 w-24 h-24 bg-blue-500/10 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2" />
-            <div className="relative flex items-center gap-3 sm:gap-4">
-              <div className="flex-shrink-0 w-12 h-12 sm:w-14 sm:h-14 rounded-xl bg-blue-500/20 flex items-center justify-center">
-                <Droplets className="w-6 h-6 sm:w-7 sm:h-7 text-blue-500" />
-              </div>
-              <div className="text-left">
-                <p className="text-xs sm:text-sm font-semibold text-blue-500 mb-0.5">Dica de Saúde</p>
-                <p className="text-sm sm:text-base text-foreground font-medium">
-                  Beba pelo menos <span className="text-blue-500 font-bold">2 litros</span> de água por dia
-                </p>
-                <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5">
-                  A hidratação adequada melhora seu metabolismo e resultados
-                </p>
-              </div>
-            </div>
-          </div>
-        </motion.div>
-
         {/* Features Grid - Mobile: 1 col, Tablet: 2 col, Desktop: 3 col */}
         <motion.div 
           initial={{ opacity: 0 }} 
           animate={{ opacity: 1 }} 
           transition={{ delay: 0.3 }} 
-          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mt-8 sm:mt-12 lg:mt-16 max-w-4xl mx-auto"
+          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mt-12 sm:mt-16 lg:mt-20 max-w-4xl mx-auto"
         >
           {features.map((f, i) => (
             <motion.div 
