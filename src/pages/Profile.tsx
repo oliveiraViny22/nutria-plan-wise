@@ -48,6 +48,7 @@ import {
 } from '@/lib/types';
 import { ObjectiveChangeWizard } from '@/components/ObjectiveChangeWizard';
 import { StudentObjectiveRequestDialog } from '@/components/StudentObjectiveRequestDialog';
+import { UpgradeDialog } from '@/components/UpgradeDialog';
 import { useLinkedStudent } from '@/hooks/useLinkedStudent';
 import { useSubscription } from '@/hooks/useSubscription';
 
@@ -77,6 +78,7 @@ export default function Profile() {
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [showObjectiveWizard, setShowObjectiveWizard] = useState(false);
   const [showStudentRequestDialog, setShowStudentRequestDialog] = useState(false);
+  const [showUpgradeDialog, setShowUpgradeDialog] = useState(false);
   
   const { isLinkedStudent, professionalId } = useLinkedStudent();
   const { subscriptionInfo } = useSubscription();
@@ -328,30 +330,38 @@ export default function Profile() {
                     </div>
                   </div>
 
-                  {/* Request Change Button - Only for linked students or paid users */}
-                  {(isLinkedStudent || isPaidUser) && (
-                    <div className="mt-6 pt-4 border-t">
-                      {isLinkedStudent && professionalId ? (
-                        <Button 
-                          variant="outline" 
-                          className="w-full"
-                          onClick={() => setShowStudentRequestDialog(true)}
-                        >
-                          <Target className="h-4 w-4 mr-2" />
-                          Solicitar Alteração ao Profissional
-                        </Button>
-                      ) : (
-                        <Button 
-                          variant="outline" 
-                          className="w-full"
-                          onClick={() => setShowObjectiveWizard(true)}
-                        >
-                          <Target className="h-4 w-4 mr-2" />
-                          Alterar Objetivo
-                        </Button>
-                      )}
-                    </div>
-                  )}
+                  {/* Request Change Button */}
+                  <div className="mt-6 pt-4 border-t">
+                    {isLinkedStudent && professionalId ? (
+                      <Button 
+                        variant="outline" 
+                        className="w-full"
+                        onClick={() => setShowStudentRequestDialog(true)}
+                      >
+                        <Target className="h-4 w-4 mr-2" />
+                        Solicitar Alteração ao Profissional
+                      </Button>
+                    ) : isPaidUser ? (
+                      <Button 
+                        variant="outline" 
+                        className="w-full"
+                        onClick={() => setShowObjectiveWizard(true)}
+                      >
+                        <Target className="h-4 w-4 mr-2" />
+                        Alterar Objetivo
+                      </Button>
+                    ) : (
+                      <Button 
+                        variant="outline" 
+                        className="w-full"
+                        onClick={() => setShowUpgradeDialog(true)}
+                      >
+                        <Lock className="h-4 w-4 mr-2" />
+                        Alterar Objetivo
+                        <Badge variant="secondary" className="ml-2 text-xs">Pro</Badge>
+                      </Button>
+                    )}
+                  </div>
                 </CardContent>
               </Card>
 
@@ -697,6 +707,13 @@ export default function Profile() {
           professionalId={professionalId}
         />
       )}
+
+      {/* Upgrade Dialog for Free Users */}
+      <UpgradeDialog
+        open={showUpgradeDialog}
+        onOpenChange={setShowUpgradeDialog}
+        feature="objective"
+      />
     </div>
   );
 }
