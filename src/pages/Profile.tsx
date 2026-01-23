@@ -4,10 +4,8 @@ import { motion } from 'framer-motion';
 import { 
   ArrowLeft, 
   User, 
-  Save, 
   Loader2,
   Target,
-  Activity,
   Utensils,
   Flame,
   TrendingUp,
@@ -71,7 +69,6 @@ export default function Profile() {
   const navigate = useNavigate();
   const { user, profile, refreshProfile, signOut } = useAuth();
   const [loading, setLoading] = useState(false);
-  const [hasChanges, setHasChanges] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
 
@@ -158,81 +155,6 @@ export default function Profile() {
     };
   };
 
-  const handleChange = (key: string, value: any) => {
-    setFormData(prev => ({ ...prev, [key]: value }));
-    setHasChanges(true);
-  };
-
-  const togglePreference = (pref: string) => {
-    handleChange('preferences', 
-      formData.preferences.includes(pref)
-        ? formData.preferences.filter((p) => p !== pref)
-        : [...formData.preferences, pref]
-    );
-  };
-
-  const toggleRestriction = (rest: string) => {
-    handleChange('restrictions',
-      formData.restrictions.includes(rest)
-        ? formData.restrictions.filter((r) => r !== rest)
-        : [...formData.restrictions, rest]
-    );
-  };
-
-  const handleSave = async () => {
-    if (!user) return;
-    setLoading(true);
-
-    try {
-      const targets = calculateTargets();
-      const previousGoal = profile?.goal;
-      const goalChanged = previousGoal !== formData.goal;
-      
-      // Dados pessoais são somente leitura - só salvamos o que pode ser alterado
-      const updateData: any = {
-        goal: formData.goal || null,
-        activity_level: formData.activity_level || null,
-        meals_per_day: formData.meals_per_day,
-        preferences: formData.preferences,
-        restrictions: formData.restrictions,
-      };
-
-      // Recalculate targets if goal or activity changed
-      if (targets) {
-        updateData.daily_calories = targets.calories;
-        updateData.protein_target = targets.protein;
-        updateData.carbs_target = targets.carbs;
-        updateData.fat_target = targets.fat;
-      }
-
-      const { error } = await supabase
-        .from('profiles')
-        .update(updateData)
-        .eq('user_id', user.id);
-
-      if (error) throw error;
-
-      await refreshProfile();
-      setHasChanges(false);
-      toast.success('Perfil atualizado com sucesso!');
-
-      // Suggest regenerating plan if goal changed
-      if (goalChanged) {
-        toast.info('Objetivo alterado! Recomendamos gerar um novo plano alimentar.', {
-          duration: 5000,
-          action: {
-            label: 'Ir para Dashboard',
-            onClick: () => navigate('/dashboard'),
-          },
-        });
-      }
-    } catch (error: any) {
-      toast.error(error.message || 'Erro ao salvar perfil');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleDeleteAccount = async () => {
     if (!user || user.email === ADMIN_EMAIL) return;
     if (deleteConfirmText !== 'EXCLUIR') {
@@ -292,15 +214,6 @@ export default function Profile() {
           <h1 className="text-base sm:text-lg font-semibold hidden xs:block">Meu Perfil</h1>
           <div className="flex items-center gap-2">
             <ThemeToggle />
-            <Button 
-              size="sm" 
-              onClick={handleSave} 
-              disabled={loading || !hasChanges}
-              className="text-xs sm:text-sm h-8 sm:h-9"
-            >
-              {loading ? <Loader2 className="h-3 w-3 sm:h-4 sm:w-4 animate-spin" /> : <Save className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />}
-              <span className="hidden xs:inline">Salvar</span>
-            </Button>
           </div>
         </div>
       </header>
@@ -323,103 +236,98 @@ export default function Profile() {
             </TabsTrigger>
           </TabsList>
 
-          {/* Goals Tab - Now first and improved */}
+          {/* Goals Tab - Read-only */}
           <TabsContent value="goals">
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               className="space-y-6"
             >
-              {/* Objective Selection */}
+              {/* Objective Display - Read-only */}
               <Card>
                 <CardHeader className="pb-4">
-                  <CardTitle className="flex items-center gap-2">
-                    <Target className="h-5 w-5 text-primary" />
-                    Objetivo Principal
-                  </CardTitle>
-                  <CardDescription>Escolha seu objetivo para calcularmos suas metas nutricionais</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid gap-3 sm:grid-cols-3">
-                    {(Object.entries(GOALS) as [keyof typeof GOALS, typeof GOALS[keyof typeof GOALS]][]).map(
-                      ([key, value]) => {
-                        const isSelected = formData.goal === key;
-                        return (
-                          <button
-                            key={key}
-                            type="button"
-                            onClick={() => handleChange('goal', key)}
-                            className={`relative p-5 rounded-xl border-2 text-center transition-all group ${
-                              isSelected
-                                ? 'border-primary bg-primary/10 shadow-md'
-                                : 'border-border hover:border-primary/50 hover:bg-muted/50'
-                            }`}
-                          >
-                            <span className="text-3xl mb-2 block">
-                              {GOAL_ICONS[key]}
-                            </span>
-                            <span className={`font-semibold block ${isSelected ? 'text-primary' : ''}`}>
-                              {value.label}
-                            </span>
-                            <span className="text-xs text-muted-foreground mt-1 block">
-                              {value.calorieAdjustment > 0 ? '+' : ''}{value.calorieAdjustment} kcal
-                            </span>
-                            {isSelected && (
-                              <div className="absolute -top-1 -right-1 w-5 h-5 bg-primary rounded-full flex items-center justify-center">
-                                <span className="text-primary-foreground text-xs">✓</span>
-                              </div>
-                            )}
-                          </button>
-                        );
-                      }
-                    )}
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle className="flex items-center gap-2">
+                        <Target className="h-5 w-5 text-primary" />
+                        Objetivo Principal
+                      </CardTitle>
+                      <CardDescription>Definido no cadastro</CardDescription>
+                    </div>
+                    <Badge variant="secondary" className="gap-1">
+                      <Lock className="h-3 w-3" />
+                      Somente leitura
+                    </Badge>
                   </div>
-                </CardContent>
-              </Card>
-
-              {/* Activity Level Selection */}
-              <Card>
-                <CardHeader className="pb-4">
-                  <CardTitle className="flex items-center gap-2">
-                    <Activity className="h-5 w-5 text-primary" />
-                    Nível de Atividade Física
-                  </CardTitle>
-                  <CardDescription>Quanto exercício você pratica na semana?</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid gap-2">
-                    {(Object.entries(ACTIVITY_LEVELS) as [keyof typeof ACTIVITY_LEVELS, typeof ACTIVITY_LEVELS[keyof typeof ACTIVITY_LEVELS]][]).map(
-                      ([key, value]) => {
-                        const isSelected = formData.activity_level === key;
-                        return (
-                          <button
-                            key={key}
-                            type="button"
-                            onClick={() => handleChange('activity_level', key)}
-                            className={`flex items-center gap-4 p-4 rounded-xl border-2 text-left transition-all ${
-                              isSelected
-                                ? 'border-primary bg-primary/10'
-                                : 'border-border hover:border-primary/50 hover:bg-muted/50'
-                            }`}
-                          >
-                            <span className="text-2xl w-10 text-center shrink-0">
-                              {ACTIVITY_ICONS[key]}
-                            </span>
-                            <div className="flex-1 min-w-0">
-                              <span className={`font-medium block ${isSelected ? 'text-primary' : ''}`}>
-                                {value.label}
-                              </span>
-                              <span className="text-sm text-muted-foreground">{value.description}</span>
-                            </div>
-                            {isSelected && (
-                              <div className="w-6 h-6 bg-primary rounded-full flex items-center justify-center shrink-0">
-                                <span className="text-primary-foreground text-sm">✓</span>
-                              </div>
-                            )}
-                          </button>
-                        );
-                      }
-                    )}
+                  {/* Info Banner */}
+                  <div className="bg-muted/50 rounded-lg p-4 mb-6 flex items-start gap-3">
+                    <Lock className="h-5 w-5 text-muted-foreground shrink-0 mt-0.5" />
+                    <div className="text-sm text-muted-foreground">
+                      <p className="font-medium text-foreground mb-1">Por que não posso alterar?</p>
+                      <p>
+                        O objetivo e nível de atividade são fixados para manter a consistência 
+                        do seu plano alimentar e histórico de adesão. Para solicitar uma alteração, 
+                        use o botão abaixo.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Goal Display */}
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    {/* Current Goal */}
+                    <div className="p-4 rounded-xl bg-muted/30 border">
+                      <div className="flex items-center gap-3">
+                        <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center text-2xl">
+                          {formData.goal ? GOAL_ICONS[formData.goal as keyof typeof GOAL_ICONS] : '🎯'}
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground uppercase tracking-wide">Objetivo</p>
+                          <p className="font-semibold text-lg">
+                            {formData.goal ? GOALS[formData.goal as keyof typeof GOALS]?.label : '-'}
+                          </p>
+                          {formData.goal && (
+                            <p className="text-xs text-muted-foreground">
+                              {GOALS[formData.goal as keyof typeof GOALS]?.calorieAdjustment > 0 ? '+' : ''}
+                              {GOALS[formData.goal as keyof typeof GOALS]?.calorieAdjustment} kcal/dia
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Current Activity Level */}
+                    <div className="p-4 rounded-xl bg-muted/30 border">
+                      <div className="flex items-center gap-3">
+                        <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center text-2xl">
+                          {formData.activity_level ? ACTIVITY_ICONS[formData.activity_level as keyof typeof ACTIVITY_ICONS] : '🏃'}
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground uppercase tracking-wide">Nível de Atividade</p>
+                          <p className="font-semibold text-lg">
+                            {formData.activity_level ? ACTIVITY_LEVELS[formData.activity_level as keyof typeof ACTIVITY_LEVELS]?.label : '-'}
+                          </p>
+                          {formData.activity_level && (
+                            <p className="text-xs text-muted-foreground">
+                              {ACTIVITY_LEVELS[formData.activity_level as keyof typeof ACTIVITY_LEVELS]?.description}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Request Change Button */}
+                  <div className="mt-6 pt-4 border-t">
+                    <Button 
+                      variant="outline" 
+                      className="w-full"
+                      onClick={() => toast.info('Funcionalidade de solicitação de alteração será implementada em breve.')}
+                    >
+                      <Target className="h-4 w-4 mr-2" />
+                      Solicitar Alteração de Objetivo
+                    </Button>
                   </div>
                 </CardContent>
               </Card>
@@ -430,7 +338,7 @@ export default function Profile() {
                   <CardHeader className="pb-3">
                     <CardTitle className="text-base flex items-center gap-2">
                       <TrendingUp className="h-5 w-5 text-primary" />
-                      Suas Metas Diárias Calculadas
+                      Suas Metas Diárias Atuais
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
@@ -468,7 +376,7 @@ export default function Profile() {
             </motion.div>
           </TabsContent>
 
-          {/* Diet Preferences Tab */}
+          {/* Diet Preferences Tab - Read-only */}
           <TabsContent value="diet">
             <motion.div
               initial={{ opacity: 0, y: 10 }}
@@ -477,91 +385,92 @@ export default function Profile() {
             >
               <Card>
                 <CardHeader className="pb-4">
-                  <CardTitle className="flex items-center gap-2">
-                    <Utensils className="h-5 w-5 text-primary" />
-                    Refeições por Dia
-                  </CardTitle>
-                  <CardDescription>Quantas refeições você costuma fazer?</CardDescription>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle className="flex items-center gap-2">
+                        <Utensils className="h-5 w-5 text-primary" />
+                        Configuração da Dieta
+                      </CardTitle>
+                      <CardDescription>Definida no cadastro</CardDescription>
+                    </div>
+                    <Badge variant="secondary" className="gap-1">
+                      <Lock className="h-3 w-3" />
+                      Somente leitura
+                    </Badge>
+                  </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid grid-cols-5 gap-2 sm:gap-3">
-                    {[2, 3, 4, 5, 6].map((num) => {
-                      const isSelected = formData.meals_per_day === num;
-                      return (
-                        <button
-                          key={num}
-                          type="button"
-                          onClick={() => handleChange('meals_per_day', num)}
-                          className={`h-14 sm:h-16 rounded-xl border-2 text-xl font-bold transition-all ${
-                            isSelected
-                              ? 'border-primary bg-primary/10 text-primary shadow-sm'
-                              : 'border-border hover:border-primary/50 hover:bg-muted/50'
-                          }`}
-                        >
-                          {num}
-                        </button>
-                      );
-                    })}
+                  {/* Info Banner */}
+                  <div className="bg-muted/50 rounded-lg p-4 mb-6 flex items-start gap-3">
+                    <Lock className="h-5 w-5 text-muted-foreground shrink-0 mt-0.5" />
+                    <div className="text-sm text-muted-foreground">
+                      <p className="font-medium text-foreground mb-1">Por que não posso alterar?</p>
+                      <p>
+                        A configuração de refeições e preferências está vinculada ao seu plano 
+                        alimentar atual. Alterações requerem a geração de um novo plano para 
+                        manter a coerência nutricional.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Meals per Day Display */}
+                  <div className="p-4 rounded-xl bg-muted/30 border mb-6">
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+                        <span className="text-2xl font-bold text-primary">{formData.meals_per_day}</span>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground uppercase tracking-wide">Refeições por Dia</p>
+                        <p className="font-semibold text-lg">{formData.meals_per_day} refeições</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Preferences Display */}
+                  <div className="mb-6">
+                    <p className="text-sm font-medium mb-3">Preferências Alimentares</p>
+                    <div className="flex flex-wrap gap-2">
+                      {formData.preferences.length > 0 ? (
+                        formData.preferences.map((pref) => (
+                          <Badge key={pref} variant="secondary" className="px-3 py-1.5">
+                            {pref}
+                          </Badge>
+                        ))
+                      ) : (
+                        <span className="text-sm text-muted-foreground">Nenhuma preferência definida</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Restrictions Display */}
+                  <div className="mb-6">
+                    <p className="text-sm font-medium mb-3">Restrições Alimentares</p>
+                    <div className="flex flex-wrap gap-2">
+                      {formData.restrictions.length > 0 ? (
+                        formData.restrictions.map((rest) => (
+                          <Badge key={rest} variant="destructive" className="px-3 py-1.5">
+                            {rest}
+                          </Badge>
+                        ))
+                      ) : (
+                        <span className="text-sm text-muted-foreground">Nenhuma restrição definida</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Request Change Button */}
+                  <div className="pt-4 border-t">
+                    <Button 
+                      variant="outline" 
+                      className="w-full"
+                      onClick={() => toast.info('Funcionalidade de solicitação de alteração será implementada em breve.')}
+                    >
+                      <Utensils className="h-4 w-4 mr-2" />
+                      Solicitar Alteração de Dieta
+                    </Button>
                   </div>
                 </CardContent>
               </Card>
-
-              <Card>
-                <CardHeader className="pb-4">
-                  <CardTitle>Preferências Alimentares</CardTitle>
-                  <CardDescription>Selecione os tipos de alimentos que você prefere</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex flex-wrap gap-2">
-                    {FOOD_PREFERENCES.map((pref) => {
-                      const isSelected = formData.preferences.includes(pref);
-                      return (
-                        <button
-                          key={pref}
-                          type="button"
-                          onClick={() => togglePreference(pref)}
-                          className={`px-4 py-2.5 rounded-full text-sm font-medium transition-all ${
-                            isSelected
-                              ? 'bg-primary text-primary-foreground shadow-sm'
-                              : 'bg-muted hover:bg-muted/80 hover:shadow-sm'
-                          }`}
-                        >
-                          {pref}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="pb-4">
-                  <CardTitle>Restrições Alimentares</CardTitle>
-                  <CardDescription>Selecione alimentos que você não pode ou não quer consumir</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex flex-wrap gap-2">
-                    {FOOD_RESTRICTIONS.map((rest) => {
-                      const isSelected = formData.restrictions.includes(rest);
-                      return (
-                        <button
-                          key={rest}
-                          type="button"
-                          onClick={() => toggleRestriction(rest)}
-                          className={`px-4 py-2.5 rounded-full text-sm font-medium transition-all ${
-                            isSelected
-                              ? 'bg-destructive text-destructive-foreground shadow-sm'
-                              : 'bg-muted hover:bg-muted/80 hover:shadow-sm'
-                          }`}
-                        >
-                          {rest}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </CardContent>
-              </Card>
-
             </motion.div>
           </TabsContent>
 
