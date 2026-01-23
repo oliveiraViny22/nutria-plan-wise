@@ -1,6 +1,6 @@
 # DOCUMENTAÇÃO TÉCNICA OFICIAL — NUTRIAPLAN
 
-## Versão do Documento: 2.5
+## Versão do Documento: 2.6
 ## Data de Geração: 18 de Janeiro de 2026
 ## Última Atualização: 23 de Janeiro de 2026
 
@@ -10,6 +10,7 @@
 
 | Versão | Data | Alterações |
 |--------|------|------------|
+| 2.6 | 23/01/2026 | **Fluxo de Alteração de Objetivo**: Implementado wizard guiado para alteração de objetivo com governança diferenciada por perfil. Usuários autônomos passam por wizard de 3 etapas (escolha, confirmação, recálculo). Alunos vinculados usam sistema de solicitações ao profissional. Tabela `objective_change_policies` para configuração de políticas. Novo tipo de solicitação `objective_change`. Recálculo automático de metas via Mifflin-St Jeor. |
 | 2.5 | 23/01/2026 | **Governança de Rebalanceamento por Adesão**: Implementada política que usa adesão como critério de governança. Alta (≥80%): rebalanceamento completo. Média (50-79%): apenas redistribuição/simplificação. Baixa (<50%): rebalanceamento bloqueado. Backend é fonte única de decisão. IA apenas consome permissões. |
 | 2.4 | 21/01/2026 | Auditoria completa de fluxos de usuário. Atualização de limites do plano gratuito (1 dieta, 3 substituições, 1 ajuste). Sincronização de permissões com banco de dados v2. Verificação de can_substitute no MealDetail. Correção de contagem de uso para ajustes no MacroRebalancer. |
 | 2.3 | 21/01/2026 | Adicionado CHECK constraint `foods_category_check` para validar categorias canônicas no BD. Atualização da documentação para refletir schema v2 consolidado com 13 tabelas. Remoção de referências a tabelas legadas (plan_history, ai_suggestions, chat_messages). Detalhamento de campos v2 (quantity_grams, unit_locked, display_unit). |
@@ -846,9 +847,10 @@ Features suportadas:
 
 | Tipo | Descrição |
 |------|-----------|
-| `goal_change` | Alteração de objetivo (perda, manutenção, ganho) |
+| `goal_change` | Alteração de objetivo (perda, manutenção, ganho) - legado |
 | `meals_change` | Alteração no número de refeições |
 | `food_substitution` | Substituição de alimento específico |
+| `objective_change` | Alteração de objetivo nutricional (v2.6) |
 
 ### 7.7.2 Status de Solicitação
 
@@ -857,6 +859,71 @@ Features suportadas:
 | `pending` | Aguardando resposta do profissional |
 | `approved` | Aprovada pelo profissional |
 | `rejected` | Rejeitada pelo profissional |
+
+## 7.8 Alteração de Objetivo Nutricional (v2.6)
+
+### 7.8.1 Governança por Perfil
+
+| Perfil | Fluxo de Alteração | Impacto no Plano |
+|--------|-------------------|------------------|
+| Usuário Autônomo | Wizard guiado (3 etapas) | Recálculo automático de metas |
+| Aluno Vinculado | Sistema de solicitações | Profissional decide impacto |
+| Profissional | N/A (não tem plano próprio) | N/A |
+
+### 7.8.2 Wizard de Alteração (Usuários Autônomos)
+
+```
+Etapa 1: Seleção do Novo Objetivo
+- Opções: lose_weight, maintain, gain_muscle
+- Visualização clara da mudança proposta
+
+Etapa 2: Confirmação e Impacto
+- Resumo da alteração
+- Preview das novas metas (calorias, macros)
+- Checkbox de confirmação obrigatório
+
+Etapa 3: Aplicação
+- Atualização do profile.goal
+- Recálculo de targets via Mifflin-St Jeor
+- Pergunta se deseja gerar novo plano
+```
+
+### 7.8.3 Solicitação de Alteração (Alunos Vinculados)
+
+```
+1. Aluno acessa perfil e tenta alterar objetivo
+2. Sistema detecta vínculo profissional
+3. Modal de solicitação é exibido
+4. Aluno seleciona novo objetivo e justifica
+5. Solicitação criada em student_requests (type = 'objective_change')
+6. Profissional recebe notificação visual
+7. Profissional aprova/rejeita com feedback
+8. Se aprovado: sistema recalcula metas automaticamente
+```
+
+### 7.8.4 Tabela de Políticas (objective_change_policies)
+
+| Campo | Tipo | Descrição |
+|-------|------|-----------|
+| `id` | UUID | Identificador único |
+| `name` | TEXT | Nome da política |
+| `description` | TEXT | Descrição |
+| `user_flow_type` | TEXT | 'wizard' ou 'request' |
+| `plan_impact_type` | TEXT | 'recalculate' ou 'ask_user' |
+| `require_confirmation` | BOOLEAN | Exige confirmação explícita |
+| `is_default` | BOOLEAN | Política padrão |
+| `is_active` | BOOLEAN | Política ativa |
+
+### 7.8.5 Hooks e Componentes
+
+| Componente/Hook | Propósito |
+|-----------------|-----------|
+| `ObjectiveChangeDialog` | Dialog principal para alteração |
+| `ObjectiveChangeWizard` | Wizard de 3 etapas (autônomos) |
+| `StudentObjectiveRequestDialog` | Modal de solicitação (alunos) |
+| `useObjectiveChange` | Lógica de alteração e recálculo |
+| `useObjectiveChangePolicies` | Gestão de políticas |
+| `useObjectiveChangeRequests` | Solicitações de alunos |
 
 ---
 

@@ -1,8 +1,8 @@
 # DOCUMENTAÇÃO COMERCIAL E INSTITUCIONAL — NUTRIAPLAN
 
-## Versão do Documento: 2.2
+## Versão do Documento: 2.3
 ## Data de Geração: 18 de Janeiro de 2026
-## Última Atualização: 21 de Janeiro de 2026
+## Última Atualização: 23 de Janeiro de 2026
 
 ---
 
@@ -10,6 +10,7 @@
 
 | Versão | Data | Alterações |
 |--------|------|------------|
+| 2.3 | 23/01/2026 | Sincronização com documentação técnica v2.6. Nova funcionalidade de **Alteração de Objetivo** com wizard guiado para usuários autônomos e sistema de solicitações para alunos vinculados. Governança diferenciada por perfil. Recálculo automático de metas nutricionais. |
 | 2.2 | 21/01/2026 | Sincronização com documentação técnica v2.4. Atualização de limites do plano gratuito (1 dieta inicial, 3 substituições, 1 ajuste). Correção de tabelas de recursos por plano. |
 | 2.1 | 21/01/2026 | Alinhamento com documentação técnica v2.2. Atualização de recursos e limites. Clarificação de funcionalidades do rebalanceador de macros. |
 | 2.0 | 18/01/2026 | Versão consolidada e alinhada com documentação técnica v2.0, detalhamento de funcionalidades por perfil, clarificação de limites |
@@ -165,6 +166,12 @@ Ser a plataforma líder em nutrição inteligente na América Latina, referênci
 - O sistema aprende com sua adesão
 - Receba sugestões de ajuste
 - Evolua seu plano conforme progride
+
+### Passo 5: Alteração de Objetivo (Novo v2.3)
+- Wizard guiado em 3 etapas simples
+- Veja o impacto da mudança antes de confirmar
+- Recálculo automático das suas metas nutricionais
+- Opção de gerar novo plano após alteração
 
 ## 5.2 Para Profissionais
 
