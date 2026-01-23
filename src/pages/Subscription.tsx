@@ -277,111 +277,112 @@ export default function Subscription() {
           </Card>
         </motion.div>
 
-        {/* Usage Stats */}
+        {/* Usage Stats & Plan Features - Side by Side */}
         {currentPlan && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-          >
-            <Card>
-              <CardHeader className="pb-4">
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <BarChart3 className="h-5 w-5 text-primary" />
-                  Uso do Período
-                </CardTitle>
-                <CardDescription>
-                  Consumo de recursos no período atual
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  {usageItems.map((item, index) => {
-                    const Icon = item.icon;
-                    const percentage = item.limit > 0 ? Math.min((item.used / item.limit) * 100, 100) : 0;
-                    const isAtLimit = percentage >= 100;
-                    const isNearLimit = percentage >= 80 && percentage < 100;
-                    
-                    return (
-                      <motion.div
-                        key={item.label}
-                        initial={{ opacity: 0, x: -10 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: 0.1 + index * 0.05 }}
-                        className="bg-muted/30 rounded-xl p-4 space-y-3"
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2.5">
-                            <div className={`p-2 rounded-lg ${item.bgColor}`}>
-                              <Icon className={`h-4 w-4 ${item.color}`} />
+          <div className="grid gap-6 md:grid-cols-2">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1 }}
+              className="h-full"
+            >
+              <Card className="h-full">
+                <CardHeader className="pb-4">
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <BarChart3 className="h-5 w-5 text-primary" />
+                    Uso do Período
+                  </CardTitle>
+                  <CardDescription>
+                    Consumo de recursos no período atual
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid gap-3">
+                    {usageItems.map((item, index) => {
+                      const Icon = item.icon;
+                      const percentage = item.limit > 0 ? Math.min((item.used / item.limit) * 100, 100) : 0;
+                      const isAtLimit = percentage >= 100;
+                      const isNearLimit = percentage >= 80 && percentage < 100;
+                      
+                      return (
+                        <motion.div
+                          key={item.label}
+                          initial={{ opacity: 0, x: -10 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: 0.1 + index * 0.05 }}
+                          className="bg-muted/30 rounded-xl p-3 space-y-2"
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <div className={`p-1.5 rounded-lg ${item.bgColor}`}>
+                                <Icon className={`h-3.5 w-3.5 ${item.color}`} />
+                              </div>
+                              <span className="font-medium text-sm">{item.label}</span>
                             </div>
-                            <span className="font-medium text-sm">{item.label}</span>
+                            <span className={`text-sm font-semibold ${isAtLimit ? 'text-destructive' : isNearLimit ? 'text-amber-500' : 'text-foreground'}`}>
+                              {item.used}/{item.limit}
+                            </span>
                           </div>
-                          <span className={`text-sm font-semibold ${isAtLimit ? 'text-destructive' : isNearLimit ? 'text-amber-500' : 'text-foreground'}`}>
-                            {item.used}/{item.limit}
-                          </span>
-                        </div>
-                        <Progress 
-                          value={percentage} 
-                          className={`h-2 ${isAtLimit ? '[&>div]:bg-destructive' : isNearLimit ? '[&>div]:bg-amber-500' : ''}`}
-                        />
-                      </motion.div>
-                    );
-                  })}
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
-        )}
+                          <Progress 
+                            value={percentage} 
+                            className={`h-1.5 ${isAtLimit ? '[&>div]:bg-destructive' : isNearLimit ? '[&>div]:bg-amber-500' : ''}`}
+                          />
+                        </motion.div>
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
 
-        {/* Plan Features */}
-        {currentPlan && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-          >
-            <Card>
-              <CardHeader className="pb-4">
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <Sparkles className="h-5 w-5 text-primary" />
-                  Recursos Inclusos
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <FeatureItem
-                    text={`${currentPlan.diet_limit} dieta${currentPlan.diet_limit > 1 ? 's' : ''} por mês`}
-                    included
-                  />
-                  <FeatureItem
-                    text={`${currentPlan.substitution_limit} substituições`}
-                    included
-                  />
-                  <FeatureItem
-                    text={`${currentPlan.adjustment_limit} ajuste${currentPlan.adjustment_limit > 1 ? 's' : ''} automático${currentPlan.adjustment_limit > 1 ? 's' : ''}`}
-                    included={currentPlan.adjustment_limit > 0}
-                  />
-                  <FeatureItem
-                    text={`Chat IA (${currentPlan.chat_messages_per_day} msgs/dia)`}
-                    included={currentPlan.has_chat}
-                  />
-                  {currentPlan.patients_limit > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2 }}
+              className="h-full"
+            >
+              <Card className="h-full">
+                <CardHeader className="pb-4">
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <Sparkles className="h-5 w-5 text-primary" />
+                    Recursos Inclusos
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid gap-2">
                     <FeatureItem
-                      text={`Até ${currentPlan.patients_limit} pacientes`}
+                      text={`${currentPlan.diet_limit} dieta${currentPlan.diet_limit > 1 ? 's' : ''} por mês`}
                       included
                     />
-                  )}
-                  <FeatureItem
-                    text={currentPlan.history_days === 9999 
-                      ? 'Histórico ilimitado' 
-                      : `${currentPlan.history_days} dias de histórico`}
-                    included
-                  />
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
+                    <FeatureItem
+                      text={`${currentPlan.substitution_limit} substituições`}
+                      included
+                    />
+                    <FeatureItem
+                      text={`${currentPlan.adjustment_limit} ajuste${currentPlan.adjustment_limit > 1 ? 's' : ''} automático${currentPlan.adjustment_limit > 1 ? 's' : ''}`}
+                      included={currentPlan.adjustment_limit > 0}
+                    />
+                    <FeatureItem
+                      text={`Chat IA (${currentPlan.chat_messages_per_day} msgs/dia)`}
+                      included={currentPlan.has_chat}
+                    />
+                    {currentPlan.patients_limit > 0 && (
+                      <FeatureItem
+                        text={`Até ${currentPlan.patients_limit} pacientes`}
+                        included
+                      />
+                    )}
+                    <FeatureItem
+                      text={currentPlan.history_days === 9999 
+                        ? 'Histórico ilimitado' 
+                        : `${currentPlan.history_days} dias de histórico`}
+                      included
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+          </div>
         )}
 
         {/* Professional Quick Actions */}
