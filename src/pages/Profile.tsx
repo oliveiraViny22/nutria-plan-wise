@@ -232,19 +232,6 @@ export default function Profile() {
 
       <main className="container mx-auto px-3 sm:px-4 py-4 sm:py-6 pb-20 sm:pb-24 max-w-4xl">
         <Tabs defaultValue="personal" className="space-y-4 sm:space-y-6">
-          {/* Info Banner - Displayed at top of tabs */}
-          <div className="bg-muted/50 rounded-lg p-4 flex items-start gap-3">
-            <Lock className="h-5 w-5 text-muted-foreground shrink-0 mt-0.5" />
-            <div className="text-sm text-muted-foreground">
-              <p className="font-medium text-foreground mb-1">Por que não posso alterar?</p>
-              <p>
-                Os dados do perfil são fixados para manter a consistência do seu plano 
-                alimentar e histórico de adesão. Para solicitar alterações específicas, 
-                acesse a aba correspondente e use o botão de solicitação.
-              </p>
-            </div>
-          </div>
-
           {/* Tabs */}
           <TabsList className="grid w-full grid-cols-3 h-auto">
             <TabsTrigger value="personal" className="text-xs sm:text-sm py-2 sm:py-2.5 px-1 sm:px-3">
@@ -261,7 +248,19 @@ export default function Profile() {
             </TabsTrigger>
           </TabsList>
 
-          {/* Goals Tab - Read-only */}
+          {/* Info Banner - Displayed below tabs */}
+          <div className="bg-muted/50 rounded-lg p-4 flex items-start gap-3">
+            <Lock className="h-5 w-5 text-muted-foreground shrink-0 mt-0.5" />
+            <div className="text-sm text-muted-foreground">
+              <p className="font-medium text-foreground mb-1">Por que não posso alterar?</p>
+              <p>
+                Os dados do perfil são fixados para manter a consistência do seu plano 
+                alimentar e histórico de adesão. Para solicitar alterações específicas, 
+                acesse a aba correspondente e use o botão de solicitação.
+              </p>
+            </div>
+          </div>
+
           <TabsContent value="goals">
             <motion.div
               initial={{ opacity: 0, y: 10 }}
