@@ -22,7 +22,8 @@ export default function Pricing() {
   const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null);
 
   // Check if user is on free plan (no current plan or gratuito)
-  const isFreePlan = !currentPlan || currentPlan.name === 'gratuito';
+  // Also treat unauthenticated users as "free" for display purposes
+  const isFreePlan = !user || !currentPlan || currentPlan.name === 'gratuito';
 
   // For free users, hide account tabs and only show upgrade to paid personal plan
   // For paid/professional users, show all tabs
@@ -32,7 +33,7 @@ export default function Pricing() {
 
   // Filter plans based on user's current plan and tab selection
   const filteredPlans = plans.filter(p => {
-    // Free users can ONLY see the paid personal plan as upgrade option
+    // Free users (including unauthenticated) can ONLY see the paid personal plan as upgrade option
     if (isFreePlan) {
       // Only show plano_pessoal_pago for free users
       return p.name === 'plano_pessoal_pago';
@@ -46,8 +47,9 @@ export default function Pricing() {
     }
     
     // Filter by account type tab for all other plans
-    const personalTypes = ['gratuito', 'plano_pessoal_pago'];
-    const isPersonalPlan = personalTypes.includes(p.type);
+    // Plan types are: 'gratuito', 'plano_pessoal_pago', 'profissional'
+    const personalPlanTypes: string[] = ['gratuito', 'plano_pessoal_pago'];
+    const isPersonalPlan = personalPlanTypes.includes(p.type);
     if (accountTab === 'personal' && !isPersonalPlan) return false;
     if (accountTab === 'professional' && p.type !== 'profissional') return false;
     
