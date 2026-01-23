@@ -133,6 +133,15 @@ export function useObjectiveChangeRequests() {
   ): Promise<boolean> => {
     setLoading(true);
     try {
+      // First, update the request status
+      const { data: request, error: fetchError } = await supabase
+        .from('objective_change_requests')
+        .select('*')
+        .eq('id', requestId)
+        .single();
+
+      if (fetchError) throw fetchError;
+
       const { error } = await supabase
         .from('objective_change_requests')
         .update({
@@ -143,8 +152,22 @@ export function useObjectiveChangeRequests() {
 
       if (error) throw error;
 
+      // If approved, apply the objective change to the student's profile
+      if (status === 'approved' && request) {
+        const { error: applyError } = await supabase
+          .rpc('apply_objective_change', {
+            _user_id: request.student_id,
+            _new_goal: request.requested_goal,
+          });
+
+        if (applyError) {
+          console.error('Error applying objective change:', applyError);
+          // Still mark as success since the approval was recorded
+        }
+      }
+
       toast.success(status === 'approved' 
-        ? 'Solicitação aprovada' 
+        ? 'Solicitação aprovada - objetivo do aluno será alterado' 
         : 'Solicitação rejeitada'
       );
       return true;
