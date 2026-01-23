@@ -491,16 +491,28 @@ export default function Profile() {
                     </div>
                   </div>
 
-                  {/* Request Change Button */}
+                  {/* Request Change Button - Only for paid users */}
                   <div className="pt-4 border-t">
-                    <Button 
-                      variant="outline" 
-                      className="w-full"
-                      onClick={() => toast.info('Funcionalidade de solicitação de alteração será implementada em breve.')}
-                    >
-                      <Utensils className="h-4 w-4 mr-2" />
-                      Solicitar Alteração de Dieta
-                    </Button>
+                    {isPaidUser ? (
+                      <Button 
+                        variant="outline" 
+                        className="w-full"
+                        onClick={() => toast.info('Funcionalidade de solicitação de alteração será implementada em breve.')}
+                      >
+                        <Utensils className="h-4 w-4 mr-2" />
+                        Solicitar Alteração de Dieta
+                      </Button>
+                    ) : (
+                      <Button 
+                        variant="outline" 
+                        className="w-full"
+                        onClick={() => setShowUpgradeDialog(true)}
+                      >
+                        <Lock className="h-4 w-4 mr-2" />
+                        Solicitar Alteração de Dieta
+                        <Badge variant="secondary" className="ml-2 text-xs">Pro</Badge>
+                      </Button>
+                    )}
                   </div>
                 </CardContent>
               </Card>
