@@ -2,7 +2,6 @@ import { useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { 
   Scale, 
-  Droplets, 
   TrendingDown, 
   TrendingUp,
   Minus,
@@ -41,25 +40,6 @@ export function GoalsProjectionCard() {
     ];
   }, [profile?.weight, profile?.goal]);
 
-  // Calculate daily water intake recommendation (ml)
-  const waterRecommendation = useMemo(() => {
-    if (!profile?.weight) return 2000;
-    const baseWater = profile.weight * 35;
-    
-    const activityMultiplier = {
-      sedentary: 1,
-      light: 1.1,
-      moderate: 1.2,
-      active: 1.3,
-      very_active: 1.4,
-    };
-    
-    const multiplier = activityMultiplier[profile.activity_level as keyof typeof activityMultiplier] || 1;
-    return Math.round(baseWater * multiplier);
-  }, [profile?.weight, profile?.activity_level]);
-
-  const waterInLiters = (waterRecommendation / 1000).toFixed(1);
-  const waterGlasses = Math.ceil(waterRecommendation / 250);
 
   const getGoalIcon = () => {
     if (!profile?.goal) return <Target className="w-4 h-4" />;
@@ -105,47 +85,25 @@ export function GoalsProjectionCard() {
     >
       <Card className="card-elevated overflow-hidden">
         <CardContent className="p-4 space-y-4">
-          {/* Header with Goal and Water */}
+          {/* Header with Goal */}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Scale className="w-4 h-4 text-primary" />
-              <span className="text-sm font-medium">Metas Diárias</span>
+              <span className="text-sm font-medium">Projeção de Peso</span>
             </div>
-            <div className="flex items-center gap-3">
-              {/* Water Intake Badge */}
-              <div className="flex items-center gap-1.5 px-2.5 py-1 bg-blue-500/10 rounded-full">
-                <Droplets className="w-4 h-4 text-blue-500" />
-                <span className="text-xs font-semibold text-blue-500">{waterInLiters}L</span>
-              </div>
-              {/* Goal Badge */}
-              <Badge variant="secondary" className="text-xs">
-                {GOALS[profile.goal as keyof typeof GOALS]?.label || 'Meta'}
-              </Badge>
-            </div>
+            <Badge variant="secondary" className="text-xs">
+              {GOALS[profile.goal as keyof typeof GOALS]?.label || 'Meta'}
+            </Badge>
           </div>
 
-          {/* Current Weight & Water Summary */}
-          <div className="grid grid-cols-2 gap-3">
-            {/* Weight */}
-            <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
-              <div className="w-9 h-9 rounded-full bg-background flex items-center justify-center">
-                {getGoalIcon()}
-              </div>
-              <div>
-                <p className="text-[10px] text-muted-foreground">Peso atual</p>
-                <p className="text-base font-bold">{formatWeight(profile.weight)} kg</p>
-              </div>
+          {/* Current Weight */}
+          <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
+            <div className="w-9 h-9 rounded-full bg-background flex items-center justify-center">
+              {getGoalIcon()}
             </div>
-
-            {/* Water */}
-            <div className="flex items-center gap-3 p-3 bg-blue-500/5 rounded-lg">
-              <div className="w-9 h-9 rounded-full bg-blue-500/10 flex items-center justify-center">
-                <Droplets className="w-4 h-4 text-blue-500" />
-              </div>
-              <div>
-                <p className="text-[10px] text-muted-foreground">Água diária</p>
-                <p className="text-base font-bold text-blue-500">~{waterGlasses} copos</p>
-              </div>
+            <div>
+              <p className="text-[10px] text-muted-foreground">Peso atual</p>
+              <p className="text-base font-bold">{formatWeight(profile.weight)} kg</p>
             </div>
           </div>
 
@@ -172,7 +130,7 @@ export function GoalsProjectionCard() {
 
           {/* Disclaimer */}
           <p className="text-[10px] text-muted-foreground text-center">
-            *Projeção estimada. Beba {waterInLiters}L de água por dia para melhores resultados.
+            *Projeção estimada baseada no seu objetivo e metabolismo.
           </p>
         </CardContent>
       </Card>
