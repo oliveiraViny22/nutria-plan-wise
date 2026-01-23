@@ -1,16 +1,38 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { CreditCard, AlertTriangle, Check, ExternalLink, ArrowLeft, Users, BarChart3, UserPlus, Lock } from 'lucide-react';
+import { 
+  CreditCard, 
+  AlertTriangle, 
+  Check, 
+  ArrowLeft, 
+  Users, 
+  BarChart3, 
+  UserPlus, 
+  Lock,
+  Sparkles,
+  TrendingUp,
+  MessageCircle,
+  RefreshCw,
+  Utensils,
+  ArrowRightLeft,
+  Settings2,
+  Calendar,
+  Crown,
+  Zap
+} from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
+import { Separator } from '@/components/ui/separator';
 import { MobileNav } from '@/components/MobileNav';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { useSubscription } from '@/hooks/useSubscription';
 import { useToast } from '@/hooks/use-toast';
 import { useUserRole } from '@/hooks/useUserRole';
-import { BILLING_CYCLE_LABELS } from '@/lib/subscription-types';
+import { BILLING_CYCLE_LABELS, PLAN_DISPLAY_NAMES } from '@/lib/subscription-types';
+import { CommercialPlan } from '@/lib/types';
 
 export default function Subscription() {
   const navigate = useNavigate();
@@ -18,8 +40,8 @@ export default function Subscription() {
   const { subscriptionInfo, currentPlan, usage, loading, openCustomerPortal, refresh, isLinkedToProfessional } = useSubscription();
   const { isProfessional, isAdmin } = useUserRole();
   const [portalLoading, setPortalLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   
-  // Aluno vinculado não deve ver opções de compra pessoal
   const isLinkedStudent = isLinkedToProfessional;
 
   const handleManageSubscription = async () => {
@@ -37,121 +59,203 @@ export default function Subscription() {
     }
   };
 
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await refresh();
+    setTimeout(() => setRefreshing(false), 500);
+  };
+
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-3">
+          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary"></div>
+          <p className="text-sm text-muted-foreground">Carregando assinatura...</p>
+        </div>
       </div>
     );
   }
 
-  const getStatusBadge = (status?: string) => {
+  const getStatusConfig = (status?: string) => {
     switch (status) {
       case 'active':
-        return <Badge className="bg-green-500">Ativa</Badge>;
+        return { label: 'Ativa', variant: 'default' as const, className: 'bg-emerald-500 hover:bg-emerald-600' };
       case 'trial':
-        return <Badge className="bg-blue-500">Período de Teste</Badge>;
+        return { label: 'Período de Teste', variant: 'default' as const, className: 'bg-blue-500 hover:bg-blue-600' };
       case 'past_due':
-        return <Badge variant="destructive">Pagamento Pendente</Badge>;
+        return { label: 'Pagamento Pendente', variant: 'destructive' as const, className: '' };
       case 'canceled':
-        return <Badge variant="secondary">Cancelada</Badge>;
+        return { label: 'Cancelada', variant: 'secondary' as const, className: '' };
       case 'expired':
-        return <Badge variant="destructive">Expirada</Badge>;
+        return { label: 'Expirada', variant: 'destructive' as const, className: '' };
       default:
-        return <Badge variant="secondary">Sem assinatura</Badge>;
+        return { label: 'Plano Gratuito', variant: 'secondary' as const, className: '' };
     }
   };
 
+  const statusConfig = getStatusConfig(subscriptionInfo?.subscription?.status);
+  const displayName = currentPlan ? (PLAN_DISPLAY_NAMES[currentPlan.type as CommercialPlan] || currentPlan.name) : 'Gratuito';
+  const isFreePlan = !currentPlan || currentPlan.type === 'gratuito';
+
+  const usageItems = [
+    {
+      icon: Utensils,
+      label: 'Dietas',
+      used: usage?.diets_used || 0,
+      limit: currentPlan?.diet_limit || 1,
+      color: 'text-amber-500',
+      bgColor: 'bg-amber-500/10',
+    },
+    {
+      icon: ArrowRightLeft,
+      label: 'Substituições',
+      used: usage?.substitutions_used || 0,
+      limit: currentPlan?.substitution_limit || 3,
+      color: 'text-blue-500',
+      bgColor: 'bg-blue-500/10',
+    },
+    {
+      icon: Settings2,
+      label: 'Ajustes',
+      used: usage?.adjustments_used || 0,
+      limit: currentPlan?.adjustment_limit || 1,
+      color: 'text-violet-500',
+      bgColor: 'bg-violet-500/10',
+    },
+    ...(currentPlan?.has_chat ? [{
+      icon: MessageCircle,
+      label: 'Mensagens hoje',
+      used: usage?.chat_messages_today || 0,
+      limit: currentPlan.chat_messages_per_day,
+      color: 'text-emerald-500',
+      bgColor: 'bg-emerald-500/10',
+    }] : []),
+  ];
+
   return (
-    <div className="min-h-screen bg-background overflow-x-hidden">
-      <header className="border-b bg-card/50 backdrop-blur-sm sticky top-0 z-50">
-        <div className="container mx-auto px-3 sm:px-4 py-3 sm:py-4 flex items-center justify-between">
+    <div className="min-h-screen bg-gradient-to-b from-background to-muted/30 overflow-x-hidden">
+      {/* Header */}
+      <header className="border-b bg-card/80 backdrop-blur-md sticky top-0 z-50">
+        <div className="container mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <MobileNav />
-            <Button variant="ghost" size="icon" className="hidden md:flex w-9 h-9 sm:w-10 sm:h-10" onClick={() => navigate(-1)}>
-              <ArrowLeft className="h-4 w-4 sm:h-5 sm:w-5" />
+            <Button variant="ghost" size="icon" className="hidden md:flex" onClick={() => navigate(-1)}>
+              <ArrowLeft className="h-5 w-5" />
             </Button>
           </div>
-          <h1 className="text-base sm:text-xl font-bold">Minha Assinatura</h1>
-          <ThemeToggle />
+          <h1 className="text-lg font-semibold">Minha Assinatura</h1>
+          <div className="flex items-center gap-2">
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={handleRefresh}
+              disabled={refreshing}
+            >
+              <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+            </Button>
+            <ThemeToggle />
+          </div>
         </div>
       </header>
 
-      <main className="container mx-auto px-3 sm:px-4 py-6 sm:py-8 max-w-2xl space-y-4 sm:space-y-6">
-        {/* Current Plan Card */}
+      <main className="container mx-auto px-4 py-6 max-w-3xl space-y-6">
+        {/* Hero Card - Current Plan */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
         >
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle>Plano Atual</CardTitle>
-                {getStatusBadge(subscriptionInfo?.subscription?.status)}
-              </div>
-              <CardDescription>
-                {currentPlan ? (
-                  <span className="capitalize text-lg font-medium text-foreground">
-                    {currentPlan.name} ({currentPlan.type === 'profissional' ? 'Profissional' : 'Pessoal'})
-                  </span>
-                ) : (
-                  'Nenhum plano ativo'
-                )}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {subscriptionInfo?.subscription && (
-                <>
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div>
-                      <p className="text-muted-foreground">Ciclo de Cobrança</p>
-                      <p className="font-medium">
-                        {BILLING_CYCLE_LABELS[subscriptionInfo.subscription.billingCycle as keyof typeof BILLING_CYCLE_LABELS] || 'Mensal'}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-muted-foreground">Próxima Renovação</p>
-                      <p className="font-medium">
-                        {new Date(subscriptionInfo.subscription.periodEnd).toLocaleDateString('pt-BR')}
-                      </p>
-                    </div>
+          <Card className="overflow-hidden border-0 shadow-lg">
+            <div className={`h-2 ${isFreePlan ? 'bg-muted' : 'bg-gradient-to-r from-primary to-primary/60'}`} />
+            <CardHeader className="pb-4">
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className={`p-3 rounded-xl ${isFreePlan ? 'bg-muted' : 'bg-primary/10'}`}>
+                    {isFreePlan ? (
+                      <Sparkles className="h-6 w-6 text-muted-foreground" />
+                    ) : (
+                      <Crown className="h-6 w-6 text-primary" />
+                    )}
                   </div>
-
-                  {subscriptionInfo.subscription.cancelAtPeriodEnd && (
-                    <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-3">
-                      <p className="text-sm text-yellow-600 flex items-center gap-2">
-                        <AlertTriangle className="h-4 w-4" />
-                        Sua assinatura será cancelada em {new Date(subscriptionInfo.subscription.periodEnd).toLocaleDateString('pt-BR')}
-                      </p>
+                  <div>
+                    <CardTitle className="text-xl">{displayName}</CardTitle>
+                    <CardDescription className="mt-0.5">
+                      {currentPlan?.type === 'profissional' ? 'Conta Profissional' : 'Conta Pessoal'}
+                    </CardDescription>
+                  </div>
+                </div>
+                <Badge variant={statusConfig.variant} className={statusConfig.className}>
+                  {statusConfig.label}
+                </Badge>
+              </div>
+            </CardHeader>
+            
+            <CardContent className="space-y-5">
+              {/* Subscription Details */}
+              {subscriptionInfo?.subscription && (
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-muted/50 rounded-xl p-4">
+                    <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                      <Calendar className="h-4 w-4" />
+                      <span className="text-xs font-medium uppercase tracking-wide">Ciclo</span>
                     </div>
-                  )}
-                </>
+                    <p className="font-semibold">
+                      {BILLING_CYCLE_LABELS[subscriptionInfo.subscription.billingCycle as keyof typeof BILLING_CYCLE_LABELS] || 'Mensal'}
+                    </p>
+                  </div>
+                  <div className="bg-muted/50 rounded-xl p-4">
+                    <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                      <TrendingUp className="h-4 w-4" />
+                      <span className="text-xs font-medium uppercase tracking-wide">Renovação</span>
+                    </div>
+                    <p className="font-semibold">
+                      {new Date(subscriptionInfo.subscription.periodEnd).toLocaleDateString('pt-BR')}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Alerts */}
+              {subscriptionInfo?.subscription?.cancelAtPeriodEnd && (
+                <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4 flex items-start gap-3">
+                  <AlertTriangle className="h-5 w-5 text-amber-500 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-medium text-amber-600 dark:text-amber-400">Cancelamento Agendado</p>
+                    <p className="text-sm text-muted-foreground mt-0.5">
+                      Sua assinatura será cancelada em {new Date(subscriptionInfo.subscription.periodEnd).toLocaleDateString('pt-BR')}
+                    </p>
+                  </div>
+                </div>
               )}
 
               {subscriptionInfo?.subscription?.status === 'past_due' && (
-                <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-3">
-                  <p className="text-sm text-destructive flex items-center gap-2">
-                    <AlertTriangle className="h-4 w-4" />
-                    Seu pagamento está pendente. Atualize sua forma de pagamento.
+                <div className="bg-destructive/10 border border-destructive/20 rounded-xl p-4 flex items-start gap-3">
+                  <AlertTriangle className="h-5 w-5 text-destructive flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-medium text-destructive">Pagamento Pendente</p>
+                    <p className="text-sm text-muted-foreground mt-0.5">
+                      Atualize sua forma de pagamento para continuar usando todos os recursos.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Linked Student Notice */}
+              {isLinkedStudent && (
+                <div className="bg-muted/50 border border-border rounded-xl p-4 flex items-center gap-3">
+                  <Lock className="h-5 w-5 text-muted-foreground" />
+                  <p className="text-sm text-muted-foreground">
+                    Sua assinatura é gerenciada pelo seu nutricionista.
                   </p>
                 </div>
               )}
 
-              {/* Alunos vinculados veem mensagem informativa */}
-              {isLinkedStudent ? (
-                <div className="bg-muted/50 border border-border rounded-lg p-3 mt-2">
-                  <div className="flex items-center gap-2 text-muted-foreground">
-                    <Lock className="h-4 w-4" />
-                    <p className="text-sm">
-                      Sua assinatura é gerenciada pelo seu nutricionista.
-                    </p>
-                  </div>
-                </div>
-              ) : !isAdmin && !isProfessional && (
-                <div className="flex gap-3 pt-2">
-                  {currentPlan?.name !== 'gratuito' && subscriptionInfo?.subscription && (
+              {/* Action Buttons */}
+              {!isLinkedStudent && !isAdmin && !isProfessional && (
+                <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                  {!isFreePlan && subscriptionInfo?.subscription && (
                     <Button 
                       variant="outline" 
+                      className="flex-1"
                       onClick={handleManageSubscription}
                       disabled={portalLoading}
                     >
@@ -163,8 +267,9 @@ export default function Subscription() {
                       Gerenciar Pagamento
                     </Button>
                   )}
-                  <Button onClick={() => navigate('/pricing')}>
-                    {currentPlan?.name === 'gratuito' ? 'Fazer Upgrade' : 'Alterar Plano'}
+                  <Button className="flex-1" onClick={() => navigate('/pricing')}>
+                    <Zap className="h-4 w-4 mr-2" />
+                    {isFreePlan ? 'Fazer Upgrade' : 'Alterar Plano'}
                   </Button>
                 </div>
               )}
@@ -172,7 +277,7 @@ export default function Subscription() {
           </Card>
         </motion.div>
 
-        {/* Usage Card */}
+        {/* Usage Stats */}
         {currentPlan && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -180,36 +285,49 @@ export default function Subscription() {
             transition={{ delay: 0.1 }}
           >
             <Card>
-              <CardHeader>
-                <CardTitle>Uso do Período</CardTitle>
+              <CardHeader className="pb-4">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <BarChart3 className="h-5 w-5 text-primary" />
+                  Uso do Período
+                </CardTitle>
                 <CardDescription>
                   Consumo de recursos no período atual
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-2 gap-4">
-                  <UsageItem
-                    label="Dietas Geradas"
-                    used={usage?.diets_used || 0}
-                    limit={currentPlan.diet_limit}
-                  />
-                  <UsageItem
-                    label="Substituições"
-                    used={usage?.substitutions_used || 0}
-                    limit={currentPlan.substitution_limit}
-                  />
-                  <UsageItem
-                    label="Ajustes"
-                    used={usage?.adjustments_used || 0}
-                    limit={currentPlan.adjustment_limit}
-                  />
-                  {currentPlan.has_chat && (
-                    <UsageItem
-                      label="Mensagens Hoje"
-                      used={usage?.chat_messages_today || 0}
-                      limit={currentPlan.chat_messages_per_day}
-                    />
-                  )}
+                <div className="grid gap-4 sm:grid-cols-2">
+                  {usageItems.map((item, index) => {
+                    const Icon = item.icon;
+                    const percentage = item.limit > 0 ? Math.min((item.used / item.limit) * 100, 100) : 0;
+                    const isAtLimit = percentage >= 100;
+                    const isNearLimit = percentage >= 80 && percentage < 100;
+                    
+                    return (
+                      <motion.div
+                        key={item.label}
+                        initial={{ opacity: 0, x: -10 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: 0.1 + index * 0.05 }}
+                        className="bg-muted/30 rounded-xl p-4 space-y-3"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2.5">
+                            <div className={`p-2 rounded-lg ${item.bgColor}`}>
+                              <Icon className={`h-4 w-4 ${item.color}`} />
+                            </div>
+                            <span className="font-medium text-sm">{item.label}</span>
+                          </div>
+                          <span className={`text-sm font-semibold ${isAtLimit ? 'text-destructive' : isNearLimit ? 'text-amber-500' : 'text-foreground'}`}>
+                            {item.used}/{item.limit}
+                          </span>
+                        </div>
+                        <Progress 
+                          value={percentage} 
+                          className={`h-2 ${isAtLimit ? '[&>div]:bg-destructive' : isNearLimit ? '[&>div]:bg-amber-500' : ''}`}
+                        />
+                      </motion.div>
+                    );
+                  })}
                 </div>
               </CardContent>
             </Card>
@@ -224,13 +342,16 @@ export default function Subscription() {
             transition={{ delay: 0.2 }}
           >
             <Card>
-              <CardHeader>
-                <CardTitle>Recursos do Plano</CardTitle>
+              <CardHeader className="pb-4">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Sparkles className="h-5 w-5 text-primary" />
+                  Recursos Inclusos
+                </CardTitle>
               </CardHeader>
               <CardContent>
-                <ul className="space-y-2">
+                <div className="grid gap-3 sm:grid-cols-2">
                   <FeatureItem
-                    text={`${currentPlan.diet_limit} dietas por mês`}
+                    text={`${currentPlan.diet_limit} dieta${currentPlan.diet_limit > 1 ? 's' : ''} por mês`}
                     included
                   />
                   <FeatureItem
@@ -238,16 +359,16 @@ export default function Subscription() {
                     included
                   />
                   <FeatureItem
-                    text={`${currentPlan.adjustment_limit} ajustes automáticos`}
+                    text={`${currentPlan.adjustment_limit} ajuste${currentPlan.adjustment_limit > 1 ? 's' : ''} automático${currentPlan.adjustment_limit > 1 ? 's' : ''}`}
                     included={currentPlan.adjustment_limit > 0}
                   />
                   <FeatureItem
-                    text={`Chat com IA (${currentPlan.chat_messages_per_day} msgs/dia)`}
+                    text={`Chat IA (${currentPlan.chat_messages_per_day} msgs/dia)`}
                     included={currentPlan.has_chat}
                   />
                   {currentPlan.patients_limit > 0 && (
                     <FeatureItem
-                      text={`${currentPlan.patients_limit} pacientes`}
+                      text={`Até ${currentPlan.patients_limit} pacientes`}
                       included
                     />
                   )}
@@ -257,7 +378,7 @@ export default function Subscription() {
                       : `${currentPlan.history_days} dias de histórico`}
                     included
                   />
-                </ul>
+                </div>
               </CardContent>
             </Card>
           </motion.div>
@@ -270,8 +391,9 @@ export default function Subscription() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.3 }}
           >
-            <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-primary/10">
-              <CardHeader>
+            <Card className="border-primary/20 overflow-hidden">
+              <div className="h-1 bg-gradient-to-r from-primary via-primary/80 to-primary/60" />
+              <CardHeader className="pb-4">
                 <CardTitle className="flex items-center gap-2">
                   <Users className="h-5 w-5 text-primary" />
                   Gestão Profissional
@@ -282,60 +404,69 @@ export default function Subscription() {
               </CardHeader>
               <CardContent className="space-y-3">
                 <Button 
-                  className="w-full justify-start" 
+                  className="w-full justify-between h-auto py-3" 
                   onClick={() => navigate('/professional')}
                 >
-                  <BarChart3 className="h-4 w-4 mr-3" />
-                  Painel Profissional
-                  <span className="ml-auto text-muted-foreground text-sm">
-                    Visão geral e métricas
-                  </span>
+                  <div className="flex items-center gap-3">
+                    <BarChart3 className="h-5 w-5" />
+                    <div className="text-left">
+                      <p className="font-medium">Painel Profissional</p>
+                      <p className="text-xs opacity-80">Visão geral e métricas</p>
+                    </div>
+                  </div>
                 </Button>
                 <Button 
-                  className="w-full justify-start" 
+                  className="w-full justify-between h-auto py-3" 
                   variant="outline"
                   onClick={() => navigate('/students')}
                 >
-                  <Users className="h-4 w-4 mr-3" />
-                  Gerenciar Alunos
-                  <span className="ml-auto text-muted-foreground text-sm">
-                    Adicionar, remover e visualizar
-                  </span>
+                  <div className="flex items-center gap-3">
+                    <Users className="h-5 w-5" />
+                    <div className="text-left">
+                      <p className="font-medium">Gerenciar Alunos</p>
+                      <p className="text-xs text-muted-foreground">Adicionar, remover e visualizar</p>
+                    </div>
+                  </div>
                 </Button>
                 <Button 
-                  className="w-full justify-start" 
+                  className="w-full justify-between h-auto py-3" 
                   variant="outline"
                   onClick={() => navigate('/students')}
                 >
-                  <UserPlus className="h-4 w-4 mr-3" />
-                  Adicionar Novo Aluno
-                  <span className="ml-auto text-muted-foreground text-sm">
-                    Vincular pelo email
-                  </span>
+                  <div className="flex items-center gap-3">
+                    <UserPlus className="h-5 w-5" />
+                    <div className="text-left">
+                      <p className="font-medium">Adicionar Novo Aluno</p>
+                      <p className="text-xs text-muted-foreground">Vincular pelo email</p>
+                    </div>
+                  </div>
                 </Button>
               </CardContent>
             </Card>
           </motion.div>
         )}
 
-        {/* Become Professional CTA - Não mostra para profissionais, admins ou alunos vinculados */}
+        {/* Become Professional CTA */}
         {!isProfessional && !isAdmin && !isLinkedStudent && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.3 }}
           >
-            <Card className="border-dashed">
-              <CardContent className="pt-6">
-                <div className="text-center space-y-3">
-                  <Users className="h-10 w-10 mx-auto text-muted-foreground" />
-                  <div>
-                    <h3 className="font-semibold">É um profissional de saúde?</h3>
-                    <p className="text-sm text-muted-foreground">
-                      Gerencie alunos, crie dietas personalizadas e acompanhe a evolução
+            <Card className="border-dashed bg-muted/20">
+              <CardContent className="pt-6 pb-6">
+                <div className="text-center space-y-4">
+                  <div className="inline-flex p-3 rounded-full bg-muted">
+                    <Users className="h-8 w-8 text-muted-foreground" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <h3 className="font-semibold text-lg">É um profissional de saúde?</h3>
+                    <p className="text-sm text-muted-foreground max-w-sm mx-auto">
+                      Gerencie até 50 alunos, crie dietas personalizadas e acompanhe a evolução de cada paciente
                     </p>
                   </div>
-                  <Button onClick={() => navigate('/become-professional')}>
+                  <Button onClick={() => navigate('/become-professional')} className="mt-2">
+                    <Crown className="h-4 w-4 mr-2" />
                     Conhecer Plano Profissional
                   </Button>
                 </div>
@@ -343,42 +474,24 @@ export default function Subscription() {
             </Card>
           </motion.div>
         )}
-
-        <Button 
-          variant="ghost" 
-          className="w-full" 
-          onClick={refresh}
-        >
-          Atualizar Status
-        </Button>
       </main>
-    </div>
-  );
-}
-
-function UsageItem({ label, used, limit }: { label: string; used: number; limit: number }) {
-  const percentage = limit > 0 ? (used / limit) * 100 : 0;
-  const isAtLimit = percentage >= 100;
-  
-  return (
-    <div className="bg-muted/50 rounded-lg p-3">
-      <p className="text-sm text-muted-foreground mb-1">{label}</p>
-      <p className={`text-2xl font-bold ${isAtLimit ? 'text-destructive' : ''}`}>
-        {used}<span className="text-sm font-normal text-muted-foreground">/{limit}</span>
-      </p>
     </div>
   );
 }
 
 function FeatureItem({ text, included }: { text: string; included: boolean }) {
   return (
-    <li className="flex items-center gap-2 text-sm">
+    <div className={`flex items-center gap-3 p-3 rounded-lg ${included ? 'bg-primary/5' : 'bg-muted/30'}`}>
       {included ? (
-        <Check className="h-4 w-4 text-primary" />
+        <div className="p-1 rounded-full bg-primary/10">
+          <Check className="h-3.5 w-3.5 text-primary" />
+        </div>
       ) : (
-        <span className="h-4 w-4 text-muted-foreground">—</span>
+        <div className="p-1 rounded-full bg-muted">
+          <span className="block h-3.5 w-3.5 text-center text-muted-foreground text-xs">—</span>
+        </div>
       )}
-      <span className={included ? '' : 'text-muted-foreground'}>{text}</span>
-    </li>
+      <span className={`text-sm ${included ? 'text-foreground' : 'text-muted-foreground'}`}>{text}</span>
+    </div>
   );
 }
