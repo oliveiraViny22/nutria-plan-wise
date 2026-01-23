@@ -10,9 +10,9 @@ const corsHeaders = {
 // Hardcoded documentation content (generated from docs/ files)
 const TECHNICAL_DOC = `# DOCUMENTAÇÃO TÉCNICA OFICIAL — NUTRIAPLAN
 
-## Versão do Documento: 2.4
+## Versão do Documento: 2.6
 ## Data de Geração: 18 de Janeiro de 2026
-## Última Atualização: 21 de Janeiro de 2026
+## Última Atualização: 23 de Janeiro de 2026
 
 ---
 
@@ -20,10 +20,12 @@ const TECHNICAL_DOC = `# DOCUMENTAÇÃO TÉCNICA OFICIAL — NUTRIAPLAN
 
 | Versão | Data | Alterações |
 |--------|------|------------|
+| 2.6 | 23/01/2026 | **Fluxo de Alteração de Objetivo**: Implementado wizard guiado para alteração de objetivo com governança diferenciada por perfil. Usuários autônomos passam por wizard de 3 etapas (escolha, confirmação, recálculo). Alunos vinculados usam sistema de solicitações ao profissional. Tabela objective_change_policies para configuração de políticas. Novo tipo de solicitação objective_change. Recálculo automático de metas via Mifflin-St Jeor. |
+| 2.5 | 23/01/2026 | **Governança de Rebalanceamento por Adesão**: Implementada política que usa adesão como critério de governança. Alta (≥80%): rebalanceamento completo. Média (50-79%): apenas redistribuição/simplificação. Baixa (<50%): rebalanceamento bloqueado. Backend é fonte única de decisão. IA apenas consome permissões. |
 | 2.4 | 21/01/2026 | Auditoria completa de fluxos de usuário. Atualização de limites do plano gratuito (1 dieta, 3 substituições, 1 ajuste). Sincronização de permissões com banco de dados v2. Verificação de can_substitute no MealDetail. |
 | 2.3 | 21/01/2026 | Adicionado CHECK constraint foods_category_check para validar categorias canônicas no BD. Atualização da documentação para refletir schema v2 consolidado com 13 tabelas. |
-| 2.2 | 21/01/2026 | Incremento automático de uso de ajustes no rebalanceador de macros. Atualização de edge functions para contagem correta de features. Remoção de campos legados v1 (billing_cycle, account_type, user_type). Consolidação do esquema v2 com 13 tabelas principais. |
-| 2.1 | 21/01/2026 | Correção do constraint profiles_sex_check para aceitar valores male, female, other. Atualização pós-auditoria de banco de dados v2. |
+| 2.2 | 21/01/2026 | Incremento automático de uso de ajustes no rebalanceador de macros. Atualização de edge functions para contagem correta de features. Remoção de campos legados v1. |
+| 2.1 | 21/01/2026 | Correção do constraint profiles_sex_check para aceitar valores male, female, other. |
 | 2.0 | 18/01/2026 | Versão consolidada: adicionados fluxos completos por perfil (Admin, Profissional, Aluno), detalhamento de gestão de alimentos, estrutura completa do banco de dados com cardinalidades, aprofundamento da IA, seção de auditoria administrativa, edge functions recentes |
 | 1.1 | 18/01/2026 | Versão inicial com estrutura base |
 
@@ -493,9 +495,9 @@ Versão 2.0 - NutriaPlan
 
 const COMMERCIAL_DOC = `# DOCUMENTAÇÃO COMERCIAL E INSTITUCIONAL — NUTRIAPLAN
 
-## Versão do Documento: 2.2
+## Versão do Documento: 2.3
 ## Data de Geração: 18 de Janeiro de 2026
-## Última Atualização: 21 de Janeiro de 2026
+## Última Atualização: 23 de Janeiro de 2026
 
 ---
 

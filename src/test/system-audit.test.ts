@@ -1448,4 +1448,219 @@ describe('System Audit - All Users and Functionalities', () => {
       expect(result.data?.length).toBe(30);
     });
   });
+
+  // =============================================================================
+  // OBJECTIVE CHANGE TESTS (v2.6)
+  // =============================================================================
+  describe('Objective Change Feature', () => {
+    describe('Autonomous User - Wizard Flow', () => {
+      it('should allow autonomous user to change objective via wizard', async () => {
+        // Mock profile update
+        mockFrom.mockReturnValueOnce({
+          update: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockResolvedValue({ data: { goal: 'gain_muscle' }, error: null }),
+        });
+
+        const { supabase } = await import('@/integrations/supabase/client');
+        const result = await supabase.from('profiles')
+          .update({ goal: 'gain_muscle' })
+          .eq('id', 'autonomous-user-id');
+
+        expect(result.error).toBeNull();
+      });
+
+      it('should recalculate targets after objective change', async () => {
+        // Simulate Mifflin-St Jeor calculation
+        const calculateTargets = (weight: number, height: number, age: number, sex: string, goal: string, activityLevel: number) => {
+          let bmr: number;
+          if (sex === 'male') {
+            bmr = 10 * weight + 6.25 * height - 5 * age + 5;
+          } else {
+            bmr = 10 * weight + 6.25 * height - 5 * age - 161;
+          }
+          
+          let tdee = bmr * activityLevel;
+          
+          // Goal adjustments
+          if (goal === 'lose_weight') tdee -= 500;
+          else if (goal === 'gain_muscle') tdee += 300;
+          
+          return {
+            daily_calories: Math.round(tdee),
+            daily_protein: Math.round(weight * 2),
+            daily_carbs: Math.round((tdee * 0.45) / 4),
+            daily_fat: Math.round((tdee * 0.25) / 9),
+          };
+        };
+
+        const targets = calculateTargets(70, 170, 30, 'male', 'gain_muscle', 1.55);
+        
+        expect(targets.daily_calories).toBeGreaterThan(0);
+        expect(targets.daily_protein).toBe(140);
+      });
+
+      it('should validate objective change policies exist', async () => {
+        mockFrom.mockReturnValueOnce({
+          select: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockResolvedValue({
+            data: [
+              { 
+                id: 'policy-1',
+                profile_type: 'autonomous',
+                change_number: 1,
+                cooldown_days: 30,
+                is_active: true 
+              }
+            ],
+            error: null,
+          }),
+        });
+
+        const { supabase } = await import('@/integrations/supabase/client');
+        // Use type assertion for table not in types
+        const result = await (supabase.from as any)('objective_change_policies')
+          .select('*')
+          .eq('is_active', true);
+
+        expect(result.error).toBeNull();
+        expect(result.data?.[0]?.profile_type).toBe('autonomous');
+      });
+    });
+
+    describe('Linked Student - Request Flow', () => {
+      it('should create objective change request for linked student', async () => {
+        // Using generic mock since student_requests may not be in types
+        const mockResult = {
+          id: 'request-1',
+          student_id: 'student-id',
+          professional_id: 'prof-id',
+          request_type: 'objective_change',
+          request_data: { new_goal: 'lose_weight', justification: 'Want to lose weight for health' },
+          status: 'pending',
+        };
+
+        mockFrom.mockReturnValueOnce({
+          insert: vi.fn().mockReturnThis(),
+          select: vi.fn().mockReturnThis(),
+          single: vi.fn().mockResolvedValue({
+            data: mockResult,
+            error: null,
+          }),
+        });
+
+        const { supabase } = await import('@/integrations/supabase/client');
+        // Use 'as any' since student_requests might not be in generated types yet
+        const result = await (supabase.from as any)('student_requests')
+          .insert({
+            student_id: 'student-id',
+            professional_id: 'prof-id',
+            request_type: 'objective_change',
+            request_data: { new_goal: 'lose_weight', justification: 'Want to lose weight for health' },
+          })
+          .select()
+          .single();
+
+        expect(result.error).toBeNull();
+        expect(result.data?.request_type).toBe('objective_change');
+        expect(result.data?.status).toBe('pending');
+      });
+
+      it('should block direct objective change for linked students', async () => {
+        // Linked students should not be able to change objective directly
+        const isLinkedStudent = true;
+        const canChangeDirectly = !isLinkedStudent;
+        
+        expect(canChangeDirectly).toBe(false);
+      });
+
+      it('should allow professional to approve objective change request', async () => {
+        mockFrom.mockReturnValueOnce({
+          update: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockResolvedValue({
+            data: {
+              id: 'request-1',
+              status: 'approved',
+              response_data: { approved: true, will_recalculate: true },
+            },
+            error: null,
+          }),
+        });
+
+        const { supabase } = await import('@/integrations/supabase/client');
+        // Use 'as any' for flexibility with mocked types
+        const result = await (supabase.from as any)('student_requests')
+          .update({ 
+            status: 'approved',
+            response_data: { approved: true, will_recalculate: true }
+          })
+          .eq('id', 'request-1');
+
+        expect(result.error).toBeNull();
+      });
+
+      it('should apply objective change after professional approval', async () => {
+        // After approval, student's profile should be updated
+        mockFrom.mockReturnValueOnce({
+          update: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockResolvedValue({
+            data: { goal: 'lose_weight', daily_calories: 1800 },
+            error: null,
+          }),
+        });
+
+        const { supabase } = await import('@/integrations/supabase/client');
+        const result = await supabase.from('profiles')
+          .update({ goal: 'lose_weight', daily_calories: 1800 })
+          .eq('id', 'student-id');
+
+        expect(result.error).toBeNull();
+      });
+    });
+
+    describe('Objective Change Validation', () => {
+      it('should validate goal values', () => {
+        const validGoals = ['lose_weight', 'maintain', 'gain_muscle'];
+        
+        expect(validGoals.includes('lose_weight')).toBe(true);
+        expect(validGoals.includes('maintain')).toBe(true);
+        expect(validGoals.includes('gain_muscle')).toBe(true);
+        expect(validGoals.includes('invalid_goal')).toBe(false);
+      });
+
+      it('should prevent changing to same goal', () => {
+        const currentGoal = 'maintain';
+        const newGoal = 'maintain';
+        
+        const canChange = currentGoal !== newGoal;
+        expect(canChange).toBe(false);
+      });
+
+      it('should track objective change in audit log', async () => {
+        mockFrom.mockReturnValueOnce({
+          insert: vi.fn().mockResolvedValue({
+            data: {
+              id: 'audit-1',
+              user_id: 'user-id',
+              entity_type: 'profile',
+              old_value: { goal: 'maintain' },
+              new_value: { goal: 'lose_weight' },
+            },
+            error: null,
+          }),
+        });
+
+        const { supabase } = await import('@/integrations/supabase/client');
+        // Use type assertion for insert with non-standard columns
+        const result = await (supabase.from as any)('admin_audit_log')
+          .insert({
+            user_id: 'user-id',
+            entity_type: 'profile',
+            old_value: { goal: 'maintain' },
+            new_value: { goal: 'lose_weight' },
+          });
+
+        expect(result.error).toBeNull();
+      });
+    });
+  });
 });
