@@ -1,8 +1,8 @@
 # DOCUMENTAÇÃO TÉCNICA OFICIAL — NUTRIAPLAN
 
-## Versão do Documento: 2.4
+## Versão do Documento: 2.5
 ## Data de Geração: 18 de Janeiro de 2026
-## Última Atualização: 21 de Janeiro de 2026
+## Última Atualização: 23 de Janeiro de 2026
 
 ---
 
@@ -10,6 +10,7 @@
 
 | Versão | Data | Alterações |
 |--------|------|------------|
+| 2.5 | 23/01/2026 | **Governança de Rebalanceamento por Adesão**: Implementada política que usa adesão como critério de governança. Alta (≥80%): rebalanceamento completo. Média (50-79%): apenas redistribuição/simplificação. Baixa (<50%): rebalanceamento bloqueado. Backend é fonte única de decisão. IA apenas consome permissões. |
 | 2.4 | 21/01/2026 | Auditoria completa de fluxos de usuário. Atualização de limites do plano gratuito (1 dieta, 3 substituições, 1 ajuste). Sincronização de permissões com banco de dados v2. Verificação de can_substitute no MealDetail. Correção de contagem de uso para ajustes no MacroRebalancer. |
 | 2.3 | 21/01/2026 | Adicionado CHECK constraint `foods_category_check` para validar categorias canônicas no BD. Atualização da documentação para refletir schema v2 consolidado com 13 tabelas. Remoção de referências a tabelas legadas (plan_history, ai_suggestions, chat_messages). Detalhamento de campos v2 (quantity_grams, unit_locked, display_unit). |
 | 2.2 | 21/01/2026 | Incremento automático de uso de ajustes no rebalanceador de macros. Atualização de edge functions para contagem correta de features. Remoção de campos legados v1 (billing_cycle, account_type, user_type). Consolidação do esquema v2 com 13 tabelas principais. |
@@ -1227,7 +1228,53 @@ A IA só pode ultrapassar limites de frases se detectar:
 
 Após gatilho: pode dobrar limite, máximo 20 frases.
 
-## 10.3 Serviços Internos de IA
+## 10.4 Governança de Rebalanceamento por Adesão
+
+### 10.4.1 Princípio
+
+A adesão do usuário ao plano alimentar determina se o rebalanceador automático pode ser usado. Essa é uma regra de **governança**, não um input matemático para a IA.
+
+### 10.4.2 Classificação de Adesão
+
+| Nível | Taxa | Estratégias Permitidas |
+|-------|------|------------------------|
+| **Alta** | ≥ 80% | Rebalanceamento completo (todos os ajustes) |
+| **Média** | 50-79% | Apenas redistribuição e simplificação |
+| **Baixa** | < 50% | Bloqueado - apenas orientação profissional |
+| **Sem dados** | 0 refeições | Bloqueado - aguardar registros |
+
+### 10.4.3 Regras Invioláveis
+
+```
+1. Adesão determina SE o rebalanceador pode ser usado
+2. O rebalanceador NUNCA é acionado automaticamente por baixa adesão
+3. Backend é a ÚNICA fonte de decisão de permissões
+4. Frontend e IA apenas CONSOMEM permissões - não decidem
+5. IA NÃO sugere ajustes matemáticos se adesão for baixa
+6. IA pode EXPLICAR e ORIENTAR mesmo com adesão baixa
+```
+
+### 10.4.4 Fluxo de Verificação
+
+```
+1. Usuário solicita rebalanceamento
+2. Backend calcula adesão (últimos 30 dias)
+3. Backend classifica nível (high/medium/low/no_data)
+4. Backend retorna:
+   - can_rebalance: boolean
+   - allowed_strategies: string[]
+   - block_reason: string (se bloqueado)
+5. Frontend exibe resultado ou bloqueio
+6. IA recebe mesmas permissões e filtra sugestões
+```
+
+### 10.4.5 Benefícios
+
+- **Menos ruído**: Planos não mudam sem dados confiáveis
+- **Menos custo**: Evita chamadas de IA desnecessárias
+- **Maior estabilidade**: Usuário foca em aderir antes de otimizar
+
+## 10.5 Serviços Internos de IA
 
 ### 10.3.1 Geração de Planos (generate-meal-plan)
 

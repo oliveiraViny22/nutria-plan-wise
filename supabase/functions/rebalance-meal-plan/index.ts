@@ -86,6 +86,68 @@ interface Adjustment {
   reason: string;
 }
 
+// =====================================================
+// CONSTANTES DE GOVERNANÇA POR ADESÃO
+// =====================================================
+
+const ADHERENCE_THRESHOLDS = {
+  HIGH: 80,    // >= 80% = Adesão alta, rebalanceamento completo
+  MEDIUM: 50,  // >= 50% = Adesão média, apenas redistribuição/simplificação
+  LOW: 0,      // < 50% = Adesão baixa, rebalanceamento bloqueado
+} as const;
+
+type AdherenceLevel = 'high' | 'medium' | 'low' | 'no_data';
+
+type RebalanceStrategyType =
+  | 'full_rebalance'
+  | 'quantity_change'
+  | 'redistribute_meals'
+  | 'reduce_complexity'
+  | 'substitute_equivalent'
+  | 'add_option'
+  | 'professional_guidance';
+
+const STRATEGIES_BY_ADHERENCE: Record<AdherenceLevel, RebalanceStrategyType[]> = {
+  high: [
+    'full_rebalance',
+    'quantity_change',
+    'redistribute_meals',
+    'reduce_complexity',
+    'substitute_equivalent',
+    'add_option',
+  ],
+  medium: [
+    'redistribute_meals',
+    'reduce_complexity',
+    'substitute_equivalent',
+  ],
+  low: [
+    'professional_guidance',
+  ],
+  no_data: [
+    'professional_guidance',
+  ],
+};
+
+const ADHERENCE_MESSAGES: Record<AdherenceLevel, string> = {
+  high: 'Sua adesão está excelente! Todas as opções de otimização estão disponíveis.',
+  medium: 'Adesão moderada. Focamos em ajustes simples para facilitar seu dia a dia.',
+  low: 'Adesão baixa detectada. Recomendamos estabilizar sua rotina antes de ajustar o plano.',
+  no_data: 'Sem dados suficientes de adesão. Registre algumas refeições primeiro.',
+};
+
+interface AdherenceGovernance {
+  can_rebalance: boolean;
+  adherence_level: AdherenceLevel;
+  adherence_rate: number;
+  allowed_strategies: RebalanceStrategyType[];
+  blocked_strategies: RebalanceStrategyType[];
+  block_reason?: string;
+  user_message: string;
+  period_days: number;
+  total_meals: number;
+}
+
 interface RebalanceResult {
   success: boolean;
   profile_type: UserProfile;
@@ -99,6 +161,8 @@ interface RebalanceResult {
   requires_approval: boolean;
   execution_blocked: boolean;
   block_reason?: string;
+  // NOVO: Governança baseada em adesão
+  adherence_governance: AdherenceGovernance;
 }
 
 // =====================================================
@@ -299,6 +363,72 @@ async function calculateAdherenceMetrics(
     : 0;
   
   return stats;
+}
+
+// =====================================================
+// GOVERNANÇA BASEADA EM ADESÃO
+// =====================================================
+
+function classifyAdherenceLevel(rate: number, totalMeals: number): AdherenceLevel {
+  if (totalMeals === 0) {
+    return 'no_data';
+  }
+  if (rate >= ADHERENCE_THRESHOLDS.HIGH) {
+    return 'high';
+  }
+  if (rate >= ADHERENCE_THRESHOLDS.MEDIUM) {
+    return 'medium';
+  }
+  return 'low';
+}
+
+function getBlockedStrategies(level: AdherenceLevel): RebalanceStrategyType[] {
+  const allStrategies: RebalanceStrategyType[] = [
+    'full_rebalance',
+    'quantity_change',
+    'redistribute_meals',
+    'reduce_complexity',
+    'substitute_equivalent',
+    'add_option',
+    'professional_guidance',
+  ];
+  const allowed = STRATEGIES_BY_ADHERENCE[level];
+  return allStrategies.filter(s => !allowed.includes(s));
+}
+
+function getAdherenceBlockReason(level: AdherenceLevel): string | undefined {
+  switch (level) {
+    case 'low':
+      return 'Adesão abaixo de 50%. Estabilize sua rotina alimentar antes de otimizar o plano.';
+    case 'no_data':
+      return 'Sem dados de adesão suficientes. Registre ao menos 3 dias de refeições.';
+    default:
+      return undefined;
+  }
+}
+
+function buildAdherenceGovernance(
+  adherence: AdherenceMetrics,
+  periodDays: number = 30
+): AdherenceGovernance {
+  const totalMeals = adherence.confirmed_meals + adherence.skipped_meals + 
+                     adherence.late_confirmed + adherence.out_of_plan;
+  const level = classifyAdherenceLevel(adherence.adherence_rate, totalMeals);
+  const allowedStrategies = STRATEGIES_BY_ADHERENCE[level];
+  const blockedStrategies = getBlockedStrategies(level);
+  const blockReason = getAdherenceBlockReason(level);
+  
+  return {
+    can_rebalance: level === 'high' || level === 'medium',
+    adherence_level: level,
+    adherence_rate: adherence.adherence_rate,
+    allowed_strategies: allowedStrategies,
+    blocked_strategies: blockedStrategies,
+    block_reason: blockReason,
+    user_message: ADHERENCE_MESSAGES[level],
+    period_days: periodDays,
+    total_meals: totalMeals,
+  };
 }
 
 async function generateAIRebalanceSuggestions(
@@ -914,6 +1044,35 @@ serve(async (req: Request) => {
     // Get adherence metrics
     const adherence = await calculateAdherenceMetrics(supabaseAdmin, targetUserId);
 
+    // =====================================================
+    // GOVERNANÇA BASEADA EM ADESÃO
+    // =====================================================
+    const adherenceGovernance = buildAdherenceGovernance(adherence);
+    
+    // Bloquear rebalanceamento se adesão for baixa (< 50%)
+    if (!adherenceGovernance.can_rebalance) {
+      return createSuccessResponse({
+        success: false,
+        profile_type: profileType,
+        adjustments: [],
+        current_macros: calculateCurrentMacros(meals),
+        proposed_macros: calculateCurrentMacros(meals),
+        target_macros: {
+          calories: profileData.daily_calories || 2000,
+          protein: profileData.protein_target || 100,
+          carbs: profileData.carbs_target || 250,
+          fat: profileData.fat_target || 65
+        },
+        justification: adherenceGovernance.user_message,
+        adherence_impact: 'Nenhum ajuste possível no momento.',
+        warnings: [adherenceGovernance.block_reason || 'Adesão insuficiente para rebalanceamento.'],
+        requires_approval: false,
+        execution_blocked: true,
+        block_reason: adherenceGovernance.block_reason,
+        adherence_governance: adherenceGovernance
+      }, corsHeaders);
+    }
+
     // Check if rebalancing is needed
     const macrosDiff = {
       calories: Math.abs(currentMacros.calories - targetMacros.calories),
@@ -923,6 +1082,11 @@ serve(async (req: Request) => {
     };
 
     const warnings: string[] = [];
+
+    // Adicionar mensagem de governança às warnings se adesão for média
+    if (adherenceGovernance.adherence_level === 'medium') {
+      warnings.push(`Adesão moderada (${adherenceGovernance.adherence_rate.toFixed(0)}%). Apenas ajustes simples estão disponíveis.`);
+    }
 
     // Check for insufficient data
     if (!profileData.daily_calories || !profileData.protein_target) {
@@ -947,7 +1111,8 @@ serve(async (req: Request) => {
         warnings: ['Restrições clínicas detectadas. O rebalanceamento automático requer supervisão profissional.'],
         requires_approval: true,
         execution_blocked: true,
-        block_reason: 'Condição clínica detectada nas restrições. Intervenção humana necessária.'
+        block_reason: 'Condição clínica detectada nas restrições. Intervenção humana necessária.',
+        adherence_governance: adherenceGovernance
       }, corsHeaders);
     }
 
@@ -1050,10 +1215,24 @@ serve(async (req: Request) => {
       });
     }
 
+    // Filtrar ajustes com base nas estratégias permitidas pela adesão
+    let filteredAdjustments = adjustments;
+    if (adherenceGovernance.adherence_level === 'medium') {
+      // Para adesão média, remover ajustes de full_rebalance e add_option
+      filteredAdjustments = adjustments.filter(adj => 
+        adj.type === 'meal_redistribution' || 
+        adj.type === 'quantity_change' // quantity_change é permitido para simplificação
+      );
+      
+      if (filteredAdjustments.length < adjustments.length) {
+        warnings.push('Alguns ajustes foram removidos devido à adesão moderada.');
+      }
+    }
+
     const result: RebalanceResult = {
       success: true,
       profile_type: profileType,
-      adjustments,
+      adjustments: filteredAdjustments,
       current_macros: currentMacros,
       proposed_macros: proposedMacros,
       target_macros: targetMacros,
@@ -1066,7 +1245,8 @@ serve(async (req: Request) => {
         ? profileType === 'free' 
           ? 'Plano gratuito não permite ajustes automáticos.' 
           : 'Ajustes requerem aprovação do profissional.'
-        : undefined
+        : undefined,
+      adherence_governance: adherenceGovernance
     };
 
     // Log AI usage

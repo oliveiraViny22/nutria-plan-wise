@@ -4,6 +4,8 @@ import { toast } from 'sonner';
 
 export type UserProfile = 'free' | 'premium' | 'usuario_pessoal_pago' | 'profissional_vinculado';
 
+export type AdherenceLevel = 'high' | 'medium' | 'low' | 'no_data';
+
 export interface MacroTargets {
   protein: number;
   carbs: number;
@@ -25,6 +27,31 @@ export interface Adjustment {
   reason: string;
 }
 
+/**
+ * Governança de rebalanceamento baseada em adesão.
+ * Determina se o rebalanceador pode ser usado e quais estratégias são permitidas.
+ */
+export interface AdherenceGovernance {
+  /** Se o rebalanceador pode ser usado */
+  can_rebalance: boolean;
+  /** Nível de adesão calculado */
+  adherence_level: AdherenceLevel;
+  /** Taxa de adesão em percentual */
+  adherence_rate: number;
+  /** Estratégias permitidas para este nível */
+  allowed_strategies: string[];
+  /** Estratégias bloqueadas para este nível */
+  blocked_strategies: string[];
+  /** Motivo do bloqueio (se houver) */
+  block_reason?: string;
+  /** Mensagem para o usuário */
+  user_message: string;
+  /** Dias de dados analisados */
+  period_days: number;
+  /** Total de refeições no período */
+  total_meals: number;
+}
+
 export interface RebalanceResult {
   success: boolean;
   profile_type: UserProfile;
@@ -38,6 +65,8 @@ export interface RebalanceResult {
   requires_approval: boolean;
   execution_blocked: boolean;
   block_reason?: string;
+  /** Governança baseada em adesão */
+  adherence_governance: AdherenceGovernance;
 }
 
 export function useRebalancer() {
@@ -141,6 +170,31 @@ export function useRebalancer() {
     return colors[profileType] || 'text-foreground';
   };
 
+  const getAdherenceLevelLabel = (level: AdherenceLevel): string => {
+    const labels: Record<AdherenceLevel, string> = {
+      high: 'Alta',
+      medium: 'Moderada',
+      low: 'Baixa',
+      no_data: 'Sem dados'
+    };
+    return labels[level] || level;
+  };
+
+  const getAdherenceLevelColor = (level: AdherenceLevel): string => {
+    const colors: Record<AdherenceLevel, string> = {
+      high: 'text-green-500',
+      medium: 'text-amber-500',
+      low: 'text-red-500',
+      no_data: 'text-muted-foreground'
+    };
+    return colors[level] || 'text-foreground';
+  };
+
+  /** Verifica se o rebalanceamento está bloqueado por governança de adesão */
+  const isBlockedByAdherence = result?.adherence_governance 
+    ? !result.adherence_governance.can_rebalance 
+    : false;
+
   return {
     loading,
     result,
@@ -148,6 +202,9 @@ export function useRebalancer() {
     applyRebalance,
     clearResult,
     getProfileLabel,
-    getProfileColor
+    getProfileColor,
+    getAdherenceLevelLabel,
+    getAdherenceLevelColor,
+    isBlockedByAdherence
   };
 }
