@@ -446,34 +446,6 @@ export default function Subscription() {
           </motion.div>
         )}
 
-        {/* Become Professional CTA */}
-        {!isProfessional && !isAdmin && !isLinkedStudent && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
-          >
-            <Card className="border-dashed bg-muted/20">
-              <CardContent className="pt-6 pb-6">
-                <div className="text-center space-y-4">
-                  <div className="inline-flex p-3 rounded-full bg-muted">
-                    <Users className="h-8 w-8 text-muted-foreground" />
-                  </div>
-                  <div className="space-y-1.5">
-                    <h3 className="font-semibold text-lg">É um profissional de saúde?</h3>
-                    <p className="text-sm text-muted-foreground max-w-sm mx-auto">
-                      Gerencie até 50 alunos, crie dietas personalizadas e acompanhe a evolução de cada paciente
-                    </p>
-                  </div>
-                  <Button onClick={() => navigate('/become-professional')} className="mt-2">
-                    <Crown className="h-4 w-4 mr-2" />
-                    Conhecer Plano Profissional
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
-        )}
       </main>
     </div>
   );
