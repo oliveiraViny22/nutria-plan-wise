@@ -90,48 +90,48 @@ function MacroComparisonCard({
   };
 
   return (
-    <div className="p-4 rounded-xl bg-card border border-border/50 shadow-sm">
+    <div className="p-3 rounded-xl bg-card border border-border/50 shadow-sm overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between mb-3">
-        <span className="text-sm font-semibold text-foreground">{label}</span>
-        <span className={`text-xs font-semibold ${colorClasses[colorVar].split(' ')[1]}`}>
+      <div className="flex items-center justify-between mb-2 gap-2">
+        <span className="text-sm font-semibold text-foreground truncate">{label}</span>
+        <span className={`text-xs font-semibold whitespace-nowrap ${colorClasses[colorVar].split(' ')[1]}`}>
           Meta: {target}{unit}
         </span>
       </div>
       
       {/* Values Row */}
-      <div className="flex items-center gap-3 mb-3">
-        <div className="flex-1">
+      <div className="flex items-center gap-2 mb-2">
+        <div className="flex-1 min-w-0">
           <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-0.5">Atual</div>
-          <div className="flex items-baseline gap-1">
-            <span className="text-xl font-bold text-foreground">{current}</span>
+          <div className="flex items-baseline gap-1 flex-wrap">
+            <span className="text-lg font-bold text-foreground">{current}</span>
             <span className="text-xs text-muted-foreground">{unit}</span>
             {currentDiff !== 0 && (
-              <span className={`text-xs font-medium ${currentDiff < 0 ? 'text-destructive' : 'text-amber-500'}`}>
+              <span className={`text-xs font-medium whitespace-nowrap ${currentDiff < 0 ? 'text-destructive' : 'text-amber-500'}`}>
                 ({currentDiff > 0 ? '+' : ''}{currentDiff})
               </span>
             )}
           </div>
         </div>
         
-        <div className="flex items-center justify-center w-8">
-          <ArrowRight className="w-4 h-4 text-muted-foreground/60" />
+        <div className="flex items-center justify-center shrink-0">
+          <ArrowRight className="w-3.5 h-3.5 text-muted-foreground/60" />
         </div>
         
-        <div className="flex-1 text-right">
+        <div className="flex-1 min-w-0 text-right">
           <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-0.5">Proposto</div>
-          <div className="flex items-baseline gap-1 justify-end">
-            <span className={`text-xl font-bold ${improved ? 'text-primary' : 'text-foreground'}`}>
+          <div className="flex items-baseline gap-1 justify-end flex-wrap">
+            <span className={`text-lg font-bold ${improved ? 'text-primary' : 'text-foreground'}`}>
               {proposed}
             </span>
             <span className="text-xs text-muted-foreground">{unit}</span>
-            {improved && <Check className="w-4 h-4 text-primary ml-1" />}
+            {improved && <Check className="w-3.5 h-3.5 text-primary shrink-0" />}
           </div>
         </div>
       </div>
       
       {/* Progress Bar */}
-      <div className="relative h-2 rounded-full overflow-hidden bg-muted/60">
+      <div className="relative h-1.5 rounded-full overflow-hidden bg-muted/60">
         {/* Target marker */}
         <div 
           className="absolute top-0 bottom-0 w-0.5 bg-foreground/40 z-10"
