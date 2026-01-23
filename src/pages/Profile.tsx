@@ -328,37 +328,30 @@ export default function Profile() {
                     </div>
                   </div>
 
-                  {/* Request Change Button */}
-                  <div className="mt-6 pt-4 border-t">
-                    {isLinkedStudent && professionalId ? (
-                      <Button 
-                        variant="outline" 
-                        className="w-full"
-                        onClick={() => setShowStudentRequestDialog(true)}
-                      >
-                        <Target className="h-4 w-4 mr-2" />
-                        Solicitar Alteração ao Profissional
-                      </Button>
-                    ) : isPaidUser ? (
-                      <Button 
-                        variant="outline" 
-                        className="w-full"
-                        onClick={() => setShowObjectiveWizard(true)}
-                      >
-                        <Target className="h-4 w-4 mr-2" />
-                        Alterar Objetivo
-                      </Button>
-                    ) : (
-                      <Button 
-                        variant="outline" 
-                        className="w-full"
-                        disabled
-                      >
-                        <Lock className="h-4 w-4 mr-2" />
-                        Upgrade necessário para alterar objetivo
-                      </Button>
-                    )}
-                  </div>
+                  {/* Request Change Button - Only for linked students or paid users */}
+                  {(isLinkedStudent || isPaidUser) && (
+                    <div className="mt-6 pt-4 border-t">
+                      {isLinkedStudent && professionalId ? (
+                        <Button 
+                          variant="outline" 
+                          className="w-full"
+                          onClick={() => setShowStudentRequestDialog(true)}
+                        >
+                          <Target className="h-4 w-4 mr-2" />
+                          Solicitar Alteração ao Profissional
+                        </Button>
+                      ) : (
+                        <Button 
+                          variant="outline" 
+                          className="w-full"
+                          onClick={() => setShowObjectiveWizard(true)}
+                        >
+                          <Target className="h-4 w-4 mr-2" />
+                          Alterar Objetivo
+                        </Button>
+                      )}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 
