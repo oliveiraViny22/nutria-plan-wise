@@ -935,6 +935,48 @@ serve(async (req: Request) => {
     const { data: planData } = await supabaseAdmin.rpc('get_user_plan', { _user_id: targetUserId });
     const userPlanData = planData?.[0] || null;
 
+    // Validate adjustment usage limit BEFORE proceeding
+    const { data: canUseAdjustment, error: adjustmentCheckError } = await supabaseAdmin.rpc('can_use_feature', {
+      _user_id: targetUserId,
+      _feature: 'adjustment'
+    });
+    
+    if (adjustmentCheckError) {
+      console.error("[REBALANCE] Error checking adjustment limit:", adjustmentCheckError.message);
+      return createErrorResponse('Erro ao verificar limite de ajustes', 500, corsHeaders);
+    }
+    
+    if (!canUseAdjustment) {
+      // Get current usage info for detailed message
+      const { data: usageInfo } = await supabaseAdmin.rpc('get_usage_info', {
+        _user_id: targetUserId,
+        _feature: 'adjustment'
+      });
+      const usage = usageInfo?.[0];
+      
+      console.log("[REBALANCE] Adjustment limit reached:", { 
+        used: usage?.current_usage || 0, 
+        limit: usage?.max_limit || 0 
+      });
+      
+      return createSuccessResponse({
+        success: false,
+        profile_type: 'free',
+        adjustments: [],
+        current_macros: { calories: 0, protein: 0, carbs: 0, fat: 0 },
+        proposed_macros: { calories: 0, protein: 0, carbs: 0, fat: 0 },
+        target_macros: { calories: 0, protein: 0, carbs: 0, fat: 0 },
+        justification: `Você atingiu o limite de ${usage?.max_limit || 0} ajustes do seu plano.`,
+        adherence_impact: '',
+        warnings: [`Limite de ajustes atingido (${usage?.current_usage || 0}/${usage?.max_limit || 0})`],
+        requires_approval: false,
+        execution_blocked: true,
+        block_reason: 'Limite de ajustes atingido. Faça upgrade para mais ajustes.',
+        usage_limit_reached: true,
+        upgrade_required: true
+      }, corsHeaders);
+    }
+
     // Determine profile type and permissions
     const profileType = determineUserProfile(userPlanData, isProfessional && targetUserId !== user.id, isLinkedStudent);
     const permissions = getProfilePermissions(profileType);
