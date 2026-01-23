@@ -328,40 +328,46 @@ export default function Dashboard() {
           </p>
         </motion.section>
 
-        {/* Stats Cards - Mobile: stack, Desktop: side by side */}
+        {/* Stats Cards + Goals - Reorganized layout */}
         <motion.section
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2"
+          className="space-y-3 sm:space-y-4"
         >
-          {/* Calorie Card */}
-          <div className="card-elevated rounded-xl sm:rounded-2xl p-4 sm:p-6 flex flex-col items-center">
-            <div className="flex items-center gap-2 mb-3 sm:mb-4">
-              <Flame className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
-              <h3 className="font-semibold text-foreground text-sm sm:text-base">Calorias</h3>
+          {/* Calorie & Macros Row */}
+          <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2">
+            {/* Calorie Card */}
+            <div className="card-elevated rounded-xl sm:rounded-2xl p-4 sm:p-6 flex flex-col items-center">
+              <div className="flex items-center gap-2 mb-3 sm:mb-4">
+                <Flame className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
+                <h3 className="font-semibold text-foreground text-sm sm:text-base">Calorias</h3>
+              </div>
+              <CalorieRing
+                current={currentCalories}
+                target={profile?.daily_calories || 2000}
+              />
             </div>
-            <CalorieRing
-              current={currentCalories}
-              target={profile?.daily_calories || 2000}
-            />
+
+            {/* Macros Card */}
+            <div className="card-elevated rounded-xl sm:rounded-2xl p-4 sm:p-6">
+              <div className="flex items-center gap-2 mb-3 sm:mb-4">
+                <Target className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
+                <h3 className="font-semibold text-foreground text-sm sm:text-base">Macros</h3>
+              </div>
+              <MacroChart
+                protein={currentProtein}
+                carbs={currentCarbs}
+                fat={currentFat}
+                proteinTarget={profile?.protein_target || 150}
+                carbsTarget={profile?.carbs_target || 250}
+                fatTarget={profile?.fat_target || 65}
+              />
+            </div>
           </div>
 
-          {/* Macros Card */}
-          <div className="card-elevated rounded-xl sm:rounded-2xl p-4 sm:p-6">
-            <div className="flex items-center gap-2 mb-3 sm:mb-4">
-              <Target className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
-              <h3 className="font-semibold text-foreground text-sm sm:text-base">Macros</h3>
-            </div>
-            <MacroChart
-              protein={currentProtein}
-              carbs={currentCarbs}
-              fat={currentFat}
-              proteinTarget={profile?.protein_target || 150}
-              carbsTarget={profile?.carbs_target || 250}
-              fatTarget={profile?.fat_target || 65}
-            />
-          </div>
+          {/* Goals Projection Card - Now directly below stats */}
+          <GoalsProjectionCard />
         </motion.section>
 
         {/* Adherence Widget - only for paid users with a plan */}
@@ -374,15 +380,6 @@ export default function Dashboard() {
             <AdherenceWidget />
           </motion.section>
         )}
-
-        {/* Goals Projection and Water Intake - visible to all users */}
-        <motion.section
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.18 }}
-        >
-          <GoalsProjectionCard />
-        </motion.section>
 
         {permissions.can_create_plan && !isLinkedStudent && (
           <motion.section
