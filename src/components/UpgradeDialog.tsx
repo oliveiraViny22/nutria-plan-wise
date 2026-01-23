@@ -33,6 +33,7 @@ export function UpgradeDialog({
     substitution: 'substituições',
     adjustment: 'ajustes',
     chat: 'mensagens de chat',
+    objective: 'alteração de objetivo',
   };
 
   const handleUpgrade = () => {
