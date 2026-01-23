@@ -19,23 +19,33 @@ export default function Pricing() {
   const { toast } = useToast();
   const { user } = useAuth();
   const { plans, currentPlan, loading, createCheckout, accountType, isLinkedToProfessional } = useSubscription();
-  const [accountTab, setAccountTab] = useState<'personal' | 'professional'>(accountType);
   const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null);
 
-  // Filter plans based on tab and Premium visibility rules
+  // Check if user is on free plan (no current plan or gratuito)
+  const isFreePlan = !currentPlan || currentPlan.name === 'gratuito';
+
+  // For free users, hide account tabs and only show upgrade to paid personal plan
+  // For paid/professional users, show all tabs
+  const [accountTab, setAccountTab] = useState<'personal' | 'professional'>(
+    isFreePlan ? 'personal' : accountType
+  );
+
+  // Filter plans based on user's current plan and tab selection
   const filteredPlans = plans.filter(p => {
-    // Premium is a special plan for students linked to professionals - always hide from Pricing tabs
-    // Students see it only if linked and on personal tab, but we'll handle this separately
+    // Free users can ONLY see the paid personal plan as upgrade option
+    if (isFreePlan) {
+      // Only show plano_pessoal_pago for free users
+      return p.name === 'plano_pessoal_pago';
+    }
+
+    // Premium is a special plan for students linked to professionals
     if (p.name === 'premium') {
-      // Premium only shows if user is linked to professional AND on personal tab
       if (!isLinkedToProfessional) return false;
-      // Premium should appear in personal tab (its type is 'personal')
       if (accountTab !== 'personal') return false;
       return true;
     }
     
     // Filter by account type tab for all other plans
-    // Map tab to plan types: 'personal' tab shows gratuito + plano_pessoal_pago, 'professional' tab shows profissional
     const personalTypes = ['gratuito', 'plano_pessoal_pago'];
     const isPersonalPlan = personalTypes.includes(p.type);
     if (accountTab === 'personal' && !isPersonalPlan) return false;
@@ -180,19 +190,21 @@ export default function Pricing() {
           </p>
         </motion.div>
 
-        {/* Account Type Tabs */}
-        <Tabs value={accountTab} onValueChange={(v) => setAccountTab(v as 'personal' | 'professional')} className="mb-6 sm:mb-8">
-          <TabsList className="grid w-full max-w-md mx-auto grid-cols-2 h-auto">
-            <TabsTrigger value="personal" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm py-2 sm:py-2.5">
-              <Zap className="h-3 w-3 sm:h-4 sm:w-4" />
-              <span className="hidden xs:inline">Uso </span>Pessoal
-            </TabsTrigger>
-            <TabsTrigger value="professional" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm py-2 sm:py-2.5">
-              <Users className="h-3 w-3 sm:h-4 sm:w-4" />
-              Profissional
-            </TabsTrigger>
-          </TabsList>
-        </Tabs>
+        {/* Account Type Tabs - Hidden for free users */}
+        {!isFreePlan && (
+          <Tabs value={accountTab} onValueChange={(v) => setAccountTab(v as 'personal' | 'professional')} className="mb-6 sm:mb-8">
+            <TabsList className="grid w-full max-w-md mx-auto grid-cols-2 h-auto">
+              <TabsTrigger value="personal" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm py-2 sm:py-2.5">
+                <Zap className="h-3 w-3 sm:h-4 sm:w-4" />
+                <span className="hidden xs:inline">Uso </span>Pessoal
+              </TabsTrigger>
+              <TabsTrigger value="professional" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm py-2 sm:py-2.5">
+                <Users className="h-3 w-3 sm:h-4 sm:w-4" />
+                Profissional
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+        )}
 
         {/* Plans Grid - Mobile: 1 col, Tablet: 2 col, Desktop: 2-3 col */}
         <div className={`grid gap-4 sm:gap-6 max-w-5xl mx-auto grid-cols-1 ${
