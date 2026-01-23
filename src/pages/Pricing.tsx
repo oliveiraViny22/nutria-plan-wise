@@ -34,13 +34,15 @@ export default function Pricing() {
   // Filter plans based on user's current plan and tab selection
   const filteredPlans = plans.filter(p => {
     // Free users (including unauthenticated) can ONLY see the paid personal plan as upgrade option
+    // They should NOT see premium (for linked students) or professional plans
     if (isFreePlan) {
-      // Only show plano_pessoal_pago for free users
-      return p.name === 'plano_pessoal_pago';
+      // Only show plano_pessoal_pago type (excluding premium which is for linked students)
+      // The "Plano Pessoal" has type=plano_pessoal_pago and name="Plano Pessoal" (not "Premium")
+      return p.type === 'plano_pessoal_pago' && p.name !== 'Premium';
     }
 
     // Premium is a special plan for students linked to professionals
-    if (p.name === 'premium') {
+    if (p.name === 'Premium') {
       if (!isLinkedToProfessional) return false;
       if (accountTab !== 'personal') return false;
       return true;
