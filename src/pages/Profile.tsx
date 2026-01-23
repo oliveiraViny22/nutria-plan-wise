@@ -255,6 +255,48 @@ export default function Profile() {
               animate={{ opacity: 1, y: 0 }}
               className="space-y-6"
             >
+              {/* Calculated Targets Preview - Moved to top */}
+              {targets && (
+                <Card className="border-primary/30 bg-gradient-to-br from-primary/5 to-primary/10">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <TrendingUp className="h-5 w-5 text-primary" />
+                      Suas Metas Diárias Atuais
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                      <div className="bg-background/60 rounded-xl p-4 text-center">
+                        <Flame className="h-6 w-6 mx-auto text-primary mb-2" />
+                        <p className="text-2xl font-bold text-primary">{targets.calories}</p>
+                        <p className="text-xs text-muted-foreground">kcal/dia</p>
+                      </div>
+                      <div className="bg-background/60 rounded-xl p-4 text-center">
+                        <div className="w-6 h-6 mx-auto mb-2 rounded-full bg-protein/20 flex items-center justify-center">
+                          <span className="text-protein font-bold text-sm">P</span>
+                        </div>
+                        <p className="text-2xl font-bold text-protein">{targets.protein}g</p>
+                        <p className="text-xs text-muted-foreground">Proteína</p>
+                      </div>
+                      <div className="bg-background/60 rounded-xl p-4 text-center">
+                        <div className="w-6 h-6 mx-auto mb-2 rounded-full bg-carbs/20 flex items-center justify-center">
+                          <span className="text-carbs font-bold text-sm">C</span>
+                        </div>
+                        <p className="text-2xl font-bold text-carbs">{targets.carbs}g</p>
+                        <p className="text-xs text-muted-foreground">Carboidratos</p>
+                      </div>
+                      <div className="bg-background/60 rounded-xl p-4 text-center">
+                        <div className="w-6 h-6 mx-auto mb-2 rounded-full bg-fat/20 flex items-center justify-center">
+                          <span className="text-fat font-bold text-sm">G</span>
+                        </div>
+                        <p className="text-2xl font-bold text-fat">{targets.fat}g</p>
+                        <p className="text-xs text-muted-foreground">Gordura</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
               {/* Objective Display - Read-only */}
               <Card>
                 <CardHeader className="pb-4">
@@ -364,48 +406,6 @@ export default function Profile() {
                   </div>
                 </CardContent>
               </Card>
-
-              {/* Calculated Targets Preview */}
-              {targets && (
-                <Card className="border-primary/30 bg-gradient-to-br from-primary/5 to-primary/10">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-base flex items-center gap-2">
-                      <TrendingUp className="h-5 w-5 text-primary" />
-                      Suas Metas Diárias Atuais
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                      <div className="bg-background/60 rounded-xl p-4 text-center">
-                        <Flame className="h-6 w-6 mx-auto text-primary mb-2" />
-                        <p className="text-2xl font-bold text-primary">{targets.calories}</p>
-                        <p className="text-xs text-muted-foreground">kcal/dia</p>
-                      </div>
-                      <div className="bg-background/60 rounded-xl p-4 text-center">
-                        <div className="w-6 h-6 mx-auto mb-2 rounded-full bg-protein/20 flex items-center justify-center">
-                          <span className="text-protein font-bold text-sm">P</span>
-                        </div>
-                        <p className="text-2xl font-bold text-protein">{targets.protein}g</p>
-                        <p className="text-xs text-muted-foreground">Proteína</p>
-                      </div>
-                      <div className="bg-background/60 rounded-xl p-4 text-center">
-                        <div className="w-6 h-6 mx-auto mb-2 rounded-full bg-carbs/20 flex items-center justify-center">
-                          <span className="text-carbs font-bold text-sm">C</span>
-                        </div>
-                        <p className="text-2xl font-bold text-carbs">{targets.carbs}g</p>
-                        <p className="text-xs text-muted-foreground">Carboidratos</p>
-                      </div>
-                      <div className="bg-background/60 rounded-xl p-4 text-center">
-                        <div className="w-6 h-6 mx-auto mb-2 rounded-full bg-fat/20 flex items-center justify-center">
-                          <span className="text-fat font-bold text-sm">G</span>
-                        </div>
-                        <p className="text-2xl font-bold text-fat">{targets.fat}g</p>
-                        <p className="text-xs text-muted-foreground">Gordura</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
             </motion.div>
           </TabsContent>
 
