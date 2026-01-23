@@ -9,17 +9,22 @@ import {
   Target,
   Activity,
   Utensils,
-  Scale,
   Flame,
   TrendingUp,
   Trash2,
-  AlertTriangle
+  AlertTriangle,
+  Lock,
+  Calendar,
+  Ruler,
+  Weight,
+  UserCircle
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -46,6 +51,22 @@ import {
 
 const ADMIN_EMAIL = "admin@nutriaplan.com";
 
+// Ícones para objetivos
+const GOAL_ICONS = {
+  lose_weight: '🔥',
+  maintain: '⚖️',
+  gain_muscle: '💪',
+};
+
+// Ícones para níveis de atividade
+const ACTIVITY_ICONS = {
+  sedentary: '🛋️',
+  light: '🚶',
+  moderate: '🏃',
+  active: '🏋️',
+  very_active: '🏆',
+};
+
 export default function Profile() {
   const navigate = useNavigate();
   const { user, profile, refreshProfile, signOut } = useAuth();
@@ -69,7 +90,6 @@ export default function Profile() {
 
   useEffect(() => {
     if (profile) {
-      // Map database values to form values
       const mapSex = (dbSex: string | null): 'male' | 'female' | 'other' | '' => {
         if (dbSex === 'M' || dbSex === 'male') return 'male';
         if (dbSex === 'F' || dbSex === 'female') return 'female';
@@ -168,12 +188,8 @@ export default function Profile() {
       const previousGoal = profile?.goal;
       const goalChanged = previousGoal !== formData.goal;
       
+      // Dados pessoais são somente leitura - só salvamos o que pode ser alterado
       const updateData: any = {
-        name: formData.name.trim(),
-        age: Number(formData.age),
-        sex: formData.sex || null,
-        height: Number(formData.height),
-        weight: Number(formData.weight),
         goal: formData.goal || null,
         activity_level: formData.activity_level || null,
         meals_per_day: formData.meals_per_day,
@@ -249,6 +265,15 @@ export default function Profile() {
     }
   };
 
+  const getSexLabel = (sex: string) => {
+    switch (sex) {
+      case 'male': return 'Masculino';
+      case 'female': return 'Feminino';
+      case 'other': return 'Outro';
+      default: return '-';
+    }
+  };
+
   const isAdmin = user?.email === ADMIN_EMAIL;
   const targets = calculateTargets();
 
@@ -280,14 +305,10 @@ export default function Profile() {
         </div>
       </header>
 
-      <main className="container mx-auto px-3 sm:px-4 py-4 sm:py-6 pb-20 sm:pb-24">
-        <Tabs defaultValue="personal" className="space-y-4 sm:space-y-6">
-          {/* Tabs - scrollable on mobile */}
+      <main className="container mx-auto px-3 sm:px-4 py-4 sm:py-6 pb-20 sm:pb-24 max-w-4xl">
+        <Tabs defaultValue="goals" className="space-y-4 sm:space-y-6">
+          {/* Tabs */}
           <TabsList className="grid w-full grid-cols-3 h-auto">
-            <TabsTrigger value="personal" className="text-xs sm:text-sm py-2 sm:py-2.5 px-1 sm:px-3">
-              <User className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-              <span className="hidden xs:inline">Pessoal</span>
-            </TabsTrigger>
             <TabsTrigger value="goals" className="text-xs sm:text-sm py-2 sm:py-2.5 px-1 sm:px-3">
               <Target className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
               <span className="hidden xs:inline">Objetivo</span>
@@ -296,155 +317,108 @@ export default function Profile() {
               <Utensils className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
               <span className="hidden xs:inline">Dieta</span>
             </TabsTrigger>
+            <TabsTrigger value="personal" className="text-xs sm:text-sm py-2 sm:py-2.5 px-1 sm:px-3">
+              <User className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+              <span className="hidden xs:inline">Dados</span>
+            </TabsTrigger>
           </TabsList>
 
-          {/* Personal Data Tab */}
-          <TabsContent value="personal">
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-            >
-              <Card>
-                <CardHeader>
-                  <CardTitle>Dados Pessoais</CardTitle>
-                  <CardDescription>Informações básicas do seu perfil</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  <div className="space-y-2">
-                    <Label htmlFor="name">Nome</Label>
-                    <Input
-                      id="name"
-                      value={formData.name}
-                      onChange={(e) => handleChange('name', e.target.value)}
-                      placeholder="Seu nome"
-                      maxLength={100}
-                    />
-                  </div>
-
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <div className="space-y-2">
-                      <Label htmlFor="age">Idade</Label>
-                      <Input
-                        id="age"
-                        type="number"
-                        min="10"
-                        max="120"
-                        value={formData.age}
-                        onChange={(e) => handleChange('age', e.target.value)}
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label>Sexo</Label>
-                      <div className="grid grid-cols-3 gap-2">
-                        {(['male', 'female', 'other'] as const).map((sex) => (
-                          <button
-                            key={sex}
-                            type="button"
-                            onClick={() => handleChange('sex', sex)}
-                            className={`h-10 rounded-lg border text-sm transition-colors ${
-                              formData.sex === sex
-                                ? 'border-primary bg-primary/10 text-primary'
-                                : 'border-border hover:border-primary/50'
-                            }`}
-                          >
-                            {sex === 'male' ? 'M' : sex === 'female' ? 'F' : 'Outro'}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <div className="space-y-2">
-                      <Label htmlFor="height">Altura (cm)</Label>
-                      <Input
-                        id="height"
-                        type="number"
-                        min="100"
-                        max="250"
-                        value={formData.height}
-                        onChange={(e) => handleChange('height', e.target.value)}
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="weight">Peso (kg)</Label>
-                      <Input
-                        id="weight"
-                        type="number"
-                        min="20"
-                        max="400"
-                        step="0.1"
-                        value={formData.weight}
-                        onChange={(e) => handleChange('weight', e.target.value)}
-                      />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
-          </TabsContent>
-
-          {/* Goals Tab */}
+          {/* Goals Tab - Now first and improved */}
           <TabsContent value="goals">
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               className="space-y-6"
             >
+              {/* Objective Selection */}
               <Card>
-                <CardHeader>
-                  <CardTitle>Objetivo Principal</CardTitle>
-                  <CardDescription>Alterar o objetivo recalcula suas metas</CardDescription>
+                <CardHeader className="pb-4">
+                  <CardTitle className="flex items-center gap-2">
+                    <Target className="h-5 w-5 text-primary" />
+                    Objetivo Principal
+                  </CardTitle>
+                  <CardDescription>Escolha seu objetivo para calcularmos suas metas nutricionais</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid gap-3">
+                  <div className="grid gap-3 sm:grid-cols-3">
                     {(Object.entries(GOALS) as [keyof typeof GOALS, typeof GOALS[keyof typeof GOALS]][]).map(
-                      ([key, value]) => (
-                        <button
-                          key={key}
-                          type="button"
-                          onClick={() => handleChange('goal', key)}
-                          className={`p-4 rounded-xl border text-left transition-all ${
-                            formData.goal === key
-                              ? 'border-primary bg-primary/10'
-                              : 'border-border hover:border-primary/50'
-                          }`}
-                        >
-                          <span className="font-medium">{value.label}</span>
-                        </button>
-                      )
+                      ([key, value]) => {
+                        const isSelected = formData.goal === key;
+                        return (
+                          <button
+                            key={key}
+                            type="button"
+                            onClick={() => handleChange('goal', key)}
+                            className={`relative p-5 rounded-xl border-2 text-center transition-all group ${
+                              isSelected
+                                ? 'border-primary bg-primary/10 shadow-md'
+                                : 'border-border hover:border-primary/50 hover:bg-muted/50'
+                            }`}
+                          >
+                            <span className="text-3xl mb-2 block">
+                              {GOAL_ICONS[key]}
+                            </span>
+                            <span className={`font-semibold block ${isSelected ? 'text-primary' : ''}`}>
+                              {value.label}
+                            </span>
+                            <span className="text-xs text-muted-foreground mt-1 block">
+                              {value.calorieAdjustment > 0 ? '+' : ''}{value.calorieAdjustment} kcal
+                            </span>
+                            {isSelected && (
+                              <div className="absolute -top-1 -right-1 w-5 h-5 bg-primary rounded-full flex items-center justify-center">
+                                <span className="text-primary-foreground text-xs">✓</span>
+                              </div>
+                            )}
+                          </button>
+                        );
+                      }
                     )}
                   </div>
                 </CardContent>
               </Card>
 
+              {/* Activity Level Selection */}
               <Card>
-                <CardHeader>
+                <CardHeader className="pb-4">
                   <CardTitle className="flex items-center gap-2">
-                    <Activity className="h-5 w-5" />
-                    Nível de Atividade
+                    <Activity className="h-5 w-5 text-primary" />
+                    Nível de Atividade Física
                   </CardTitle>
+                  <CardDescription>Quanto exercício você pratica na semana?</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid gap-3">
+                  <div className="grid gap-2">
                     {(Object.entries(ACTIVITY_LEVELS) as [keyof typeof ACTIVITY_LEVELS, typeof ACTIVITY_LEVELS[keyof typeof ACTIVITY_LEVELS]][]).map(
-                      ([key, value]) => (
-                        <button
-                          key={key}
-                          type="button"
-                          onClick={() => handleChange('activity_level', key)}
-                          className={`p-4 rounded-xl border text-left transition-all ${
-                            formData.activity_level === key
-                              ? 'border-primary bg-primary/10'
-                              : 'border-border hover:border-primary/50'
-                          }`}
-                        >
-                          <span className="font-medium block">{value.label}</span>
-                          <span className="text-sm text-muted-foreground">{value.description}</span>
-                        </button>
-                      )
+                      ([key, value]) => {
+                        const isSelected = formData.activity_level === key;
+                        return (
+                          <button
+                            key={key}
+                            type="button"
+                            onClick={() => handleChange('activity_level', key)}
+                            className={`flex items-center gap-4 p-4 rounded-xl border-2 text-left transition-all ${
+                              isSelected
+                                ? 'border-primary bg-primary/10'
+                                : 'border-border hover:border-primary/50 hover:bg-muted/50'
+                            }`}
+                          >
+                            <span className="text-2xl w-10 text-center shrink-0">
+                              {ACTIVITY_ICONS[key]}
+                            </span>
+                            <div className="flex-1 min-w-0">
+                              <span className={`font-medium block ${isSelected ? 'text-primary' : ''}`}>
+                                {value.label}
+                              </span>
+                              <span className="text-sm text-muted-foreground">{value.description}</span>
+                            </div>
+                            {isSelected && (
+                              <div className="w-6 h-6 bg-primary rounded-full flex items-center justify-center shrink-0">
+                                <span className="text-primary-foreground text-sm">✓</span>
+                              </div>
+                            )}
+                          </button>
+                        );
+                      }
                     )}
                   </div>
                 </CardContent>
@@ -452,33 +426,39 @@ export default function Profile() {
 
               {/* Calculated Targets Preview */}
               {targets && (
-                <Card className="border-primary/20 bg-primary/5">
-                  <CardHeader>
+                <Card className="border-primary/30 bg-gradient-to-br from-primary/5 to-primary/10">
+                  <CardHeader className="pb-3">
                     <CardTitle className="text-base flex items-center gap-2">
                       <TrendingUp className="h-5 w-5 text-primary" />
-                      Metas Calculadas
+                      Suas Metas Diárias Calculadas
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
-                      <div>
-                        <Flame className="h-5 w-5 mx-auto text-primary mb-1" />
-                        <p className="text-lg font-bold">{targets.calories}</p>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                      <div className="bg-background/60 rounded-xl p-4 text-center">
+                        <Flame className="h-6 w-6 mx-auto text-primary mb-2" />
+                        <p className="text-2xl font-bold text-primary">{targets.calories}</p>
                         <p className="text-xs text-muted-foreground">kcal/dia</p>
                       </div>
-                      <div>
-                        <span className="text-protein text-lg">●</span>
-                        <p className="text-lg font-bold">{targets.protein}g</p>
+                      <div className="bg-background/60 rounded-xl p-4 text-center">
+                        <div className="w-6 h-6 mx-auto mb-2 rounded-full bg-protein/20 flex items-center justify-center">
+                          <span className="text-protein font-bold text-sm">P</span>
+                        </div>
+                        <p className="text-2xl font-bold text-protein">{targets.protein}g</p>
                         <p className="text-xs text-muted-foreground">Proteína</p>
                       </div>
-                      <div>
-                        <span className="text-carbs text-lg">●</span>
-                        <p className="text-lg font-bold">{targets.carbs}g</p>
+                      <div className="bg-background/60 rounded-xl p-4 text-center">
+                        <div className="w-6 h-6 mx-auto mb-2 rounded-full bg-carbs/20 flex items-center justify-center">
+                          <span className="text-carbs font-bold text-sm">C</span>
+                        </div>
+                        <p className="text-2xl font-bold text-carbs">{targets.carbs}g</p>
                         <p className="text-xs text-muted-foreground">Carboidratos</p>
                       </div>
-                      <div>
-                        <span className="text-fat text-lg">●</span>
-                        <p className="text-lg font-bold">{targets.fat}g</p>
+                      <div className="bg-background/60 rounded-xl p-4 text-center">
+                        <div className="w-6 h-6 mx-auto mb-2 rounded-full bg-fat/20 flex items-center justify-center">
+                          <span className="text-fat font-bold text-sm">G</span>
+                        </div>
+                        <p className="text-2xl font-bold text-fat">{targets.fat}g</p>
                         <p className="text-xs text-muted-foreground">Gordura</p>
                       </div>
                     </div>
@@ -496,78 +476,88 @@ export default function Profile() {
               className="space-y-6"
             >
               <Card>
-                <CardHeader>
+                <CardHeader className="pb-4">
                   <CardTitle className="flex items-center gap-2">
-                    <Utensils className="h-5 w-5" />
+                    <Utensils className="h-5 w-5 text-primary" />
                     Refeições por Dia
                   </CardTitle>
+                  <CardDescription>Quantas refeições você costuma fazer?</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid grid-cols-5 gap-2">
-                    {[2, 3, 4, 5, 6].map((num) => (
-                      <button
-                        key={num}
-                        type="button"
-                        onClick={() => handleChange('meals_per_day', num)}
-                        className={`h-12 rounded-lg border text-lg font-medium transition-colors ${
-                          formData.meals_per_day === num
-                            ? 'border-primary bg-primary/10 text-primary'
-                            : 'border-border hover:border-primary/50'
-                        }`}
-                      >
-                        {num}
-                      </button>
-                    ))}
+                  <div className="grid grid-cols-5 gap-2 sm:gap-3">
+                    {[2, 3, 4, 5, 6].map((num) => {
+                      const isSelected = formData.meals_per_day === num;
+                      return (
+                        <button
+                          key={num}
+                          type="button"
+                          onClick={() => handleChange('meals_per_day', num)}
+                          className={`h-14 sm:h-16 rounded-xl border-2 text-xl font-bold transition-all ${
+                            isSelected
+                              ? 'border-primary bg-primary/10 text-primary shadow-sm'
+                              : 'border-border hover:border-primary/50 hover:bg-muted/50'
+                          }`}
+                        >
+                          {num}
+                        </button>
+                      );
+                    })}
                   </div>
                 </CardContent>
               </Card>
 
               <Card>
-                <CardHeader>
+                <CardHeader className="pb-4">
                   <CardTitle>Preferências Alimentares</CardTitle>
                   <CardDescription>Selecione os tipos de alimentos que você prefere</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="flex flex-wrap gap-2">
-                    {FOOD_PREFERENCES.map((pref) => (
-                      <button
-                        key={pref}
-                        type="button"
-                        onClick={() => togglePreference(pref)}
-                        className={`px-3 py-2 rounded-full text-sm transition-colors ${
-                          formData.preferences.includes(pref)
-                            ? 'bg-primary text-primary-foreground'
-                            : 'bg-muted hover:bg-muted/80'
-                        }`}
-                      >
-                        {pref}
-                      </button>
-                    ))}
+                    {FOOD_PREFERENCES.map((pref) => {
+                      const isSelected = formData.preferences.includes(pref);
+                      return (
+                        <button
+                          key={pref}
+                          type="button"
+                          onClick={() => togglePreference(pref)}
+                          className={`px-4 py-2.5 rounded-full text-sm font-medium transition-all ${
+                            isSelected
+                              ? 'bg-primary text-primary-foreground shadow-sm'
+                              : 'bg-muted hover:bg-muted/80 hover:shadow-sm'
+                          }`}
+                        >
+                          {pref}
+                        </button>
+                      );
+                    })}
                   </div>
                 </CardContent>
               </Card>
 
               <Card>
-                <CardHeader>
+                <CardHeader className="pb-4">
                   <CardTitle>Restrições Alimentares</CardTitle>
                   <CardDescription>Selecione alimentos que você não pode ou não quer consumir</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="flex flex-wrap gap-2">
-                    {FOOD_RESTRICTIONS.map((rest) => (
-                      <button
-                        key={rest}
-                        type="button"
-                        onClick={() => toggleRestriction(rest)}
-                        className={`px-3 py-2 rounded-full text-sm transition-colors ${
-                          formData.restrictions.includes(rest)
-                            ? 'bg-destructive text-destructive-foreground'
-                            : 'bg-muted hover:bg-muted/80'
-                        }`}
-                      >
-                        {rest}
-                      </button>
-                    ))}
+                    {FOOD_RESTRICTIONS.map((rest) => {
+                      const isSelected = formData.restrictions.includes(rest);
+                      return (
+                        <button
+                          key={rest}
+                          type="button"
+                          onClick={() => toggleRestriction(rest)}
+                          className={`px-4 py-2.5 rounded-full text-sm font-medium transition-all ${
+                            isSelected
+                              ? 'bg-destructive text-destructive-foreground shadow-sm'
+                              : 'bg-muted hover:bg-muted/80 hover:shadow-sm'
+                          }`}
+                        >
+                          {rest}
+                        </button>
+                      );
+                    })}
                   </div>
                 </CardContent>
               </Card>
@@ -644,6 +634,114 @@ export default function Profile() {
                   </CardContent>
                 </Card>
               )}
+            </motion.div>
+          </TabsContent>
+
+          {/* Personal Data Tab - Read-only */}
+          <TabsContent value="personal">
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+            >
+              <Card>
+                <CardHeader className="pb-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle className="flex items-center gap-2">
+                        <UserCircle className="h-5 w-5 text-primary" />
+                        Dados Pessoais
+                      </CardTitle>
+                      <CardDescription>Informações definidas no cadastro</CardDescription>
+                    </div>
+                    <Badge variant="secondary" className="gap-1">
+                      <Lock className="h-3 w-3" />
+                      Somente leitura
+                    </Badge>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {/* Info Banner */}
+                  <div className="bg-muted/50 rounded-lg p-4 mb-6 flex items-start gap-3">
+                    <Lock className="h-5 w-5 text-muted-foreground shrink-0 mt-0.5" />
+                    <div className="text-sm text-muted-foreground">
+                      <p className="font-medium text-foreground mb-1">Por que não posso alterar?</p>
+                      <p>
+                        Os dados pessoais são fixados no cadastro para garantir a precisão 
+                        do seu histórico e evolução nutricional. Alterações nesses dados 
+                        poderiam distorcer suas métricas de progresso.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Personal Data Display */}
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    {/* Name */}
+                    <div className="col-span-full p-4 rounded-xl bg-muted/30 border">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                          <User className="h-5 w-5 text-primary" />
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground uppercase tracking-wide">Nome</p>
+                          <p className="font-semibold text-lg">{formData.name || '-'}</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Age */}
+                    <div className="p-4 rounded-xl bg-muted/30 border">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                          <Calendar className="h-5 w-5 text-primary" />
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground uppercase tracking-wide">Idade</p>
+                          <p className="font-semibold text-lg">{formData.age ? `${formData.age} anos` : '-'}</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Sex */}
+                    <div className="p-4 rounded-xl bg-muted/30 border">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                          <UserCircle className="h-5 w-5 text-primary" />
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground uppercase tracking-wide">Sexo</p>
+                          <p className="font-semibold text-lg">{getSexLabel(formData.sex)}</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Height */}
+                    <div className="p-4 rounded-xl bg-muted/30 border">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                          <Ruler className="h-5 w-5 text-primary" />
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground uppercase tracking-wide">Altura</p>
+                          <p className="font-semibold text-lg">{formData.height ? `${formData.height} cm` : '-'}</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Weight */}
+                    <div className="p-4 rounded-xl bg-muted/30 border">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                          <Weight className="h-5 w-5 text-primary" />
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground uppercase tracking-wide">Peso</p>
+                          <p className="font-semibold text-lg">{formData.weight ? `${formData.weight} kg` : '-'}</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
             </motion.div>
           </TabsContent>
         </Tabs>
