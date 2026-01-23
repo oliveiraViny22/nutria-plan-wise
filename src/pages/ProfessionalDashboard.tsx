@@ -22,6 +22,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Logo } from '@/components/Logo';
 import { MobileNav } from '@/components/MobileNav';
 import { ThemeToggle } from '@/components/ThemeToggle';
+import { ProfessionalRequestsPanel } from '@/components/ProfessionalRequestsPanel';
 
 import { useUserRole } from '@/hooks/useUserRole';
 import { supabase } from '@/integrations/supabase/client';
@@ -267,26 +268,36 @@ export default function ProfessionalDashboard() {
           </div>
         </motion.div>
 
-        {/* Empty State for Students */}
+        {/* Student Objective Change Requests */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.4 }}
         >
+          <ProfessionalRequestsPanel />
+        </motion.div>
+
+        {/* Student Management Info */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.5 }}
+        >
           <Card>
             <CardHeader>
               <CardTitle>Gerenciamento de Alunos</CardTitle>
-              <CardDescription>Funcionalidade em desenvolvimento</CardDescription>
+              <CardDescription>Acesse a página de alunos para gerenciamento completo</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="text-center py-8 space-y-3">
+              <div className="text-center py-6 space-y-3">
                 <Users className="h-12 w-12 mx-auto text-muted-foreground" />
                 <p className="text-muted-foreground">
-                  O gerenciamento de alunos estará disponível em breve.
+                  Gerencie seus alunos, crie planos e acompanhe o progresso.
                 </p>
-                <p className="text-sm text-muted-foreground">
-                  Por enquanto, você pode gerenciar seu próprio plano alimentar.
-                </p>
+                <Button onClick={() => navigate('/students')}>
+                  <UserPlus className="h-4 w-4 mr-2" />
+                  Gerenciar Alunos
+                </Button>
               </div>
             </CardContent>
           </Card>

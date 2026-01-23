@@ -46,7 +46,8 @@ import {
   FOOD_PREFERENCES,
   FOOD_RESTRICTIONS,
 } from '@/lib/types';
-import { ObjectiveChangeDialog } from '@/components/ObjectiveChangeDialog';
+import { ObjectiveChangeWizard } from '@/components/ObjectiveChangeWizard';
+import { StudentObjectiveRequestDialog } from '@/components/StudentObjectiveRequestDialog';
 import { useLinkedStudent } from '@/hooks/useLinkedStudent';
 import { useSubscription } from '@/hooks/useSubscription';
 
@@ -74,9 +75,10 @@ export default function Profile() {
   const [loading, setLoading] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
-  const [showObjectiveDialog, setShowObjectiveDialog] = useState(false);
+  const [showObjectiveWizard, setShowObjectiveWizard] = useState(false);
+  const [showStudentRequestDialog, setShowStudentRequestDialog] = useState(false);
   
-  const { isLinkedStudent } = useLinkedStudent();
+  const { isLinkedStudent, professionalId } = useLinkedStudent();
   const { subscriptionInfo } = useSubscription();
   const isPaidUser = subscriptionInfo?.plan?.type !== 'gratuito';
 
@@ -328,11 +330,11 @@ export default function Profile() {
 
                   {/* Request Change Button */}
                   <div className="mt-6 pt-4 border-t">
-                    {isLinkedStudent ? (
+                    {isLinkedStudent && professionalId ? (
                       <Button 
                         variant="outline" 
                         className="w-full"
-                        onClick={() => toast.info('Alunos devem solicitar alteração ao profissional responsável.')}
+                        onClick={() => setShowStudentRequestDialog(true)}
                       >
                         <Target className="h-4 w-4 mr-2" />
                         Solicitar Alteração ao Profissional
@@ -341,7 +343,7 @@ export default function Profile() {
                       <Button 
                         variant="outline" 
                         className="w-full"
-                        onClick={() => setShowObjectiveDialog(true)}
+                        onClick={() => setShowObjectiveWizard(true)}
                       >
                         <Target className="h-4 w-4 mr-2" />
                         Alterar Objetivo
@@ -685,13 +687,23 @@ export default function Profile() {
         </Tabs>
       </main>
 
-      {/* Objective Change Dialog */}
-      <ObjectiveChangeDialog
-        open={showObjectiveDialog}
-        onOpenChange={setShowObjectiveDialog}
+      {/* Objective Change Wizard for Paid Users */}
+      <ObjectiveChangeWizard
+        open={showObjectiveWizard}
+        onOpenChange={setShowObjectiveWizard}
         currentGoal={formData.goal || null}
         onSuccess={() => refreshProfile()}
       />
+
+      {/* Student Request Dialog for Linked Students */}
+      {professionalId && (
+        <StudentObjectiveRequestDialog
+          open={showStudentRequestDialog}
+          onOpenChange={setShowStudentRequestDialog}
+          currentGoal={formData.goal || null}
+          professionalId={professionalId}
+        />
+      )}
     </div>
   );
 }
