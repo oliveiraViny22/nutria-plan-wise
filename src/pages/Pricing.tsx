@@ -5,7 +5,7 @@ import { Check, Crown, Zap, Users, MessageCircle, ArrowLeft, Sparkles } from 'lu
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+// Tabs removed - professional options hidden from free/paid users
 import { useSubscription } from '@/hooks/useSubscription';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
@@ -18,42 +18,39 @@ export default function Pricing() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { user } = useAuth();
-  const { plans, currentPlan, loading, createCheckout, accountType, isLinkedToProfessional } = useSubscription();
+  const { plans, currentPlan, loading, createCheckout, isLinkedToProfessional } = useSubscription();
   const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null);
 
   // Check if user is on free plan (no current plan or gratuito)
   // Also treat unauthenticated users as "free" for display purposes
   const isFreePlan = !user || !currentPlan || currentPlan.name === 'gratuito';
+  
+  // Check if user is on a paid personal plan
+  const isPaidPersonalPlan = currentPlan?.type === 'plano_pessoal_pago';
 
-  // For free users, hide account tabs and only show upgrade to paid personal plan
-  // For paid/professional users, show all tabs
-  const [accountTab, setAccountTab] = useState<'personal' | 'professional'>(
-    isFreePlan ? 'personal' : accountType
-  );
-
-  // Filter plans based on user's current plan and tab selection
+  // Filter plans based on user's current plan
+  // Free and paid personal users should NOT see professional plans
   const filteredPlans = plans.filter(p => {
-    // Free users (including unauthenticated) can ONLY see the paid personal plan as upgrade option
-    // They should NOT see premium (for linked students) or professional plans
+    // Never show professional plans to free or paid personal users
+    if (p.type === 'profissional') {
+      return false;
+    }
+    
+    // Free users can ONLY see the paid personal plan as upgrade option
     if (isFreePlan) {
-      // Only show plano_pessoal_pago type (excluding premium which is for linked students)
-      // The "Plano Pessoal" has type=plano_pessoal_pago and name="Plano Pessoal" (not "Premium")
       return p.type === 'plano_pessoal_pago' && p.name !== 'Premium';
     }
 
     // Premium is a special plan for students linked to professionals
     if (p.name === 'Premium') {
-      if (!isLinkedToProfessional) return false;
-      if (accountTab !== 'personal') return false;
-      return true;
+      return isLinkedToProfessional;
     }
     
-    // Filter by account type tab for all other plans
-    // Plan types are: 'gratuito', 'plano_pessoal_pago', 'profissional'
-    const personalPlanTypes: string[] = ['gratuito', 'plano_pessoal_pago'];
-    const isPersonalPlan = personalPlanTypes.includes(p.type);
-    if (accountTab === 'personal' && !isPersonalPlan) return false;
-    if (accountTab === 'professional' && p.type !== 'profissional') return false;
+    // Paid personal users see only personal plans (gratuito and plano_pessoal_pago)
+    if (isPaidPersonalPlan) {
+      const personalPlanTypes: string[] = ['gratuito', 'plano_pessoal_pago'];
+      return personalPlanTypes.includes(p.type);
+    }
     
     return true;
   });
@@ -194,21 +191,7 @@ export default function Pricing() {
           </p>
         </motion.div>
 
-        {/* Account Type Tabs - Hidden for free users */}
-        {!isFreePlan && (
-          <Tabs value={accountTab} onValueChange={(v) => setAccountTab(v as 'personal' | 'professional')} className="mb-6 sm:mb-8">
-            <TabsList className="grid w-full max-w-md mx-auto grid-cols-2 h-auto">
-              <TabsTrigger value="personal" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm py-2 sm:py-2.5">
-                <Zap className="h-3 w-3 sm:h-4 sm:w-4" />
-                <span className="hidden xs:inline">Uso </span>Pessoal
-              </TabsTrigger>
-              <TabsTrigger value="professional" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm py-2 sm:py-2.5">
-                <Users className="h-3 w-3 sm:h-4 sm:w-4" />
-                Profissional
-              </TabsTrigger>
-            </TabsList>
-          </Tabs>
-        )}
+        {/* Account Type Tabs - Removed: free and paid personal users should not see professional options */}
 
         {/* Plans Grid - Mobile: 1 col, Tablet: 2 col, Desktop: 2-3 col */}
         <div className={`grid gap-4 sm:gap-6 max-w-5xl mx-auto grid-cols-1 ${
