@@ -106,10 +106,9 @@ export function useSubstitution(options?: UseSubstitutionOptions): UseSubstituti
       setCandidates(result.candidates || []);
       setSourceData({ food: sourceFood, grams: sourceGrams });
       
-      // Se houver proposta do melhor candidato, definir
-      if (result.proposal) {
-        setProposal(result.proposal);
-      }
+      // NÃO definir proposta automaticamente - deixar o usuário escolher
+      // A proposta só será criada quando o usuário selecionar um candidato
+      setProposal(null);
     } catch (err) {
       console.error('Error finding candidates:', err);
       setError('NO_CANDIDATES');
