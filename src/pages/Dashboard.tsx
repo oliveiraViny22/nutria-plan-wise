@@ -40,6 +40,7 @@ import { MacroRebalancer } from '@/components/MacroRebalancer';
 import { UsageLimits } from '@/components/UsageLimits';
 import { UpgradeDialog } from '@/components/UpgradeDialog';
 import { AdherenceWidget } from '@/components/AdherenceWidget';
+import { GoalsProjectionCard } from '@/components/GoalsProjectionCard';
 import { OnboardingTutorial } from '@/components/OnboardingTutorial';
 import { useTutorial } from '@/hooks/useTutorial';
 import { useAuth } from '@/contexts/AuthContext';
@@ -373,6 +374,16 @@ export default function Dashboard() {
             <AdherenceWidget />
           </motion.section>
         )}
+
+        {/* Goals Projection and Water Intake - visible to all users */}
+        <motion.section
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.18 }}
+        >
+          <GoalsProjectionCard />
+        </motion.section>
+
         {permissions.can_create_plan && !isLinkedStudent && (
           <motion.section
             initial={{ opacity: 0, y: 20 }}
