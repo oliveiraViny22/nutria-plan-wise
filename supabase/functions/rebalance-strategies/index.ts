@@ -44,6 +44,46 @@ type AIStrategyType =
   | 'adjust_meal_timing'
   | 'professional_guidance';
 
+// =====================================================
+// GOVERNANÇA BASEADA EM ADESÃO
+// =====================================================
+
+type AdherenceLevel = 'high' | 'medium' | 'low' | 'no_data';
+
+interface AdherenceGovernance {
+  can_rebalance: boolean;
+  adherence_level: AdherenceLevel;
+  adherence_rate: number;
+  allowed_strategies: string[];
+  blocked_strategies: string[];
+  block_reason?: string;
+  user_message: string;
+}
+
+// Mapeamento de estratégias permitidas por adesão
+const ADHERENCE_ALLOWED_AI_STRATEGIES: Record<AdherenceLevel, AIStrategyType[]> = {
+  high: [
+    'redistribute_meals',
+    'substitute_within_category',
+    'add_complementary_option',
+    'reduce_meal_complexity',
+    'adjust_meal_timing',
+    'professional_guidance',
+  ],
+  medium: [
+    'redistribute_meals',
+    'reduce_meal_complexity',
+    'substitute_within_category',
+    'professional_guidance',
+  ],
+  low: [
+    'professional_guidance',
+  ],
+  no_data: [
+    'professional_guidance',
+  ],
+};
+
 interface AIStrategy {
   type: AIStrategyType;
   title: string;
@@ -62,6 +102,9 @@ interface AIStrategiesResponse {
   noViableStrategy: boolean;
   noViableReason?: string;
   recommendation: string;
+  // NOVO: Informações de governança
+  adherence_filtered?: boolean;
+  adherence_message?: string;
 }
 
 interface RequestBody {
@@ -75,6 +118,8 @@ interface RequestBody {
   user_preferences?: string[];
   user_restrictions?: string[];
   allow_supplements: boolean;
+  // NOVO: Governança de adesão passada pelo frontend
+  adherence_governance?: AdherenceGovernance;
 }
 
 // =====================================================
@@ -184,8 +229,8 @@ Lembre-se: NÃO forneça valores numéricos, apenas estratégias em linguagem si
 // =====================================================
 
 function generateRuleBasedStrategies(body: RequestBody): AIStrategiesResponse {
-  const { failure_details, allow_supplements } = body;
-  const strategies: AIStrategy[] = [];
+  const { failure_details, allow_supplements, adherence_governance } = body;
+  let strategies: AIStrategy[] = [];
 
   // Estratégia 1: Redistribuição
   if (failure_details.proteinGap > 0) {
@@ -236,6 +281,41 @@ function generateRuleBasedStrategies(body: RequestBody): AIStrategiesResponse {
     });
   }
 
+  // =====================================================
+  // FILTRAR ESTRATÉGIAS COM BASE NA GOVERNANÇA DE ADESÃO
+  // =====================================================
+  let adherence_filtered = false;
+  let adherence_message: string | undefined;
+
+  if (adherence_governance) {
+    const level = adherence_governance.adherence_level;
+    const allowedTypes = ADHERENCE_ALLOWED_AI_STRATEGIES[level] || [];
+    
+    const originalCount = strategies.length;
+    strategies = strategies.filter(s => allowedTypes.includes(s.type));
+    
+    if (strategies.length < originalCount) {
+      adherence_filtered = true;
+      adherence_message = adherence_governance.user_message;
+    }
+    
+    // Se nenhuma estratégia restou, adicionar professional_guidance
+    if (strategies.length === 0 && allowedTypes.includes('professional_guidance')) {
+      strategies.push({
+        type: 'professional_guidance',
+        title: 'Estabilize sua Rotina Primeiro',
+        description: adherence_governance.block_reason || 'Sua adesão atual não permite ajustes automáticos. Foque em seguir o plano atual.',
+        requiresSupplement: false,
+        requiresProfessional: false,
+        expectedImpact: 'low',
+        considerations: [
+          'Registre suas refeições por mais tempo',
+          'Foque em manter a rotina antes de otimizar'
+        ]
+      });
+    }
+  }
+
   // Se nenhuma estratégia viável
   if (strategies.length === 0) {
     return {
@@ -251,7 +331,9 @@ function generateRuleBasedStrategies(body: RequestBody): AIStrategiesResponse {
       }],
       noViableStrategy: true,
       noViableReason: 'As metas definidas não são atingíveis apenas com ajustes de porções.',
-      recommendation: 'Consulte um nutricionista para revisar suas metas calóricas e proteicas.'
+      recommendation: 'Consulte um nutricionista para revisar suas metas calóricas e proteicas.',
+      adherence_filtered,
+      adherence_message
     };
   }
 
@@ -259,7 +341,11 @@ function generateRuleBasedStrategies(body: RequestBody): AIStrategiesResponse {
     failureAnalysis: `O rebalanceador não conseguiu atingir as metas porque: ${failure_details.userMessage}`,
     strategies,
     noViableStrategy: false,
-    recommendation: 'Escolha uma das estratégias acima para o sistema recalcular seu plano.'
+    recommendation: adherence_filtered 
+      ? 'Algumas estratégias foram limitadas devido à sua adesão atual. Escolha uma das disponíveis.'
+      : 'Escolha uma das estratégias acima para o sistema recalcular seu plano.',
+    adherence_filtered,
+    adherence_message
   };
 }
 
@@ -301,6 +387,33 @@ serve(async (req: Request) => {
       return createErrorResponse('Dados incompletos para análise de estratégias', 400, corsHeaders);
     }
 
+    // =====================================================
+    // VERIFICAÇÃO DE GOVERNANÇA DE ADESÃO
+    // =====================================================
+    // Se adesão for baixa, bloquear e retornar orientação
+    if (body.adherence_governance && !body.adherence_governance.can_rebalance) {
+      return createSuccessResponse({
+        failureAnalysis: 'Rebalanceamento bloqueado por governança de adesão.',
+        strategies: [{
+          type: 'professional_guidance',
+          title: 'Estabilize sua Rotina Primeiro',
+          description: body.adherence_governance.block_reason || 'Sua adesão atual não permite ajustes. Foque em seguir o plano.',
+          requiresSupplement: false,
+          requiresProfessional: false,
+          expectedImpact: 'low',
+          considerations: [
+            'Registre suas refeições consistentemente',
+            'Foque em manter a rotina atual'
+          ]
+        }],
+        noViableStrategy: true,
+        noViableReason: body.adherence_governance.block_reason,
+        recommendation: body.adherence_governance.user_message,
+        adherence_filtered: true,
+        adherence_message: body.adherence_governance.user_message
+      }, corsHeaders);
+    }
+
     // Try AI-powered strategies
     const apiKey = Deno.env.get('LOVABLE_API_KEY');
     let strategies: AIStrategiesResponse;
@@ -332,6 +445,36 @@ serve(async (req: Request) => {
           const jsonMatch = content.match(/\{[\s\S]*\}/);
           if (jsonMatch) {
             strategies = JSON.parse(jsonMatch[0]);
+            
+            // =====================================================
+            // FILTRAR ESTRATÉGIAS DA IA COM BASE NA ADESÃO
+            // =====================================================
+            if (body.adherence_governance) {
+              const level = body.adherence_governance.adherence_level;
+              const allowedTypes = ADHERENCE_ALLOWED_AI_STRATEGIES[level] || [];
+              
+              const originalCount = strategies.strategies.length;
+              strategies.strategies = strategies.strategies.filter(s => allowedTypes.includes(s.type));
+              
+              if (strategies.strategies.length < originalCount) {
+                strategies.adherence_filtered = true;
+                strategies.adherence_message = body.adherence_governance.user_message;
+              }
+              
+              // Se nenhuma estratégia restou, adicionar professional_guidance
+              if (strategies.strategies.length === 0) {
+                strategies.strategies.push({
+                  type: 'professional_guidance',
+                  title: 'Estabilize sua Rotina Primeiro',
+                  description: body.adherence_governance.block_reason || 'Foque em seguir o plano atual.',
+                  requiresSupplement: false,
+                  requiresProfessional: false,
+                  expectedImpact: 'low',
+                  considerations: ['Registre suas refeições consistentemente']
+                });
+                strategies.noViableStrategy = true;
+              }
+            }
           } else {
             strategies = generateRuleBasedStrategies(body);
           }
