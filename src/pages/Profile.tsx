@@ -46,6 +46,9 @@ import {
   FOOD_PREFERENCES,
   FOOD_RESTRICTIONS,
 } from '@/lib/types';
+import { ObjectiveChangeDialog } from '@/components/ObjectiveChangeDialog';
+import { useLinkedStudent } from '@/hooks/useLinkedStudent';
+import { useSubscription } from '@/hooks/useSubscription';
 
 const ADMIN_EMAIL = "admin@nutriaplan.com";
 
@@ -71,6 +74,11 @@ export default function Profile() {
   const [loading, setLoading] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
+  const [showObjectiveDialog, setShowObjectiveDialog] = useState(false);
+  
+  const { isLinkedStudent } = useLinkedStudent();
+  const { subscriptionInfo } = useSubscription();
+  const isPaidUser = subscriptionInfo?.plan?.type !== 'gratuito';
 
   const [formData, setFormData] = useState({
     name: '',
@@ -320,14 +328,34 @@ export default function Profile() {
 
                   {/* Request Change Button */}
                   <div className="mt-6 pt-4 border-t">
-                    <Button 
-                      variant="outline" 
-                      className="w-full"
-                      onClick={() => toast.info('Funcionalidade de solicitação de alteração será implementada em breve.')}
-                    >
-                      <Target className="h-4 w-4 mr-2" />
-                      Solicitar Alteração de Objetivo
-                    </Button>
+                    {isLinkedStudent ? (
+                      <Button 
+                        variant="outline" 
+                        className="w-full"
+                        onClick={() => toast.info('Alunos devem solicitar alteração ao profissional responsável.')}
+                      >
+                        <Target className="h-4 w-4 mr-2" />
+                        Solicitar Alteração ao Profissional
+                      </Button>
+                    ) : isPaidUser ? (
+                      <Button 
+                        variant="outline" 
+                        className="w-full"
+                        onClick={() => setShowObjectiveDialog(true)}
+                      >
+                        <Target className="h-4 w-4 mr-2" />
+                        Alterar Objetivo
+                      </Button>
+                    ) : (
+                      <Button 
+                        variant="outline" 
+                        className="w-full"
+                        disabled
+                      >
+                        <Lock className="h-4 w-4 mr-2" />
+                        Upgrade necessário para alterar objetivo
+                      </Button>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -656,6 +684,14 @@ export default function Profile() {
           </TabsContent>
         </Tabs>
       </main>
+
+      {/* Objective Change Dialog */}
+      <ObjectiveChangeDialog
+        open={showObjectiveDialog}
+        onOpenChange={setShowObjectiveDialog}
+        currentGoal={formData.goal || null}
+        onSuccess={() => refreshProfile()}
+      />
     </div>
   );
 }

@@ -156,6 +156,8 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          objective_change_count: number
+          objective_locked_until: string | null
           status: string
           total_calories: number
           total_carbs: number
@@ -167,6 +169,8 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: string
+          objective_change_count?: number
+          objective_locked_until?: string | null
           status?: string
           total_calories: number
           total_carbs: number
@@ -178,6 +182,8 @@ export type Database = {
         Update: {
           created_at?: string
           id?: string
+          objective_change_count?: number
+          objective_locked_until?: string | null
           status?: string
           total_calories?: number
           total_carbs?: number
@@ -521,6 +527,72 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      objective_change_policies: {
+        Row: {
+          change_number: number
+          cooldown_days: number
+          created_at: string
+          id: string
+          profile_type: string
+          updated_at: string
+        }
+        Insert: {
+          change_number: number
+          cooldown_days?: number
+          created_at?: string
+          id?: string
+          profile_type: string
+          updated_at?: string
+        }
+        Update: {
+          change_number?: number
+          cooldown_days?: number
+          created_at?: string
+          id?: string
+          profile_type?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      objective_change_requests: {
+        Row: {
+          created_at: string
+          current_goal: string
+          id: string
+          justification: string
+          professional_id: string
+          professional_response: string | null
+          requested_goal: string
+          status: string
+          student_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          current_goal: string
+          id?: string
+          justification: string
+          professional_id: string
+          professional_response?: string | null
+          requested_goal: string
+          status?: string
+          student_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          current_goal?: string
+          id?: string
+          justification?: string
+          professional_id?: string
+          professional_response?: string | null
+          requested_goal?: string
+          status?: string
+          student_id?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       plans: {
         Row: {
@@ -897,6 +969,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      apply_objective_change: {
+        Args: { _new_goal: string; _user_id: string }
+        Returns: Json
+      }
       can_use_feature: {
         Args: { _feature: string; _user_id: string }
         Returns: boolean
@@ -906,6 +982,16 @@ export type Database = {
         Returns: boolean
       }
       can_view_supplements: { Args: { _user_id: string }; Returns: boolean }
+      check_objective_change_eligibility: {
+        Args: { _user_id: string }
+        Returns: {
+          can_change: boolean
+          change_count: number
+          locked_until: string
+          next_cooldown_days: number
+          reason: string
+        }[]
+      }
       confirm_meal_consumption: {
         Args: {
           _log_date?: string

@@ -32,6 +32,8 @@ import {
   Sparkles,
   Bot,
   Code,
+  Clock,
+  Target,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -57,6 +59,7 @@ import { FoodCuration } from '@/components/FoodCuration';
 import { PendingFoodsReview } from '@/components/PendingFoodsReview';
 import { useRealtimeSettings } from '@/hooks/useRealtimeSettings';
 import { ThemeToggle } from '@/components/ThemeToggle';
+import { ObjectiveChangePoliciesManager } from '@/components/admin/ObjectiveChangePoliciesManager';
 
 
 const CHART_COLORS = [
@@ -747,6 +750,10 @@ export default function Admin() {
             <TabsTrigger value="docs" className="flex items-center gap-2">
               <BookOpen className="h-4 w-4" />
               Documentação
+            </TabsTrigger>
+            <TabsTrigger value="policies" className="flex items-center gap-2">
+              <Target className="h-4 w-4" />
+              Políticas
             </TabsTrigger>
           </TabsList>
 
@@ -1831,6 +1838,68 @@ export default function Admin() {
                       <li>Conhecer integrações (Stripe, IA)</li>
                       <li>Apresentar a plataforma para investidores e parceiros</li>
                     </ul>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
+          {/* Policies Tab */}
+          <TabsContent value="policies">
+            <div className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Target className="h-5 w-5 text-primary" />
+                    Políticas de Cooldown de Objetivo
+                  </CardTitle>
+                  <CardDescription>
+                    Configure as regras de cooldown progressivo para alteração de objetivo nutricional.
+                    Cada perfil de usuário pode ter diferentes períodos de espera para cada tentativa de alteração.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ObjectiveChangePoliciesManager />
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Clock className="h-5 w-5" />
+                    Como funciona o Cooldown Progressivo
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="text-sm text-muted-foreground space-y-3">
+                    <p>
+                      O sistema de cooldown progressivo controla quantas vezes um usuário pode alterar
+                      seu objetivo nutricional e o tempo de espera entre cada alteração.
+                    </p>
+                    <div className="grid md:grid-cols-2 gap-4">
+                      <div className="p-4 border rounded-lg">
+                        <h4 className="font-medium mb-2">Plano Pessoal Pago</h4>
+                        <ul className="text-xs space-y-1">
+                          <li>• 1ª alteração: 14 dias de cooldown</li>
+                          <li>• 2ª alteração: 30 dias de cooldown</li>
+                          <li>• 3ª alteração: 60 dias de cooldown</li>
+                          <li>• 4ª+ alteração: 90 dias de cooldown</li>
+                        </ul>
+                      </div>
+                      <div className="p-4 border rounded-lg">
+                        <h4 className="font-medium mb-2">Profissional</h4>
+                        <ul className="text-xs space-y-1">
+                          <li>• 1ª alteração: 7 dias de cooldown</li>
+                          <li>• 2ª alteração: 14 dias de cooldown</li>
+                          <li>• 3ª alteração: 30 dias de cooldown</li>
+                          <li>• 4ª+ alteração: 60 dias de cooldown</li>
+                        </ul>
+                      </div>
+                    </div>
+                    <p className="text-xs mt-4">
+                      <strong>Nota:</strong> Alunos vinculados a profissionais não podem alterar objetivo diretamente.
+                      Eles devem solicitar a alteração ao profissional responsável.
+                    </p>
                   </div>
                 </CardContent>
               </Card>
