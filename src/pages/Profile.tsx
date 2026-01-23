@@ -306,9 +306,13 @@ export default function Profile() {
       </header>
 
       <main className="container mx-auto px-3 sm:px-4 py-4 sm:py-6 pb-20 sm:pb-24 max-w-4xl">
-        <Tabs defaultValue="goals" className="space-y-4 sm:space-y-6">
+        <Tabs defaultValue="personal" className="space-y-4 sm:space-y-6">
           {/* Tabs */}
           <TabsList className="grid w-full grid-cols-3 h-auto">
+            <TabsTrigger value="personal" className="text-xs sm:text-sm py-2 sm:py-2.5 px-1 sm:px-3">
+              <User className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+              <span className="hidden xs:inline">Dados</span>
+            </TabsTrigger>
             <TabsTrigger value="goals" className="text-xs sm:text-sm py-2 sm:py-2.5 px-1 sm:px-3">
               <Target className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
               <span className="hidden xs:inline">Objetivo</span>
@@ -316,10 +320,6 @@ export default function Profile() {
             <TabsTrigger value="diet" className="text-xs sm:text-sm py-2 sm:py-2.5 px-1 sm:px-3">
               <Utensils className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
               <span className="hidden xs:inline">Dieta</span>
-            </TabsTrigger>
-            <TabsTrigger value="personal" className="text-xs sm:text-sm py-2 sm:py-2.5 px-1 sm:px-3">
-              <User className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-              <span className="hidden xs:inline">Dados</span>
             </TabsTrigger>
           </TabsList>
 
@@ -562,78 +562,6 @@ export default function Profile() {
                 </CardContent>
               </Card>
 
-              {/* Delete Account Section */}
-              {!isAdmin && (
-                <Card className="border-destructive/30 bg-destructive/5">
-                  <CardHeader>
-                    <CardTitle className="text-destructive flex items-center gap-2">
-                      <AlertTriangle className="h-5 w-5" />
-                      Zona de Perigo
-                    </CardTitle>
-                    <CardDescription>
-                      Ações irreversíveis para sua conta
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button variant="destructive" className="w-full sm:w-auto">
-                          <Trash2 className="h-4 w-4 mr-2" />
-                          Excluir minha conta
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle className="flex items-center gap-2 text-destructive">
-                            <AlertTriangle className="h-5 w-5" />
-                            Excluir conta permanentemente?
-                          </AlertDialogTitle>
-                          <AlertDialogDescription className="space-y-3">
-                            <p>
-                              Esta ação é <strong>irreversível</strong>. Todos os seus dados serão excluídos permanentemente:
-                            </p>
-                            <ul className="list-disc list-inside text-sm space-y-1">
-                              <li>Perfil e informações pessoais</li>
-                              <li>Planos alimentares e histórico</li>
-                              <li>Registros de refeições e adesão</li>
-                              <li>Conversas com o chat nutricional</li>
-                            </ul>
-                            <div className="pt-2">
-                              <Label htmlFor="confirm-delete" className="text-sm font-medium">
-                                Digite <strong>EXCLUIR</strong> para confirmar:
-                              </Label>
-                              <Input
-                                id="confirm-delete"
-                                value={deleteConfirmText}
-                                onChange={(e) => setDeleteConfirmText(e.target.value.toUpperCase())}
-                                placeholder="EXCLUIR"
-                                className="mt-2"
-                              />
-                            </div>
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel onClick={() => setDeleteConfirmText('')}>
-                            Cancelar
-                          </AlertDialogCancel>
-                          <AlertDialogAction
-                            onClick={handleDeleteAccount}
-                            disabled={deleteConfirmText !== 'EXCLUIR' || deleting}
-                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                          >
-                            {deleting ? (
-                              <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                            ) : (
-                              <Trash2 className="h-4 w-4 mr-2" />
-                            )}
-                            Excluir permanentemente
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  </CardContent>
-                </Card>
-              )}
             </motion.div>
           </TabsContent>
 
@@ -737,11 +665,84 @@ export default function Profile() {
                           <p className="text-xs text-muted-foreground uppercase tracking-wide">Peso</p>
                           <p className="font-semibold text-lg">{formData.weight ? `${formData.weight} kg` : '-'}</p>
                         </div>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </CardContent>
-              </Card>
+                  </CardContent>
+                </Card>
+
+              {/* Delete Account Section */}
+              {!isAdmin && (
+                <Card className="border-destructive/30 bg-destructive/5 mt-6">
+                  <CardHeader>
+                    <CardTitle className="text-destructive flex items-center gap-2">
+                      <AlertTriangle className="h-5 w-5" />
+                      Zona de Perigo
+                    </CardTitle>
+                    <CardDescription>
+                      Ações irreversíveis para sua conta
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button variant="destructive" className="w-full sm:w-auto">
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Excluir minha conta
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle className="flex items-center gap-2 text-destructive">
+                            <AlertTriangle className="h-5 w-5" />
+                            Excluir conta permanentemente?
+                          </AlertDialogTitle>
+                          <AlertDialogDescription className="space-y-3">
+                            <p>
+                              Esta ação é <strong>irreversível</strong>. Todos os seus dados serão excluídos permanentemente:
+                            </p>
+                            <ul className="list-disc list-inside text-sm space-y-1">
+                              <li>Perfil e informações pessoais</li>
+                              <li>Planos alimentares e histórico</li>
+                              <li>Registros de refeições e adesão</li>
+                              <li>Conversas com o chat nutricional</li>
+                            </ul>
+                            <div className="pt-2">
+                              <Label htmlFor="confirm-delete" className="text-sm font-medium">
+                                Digite <strong>EXCLUIR</strong> para confirmar:
+                              </Label>
+                              <Input
+                                id="confirm-delete"
+                                value={deleteConfirmText}
+                                onChange={(e) => setDeleteConfirmText(e.target.value.toUpperCase())}
+                                placeholder="EXCLUIR"
+                                className="mt-2"
+                              />
+                            </div>
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel onClick={() => setDeleteConfirmText('')}>
+                            Cancelar
+                          </AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={handleDeleteAccount}
+                            disabled={deleteConfirmText !== 'EXCLUIR' || deleting}
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                          >
+                            {deleting ? (
+                              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                            ) : (
+                              <Trash2 className="h-4 w-4 mr-2" />
+                            )}
+                            Excluir permanentemente
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </CardContent>
+                </Card>
+              )}
             </motion.div>
           </TabsContent>
         </Tabs>
