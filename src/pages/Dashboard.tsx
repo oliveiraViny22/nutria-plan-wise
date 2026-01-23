@@ -22,7 +22,6 @@ import {
   Shield,
   HelpCircle,
   Layers,
-  Droplets,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Logo } from '@/components/Logo';
@@ -42,6 +41,7 @@ import { UsageLimits } from '@/components/UsageLimits';
 import { UpgradeDialog } from '@/components/UpgradeDialog';
 import { AdherenceWidget } from '@/components/AdherenceWidget';
 import { GoalsProjectionCard } from '@/components/GoalsProjectionCard';
+import { HydrationTipCard } from '@/components/HydrationTipCard';
 import { OnboardingTutorial } from '@/components/OnboardingTutorial';
 import { useTutorial } from '@/hooks/useTutorial';
 import { useAuth } from '@/contexts/AuthContext';
@@ -367,26 +367,10 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Goals Projection Card - Now directly below stats */}
-          <GoalsProjectionCard />
-
-          {/* Hydration Tip */}
-          <div className="relative overflow-hidden rounded-xl sm:rounded-2xl bg-gradient-to-br from-blue-500/10 via-cyan-500/5 to-blue-600/10 border border-blue-500/20 p-4 sm:p-5">
-            <div className="absolute top-0 right-0 w-24 h-24 bg-blue-500/10 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2" />
-            <div className="relative flex items-center gap-3 sm:gap-4">
-              <div className="flex-shrink-0 w-12 h-12 sm:w-14 sm:h-14 rounded-xl bg-blue-500/20 flex items-center justify-center">
-                <Droplets className="w-6 h-6 sm:w-7 sm:h-7 text-blue-500" />
-              </div>
-              <div className="text-left">
-                <p className="text-xs sm:text-sm font-semibold text-blue-500 mb-0.5">Dica de Saúde</p>
-                <p className="text-sm sm:text-base text-foreground font-medium">
-                  Beba pelo menos <span className="text-blue-500 font-bold">2 litros</span> de água por dia
-                </p>
-                <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5">
-                  A hidratação adequada melhora seu metabolismo e resultados
-                </p>
-              </div>
-            </div>
+          {/* Goals Projection + Hydration Tip - Side by Side */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <GoalsProjectionCard />
+            <HydrationTipCard />
           </div>
         </motion.section>
 
