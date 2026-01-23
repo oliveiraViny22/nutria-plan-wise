@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { Plus, Trash2, Save, Loader2, Clock, Settings2 } from 'lucide-react';
+import { Plus, Trash2, Save, Loader2, Clock, Settings2, AlertCircle, Wand2, Info } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -38,15 +38,41 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useObjectiveChangePolicies, ObjectiveChangePolicy } from '@/hooks/useObjectiveChangePolicies';
+import { toast } from 'sonner';
 
 const PROFILE_TYPES = [
-  { value: 'plano_pessoal_pago', label: 'Plano Pessoal Pago' },
-  { value: 'profissional', label: 'Profissional' },
+  { value: 'gratuito', label: 'Gratuito', description: 'Usuários sem assinatura ativa' },
+  { value: 'plano_pessoal_pago', label: 'Plano Pessoal Pago', description: 'Assinantes do plano pessoal' },
+  { value: 'profissional', label: 'Profissional', description: 'Nutricionistas e profissionais' },
+  { value: 'aluno_vinculado', label: 'Aluno Vinculado', description: 'Alunos sob gestão de profissional' },
 ];
 
+const DEFAULT_COOLDOWNS: Record<string, Array<{ changeNumber: number; days: number }>> = {
+  gratuito: [
+    { changeNumber: 1, days: 30 },
+    { changeNumber: 2, days: 60 },
+    { changeNumber: 3, days: 90 },
+  ],
+  plano_pessoal_pago: [
+    { changeNumber: 1, days: 14 },
+    { changeNumber: 2, days: 30 },
+    { changeNumber: 3, days: 60 },
+    { changeNumber: 4, days: 90 },
+  ],
+  profissional: [
+    { changeNumber: 1, days: 7 },
+    { changeNumber: 2, days: 14 },
+    { changeNumber: 3, days: 30 },
+    { changeNumber: 4, days: 60 },
+  ],
+  aluno_vinculado: [], // Alunos não podem alterar diretamente, precisam solicitar
+};
+
 export function ObjectiveChangePoliciesManager() {
-  const { loading, policies, createPolicy, updatePolicy, deletePolicy } = useObjectiveChangePolicies();
+  const { loading, policies, createPolicy, updatePolicy, deletePolicy, fetchPolicies } = useObjectiveChangePolicies();
   
   const [newPolicy, setNewPolicy] = useState({
     profileType: '',
@@ -56,9 +82,30 @@ export function ObjectiveChangePoliciesManager() {
   
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState<number>(0);
+  const [seedingDefaults, setSeedingDefaults] = useState(false);
+
+  // Verificar se já existe essa combinação de perfil + nº de alteração
+  const isDuplicate = useMemo(() => {
+    if (!newPolicy.profileType) return false;
+    return policies.some(
+      p => p.profile_type === newPolicy.profileType && p.change_number === newPolicy.changeNumber
+    );
+  }, [policies, newPolicy.profileType, newPolicy.changeNumber]);
+
+  // Perfis que ainda não têm nenhuma política configurada
+  const missingProfiles = useMemo(() => {
+    const configuredProfiles = new Set(policies.map(p => p.profile_type));
+    return PROFILE_TYPES.filter(
+      pt => !configuredProfiles.has(pt.value) && DEFAULT_COOLDOWNS[pt.value]?.length > 0
+    );
+  }, [policies]);
 
   const handleCreate = async () => {
     if (!newPolicy.profileType) return;
+    if (isDuplicate) {
+      toast.error('Já existe uma política para este perfil e número de alteração');
+      return;
+    }
     
     const success = await createPolicy(
       newPolicy.profileType,
@@ -69,6 +116,34 @@ export function ObjectiveChangePoliciesManager() {
     if (success) {
       setNewPolicy({ profileType: '', changeNumber: 1, cooldownDays: 30 });
     }
+  };
+
+  const handleSeedDefaults = async (profileType: string) => {
+    setSeedingDefaults(true);
+    const defaults = DEFAULT_COOLDOWNS[profileType];
+    if (!defaults?.length) {
+      toast.info('Este perfil não possui políticas padrão');
+      setSeedingDefaults(false);
+      return;
+    }
+
+    let successCount = 0;
+    for (const rule of defaults) {
+      const exists = policies.some(
+        p => p.profile_type === profileType && p.change_number === rule.changeNumber
+      );
+      if (!exists) {
+        const success = await createPolicy(profileType, rule.changeNumber, rule.days);
+        if (success) successCount++;
+      }
+    }
+
+    if (successCount > 0) {
+      toast.success(`${successCount} regra(s) padrão criada(s) para ${getProfileLabel(profileType)}`);
+    } else {
+      toast.info('Todas as regras padrão já existem');
+    }
+    setSeedingDefaults(false);
   };
 
   const handleSaveEdit = async (id: string) => {
@@ -83,6 +158,10 @@ export function ObjectiveChangePoliciesManager() {
 
   const getProfileLabel = (type: string) => {
     return PROFILE_TYPES.find(p => p.value === type)?.label || type;
+  };
+
+  const getProfileDescription = (type: string) => {
+    return PROFILE_TYPES.find(p => p.value === type)?.description || '';
   };
 
   // Agrupar políticas por perfil
@@ -107,7 +186,18 @@ export function ObjectiveChangePoliciesManager() {
             Defina regras de cooldown progressivo por perfil de usuário
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
+          {/* Alerta de duplicata */}
+          {isDuplicate && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                Já existe uma regra para a {newPolicy.changeNumber}ª alteração do perfil "{getProfileLabel(newPolicy.profileType)}". 
+                Edite a regra existente ou escolha outro número de alteração.
+              </AlertDescription>
+            </Alert>
+          )}
+
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="space-y-2">
               <Label>Tipo de Perfil</Label>
@@ -121,7 +211,10 @@ export function ObjectiveChangePoliciesManager() {
                 <SelectContent>
                   {PROFILE_TYPES.map((type) => (
                     <SelectItem key={type.value} value={type.value}>
-                      {type.label}
+                      <div className="flex flex-col">
+                        <span>{type.label}</span>
+                        <span className="text-xs text-muted-foreground">{type.description}</span>
+                      </div>
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -151,7 +244,7 @@ export function ObjectiveChangePoliciesManager() {
             <div className="flex items-end">
               <Button
                 onClick={handleCreate}
-                disabled={loading || !newPolicy.profileType}
+                disabled={loading || !newPolicy.profileType || isDuplicate}
                 className="w-full"
               >
                 {loading ? (
@@ -165,8 +258,47 @@ export function ObjectiveChangePoliciesManager() {
               </Button>
             </div>
           </div>
+
+          {/* Botões para aplicar regras padrão */}
+          {missingProfiles.length > 0 && (
+            <div className="pt-4 border-t">
+              <p className="text-sm text-muted-foreground mb-3">
+                <Wand2 className="h-4 w-4 inline mr-1" />
+                Aplicar regras padrão para perfis não configurados:
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {missingProfiles.map((profile) => (
+                  <Button
+                    key={profile.value}
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleSeedDefaults(profile.value)}
+                    disabled={seedingDefaults}
+                  >
+                    {seedingDefaults ? (
+                      <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                    ) : (
+                      <Plus className="h-3 w-3 mr-1" />
+                    )}
+                    {profile.label}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
+
+      {/* Alerta para aluno vinculado */}
+      {groupedPolicies['aluno_vinculado']?.length > 0 && (
+        <Alert>
+          <Info className="h-4 w-4" />
+          <AlertDescription>
+            Alunos vinculados a profissionais não podem alterar objetivo diretamente. 
+            Eles devem solicitar a alteração ao profissional responsável via sistema de solicitações.
+          </AlertDescription>
+        </Alert>
+      )}
 
       {/* Políticas existentes por perfil */}
       {Object.entries(groupedPolicies).map(([profileType, profilePolicies]) => (
