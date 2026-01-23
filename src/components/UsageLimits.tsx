@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { Check, X, AlertTriangle } from 'lucide-react';
+import { Check, X, AlertTriangle, Activity, Package } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
@@ -27,7 +27,8 @@ export function UsageLimits() {
   // Só exibe opções de refeição se o limite for maior que 1 (planos pagos permitem escolher entre opções)
   const showMealOptions = !isFreePlan && effectiveMealOptionsLimit > 1;
 
-  const limits = [
+  // Usage items (counters)
+  const usageItems = [
     {
       name: 'Dietas',
       used: usage?.diets_used || 0,
@@ -46,24 +47,25 @@ export function UsageLimits() {
       limit: currentPlan.adjustment_limit,
       key: 'adjustment',
     },
-    // Só mostra opções por refeição para planos pagos com mais de 1 opção
-    ...(showMealOptions ? [{
-      name: 'Opções por refeição',
-      used: effectiveMealOptionsLimit,
-      limit: effectiveMealOptionsLimit,
-      key: 'meal_options',
-      isStatic: true, // Não é um contador de uso, é um limite configurado
-    }] : []),
   ];
 
   if (currentPlan.has_chat) {
-    limits.push({
+    usageItems.push({
       name: 'Mensagens (hoje)',
       used: usage?.chat_messages_today || 0,
       limit: currentPlan.chat_messages_per_day,
       key: 'chat',
     });
   }
+
+  // Features/resources included
+  const features = [
+    { name: 'Chat com IA', available: currentPlan.has_chat },
+    ...(showMealOptions ? [{ 
+      name: `${effectiveMealOptionsLimit} opções por refeição`, 
+      available: true 
+    }] : []),
+  ];
 
   const getPercentage = (used: number, limit: number) => {
     if (limit === 0) return 0;
@@ -83,83 +85,113 @@ export function UsageLimits() {
   };
 
   return (
-    <Card>
-      <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-lg">Uso do Plano</CardTitle>
-          <Badge variant="outline" className="capitalize">
-            {currentPlan.name}
-          </Badge>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {limits.map((item) => {
-          const isStatic = 'isStatic' in item && item.isStatic;
-          const percentage = isStatic ? 100 : getPercentage(item.used, item.limit);
-          const isAtLimit = !isStatic && percentage >= 100;
-          const isNearLimit = !isStatic && percentage >= 80;
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {/* Uso do Período */}
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Activity className="h-4 w-4 text-primary" />
+              <CardTitle className="text-lg">Uso do Período</CardTitle>
+            </div>
+            <Badge variant="outline" className="capitalize">
+              {currentPlan.name}
+            </Badge>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {usageItems.map((item) => {
+            const percentage = getPercentage(item.used, item.limit);
+            const isAtLimit = percentage >= 100;
+            const isNearLimit = percentage >= 80;
 
-          return (
-            <motion.div
-              key={item.key}
-              initial={{ opacity: 0, x: -10 }}
-              animate={{ opacity: 1, x: 0 }}
-              className="space-y-2"
-            >
-              <div className="flex items-center justify-between text-sm">
-                <span className="flex items-center gap-2">
-                  {item.name}
-                  {isAtLimit && (
-                    <X className="h-3 w-3 text-destructive" />
-                  )}
-                  {isNearLimit && !isAtLimit && (
-                    <AlertTriangle className="h-3 w-3 text-yellow-500" />
-                  )}
-                </span>
-                <span className={isStatic ? 'text-primary' : getStatusColor(percentage)}>
-                  {isStatic ? item.limit : `${item.used}/${item.limit}`}
-                </span>
-              </div>
-              {!isStatic && (
+            return (
+              <motion.div
+                key={item.key}
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                className="space-y-2"
+              >
+                <div className="flex items-center justify-between text-sm">
+                  <span className="flex items-center gap-2">
+                    {item.name}
+                    {isAtLimit && (
+                      <X className="h-3 w-3 text-destructive" />
+                    )}
+                    {isNearLimit && !isAtLimit && (
+                      <AlertTriangle className="h-3 w-3 text-yellow-500" />
+                    )}
+                  </span>
+                  <span className={getStatusColor(percentage)}>
+                    {item.used}/{item.limit}
+                  </span>
+                </div>
                 <Progress 
                   value={percentage} 
                   className={`h-2 ${getProgressColor(percentage)}`}
                 />
+              </motion.div>
+            );
+          })}
+
+          {subscriptionInfo?.subscription?.cancelAtPeriodEnd && (
+            <div className="pt-3 border-t">
+              <p className="text-sm text-yellow-600 flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4" />
+                Assinatura será cancelada em {subscriptionInfo.subscription.periodEnd}
+              </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Recursos Inclusos */}
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex items-center gap-2">
+            <Package className="h-4 w-4 text-primary" />
+            <CardTitle className="text-lg">Recursos Inclusos</CardTitle>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {features.map((feature, index) => (
+            <motion.div
+              key={index}
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
+              className="flex items-center justify-between text-sm"
+            >
+              <span>{feature.name}</span>
+              {feature.available ? (
+                <Check className="h-4 w-4 text-green-500" />
+              ) : (
+                <X className="h-4 w-4 text-muted-foreground" />
               )}
             </motion.div>
-          );
-        })}
+          ))}
 
-        {!currentPlan.has_chat && (
-          <div className="flex items-center justify-between text-sm text-muted-foreground pt-2 border-t">
-            <span>Chat com IA</span>
-            <Badge variant="secondary">Não disponível</Badge>
-          </div>
-        )}
+          {!currentPlan.has_chat && (
+            <div className="flex items-center justify-between text-sm text-muted-foreground">
+              <span>Chat com IA</span>
+              <Badge variant="secondary" className="text-xs">Indisponível</Badge>
+            </div>
+          )}
 
-        {subscriptionInfo?.subscription?.cancelAtPeriodEnd && (
-          <div className="pt-3 border-t">
-            <p className="text-sm text-yellow-600 flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4" />
-              Assinatura será cancelada em {subscriptionInfo.subscription.periodEnd}
-            </p>
-          </div>
-        )}
-
-        {/* Não mostra botão para profissionais ou alunos vinculados */}
-        {!isProfessional && !isLinkedToProfessional && (
-          <div className="pt-3">
-            <Button 
-              variant="outline" 
-              size="sm" 
-              className="w-full"
-              onClick={() => navigate('/pricing')}
-            >
-              {currentPlan.name === 'gratuito' ? 'Fazer Upgrade' : 'Gerenciar Plano'}
-            </Button>
-          </div>
-        )}
-      </CardContent>
-    </Card>
+          {/* Não mostra botão para profissionais ou alunos vinculados */}
+          {!isProfessional && !isLinkedToProfessional && (
+            <div className="pt-3 border-t">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="w-full"
+                onClick={() => navigate('/pricing')}
+              >
+                {currentPlan.name === 'gratuito' ? 'Fazer Upgrade' : 'Gerenciar Plano'}
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
   );
 }
