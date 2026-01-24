@@ -451,9 +451,25 @@ function applyUnitConversion(food: Food, quantityGrams: number): FoodWithDisplay
 
 function fetchEligibleFoods(
   allFoods: Food[],
-  restrictions: string[]
+  restrictions: string[],
+  avoidedFoods: string[] = [] // NOVO: Lista de alimentos evitados pelo usuário
 ): Food[] {
+  // Criar set de alimentos evitados para lookup O(1)
+  const avoidedSet = new Set(avoidedFoods.map(f => f.toLowerCase().trim()));
+  
   return allFoods.filter((f: Food) => {
+    const foodName = f.name.toLowerCase();
+    
+    // REGRA ABSOLUTA: Alimentos evitados NUNCA entram no plano
+    // Checagem por nome exato ou substring
+    if (avoidedSet.size > 0) {
+      for (const avoided of avoidedSet) {
+        if (foodName === avoided || foodName.includes(avoided)) {
+          return false;
+        }
+      }
+    }
+    
     // 1. Status deve ser approved ou active
     const status = (f.status || '').toLowerCase();
     if (status !== 'approved' && status !== 'active' && status !== '') {
@@ -472,7 +488,6 @@ function fetchEligibleFoods(
     }
     
     // 4. Aplicar restrições do usuário
-    const foodName = f.name.toLowerCase();
     const isRestricted = restrictions.some(r => {
       const restriction = r.toLowerCase();
       if (restriction.includes('lactose') && category === 'laticinios') return true;
@@ -560,13 +575,17 @@ function findCompatibleProteinSource(
   mealType: MealType,
   usedIds: Set<string>,
   preferences: string[],
-  preferLean: boolean = true // G0.1 FIX: Default agora é TRUE
+  preferLean: boolean = true, // G0.1 FIX: Default agora é TRUE
+  preferredFoods: string[] = [] // NOVO: Alimentos específicos preferidos pelo usuário
 ): Food | null {
   const context = MEAL_CONTEXT_RULES_V2[mealType];
   if (!context) return null;
   
   // G0.1 FIX: Limites de gordura para proteínas "magras"
   const MAX_FAT_PER_100G_LEAN = 8; // máx 8g gordura por 100g para ser considerada magra
+  
+  // Set de alimentos preferidos para lookup O(1)
+  const preferredSet = new Set(preferredFoods.map(f => f.toLowerCase().trim()));
   
   // Primeiro, buscar proteínas da categoria correta que não estão bloqueadas
   let candidates = foods.filter(f => {
@@ -626,7 +645,26 @@ function findCompatibleProteinSource(
     }
   }
   
-  // Priorizar preferências do usuário (mas apenas entre os candidatos magros)
+  // PRIORIDADE 1: Alimentos ESPECÍFICOS preferidos pelo usuário (maior prioridade)
+  if (preferredSet.size > 0) {
+    const userPreferred = candidates.filter(f => {
+      const foodName = f.name.toLowerCase();
+      for (const pref of preferredSet) {
+        if (foodName.includes(pref)) return true;
+      }
+      return false;
+    });
+    if (userPreferred.length > 0) {
+      logStep("Using user-preferred protein", { 
+        mealType, 
+        selected: userPreferred[0].name,
+        matchedFromPreferredFoods: true
+      });
+      return userPreferred[Math.floor(Math.random() * userPreferred.length)];
+    }
+  }
+  
+  // PRIORIDADE 2: Preferências gerais de dieta (ex: "Proteína Alta")
   const preferred = candidates.filter(f => 
     preferences.some(p => f.name.toLowerCase().includes(p.toLowerCase()))
   );
@@ -640,8 +678,12 @@ function pickFoodFromCategory(
   category: FoodCategory,
   usedIds: Set<string>,
   preferences: string[],
-  mealType: MealType
+  mealType: MealType,
+  preferredFoods: string[] = [] // NOVO: Alimentos específicos preferidos pelo usuário
 ): Food | null {
+  // Set de alimentos preferidos para lookup O(1)
+  const preferredSet = new Set(preferredFoods.map(f => f.toLowerCase().trim()));
+  
   // Filtrar por categoria e aplicar regras de contexto
   let candidates = foods.filter(f => {
     const cat = (f.category || '').toLowerCase();
@@ -662,7 +704,21 @@ function pickFoodFromCategory(
     candidates = contextFiltered;
   }
   
-  // Priorizar preferências do usuário (nunca quebrar regras estruturais)
+  // PRIORIDADE 1: Alimentos ESPECÍFICOS preferidos pelo usuário (maior prioridade)
+  if (preferredSet.size > 0) {
+    const userPreferred = candidates.filter(f => {
+      const foodName = f.name.toLowerCase();
+      for (const pref of preferredSet) {
+        if (foodName.includes(pref)) return true;
+      }
+      return false;
+    });
+    if (userPreferred.length > 0) {
+      return userPreferred[Math.floor(Math.random() * userPreferred.length)];
+    }
+  }
+  
+  // PRIORIDADE 2: Preferências gerais de dieta (ex: "Low Carb")
   const preferred = candidates.filter(f => 
     preferences.some(p => f.name.toLowerCase().includes(p.toLowerCase()))
   );
@@ -755,10 +811,14 @@ function findBaseCarbSource(
   mealType: MealType,
   usedIds: Set<string>,
   preferences: string[],
-  preferLowFat: boolean = true // G0.1 FIX: Preferir carbs com baixa gordura
+  preferLowFat: boolean = true, // G0.1 FIX: Preferir carbs com baixa gordura
+  preferredFoods: string[] = [] // NOVO: Alimentos específicos preferidos pelo usuário
 ): Food | null {
   const MIN_CARB_DENSITY = 15; // mínimo de 15g carbs por 100g
   const MAX_FAT_FOR_CARB = 5; // G0.1 FIX: máximo de 5g gordura por 100g para carbs ideais
+  
+  // Set de alimentos preferidos para lookup O(1)
+  const preferredSet = new Set(preferredFoods.map(f => f.toLowerCase().trim()));
   
   // Primeiro: carboidratos da categoria específica com boa densidade
   let candidates = foods.filter(f => {
@@ -808,7 +868,26 @@ function findBaseCarbSource(
     return b.carbs - a.carbs;
   });
   
-  // Priorizar preferências entre os top candidatos
+  // PRIORIDADE 1: Alimentos ESPECÍFICOS preferidos pelo usuário (maior prioridade)
+  if (preferredSet.size > 0) {
+    const userPreferred = candidates.filter(f => {
+      const foodName = f.name.toLowerCase();
+      for (const pref of preferredSet) {
+        if (foodName.includes(pref)) return true;
+      }
+      return false;
+    });
+    if (userPreferred.length > 0) {
+      logStep("Using user-preferred carb source", { 
+        mealType, 
+        selected: userPreferred[0].name,
+        matchedFromPreferredFoods: true
+      });
+      return userPreferred[Math.floor(Math.random() * userPreferred.length)];
+    }
+  }
+  
+  // PRIORIDADE 2: Preferências gerais entre os top candidatos
   const topCandidates = candidates.slice(0, Math.min(10, candidates.length));
   const preferred = topCandidates.filter(f => 
     preferences.some(p => f.name.toLowerCase().includes(p.toLowerCase()))
@@ -824,7 +903,8 @@ function buildMealOption(
   targetMacro: MealMacroDistribution,
   preferences: string[],
   usedFoodIds: Set<string>,
-  optionNumber: number
+  optionNumber: number,
+  preferredFoods: string[] = [] // NOVO: Alimentos específicos preferidos pelo usuário
 ): MealBuildResult {
   const context = MEAL_CONTEXT_RULES_V2[mealType];
   const categoryPriorities = MEAL_CATEGORY_PRIORITIES[mealType] || 
@@ -1430,6 +1510,14 @@ serve(async (req) => {
       ? (profileData.restrictions as unknown[]).filter(validate.isString).slice(0, 20) as string[]
       : [];
     
+    // NOVO: Alimentos específicos preferidos e evitados (v2.2)
+    const preferredFoods = validate.isArray(profileData.preferred_foods)
+      ? (profileData.preferred_foods as unknown[]).filter(validate.isString).slice(0, 30) as string[]
+      : [];
+    const avoidedFoods = validate.isArray(profileData.avoided_foods)
+      ? (profileData.avoided_foods as unknown[]).filter(validate.isString).slice(0, 30) as string[]
+      : [];
+    
     const prefValidation = assertValidPreferences(preferences, restrictions);
     if (!prefValidation.valid) {
       logStep("Invalid preferences", { error: prefValidation.error });
@@ -1443,7 +1531,14 @@ serve(async (req) => {
       ? studentId as string
       : null;
     
-    logStep("Input validated", { calories: targets.calories, mealsPerDay, goal, studentId: validStudentId });
+    logStep("Input validated", { 
+      calories: targets.calories, 
+      mealsPerDay, 
+      goal, 
+      studentId: validStudentId,
+      preferredFoodsCount: preferredFoods.length,
+      avoidedFoodsCount: avoidedFoods.length,
+    });
     
     // ============================================================
     // AUTENTICAÇÃO E PERMISSÕES
@@ -1546,11 +1641,12 @@ serve(async (req) => {
       return createErrorResponse(CLIENT_ERRORS.SERVER_ERROR, 500, corsHeaders);
     }
     
-    const eligibleFoods = fetchEligibleFoods(allFoods as Food[], restrictions);
+    const eligibleFoods = fetchEligibleFoods(allFoods as Food[], restrictions, avoidedFoods);
     
     logStep("Eligible foods filtered", { 
       total: allFoods.length, 
       eligible: eligibleFoods.length,
+      avoidedFoodsApplied: avoidedFoods.length,
     });
     
     if (eligibleFoods.length < 10) {

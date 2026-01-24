@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, ArrowRight, Check, Loader2, Utensils } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, Loader2, Utensils, Heart, Ban } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -13,6 +13,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { OnboardingTutorial } from '@/components/OnboardingTutorial';
 import { useTutorial } from '@/hooks/useTutorial';
+import { FoodSearchSelect } from '@/components/FoodSearchSelect';
 import {
   ACTIVITY_LEVELS,
   GOALS,
@@ -25,6 +26,7 @@ const steps = [
   { id: 2, title: 'Objetivo', description: 'Sua meta principal' },
   { id: 3, title: 'Refeições', description: 'Quantas refeições por dia' },
   { id: 4, title: 'Preferências', description: 'Alimentação e restrições' },
+  { id: 5, title: 'Alimentos', description: 'O que você gosta e não gosta' },
 ];
 
 const MEALS_OPTIONS = [
@@ -54,6 +56,8 @@ export default function Onboarding() {
     meals_per_day: 4,
     preferences: [] as string[],
     restrictions: [] as string[],
+    preferred_foods: [] as string[], // Alimentos preferidos específicos
+    avoided_foods: [] as string[],   // Alimentos evitados específicos
   });
 
   const calculateTargets = () => {
@@ -124,6 +128,8 @@ export default function Onboarding() {
           meals_per_day: formData.meals_per_day,
           preferences: formData.preferences,
           restrictions: formData.restrictions,
+          preferred_foods: formData.preferred_foods,
+          avoided_foods: formData.avoided_foods,
           daily_calories: targets.calories,
           protein_target: targets.protein,
           carbs_target: targets.carbs,
@@ -478,6 +484,56 @@ export default function Onboarding() {
                         </button>
                       ))}
                     </div>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
+            {currentStep === 5 && (
+              <motion.div
+                key="step5"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                className="card-elevated rounded-xl sm:rounded-2xl p-4 sm:p-6 md:p-8"
+              >
+                <div className="space-y-6 sm:space-y-8">
+                  {/* Alimentos Preferidos */}
+                  <div className="space-y-3 sm:space-y-4">
+                    <div className="flex items-center gap-2">
+                      <Heart className="w-5 h-5 text-green-500" />
+                      <Label className="text-sm font-medium">Alimentos que você gosta</Label>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Esses alimentos serão priorizados no seu plano alimentar
+                    </p>
+                    <FoodSearchSelect
+                      selectedFoods={formData.preferred_foods}
+                      onSelect={(foods) => setFormData(prev => ({ ...prev, preferred_foods: foods }))}
+                      placeholder="Buscar alimento preferido..."
+                      excludeFoods={formData.avoided_foods}
+                      variant="preferred"
+                      maxSelections={30}
+                    />
+                  </div>
+
+                  {/* Alimentos Evitados */}
+                  <div className="space-y-3 sm:space-y-4">
+                    <div className="flex items-center gap-2">
+                      <Ban className="w-5 h-5 text-destructive" />
+                      <Label className="text-sm font-medium">Alimentos que você NÃO quer</Label>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Esses alimentos NUNCA aparecerão no seu plano, opções ou substituições
+                    </p>
+                    <FoodSearchSelect
+                      selectedFoods={formData.avoided_foods}
+                      onSelect={(foods) => setFormData(prev => ({ ...prev, avoided_foods: foods }))}
+                      placeholder="Buscar alimento para evitar..."
+                      excludeFoods={formData.preferred_foods}
+                      variant="avoided"
+                      maxSelections={30}
+                    />
                   </div>
                 </div>
               </motion.div>
