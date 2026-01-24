@@ -642,20 +642,25 @@ function calculateDefaultPortion(
   targetMacro: MealMacroDistribution,
   currentMealCalories: number = 0  // Calorias já acumuladas na refeição
 ): number {
-  // G0.2: Porções padrão mais conservadoras para evitar excesso
-  const defaultPortions: Record<string, number> = {
-    proteinas: 100,      // Reduzido de 120
-    carboidratos: 120,   // Reduzido de 150
-    gorduras: 12,        // Reduzido de 15
-    vegetais: 80,        // Reduzido de 100
-    frutas: 100,         // Reduzido de 120
-    laticinios: 150,     // Reduzido de 200
-    leguminosas: 80,     // Reduzido de 100
-    mistos: 100,         // Reduzido de 150
+  // Escalar porções baseado na meta calórica da refeição
+  // Para metas altas (>500 kcal por refeição), usar porções maiores
+  const calorieScale = Math.max(1, targetMacro.calories / 400);
+  
+  // Porções base que serão escaladas
+  const basePortions: Record<string, number> = {
+    proteinas: 110,
+    carboidratos: 130,
+    gorduras: 12,
+    vegetais: 90,
+    frutas: 110,
+    laticinios: 160,
+    leguminosas: 90,
+    mistos: 110,
   };
   
   const category = (food.category || '').toLowerCase();
-  let portion = defaultPortions[category] || 80;
+  // Escalar porção base (máximo 1.5x para evitar excessos)
+  let portion = Math.round(basePortions[category] * Math.min(1.5, calorieScale)) || 90;
   
   const foodCalPerGram = food.calories > 0 ? food.calories / 100 : 1;
   
@@ -665,13 +670,14 @@ function calculateDefaultPortion(
     ? (remainingCalories / foodCalPerGram) * 100 
     : portion;
   
-  // Usar 20% das calorias restantes da refeição (mais conservador que 25%)
-  const targetCalsForThis = Math.min(targetMacro.calories * 0.20, remainingCalories * 0.5);
+  // Usar 25% das calorias restantes para dar mais margem
+  const targetCalsForThis = Math.min(targetMacro.calories * 0.25, remainingCalories * 0.6);
   const suggestedPortion = targetCalsForThis / foodCalPerGram;
   
-  // G0.2: Limitar mais agressivamente para evitar estourar calorias
+  // Limites mais generosos para metas calóricas altas
+  const maxPortion = targetMacro.calories > 700 ? 450 : 350;
   portion = Math.round(Math.min(suggestedPortion, portion, maxPortionByCalories) / 10) * 10;
-  portion = Math.min(350, Math.max(20, portion));  // Limite máximo reduzido de 500 para 350
+  portion = Math.min(maxPortion, Math.max(30, portion));
   
   return portion;
 }
@@ -813,15 +819,18 @@ function buildMealOption(
       const targetCarbsForMeal = targetMacro.carbs;
       
       // Calcular calorias restantes disponíveis (deixando espaço para vegetais)
-      const remainingCalories = targetMacro.calories - totalCalories - 50; // Reserva 50 cal para vegetais
+      const remainingCalories = targetMacro.calories - totalCalories - 40; // Reserva 40 cal para vegetais
       const maxPortionByCalories = remainingCalories > 0 ? remainingCalories / carbCalPerGram : 100;
       
-      // Tentar cobrir 60% dos carbs da refeição (reduzido de 75%)
-      const carbCoverageTarget = targetCarbsForMeal * 0.60;
-      const suggestedPortion = carbsPerGram > 0 ? (carbCoverageTarget / carbsPerGram) * 100 : 120;
+      // Escalar cobertura de carbs baseado na meta calórica
+      // Metas altas (>700 kcal) precisam de mais carbs por refeição
+      const carbCoveragePercent = targetMacro.calories > 700 ? 0.75 : 0.65;
+      const carbCoverageTarget = targetCarbsForMeal * carbCoveragePercent;
+      const suggestedPortion = carbsPerGram > 0 ? (carbCoverageTarget / carbsPerGram) * 100 : 140;
       
-      // G0: Limite mais conservador de 280g (reduzido de 400g)
-      const carbPortion = Math.min(280, maxPortionByCalories, Math.max(60, Math.round(suggestedPortion / 10) * 10));
+      // Limites escalados: metas altas permitem porções maiores
+      const maxCarbPortion = targetMacro.calories > 900 ? 400 : (targetMacro.calories > 600 ? 350 : 280);
+      const carbPortion = Math.min(maxCarbPortion, maxPortionByCalories, Math.max(80, Math.round(suggestedPortion / 10) * 10));
       
       const carbConverted = applyUnitConversion(baseCarbSource, carbPortion);
       
