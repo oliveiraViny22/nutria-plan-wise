@@ -1441,12 +1441,12 @@ function isBaseCarbSource(food: Food): boolean {
 }
 
 /**
- * REGRA G7.1: Valida que carboidratos totais ≥ 90% da meta
+ * REGRA G7.1: Valida que carboidratos totais ≥ 90% E ≤ 120% da meta
  */
 function validateCarbsThreshold(
   meals: Array<{ name: string; mealType: MealType; options: MealOption[] }>,
   targets: MacroTargets
-): { valid: boolean; error?: string; totalCarbs: number; minRequired: number } {
+): { valid: boolean; error?: string; totalCarbs: number; minRequired: number; maxAllowed: number } {
   // Calcula total de carbs considerando apenas opção principal (option_number = 1)
   const totalCarbs = meals.reduce((sum, meal) => {
     const primaryOption = meal.options.find(o => o.option_number === 1);
@@ -1454,6 +1454,7 @@ function validateCarbsThreshold(
   }, 0);
   
   const minRequired = targets.carbs * 0.90; // 90% da meta
+  const maxAllowed = targets.carbs * 1.20;  // 120% da meta (limite superior)
   
   if (totalCarbs < minRequired) {
     return {
@@ -1461,10 +1462,22 @@ function validateCarbsThreshold(
       error: `[G7] Carboidratos insuficientes: ${Math.round(totalCarbs)}g gerado, mínimo ${Math.round(minRequired)}g (90% de ${targets.carbs}g)`,
       totalCarbs,
       minRequired,
+      maxAllowed,
     };
   }
   
-  return { valid: true, totalCarbs, minRequired };
+  // NOVA VALIDAÇÃO: Excesso de carboidrato também é erro
+  if (totalCarbs > maxAllowed) {
+    return {
+      valid: false,
+      error: `[G7] Carboidratos em excesso: ${Math.round(totalCarbs)}g gerado (${Math.round(totalCarbs/targets.carbs*100)}%), máximo ${Math.round(maxAllowed)}g (120% de ${targets.carbs}g)`,
+      totalCarbs,
+      minRequired,
+      maxAllowed,
+    };
+  }
+  
+  return { valid: true, totalCarbs, minRequired, maxAllowed };
 }
 
 /**
@@ -1572,12 +1585,16 @@ function validatePlan(
     }
   }
   
-  // 4. Proteína total (apenas warning, G0 já valida calorias)
+  // 4. Proteína total - REGRA BLOQUEANTE: mínimo 80% da meta
   const totalProtein = meals.reduce((sum, m) => sum + (m.options[0]?.total_protein || 0), 0);
-  const proteinError = Math.abs(totalProtein - targets.protein) / targets.protein;
+  const proteinPercent = (totalProtein / targets.protein) * 100;
   
-  if (proteinError > 0.20) {
-    warnings.push(`Proteína total (${Math.round(totalProtein)}g) difere ${Math.round(proteinError * 100)}% da meta (${targets.protein}g)`);
+  // BLOQUEANTE: Proteína abaixo de 80% da meta é ERRO (não apenas warning)
+  if (proteinPercent < 80) {
+    errors.push(`Proteína insuficiente: ${Math.round(totalProtein)}g (${Math.round(proteinPercent)}% da meta de ${targets.protein}g, mínimo: 80%)`);
+  } else if (proteinPercent < 95) {
+    // Warning para proteína entre 80-95%
+    warnings.push(`Proteína abaixo do ideal: ${Math.round(totalProtein)}g (${Math.round(proteinPercent)}% da meta de ${targets.protein}g)`);
   }
   
   // 5. Verificar categorias canônicas
