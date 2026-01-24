@@ -10,6 +10,8 @@
 // 2. Alimentos bloqueados por contexto NUNCA entram
 // 3. Proteína distribuída equilibradamente (mínimo por refeição)
 // 4. Se regras não forem atendidas, plano NÃO é gerado
+// 5. [G7] Carboidratos totais ≥ 90% da meta (validação pré-save)
+// 6. [G7] Refeições principais devem ter fonte de carb base (não apenas frutas)
 // ============================================================
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
@@ -656,17 +658,58 @@ function calculateDefaultPortion(food: Food, targetMacro: MealMacroDistribution)
 }
 
 // ============================================================
-// MONTAGEM DA REFEIÇÃO (REGRAS ESTRUTURAIS v2)
+// MONTAGEM DA REFEIÇÃO (REGRAS ESTRUTURAIS v2 + G7)
 // ============================================================
 // REGRA 1: TODA refeição DEVE ter fonte de proteína compatível
 // REGRA 2: Proteína deve atingir mínimo definido para o tipo
 // REGRA 3: Se não for possível, retornar FALHA (não gerar plano)
+// REGRA G7: Refeições principais DEVEM ter fonte de carb base
 // ============================================================
 
 interface MealBuildResult {
   success: boolean;
   option?: MealOption;
   error?: string;
+}
+
+/**
+ * Busca fonte de carboidrato BASE (não fruta) para refeição principal
+ * REGRA G7: Prioriza categoria 'carboidratos' ou 'leguminosas'
+ */
+function findBaseCarbSource(
+  foods: Food[],
+  mealType: MealType,
+  usedIds: Set<string>,
+  preferences: string[]
+): Food | null {
+  // Primeiro: carboidratos da categoria específica
+  let candidates = foods.filter(f => {
+    if (usedIds.has(f.id)) return false;
+    if (isFoodBlockedForMeal(f, mealType)) return false;
+    
+    const category = (f.category || '').toLowerCase();
+    const foodName = f.name.toLowerCase();
+    
+    // Categoria carboidratos ou leguminosas
+    if (category === 'carboidratos') return true;
+    if (category === 'leguminosas') return true;
+    
+    // Verificar keywords de carbs base em outras categorias
+    return BASE_CARB_SOURCES.some(keyword => foodName.includes(keyword));
+  });
+  
+  if (candidates.length === 0) {
+    logStep("Warning: no base carb source found", { mealType });
+    return null;
+  }
+  
+  // Priorizar preferências
+  const preferred = candidates.filter(f => 
+    preferences.some(p => f.name.toLowerCase().includes(p.toLowerCase()))
+  );
+  
+  const pool = preferred.length > 0 ? preferred : candidates;
+  return pool[Math.floor(Math.random() * pool.length)];
 }
 
 function buildMealOption(
@@ -717,10 +760,53 @@ function buildMealOption(
   
   mealFoods.push(proteinConverted);
   
+  // ============================================================
+  // REGRA G7: Para refeições principais, garantir carb base PRIMEIRO
+  // ============================================================
+  const isMainMeal = MAIN_MEALS_REQUIRING_CARBS.includes(mealType);
+  let hasBaseCarb = false;
+  
+  if (isMainMeal) {
+    const baseCarbSource = findBaseCarbSource(foods, mealType, usedFoodIds, preferences);
+    
+    if (baseCarbSource) {
+      usedFoodIds.add(baseCarbSource.id);
+      
+      // Calcular porção de carb baseada na meta da refeição
+      const carbsPerGram = baseCarbSource.carbs / 100;
+      const targetCarbsForMeal = targetMacro.carbs;
+      const suggestedPortion = carbsPerGram > 0 ? (targetCarbsForMeal * 0.6) / carbsPerGram : 150;
+      const carbPortion = Math.min(300, Math.max(50, Math.round(suggestedPortion / 10) * 10));
+      
+      const carbConverted = applyUnitConversion(baseCarbSource, carbPortion);
+      
+      const carbMultiplier = carbConverted.calculated_grams / 100;
+      totalCalories += baseCarbSource.calories * carbMultiplier;
+      totalProtein += baseCarbSource.protein * carbMultiplier;
+      totalCarbs += baseCarbSource.carbs * carbMultiplier;
+      totalFat += baseCarbSource.fat * carbMultiplier;
+      
+      mealFoods.push(carbConverted);
+      hasBaseCarb = true;
+      
+      logStep("G7: Added base carb source", { 
+        mealType, 
+        food: baseCarbSource.name, 
+        portion: carbPortion,
+        carbs: baseCarbSource.carbs * carbMultiplier,
+      });
+    }
+  }
+  
   // Agora adicionar outros alimentos por categoria (exceto proteínas, já adicionada)
   for (const category of categoryPriorities) {
     if (!isValidCategory(category)) continue;
     if (category === 'proteinas') continue; // Já adicionamos
+    
+    // G7: Se já adicionamos carb base, pular carboidratos na prioridade
+    if (hasBaseCarb && (category === 'carboidratos' || category === 'leguminosas')) {
+      continue;
+    }
     
     const food = pickFoodFromCategory(foods, category, usedFoodIds, preferences, mealType);
     if (!food) continue;
@@ -772,12 +858,139 @@ interface PlanValidation {
   warnings: string[];
 }
 
+// ============================================================
+// REGRA G7 — VALIDAÇÃO DE CARBOIDRATO
+// ============================================================
+// 1. Total de carboidratos ≥ 90% da meta diária
+// 2. Refeições principais devem ter fonte de carb base (não frutas)
+// 3. Nunca compensar déficit de carb com aumento de gordura
+// ============================================================
+
+/**
+ * Refeições consideradas "principais" que DEVEM ter fonte de carboidrato base
+ */
+const MAIN_MEALS_REQUIRING_CARBS: MealType[] = ['breakfast', 'lunch', 'dinner'];
+
+/**
+ * Keywords de fontes de carboidrato BASE (não frutas)
+ */
+const BASE_CARB_SOURCES = [
+  // Cereais
+  'arroz', 'aveia', 'granola', 'cereal', 'milho', 'cuscuz', 'quinoa',
+  // Pães e massas
+  'pão', 'torrada', 'tapioca', 'macarrão', 'massa', 'lasanha', 'nhoque',
+  // Tubérculos
+  'batata', 'mandioca', 'inhame', 'cará', 'purê',
+  // Leguminosas com carbs
+  'feijão', 'lentilha', 'grão-de-bico', 'ervilha',
+];
+
+/**
+ * Verifica se um alimento é fonte de carboidrato base (não apenas fruta)
+ */
+function isBaseCarbSource(food: Food): boolean {
+  const category = (food.category || '').toLowerCase();
+  const foodName = food.name.toLowerCase();
+  
+  // Categoria carboidratos ou leguminosas (ricas em carbs)
+  if (category === 'carboidratos' || category === 'leguminosas') {
+    return true;
+  }
+  
+  // Verificar keywords de carbs base
+  return BASE_CARB_SOURCES.some(keyword => foodName.includes(keyword));
+}
+
+/**
+ * REGRA G7.1: Valida que carboidratos totais ≥ 90% da meta
+ */
+function validateCarbsThreshold(
+  meals: Array<{ name: string; mealType: MealType; options: MealOption[] }>,
+  targets: MacroTargets
+): { valid: boolean; error?: string; totalCarbs: number; minRequired: number } {
+  // Calcula total de carbs considerando apenas opção principal (option_number = 1)
+  const totalCarbs = meals.reduce((sum, meal) => {
+    const primaryOption = meal.options.find(o => o.option_number === 1);
+    return sum + (primaryOption?.total_carbs || 0);
+  }, 0);
+  
+  const minRequired = targets.carbs * 0.90; // 90% da meta
+  
+  if (totalCarbs < minRequired) {
+    return {
+      valid: false,
+      error: `[G7] Carboidratos insuficientes: ${Math.round(totalCarbs)}g gerado, mínimo ${Math.round(minRequired)}g (90% de ${targets.carbs}g)`,
+      totalCarbs,
+      minRequired,
+    };
+  }
+  
+  return { valid: true, totalCarbs, minRequired };
+}
+
+/**
+ * REGRA G7.2: Valida que refeições principais têm fonte de carboidrato base
+ */
+function validateBaseCarbInMainMeals(
+  meals: Array<{ name: string; mealType: MealType; options: MealOption[] }>
+): { valid: boolean; errors: string[] } {
+  const errors: string[] = [];
+  
+  for (const meal of meals) {
+    // Apenas refeições principais
+    if (!MAIN_MEALS_REQUIRING_CARBS.includes(meal.mealType)) {
+      continue;
+    }
+    
+    const primaryOption = meal.options.find(o => o.option_number === 1);
+    if (!primaryOption) continue;
+    
+    // Verificar se tem pelo menos uma fonte de carb base
+    const hasBaseCarb = primaryOption.foods.some(f => isBaseCarbSource(f.food));
+    
+    if (!hasBaseCarb) {
+      errors.push(`[G7] ${meal.name} deve ter fonte de carboidrato base (não apenas frutas)`);
+    }
+  }
+  
+  return {
+    valid: errors.length === 0,
+    errors,
+  };
+}
+
 function validatePlan(
-  meals: Array<{ name: string; options: MealOption[] }>,
+  meals: Array<{ name: string; mealType: MealType; options: MealOption[] }>,
   targets: MacroTargets
 ): PlanValidation {
   const errors: string[] = [];
   const warnings: string[] = [];
+  
+  // ============================================================
+  // REGRA G7 — VALIDAÇÃO DE CARBOIDRATO (BLOQUEANTE)
+  // ============================================================
+  
+  // G7.1: Carboidratos totais ≥ 90% da meta
+  const carbsValidation = validateCarbsThreshold(meals, targets);
+  if (!carbsValidation.valid && carbsValidation.error) {
+    errors.push(carbsValidation.error);
+  }
+  
+  // G7.2: Refeições principais devem ter fonte de carb base
+  const baseCarbValidation = validateBaseCarbInMainMeals(meals);
+  errors.push(...baseCarbValidation.errors);
+  
+  // Log de validação G7
+  logStep("G7 Carb validation", {
+    totalCarbs: carbsValidation.totalCarbs,
+    minRequired: carbsValidation.minRequired,
+    carbsValid: carbsValidation.valid,
+    baseCarbValid: baseCarbValidation.valid,
+  });
+  
+  // ============================================================
+  // VALIDAÇÕES ORIGINAIS
+  // ============================================================
   
   // 1. Todas as refeições devem ter pelo menos uma opção
   for (const meal of meals) {
