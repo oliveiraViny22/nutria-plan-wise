@@ -1095,6 +1095,83 @@ function buildMealOption(
     mealFoods.push(converted);
   }
   
+  // ============================================================
+  // G0 FIX: CALORIE BOOST - Se refeição terminou muito abaixo do target,
+  // aumentar porções dos alimentos já adicionados (priorizar carbs)
+  // ============================================================
+  const calorieDeficitPercent = ((targetMacro.calories - totalCalories) / targetMacro.calories) * 100;
+  
+  if (calorieDeficitPercent > 15 && mealFoods.length > 0) {
+    logStep("G0 FIX: Calorie deficit detected, boosting portions", {
+      mealType,
+      currentCalories: totalCalories,
+      targetCalories: targetMacro.calories,
+      deficitPercent: Math.round(calorieDeficitPercent),
+    });
+    
+    // Calcular quanto precisamos adicionar (tentar cobrir 80% do déficit)
+    const targetBoost = (targetMacro.calories - totalCalories) * 0.80;
+    let boostedCalories = 0;
+    
+    // Priorizar boost em carboidratos (primeiro alimento geralmente é carb base)
+    for (let i = 0; i < mealFoods.length && boostedCalories < targetBoost; i++) {
+      const mealFood = mealFoods[i];
+      const food = mealFood.food;
+      const category = (food.category || '').toLowerCase();
+      
+      // Preferir boost em carboidratos e leguminosas (baixa gordura, alta energia)
+      const isGoodForBoost = category === 'carboidratos' || category === 'leguminosas' || 
+                              (category === 'proteinas' && food.fat < 5);
+      if (!isGoodForBoost) continue;
+      
+      // Calcular quanto podemos aumentar esta porção
+      const currentPortion = mealFood.calculated_grams;
+      const maxBoostPortion = Math.min(currentPortion * 0.5, 150); // Max 50% ou 150g de aumento
+      const caloriesPerGram = food.calories / 100;
+      const fatPerGram = food.fat / 100;
+      
+      // Limitar pela gordura restante também
+      const remainingFat = targetMacro.fat - totalFat;
+      const maxBoostByFat = fatPerGram > 0.1 ? (remainingFat * 0.5 / fatPerGram) * 100 : maxBoostPortion;
+      
+      const actualBoost = Math.min(maxBoostPortion, maxBoostByFat, (targetBoost - boostedCalories) / caloriesPerGram);
+      
+      if (actualBoost < 20) continue; // Não vale a pena boost menor que 20g
+      
+      const newPortion = currentPortion + actualBoost;
+      const newConverted = applyUnitConversion(food, newPortion);
+      
+      // Recalcular macros com a nova porção
+      const oldMultiplier = currentPortion / 100;
+      const newMultiplier = newConverted.calculated_grams / 100;
+      const deltaMultiplier = newMultiplier - oldMultiplier;
+      
+      totalCalories += food.calories * deltaMultiplier;
+      totalProtein += food.protein * deltaMultiplier;
+      totalCarbs += food.carbs * deltaMultiplier;
+      totalFat += food.fat * deltaMultiplier;
+      
+      boostedCalories += food.calories * deltaMultiplier;
+      
+      // Atualizar o alimento na lista
+      mealFoods[i] = newConverted;
+      
+      logStep("G0 FIX: Boosted portion", {
+        food: food.name,
+        oldPortion: currentPortion,
+        newPortion: newConverted.calculated_grams,
+        caloriesAdded: Math.round(food.calories * deltaMultiplier),
+      });
+    }
+    
+    logStep("G0 FIX: Boost complete", {
+      mealType,
+      finalCalories: Math.round(totalCalories),
+      targetCalories: targetMacro.calories,
+      boostedBy: Math.round(boostedCalories),
+    });
+  }
+  
   // VALIDAÇÃO: Verificar se atingimos proteína mínima
   if (totalProtein < minProtein * 0.8) { // 80% de tolerância
     logStep("Warning: meal below protein minimum", { 
