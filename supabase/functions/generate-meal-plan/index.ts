@@ -643,24 +643,26 @@ function calculateDefaultPortion(
   currentMealCalories: number = 0  // Calorias já acumuladas na refeição
 ): number {
   // Escalar porções baseado na meta calórica da refeição
-  // Para metas altas (>500 kcal por refeição), usar porções maiores
+  // Para metas altas (>700 kcal por refeição), usar porções proporcionalmente maiores
+  // Base de referência: 400 kcal por refeição
   const calorieScale = Math.max(1, targetMacro.calories / 400);
   
-  // Porções base que serão escaladas
+  // Porções base que serão escaladas - aumentadas para suportar metas altas
   const basePortions: Record<string, number> = {
-    proteinas: 110,
-    carboidratos: 130,
-    gorduras: 12,
-    vegetais: 90,
-    frutas: 110,
-    laticinios: 160,
-    leguminosas: 90,
-    mistos: 110,
+    proteinas: 130,      // Aumentado de 110
+    carboidratos: 180,   // Aumentado de 130 - crítico para metas altas
+    gorduras: 15,        // Aumentado de 12
+    vegetais: 100,       // Aumentado de 90
+    frutas: 130,         // Aumentado de 110
+    laticinios: 200,     // Aumentado de 160
+    leguminosas: 120,    // Aumentado de 90
+    mistos: 130,         // Aumentado de 110
   };
   
   const category = (food.category || '').toLowerCase();
-  // Escalar porção base (máximo 1.5x para evitar excessos)
-  let portion = Math.round(basePortions[category] * Math.min(1.5, calorieScale)) || 90;
+  // Escalar porção base - máximo mais generoso para metas altas (até 2x)
+  const maxScale = targetMacro.calories > 900 ? 2.5 : (targetMacro.calories > 600 ? 2.0 : 1.5);
+  let portion = Math.round(basePortions[category] * Math.min(maxScale, calorieScale)) || 100;
   
   const foodCalPerGram = food.calories > 0 ? food.calories / 100 : 1;
   
@@ -670,14 +672,19 @@ function calculateDefaultPortion(
     ? (remainingCalories / foodCalPerGram) * 100 
     : portion;
   
-  // Usar 25% das calorias restantes para dar mais margem
-  const targetCalsForThis = Math.min(targetMacro.calories * 0.25, remainingCalories * 0.6);
+  // Para metas altas, usar 35% das calorias restantes para cada item
+  // Isso garante que mais calorias sejam alocadas
+  const targetCalsPercent = targetMacro.calories > 800 ? 0.35 : 0.25;
+  const targetCalsForThis = Math.min(targetMacro.calories * targetCalsPercent, remainingCalories * 0.7);
   const suggestedPortion = targetCalsForThis / foodCalPerGram;
   
-  // Limites mais generosos para metas calóricas altas
-  const maxPortion = targetMacro.calories > 700 ? 450 : 350;
-  portion = Math.round(Math.min(suggestedPortion, portion, maxPortionByCalories) / 10) * 10;
-  portion = Math.min(maxPortion, Math.max(30, portion));
+  // Limites escalados para metas calóricas altas
+  const maxPortion = targetMacro.calories > 1000 ? 550 : 
+                     targetMacro.calories > 700 ? 500 : 400;
+  
+  // Tomar a maior porção entre a sugerida e a base escalada, respeitando limites
+  portion = Math.round(Math.max(portion, suggestedPortion) / 10) * 10;
+  portion = Math.min(maxPortion, maxPortionByCalories, Math.max(40, portion));
   
   return portion;
 }
@@ -787,8 +794,9 @@ function buildMealOption(
   const minPortionForProtein = proteinPer100g > 0 ? (minProtein / proteinPer100g) * 100 : 100;
   const defaultPortion = calculateDefaultPortion(proteinSource, targetMacro, totalCalories);
   
-  // G0: Limitar porção de proteína para não estourar calorias
-  const maxProteinPortion = Math.min(250, defaultPortion);  // Máximo 250g para proteína
+  // G0: Limite de proteína escalado para metas calóricas altas
+  const maxProteinPortion = targetMacro.calories > 900 ? 350 : 
+                            targetMacro.calories > 600 ? 300 : 250;
   const proteinPortion = Math.min(maxProteinPortion, Math.max(Math.round(minPortionForProtein / 10) * 10, defaultPortion));
   
   const proteinConverted = applyUnitConversion(proteinSource, proteinPortion);
@@ -818,19 +826,22 @@ function buildMealOption(
       const carbCalPerGram = baseCarbSource.calories / 100;
       const targetCarbsForMeal = targetMacro.carbs;
       
-      // Calcular calorias restantes disponíveis (deixando espaço para vegetais)
-      const remainingCalories = targetMacro.calories - totalCalories - 40; // Reserva 40 cal para vegetais
-      const maxPortionByCalories = remainingCalories > 0 ? remainingCalories / carbCalPerGram : 100;
+      // Calcular calorias restantes disponíveis (reserva mínima para vegetais)
+      const remainingCalories = targetMacro.calories - totalCalories - 30; // Reserva 30 cal para vegetais
+      const maxPortionByCalories = remainingCalories > 0 ? remainingCalories / carbCalPerGram : 120;
       
       // Escalar cobertura de carbs baseado na meta calórica
-      // Metas altas (>700 kcal) precisam de mais carbs por refeição
-      const carbCoveragePercent = targetMacro.calories > 700 ? 0.75 : 0.65;
+      // Metas altas (>800 kcal) precisam de mais carbs por refeição - aumentar cobertura
+      const carbCoveragePercent = targetMacro.calories > 900 ? 0.85 : 
+                                  targetMacro.calories > 700 ? 0.80 : 0.70;
       const carbCoverageTarget = targetCarbsForMeal * carbCoveragePercent;
-      const suggestedPortion = carbsPerGram > 0 ? (carbCoverageTarget / carbsPerGram) * 100 : 140;
+      const suggestedPortion = carbsPerGram > 0 ? (carbCoverageTarget / carbsPerGram) * 100 : 180;
       
       // Limites escalados: metas altas permitem porções maiores
-      const maxCarbPortion = targetMacro.calories > 900 ? 400 : (targetMacro.calories > 600 ? 350 : 280);
-      const carbPortion = Math.min(maxCarbPortion, maxPortionByCalories, Math.max(80, Math.round(suggestedPortion / 10) * 10));
+      const maxCarbPortion = targetMacro.calories > 1000 ? 500 : 
+                             targetMacro.calories > 800 ? 450 : 
+                             targetMacro.calories > 600 ? 400 : 320;
+      const carbPortion = Math.min(maxCarbPortion, maxPortionByCalories, Math.max(100, Math.round(suggestedPortion / 10) * 10));
       
       const carbConverted = applyUnitConversion(baseCarbSource, carbPortion);
       
