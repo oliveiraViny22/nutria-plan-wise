@@ -552,17 +552,21 @@ function filterFoodsByMealContext(
 
 /**
  * Busca fonte de proteína COMPATÍVEL para a refeição
- * @param preferLean - Se true, prioriza fontes magras (menor gordura por proteína)
+ * G0.1 FIX: SEMPRE prioriza fontes magras por padrão para evitar excesso de gordura
+ * @param preferLean - Se true, filtra APENAS fontes magras (default: true)
  */
 function findCompatibleProteinSource(
   foods: Food[],
   mealType: MealType,
   usedIds: Set<string>,
   preferences: string[],
-  preferLean: boolean = false
+  preferLean: boolean = true // G0.1 FIX: Default agora é TRUE
 ): Food | null {
   const context = MEAL_CONTEXT_RULES_V2[mealType];
   if (!context) return null;
+  
+  // G0.1 FIX: Limites de gordura para proteínas "magras"
+  const MAX_FAT_PER_100G_LEAN = 8; // máx 8g gordura por 100g para ser considerada magra
   
   // Primeiro, buscar proteínas da categoria correta que não estão bloqueadas
   let candidates = foods.filter(f => {
@@ -594,22 +598,35 @@ function findCompatibleProteinSource(
     return null;
   }
   
-  // G7 FIX: Se preferLean, ordenar por razão proteína/gordura (maior = mais magro)
+  // G0.1 FIX: SEMPRE ordenar por razão proteína/gordura
+  candidates.sort((a, b) => {
+    const ratioA = a.fat > 0 ? a.protein / a.fat : a.protein * 10;
+    const ratioB = b.fat > 0 ? b.protein / b.fat : b.protein * 10;
+    return ratioB - ratioA; // Maior ratio primeiro (mais magro)
+  });
+  
+  // G0.1 FIX: Se preferLean, filtrar apenas proteínas realmente magras
   if (preferLean) {
-    candidates.sort((a, b) => {
-      const ratioA = a.fat > 0 ? a.protein / a.fat : a.protein * 10;
-      const ratioB = b.fat > 0 ? b.protein / b.fat : b.protein * 10;
-      return ratioB - ratioA; // Maior ratio primeiro (mais magro)
-    });
-    // Pegar apenas os top 5 mais magros
-    candidates = candidates.slice(0, Math.min(5, candidates.length));
-    logStep("Preferring lean protein sources", { 
-      mealType, 
-      topCandidates: candidates.slice(0, 3).map(c => ({ name: c.name, protein: c.protein, fat: c.fat }))
-    });
+    const leanCandidates = candidates.filter(f => f.fat <= MAX_FAT_PER_100G_LEAN);
+    if (leanCandidates.length >= 2) {
+      candidates = leanCandidates;
+      logStep("G0.1 FIX: Filtered to lean protein sources only", { 
+        mealType, 
+        count: leanCandidates.length,
+        maxFat: MAX_FAT_PER_100G_LEAN,
+        examples: leanCandidates.slice(0, 3).map(c => ({ name: c.name, protein: c.protein, fat: c.fat }))
+      });
+    } else {
+      // Se não há proteínas magras suficientes, pegar as 5 mais magras disponíveis
+      candidates = candidates.slice(0, Math.min(5, candidates.length));
+      logStep("G0.1 FIX: Not enough lean proteins, using leanest available", { 
+        mealType, 
+        topCandidates: candidates.slice(0, 3).map(c => ({ name: c.name, protein: c.protein, fat: c.fat }))
+      });
+    }
   }
   
-  // Priorizar preferências do usuário
+  // Priorizar preferências do usuário (mas apenas entre os candidatos magros)
   const preferred = candidates.filter(f => 
     preferences.some(p => f.name.toLowerCase().includes(p.toLowerCase()))
   );
@@ -657,51 +674,57 @@ function pickFoodFromCategory(
 function calculateDefaultPortion(
   food: Food, 
   targetMacro: MealMacroDistribution,
-  currentMealCalories: number = 0  // Calorias já acumuladas na refeição
+  currentMealCalories: number = 0,
+  currentMealFat: number = 0 // G0.1 FIX: Também rastrear gordura acumulada
 ): number {
   // Escalar porções baseado na meta calórica da refeição
-  // Para metas altas (>700 kcal por refeição), usar porções proporcionalmente maiores
-  // Base de referência: 400 kcal por refeição
-  const calorieScale = Math.max(1, targetMacro.calories / 400);
+  // G0.1 FIX: Ser mais conservador para evitar excesso
+  const calorieScale = Math.max(1, Math.min(1.5, targetMacro.calories / 500));
   
-  // Porções base que serão escaladas - aumentadas para suportar metas altas
+  // G0.1 FIX: Porções base mais conservadoras
   const basePortions: Record<string, number> = {
-    proteinas: 130,      // Aumentado de 110
-    carboidratos: 180,   // Aumentado de 130 - crítico para metas altas
-    gorduras: 15,        // Aumentado de 12
-    vegetais: 100,       // Aumentado de 90
-    frutas: 130,         // Aumentado de 110
-    laticinios: 200,     // Aumentado de 160
-    leguminosas: 120,    // Aumentado de 90
-    mistos: 130,         // Aumentado de 110
+    proteinas: 100,      // Reduzido de 130
+    carboidratos: 120,   // Reduzido de 180
+    gorduras: 10,        // Reduzido de 15
+    vegetais: 80,        // Reduzido de 100
+    frutas: 100,         // Reduzido de 130
+    laticinios: 120,     // Reduzido de 200
+    leguminosas: 80,     // Reduzido de 120
+    mistos: 100,         // Reduzido de 130
   };
   
   const category = (food.category || '').toLowerCase();
-  // Escalar porção base - máximo mais generoso para metas altas (até 2x)
-  const maxScale = targetMacro.calories > 900 ? 2.5 : (targetMacro.calories > 600 ? 2.0 : 1.5);
-  let portion = Math.round(basePortions[category] * Math.min(maxScale, calorieScale)) || 100;
+  // G0.1 FIX: Escalar mais conservadoramente
+  const maxScale = targetMacro.calories > 900 ? 1.5 : (targetMacro.calories > 600 ? 1.3 : 1.2);
+  let portion = Math.round(basePortions[category] * Math.min(maxScale, calorieScale)) || 80;
   
   const foodCalPerGram = food.calories > 0 ? food.calories / 100 : 1;
+  const foodFatPerGram = food.fat / 100;
   
   // G0: Calcular quanto ainda pode ser adicionado respeitando o target
   const remainingCalories = Math.max(0, targetMacro.calories - currentMealCalories);
   const maxPortionByCalories = remainingCalories > 0 
-    ? (remainingCalories / foodCalPerGram) * 100 
+    ? (remainingCalories * 0.5 / foodCalPerGram) * 100  // G0.1 FIX: Usar no máx 50% das calorias restantes
     : portion;
   
-  // Para metas altas, usar 35% das calorias restantes para cada item
-  // Isso garante que mais calorias sejam alocadas
-  const targetCalsPercent = targetMacro.calories > 800 ? 0.35 : 0.25;
-  const targetCalsForThis = Math.min(targetMacro.calories * targetCalsPercent, remainingCalories * 0.7);
+  // G0.1 FIX: Limitar também pela gordura restante
+  const remainingFat = Math.max(0, targetMacro.fat - currentMealFat);
+  const maxPortionByFat = foodFatPerGram > 0.1
+    ? (remainingFat * 0.6 / foodFatPerGram) * 100  // Usar no máx 60% da gordura restante
+    : 500;
+  
+  // G0.1 FIX: Usar 20% das calorias restantes para cada item (era 35%)
+  const targetCalsPercent = 0.20;
+  const targetCalsForThis = Math.min(targetMacro.calories * targetCalsPercent, remainingCalories * 0.5);
   const suggestedPortion = targetCalsForThis / foodCalPerGram;
   
-  // Limites escalados para metas calóricas altas
-  const maxPortion = targetMacro.calories > 1000 ? 550 : 
-                     targetMacro.calories > 700 ? 500 : 400;
+  // G0.1 FIX: Limites mais conservadores
+  const maxPortion = targetMacro.calories > 1000 ? 300 : 
+                     targetMacro.calories > 700 ? 250 : 200;
   
-  // Tomar a maior porção entre a sugerida e a base escalada, respeitando limites
-  portion = Math.round(Math.max(portion, suggestedPortion) / 10) * 10;
-  portion = Math.min(maxPortion, maxPortionByCalories, Math.max(40, portion));
+  // Tomar a menor entre as opções para evitar excesso
+  portion = Math.round(Math.min(portion, suggestedPortion * 1.2) / 10) * 10;
+  portion = Math.min(maxPortion, maxPortionByCalories, maxPortionByFat, Math.max(30, portion));
   
   return portion;
 }
@@ -725,14 +748,17 @@ interface MealBuildResult {
  * Busca fonte de carboidrato BASE (não fruta) para refeição principal
  * REGRA G7: Prioriza categoria 'carboidratos' com ALTA densidade de carbs
  * Filtra alimentos com pelo menos 15g carbs/100g
+ * REGRA G0.1 FIX: Prioriza carbs BAIXOS em gordura para evitar excesso simultâneo
  */
 function findBaseCarbSource(
   foods: Food[],
   mealType: MealType,
   usedIds: Set<string>,
-  preferences: string[]
+  preferences: string[],
+  preferLowFat: boolean = true // G0.1 FIX: Preferir carbs com baixa gordura
 ): Food | null {
   const MIN_CARB_DENSITY = 15; // mínimo de 15g carbs por 100g
+  const MAX_FAT_FOR_CARB = 5; // G0.1 FIX: máximo de 5g gordura por 100g para carbs ideais
   
   // Primeiro: carboidratos da categoria específica com boa densidade
   let candidates = foods.filter(f => {
@@ -761,8 +787,26 @@ function findBaseCarbSource(
     return null;
   }
   
-  // Ordenar por densidade de carboidrato (maior primeiro)
-  candidates.sort((a, b) => b.carbs - a.carbs);
+  // G0.1 FIX: Se preferLowFat, filtrar/priorizar carbs com baixa gordura
+  if (preferLowFat) {
+    const lowFatCandidates = candidates.filter(f => f.fat <= MAX_FAT_FOR_CARB);
+    if (lowFatCandidates.length >= 3) {
+      candidates = lowFatCandidates;
+      logStep("G0.1 FIX: Filtered to low-fat carb sources", { 
+        count: lowFatCandidates.length,
+        examples: lowFatCandidates.slice(0, 3).map(c => ({ name: c.name, fat: c.fat, carbs: c.carbs }))
+      });
+    }
+  }
+  
+  // Ordenar por: (1) baixa gordura, (2) alta densidade de carboidrato
+  candidates.sort((a, b) => {
+    // Primeiro critério: menor gordura
+    const fatDiff = a.fat - b.fat;
+    if (Math.abs(fatDiff) > 2) return fatDiff;
+    // Segundo critério: maior carbs
+    return b.carbs - a.carbs;
+  });
   
   // Priorizar preferências entre os top candidatos
   const topCandidates = candidates.slice(0, Math.min(10, candidates.length));
@@ -802,32 +846,38 @@ function buildMealOption(
   // ============================================================
   
   if (isMainMeal) {
-    const baseCarbSource = findBaseCarbSource(foods, mealType, usedFoodIds, preferences);
+    // G0.1 FIX: Sempre preferir carbs com baixa gordura para evitar excesso simultâneo
+    const baseCarbSource = findBaseCarbSource(foods, mealType, usedFoodIds, preferences, true);
     
     if (baseCarbSource) {
       usedFoodIds.add(baseCarbSource.id);
       
-      // G7: Calcular porção de carb GARANTIDA antes de proteína
+      // G7: Calcular porção de carb respeitando tanto carbs quanto gordura
       const carbsPerGram = baseCarbSource.carbs / 100;
       const carbCalPerGram = baseCarbSource.calories / 100;
+      const fatPerGram = baseCarbSource.fat / 100;
       const targetCarbsForMeal = targetMacro.carbs;
       
-      // Reservar 40% do orçamento calórico para proteína
-      // Isso deixa 60% disponível para carbs (mais generoso)
-      const carbCalorieBudget = targetMacro.calories * 0.55; // 55% para carbs
+      // G0.1 FIX: Limitar orçamento de carboidratos para não estourar calorias
+      // Usar 45% do orçamento calórico (reduzido de 55%)
+      const carbCalorieBudget = targetMacro.calories * 0.45;
       const maxPortionByCalories = carbCalorieBudget / carbCalPerGram;
       
-      // Escalar cobertura de carbs baseado na meta
-      // Metas altas precisam de mais carbs - garantir 90%+ da meta
-      const carbCoveragePercent = targetMacro.carbs > 100 ? 0.95 : 0.85;
-      const carbCoverageTarget = targetCarbsForMeal * carbCoveragePercent;
-      const suggestedPortion = carbsPerGram > 0 ? (carbCoverageTarget / carbsPerGram) * 100 : 180;
+      // G0.1 FIX: Limitar também pela gordura da refeição (máx 50% do budget de gordura)
+      const maxFatForCarb = targetMacro.fat * 0.3; // máx 30% da gordura pode vir do carb
+      const maxPortionByFat = fatPerGram > 0.1 ? (maxFatForCarb / fatPerGram) * 100 : 500;
       
-      // Limites escalados: permitir porções bem generosas para atingir meta
-      const maxCarbPortion = targetMacro.calories > 1000 ? 550 : 
-                             targetMacro.calories > 800 ? 500 : 
-                             targetMacro.calories > 600 ? 450 : 350;
-      const carbPortion = Math.min(maxCarbPortion, maxPortionByCalories, Math.max(120, Math.round(suggestedPortion / 10) * 10));
+      // Escalar cobertura de carbs de forma mais conservadora
+      // G0.1 FIX: Reduzido para 75% da meta (era 95%)
+      const carbCoveragePercent = targetMacro.carbs > 100 ? 0.75 : 0.70;
+      const carbCoverageTarget = targetCarbsForMeal * carbCoveragePercent;
+      const suggestedPortion = carbsPerGram > 0 ? (carbCoverageTarget / carbsPerGram) * 100 : 150;
+      
+      // G0.1 FIX: Limites mais conservadores
+      const maxCarbPortion = targetMacro.calories > 1000 ? 350 : 
+                             targetMacro.calories > 800 ? 300 : 
+                             targetMacro.calories > 600 ? 250 : 200;
+      const carbPortion = Math.min(maxCarbPortion, maxPortionByCalories, maxPortionByFat, Math.max(100, Math.round(suggestedPortion / 10) * 10));
       
       const carbConverted = applyUnitConversion(baseCarbSource, carbPortion);
       
@@ -845,7 +895,9 @@ function buildMealOption(
         food: baseCarbSource.name, 
         portion: carbPortion,
         carbDensity: baseCarbSource.carbs,
+        fatContent: baseCarbSource.fat,
         carbs: baseCarbSource.carbs * carbMultiplier,
+        fat: baseCarbSource.fat * carbMultiplier,
         caloriesUsed: baseCarbSource.calories * carbMultiplier,
         budgetRemaining: targetMacro.calories - totalCalories,
       });
@@ -857,11 +909,12 @@ function buildMealOption(
   // Priorizar fontes MAGRAS quando orçamento de gordura é apertado
   // ============================================================
   
-  // Calcular orçamento restante de gordura
-  const remainingFatBudget = targetMacro.fat - totalFat;
-  const preferLeanProtein = remainingFatBudget < targetMacro.fat * 0.5; // Se gastou mais de 50% da gordura
+  // Calcular orçamento restante de gordura para proteína
+  const fatBudgetForProtein = targetMacro.fat - totalFat;
+  const preferLeanProtein = fatBudgetForProtein < targetMacro.fat * 0.5; // Se gastou mais de 50% da gordura
   
-  const proteinSource = findCompatibleProteinSource(foods, mealType, usedFoodIds, preferences, preferLeanProtein);
+  // G0.1 FIX: SEMPRE preferir proteínas magras (default já é true na função)
+  const proteinSource = findCompatibleProteinSource(foods, mealType, usedFoodIds, preferences, true);
   
   if (!proteinSource) {
     return {
@@ -910,6 +963,9 @@ function buildMealOption(
   // G0: Verificar se ainda há espaço calórico para mais alimentos
   const remainingCaloriesBudget = targetMacro.calories - totalCalories;
   
+  // G0.1 FIX: Verificar também espaço de gordura restante
+  const remainingFatBudget = targetMacro.fat - totalFat;
+  
   // Agora adicionar outros alimentos por categoria (exceto proteínas e carbs base)
   for (const category of categoryPriorities) {
     if (!isValidCategory(category)) continue;
@@ -926,13 +982,25 @@ function buildMealOption(
       break;
     }
     
+    // G0.1 FIX: Pular gorduras se orçamento de gordura está esgotado
+    if (category === 'gorduras' && totalFat >= targetMacro.fat * 0.8) {
+      logStep("G0.1 FIX: Skipping gorduras - fat budget nearly exhausted", { currentFat: totalFat, targetFat: targetMacro.fat });
+      continue;
+    }
+    
     const food = pickFoodFromCategory(foods, category, usedFoodIds, preferences, mealType);
     if (!food) continue;
     
+    // G0.1 FIX: Se o alimento é muito gorduroso e estamos perto do limite, pular
+    if (food.fat > 5 && totalFat + food.fat > targetMacro.fat * 0.9) {
+      logStep("G0.1 FIX: Skipping high-fat food", { food: food.name, foodFat: food.fat, currentFat: totalFat });
+      continue;
+    }
+    
     usedFoodIds.add(food.id);
     
-    // G0.2: Passar calorias acumuladas para calcular porção limitada
-    const portion = calculateDefaultPortion(food, targetMacro, totalCalories);
+    // G0.1 FIX: Passar calorias E gordura acumuladas para calcular porção limitada
+    const portion = calculateDefaultPortion(food, targetMacro, totalCalories, totalFat);
     const converted = applyUnitConversion(food, portion);
     
     const multiplier = converted.calculated_grams / 100;
