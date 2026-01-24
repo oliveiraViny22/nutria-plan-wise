@@ -734,25 +734,25 @@ function calculateDefaultPortion(
   currentMealFat: number = 0
 ): number {
   // Escalar porções baseado na meta calórica da refeição
-  // Permitir escala mais agressiva para metas altas
-  const calorieScale = Math.max(1, Math.min(2.5, targetMacro.calories / 400));
+  // CORREÇÃO: Permitir escala mais agressiva para metas muito altas (ex: 800+ kcal/refeição)
+  const calorieScale = Math.max(1, Math.min(3.0, targetMacro.calories / 350));
   
-  // Porções base adequadas para cobrir metas
+  // Porções base adequadas para cobrir metas - AUMENTADAS para metas altas
   const basePortions: Record<string, number> = {
-    proteinas: 150,
-    carboidratos: 200,
-    gorduras: 15,
-    vegetais: 100,
-    frutas: 150,
-    laticinios: 180,
-    leguminosas: 150,
-    mistos: 150,
+    proteinas: 180,        // Aumentado de 150 para garantir mais proteína
+    carboidratos: 250,     // Aumentado de 200 para cobrir mais calorias
+    gorduras: 20,          // Aumentado de 15
+    vegetais: 120,         // Aumentado de 100
+    frutas: 180,           // Aumentado de 150
+    laticinios: 220,       // Aumentado de 180
+    leguminosas: 180,      // Aumentado de 150
+    mistos: 180,           // Aumentado de 150
   };
   
   const category = (food.category || '').toLowerCase();
-  // Escalar de forma mais agressiva para metas altas
-  const maxScale = targetMacro.calories > 900 ? 2.0 : (targetMacro.calories > 600 ? 1.6 : 1.3);
-  let portion = Math.round(basePortions[category] * Math.min(maxScale, calorieScale)) || 100;
+  // Escalar de forma mais agressiva para metas altas (ex: 3000+ kcal)
+  const maxScale = targetMacro.calories > 1000 ? 2.5 : (targetMacro.calories > 900 ? 2.0 : (targetMacro.calories > 600 ? 1.6 : 1.3));
+  let portion = Math.round(basePortions[category] * Math.min(maxScale, calorieScale)) || 120;
   
   const foodCalPerGram = food.calories > 0 ? food.calories / 100 : 1;
   const foodFatPerGram = food.fat / 100;
@@ -774,13 +774,16 @@ function calculateDefaultPortion(
   const targetCalsForThis = Math.min(targetMacro.calories * targetCalsPercent, remainingCalories * 0.7);
   const suggestedPortion = targetCalsForThis / foodCalPerGram;
   
-  // Limites mais generosos para metas altas
-  const maxPortion = targetMacro.calories > 1000 ? 450 : 
-                     targetMacro.calories > 700 ? 350 : 280;
+  // Limites mais generosos para metas altas (ex: 3000+ kcal)
+  const maxPortion = targetMacro.calories > 1200 ? 550 : 
+                     targetMacro.calories > 1000 ? 480 : 
+                     targetMacro.calories > 700 ? 400 : 320;
   
   // Tomar a menor entre as opções para evitar excesso
-  portion = Math.round(Math.min(portion, suggestedPortion * 1.3) / 10) * 10;
-  portion = Math.min(maxPortion, maxPortionByCalories, maxPortionByFat, Math.max(50, portion));
+  // CORREÇÃO: Ser menos conservador com suggestedPortion para metas altas
+  const portionMultiplier = targetMacro.calories > 900 ? 1.5 : 1.3;
+  portion = Math.round(Math.min(portion, suggestedPortion * portionMultiplier) / 10) * 10;
+  portion = Math.min(maxPortion, maxPortionByCalories, maxPortionByFat, Math.max(60, portion));
   
   return portion;
 }
@@ -951,11 +954,12 @@ function buildMealOption(
       const carbCoverageTarget = targetCarbsForMeal * carbCoveragePercent;
       const suggestedPortion = carbsPerGram > 0 ? (carbCoverageTarget / carbsPerGram) * 100 : 200;
       
-      // Limites mais generosos para metas altas
-      const maxCarbPortion = targetMacro.calories > 1000 ? 500 : 
-                             targetMacro.calories > 800 ? 400 : 
-                             targetMacro.calories > 600 ? 350 : 280;
-      const carbPortion = Math.min(maxCarbPortion, maxPortionByCalories, maxPortionByFat, Math.max(120, Math.round(suggestedPortion / 10) * 10));
+      // Limites mais generosos para metas altas (ex: 3000+ kcal requer refeições de 1000+ kcal)
+      const maxCarbPortion = targetMacro.calories > 1100 ? 600 : 
+                             targetMacro.calories > 1000 ? 520 : 
+                             targetMacro.calories > 800 ? 450 : 
+                             targetMacro.calories > 600 ? 380 : 300;
+      const carbPortion = Math.min(maxCarbPortion, maxPortionByCalories, maxPortionByFat, Math.max(140, Math.round(suggestedPortion / 10) * 10));
       
       const carbConverted = applyUnitConversion(baseCarbSource, carbPortion);
       
@@ -1011,13 +1015,14 @@ function buildMealOption(
   // Usar calorias restantes para limitar proteína
   const remainingCalories = targetMacro.calories - totalCalories - 30; // Reserva 30 cal para vegetais
   const proteinCalPerGram = proteinSource.calories / 100;
-  const maxPortionByCalories = remainingCalories > 0 ? (remainingCalories * 0.85) / proteinCalPerGram : 200;
+  const maxPortionByCalories = remainingCalories > 0 ? (remainingCalories * 0.90) / proteinCalPerGram : 200;
   
-  // Limites mais generosos para metas altas
-  const maxProteinPortion = targetMacro.calories > 900 ? 350 : 
+  // Limites mais generosos para metas altas (ex: 3000+ kcal)
+  const maxProteinPortion = targetMacro.calories > 1000 ? 420 : 
+                            targetMacro.calories > 800 ? 360 : 
                             targetMacro.calories > 600 ? 300 : 260;
   const proteinPortion = Math.min(maxProteinPortion, maxPortionByCalories, 
-                                  Math.max(Math.round(minPortionForProtein / 10) * 10, 120));
+                                  Math.max(Math.round(minPortionForProtein / 10) * 10, 130));
   
   const proteinConverted = applyUnitConversion(proteinSource, proteinPortion);
   
@@ -1391,9 +1396,14 @@ function validatePlan(
       }
       
       // 3. REGRA v2: TODA refeição deve ter proteína
+      // CORREÇÃO: Verificar proteína TOTAL da porção, não apenas por 100g
       const hasProtein = option.foods.some(f => {
         const cat = (f.food.category || '').toLowerCase();
-        return cat === 'proteinas' || (cat === 'laticinios' && f.food.protein >= 5);
+        const portionMultiplier = f.calculated_grams / 100;
+        const totalProteinInPortion = f.food.protein * portionMultiplier;
+        
+        // Aceitar proteínas, ou laticínios com proteína significativa NA PORÇÃO
+        return cat === 'proteinas' || (cat === 'laticinios' && totalProteinInPortion >= 5);
       });
       
       if (!hasProtein) {
