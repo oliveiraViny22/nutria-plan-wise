@@ -674,7 +674,8 @@ interface MealBuildResult {
 
 /**
  * Busca fonte de carboidrato BASE (não fruta) para refeição principal
- * REGRA G7: Prioriza categoria 'carboidratos' ou 'leguminosas'
+ * REGRA G7: Prioriza categoria 'carboidratos' com ALTA densidade de carbs
+ * Filtra alimentos com pelo menos 15g carbs/100g
  */
 function findBaseCarbSource(
   foods: Food[],
@@ -682,7 +683,9 @@ function findBaseCarbSource(
   usedIds: Set<string>,
   preferences: string[]
 ): Food | null {
-  // Primeiro: carboidratos da categoria específica
+  const MIN_CARB_DENSITY = 15; // mínimo de 15g carbs por 100g
+  
+  // Primeiro: carboidratos da categoria específica com boa densidade
   let candidates = foods.filter(f => {
     if (usedIds.has(f.id)) return false;
     if (isFoodBlockedForMeal(f, mealType)) return false;
@@ -690,25 +693,35 @@ function findBaseCarbSource(
     const category = (f.category || '').toLowerCase();
     const foodName = f.name.toLowerCase();
     
-    // Categoria carboidratos ou leguminosas
+    // REGRA G7: Filtrar por densidade de carboidratos (evitar leguminosas pobres)
+    const carbDensity = f.carbs; // carbs por 100g
+    if (carbDensity < MIN_CARB_DENSITY) return false;
+    
+    // Categoria carboidratos é prioridade absoluta
     if (category === 'carboidratos') return true;
-    if (category === 'leguminosas') return true;
+    
+    // Leguminosas apenas se tiverem boa densidade de carbs
+    if (category === 'leguminosas' && carbDensity >= 20) return true;
     
     // Verificar keywords de carbs base em outras categorias
     return BASE_CARB_SOURCES.some(keyword => foodName.includes(keyword));
   });
   
   if (candidates.length === 0) {
-    logStep("Warning: no base carb source found", { mealType });
+    logStep("Warning: no base carb source found with good density", { mealType, minDensity: MIN_CARB_DENSITY });
     return null;
   }
   
-  // Priorizar preferências
-  const preferred = candidates.filter(f => 
+  // Ordenar por densidade de carboidrato (maior primeiro)
+  candidates.sort((a, b) => b.carbs - a.carbs);
+  
+  // Priorizar preferências entre os top candidatos
+  const topCandidates = candidates.slice(0, Math.min(10, candidates.length));
+  const preferred = topCandidates.filter(f => 
     preferences.some(p => f.name.toLowerCase().includes(p.toLowerCase()))
   );
   
-  const pool = preferred.length > 0 ? preferred : candidates;
+  const pool = preferred.length > 0 ? preferred : topCandidates;
   return pool[Math.floor(Math.random() * pool.length)];
 }
 
@@ -772,11 +785,14 @@ function buildMealOption(
     if (baseCarbSource) {
       usedFoodIds.add(baseCarbSource.id);
       
-      // Calcular porção de carb baseada na meta da refeição
+      // REGRA G7 REFORÇADA: Calcular porção para atingir 70-80% dos carbs da refeição
       const carbsPerGram = baseCarbSource.carbs / 100;
       const targetCarbsForMeal = targetMacro.carbs;
-      const suggestedPortion = carbsPerGram > 0 ? (targetCarbsForMeal * 0.6) / carbsPerGram : 150;
-      const carbPortion = Math.min(300, Math.max(50, Math.round(suggestedPortion / 10) * 10));
+      // Tentar cobrir 75% dos carbs da refeição com fonte base
+      const carbCoverageTarget = targetCarbsForMeal * 0.75;
+      const suggestedPortion = carbsPerGram > 0 ? (carbCoverageTarget / carbsPerGram) * 100 : 150;
+      // Aumentar limite máximo para 400g para fontes de carb densas
+      const carbPortion = Math.min(400, Math.max(80, Math.round(suggestedPortion / 10) * 10));
       
       const carbConverted = applyUnitConversion(baseCarbSource, carbPortion);
       
@@ -793,6 +809,7 @@ function buildMealOption(
         mealType, 
         food: baseCarbSource.name, 
         portion: carbPortion,
+        carbDensity: baseCarbSource.carbs,
         carbs: baseCarbSource.carbs * carbMultiplier,
       });
     }
