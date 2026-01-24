@@ -46,29 +46,29 @@ export const GENERATOR_CONTRACT = {
 // =====================================================
 
 export const REBALANCER_CONTRACT = {
-  /** Tolerância calórica ABSOLUTA: ±2% */
-  CALORIE_TOLERANCE_PERCENT: 2,
+  /** Tolerância calórica ABSOLUTA: ±5% (mais flexível para ajustes práticos) */
+  CALORIE_TOLERANCE_PERCENT: 5,
   
-  /** Tolerância de proteína: ±2% */
-  PROTEIN_TOLERANCE_PERCENT: 2,
+  /** Tolerância de proteína: ±5% */
+  PROTEIN_TOLERANCE_PERCENT: 5,
   
-  /** Tolerância de carboidrato para baixo: -8% (flexível) */
-  CARBS_MIN_TOLERANCE_PERCENT: 8,
+  /** Tolerância de carboidrato para baixo: -10% (flexível para redução) */
+  CARBS_MIN_TOLERANCE_PERCENT: 10,
   
-  /** Tolerância de carboidrato para cima: +5% */
-  CARBS_MAX_TOLERANCE_PERCENT: 5,
+  /** Tolerância de carboidrato para cima: +10% */
+  CARBS_MAX_TOLERANCE_PERCENT: 10,
   
-  /** Tolerância de gordura: ±5g ABSOLUTO */
-  FAT_TOLERANCE_GRAMS: 5,
+  /** Tolerância de gordura: ±8g ABSOLUTO */
+  FAT_TOLERANCE_GRAMS: 8,
   
-  /** Máximo ajuste por alimento: 75% */
-  MAX_ADJUSTMENT_PERCENT: 75,
+  /** Máximo ajuste por alimento: 100% (dobrar ou zerar) */
+  MAX_ADJUSTMENT_PERCENT: 100,
   
-  /** Quantidade mínima: 10g */
-  MIN_QUANTITY_GRAMS: 10,
+  /** Quantidade mínima: 5g */
+  MIN_QUANTITY_GRAMS: 5,
   
-  /** Quantidade máxima por item: 500g */
-  MAX_QUANTITY_GRAMS: 500,
+  /** Quantidade máxima por item: 600g */
+  MAX_QUANTITY_GRAMS: 600,
 } as const;
 
 // =====================================================
