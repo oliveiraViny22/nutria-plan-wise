@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { Droplets } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { motion } from 'framer-motion';
 
 export function HydrationTipCard() {
   const { profile } = useAuth();
@@ -49,28 +50,55 @@ export function HydrationTipCard() {
   }, [profile?.weight, profile?.height, profile?.activity_level, profile?.goal]);
 
   return (
-    <div className="relative overflow-hidden rounded-xl sm:rounded-2xl bg-gradient-to-br from-blue-500/10 via-cyan-500/5 to-blue-600/10 border border-blue-500/20 p-4 h-full flex flex-col justify-center">
-      <div className="absolute top-0 right-0 w-24 h-24 bg-blue-500/10 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2" />
-      <div className="relative flex flex-col gap-3">
-        <div className="flex items-center gap-3">
-          <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-blue-500/20 flex items-center justify-center">
-            <Droplets className="w-5 h-5 text-blue-500" />
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4, ease: 'easeOut' }}
+      className="relative overflow-hidden rounded-xl sm:rounded-2xl bg-gradient-to-br from-sky-500/10 via-cyan-400/5 to-blue-500/10 dark:from-sky-500/15 dark:via-cyan-400/10 dark:to-blue-500/15 border border-sky-400/20 dark:border-sky-500/25 p-4 h-full flex flex-col justify-center shadow-sm"
+    >
+      {/* Decorative elements */}
+      <div className="absolute top-0 right-0 w-20 h-20 bg-sky-400/15 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2" />
+      <div className="absolute bottom-0 left-0 w-16 h-16 bg-cyan-400/10 rounded-full blur-xl translate-y-1/2 -translate-x-1/2" />
+      
+      <div className="relative flex flex-col gap-2.5">
+        {/* Header with icon and value */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <motion.div 
+              className="flex-shrink-0 w-9 h-9 rounded-lg bg-sky-500/20 dark:bg-sky-500/25 flex items-center justify-center"
+              animate={{ 
+                scale: [1, 1.05, 1],
+              }}
+              transition={{ 
+                duration: 2,
+                repeat: Infinity,
+                ease: 'easeInOut'
+              }}
+            >
+              <Droplets className="w-4.5 h-4.5 text-sky-500 dark:text-sky-400" />
+            </motion.div>
+            <span className="text-xs font-medium text-sky-600 dark:text-sky-400 uppercase tracking-wide">
+              Hidratação
+            </span>
           </div>
-          <div>
-            <p className="text-xs font-semibold text-blue-500">Hidratação Diária</p>
-            <p className="text-lg font-bold text-blue-500">{waterInLiters}L</p>
+          <div className="text-right">
+            <span className="text-2xl font-bold text-sky-600 dark:text-sky-400 tabular-nums">
+              {waterInLiters}
+            </span>
+            <span className="text-sm font-medium text-sky-500/80 dark:text-sky-400/80 ml-0.5">L</span>
           </div>
         </div>
         
+        {/* Main recommendation */}
         <div className="space-y-1">
-          <p className="text-sm text-foreground">
-            Beba cerca de <span className="text-blue-500 font-bold">{waterGlasses} copos</span> de água por dia
+          <p className="text-sm text-foreground/90 leading-snug">
+            Beba <span className="text-sky-600 dark:text-sky-400 font-semibold">{waterGlasses} copos</span> de água hoje
           </p>
-          <p className="text-[10px] text-muted-foreground">
-            *Cálculo baseado no seu peso, altura, objetivo e nível de atividade
+          <p className="text-[10px] text-muted-foreground/70 leading-tight">
+            Baseado no seu peso, altura e nível de atividade
           </p>
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 }
