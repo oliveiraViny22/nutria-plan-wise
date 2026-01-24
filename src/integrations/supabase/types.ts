@@ -697,6 +697,7 @@ export type Database = {
         Row: {
           activity_level: string | null
           age: number | null
+          avoided_foods: string[] | null
           carbs_target: number | null
           created_at: string
           daily_calories: number | null
@@ -709,6 +710,7 @@ export type Database = {
           name: string | null
           onboarding_completed: boolean | null
           preferences: string[] | null
+          preferred_foods: string[] | null
           protein_target: number | null
           restrictions: string[] | null
           sex: string | null
@@ -719,6 +721,7 @@ export type Database = {
         Insert: {
           activity_level?: string | null
           age?: number | null
+          avoided_foods?: string[] | null
           carbs_target?: number | null
           created_at?: string
           daily_calories?: number | null
@@ -731,6 +734,7 @@ export type Database = {
           name?: string | null
           onboarding_completed?: boolean | null
           preferences?: string[] | null
+          preferred_foods?: string[] | null
           protein_target?: number | null
           restrictions?: string[] | null
           sex?: string | null
@@ -741,6 +745,7 @@ export type Database = {
         Update: {
           activity_level?: string | null
           age?: number | null
+          avoided_foods?: string[] | null
           carbs_target?: number | null
           created_at?: string
           daily_calories?: number | null
@@ -753,6 +758,7 @@ export type Database = {
           name?: string | null
           onboarding_completed?: boolean | null
           preferences?: string[] | null
+          preferred_foods?: string[] | null
           protein_target?: number | null
           restrictions?: string[] | null
           sex?: string | null
