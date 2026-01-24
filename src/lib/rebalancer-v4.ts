@@ -1,16 +1,16 @@
 // =====================================================
-// REBALANCER V4 - PRÉ-VALIDAÇÃO ESTRUTURAL OBRIGATÓRIA
+// REBALANCER V4 - AJUSTE DE QUANTIDADES PARA METAS
 // =====================================================
 // 
 // CONTRATO:
-// - NÃO corrige planos mal-formados
-// - SÓ ajusta QUANTIDADES de planos estruturalmente válidos
-// - Planos inválidos resultam em BLOQUEIO ESTRUTURAL explícito
+// - Ajusta QUANTIDADES de alimentos para atingir metas
+// - Prioriza alcançar calorias e macros diários
+// - Mantém estrutura do plano (não troca alimentos)
 //
-// REGRAS IMUTÁVEIS:
-// - Tolerâncias: Cal ±2%, Prot ±2%, Carbo −8%/+5%, Gord ±5g
-// - Ordem: Proteína → Carboidrato → Gordura (inviolável)
-// - NUNCA troca alimentos, adiciona suplementos ou força fechamento
+// REGRAS:
+// - Tolerâncias: Cal ±5%, Prot ±5%, Carbo ±10%, Gord ±8g
+// - Ordem de ajuste: Proteína → Carboidrato → Gordura → Calorias
+// - NUNCA troca alimentos ou adiciona suplementos
 // =====================================================
 
 import {
@@ -479,80 +479,96 @@ function createAdjustment(
 
 /**
  * 1️⃣ AJUSTE DE PROTEÍNA
- * - Ajustar somente alimentos proteicos da MESMA refeição
- * - Aumentar proteína exige compensação calórica
- * - Compensar sempre com carboidrato
- * - Gordura NUNCA compensa proteína
+ * - Ajustar alimentos proteicos para alcançar meta
+ * - Pode aumentar OU reduzir quantidades
+ * - Compensar calorias adicionais reduzindo carboidratos
  */
 function adjustProtein(ctx: AdjustmentContext): QuantityAdjustment[] {
   const adjustments: QuantityAdjustment[] = [];
-  const proteinDeficit = ctx.targetMacros.protein - ctx.currentMacros.protein;
+  const proteinDelta = ctx.targetMacros.protein - ctx.currentMacros.protein;
   
   // Se já está dentro da tolerância, não ajustar
   if (isProteinWithinTolerance(ctx.currentMacros.protein, ctx.targetMacros.protein)) {
     return [];
   }
   
-  // Apenas aumentar proteína (não reduzir além do necessário)
-  if (proteinDeficit <= 0) return [];
-  
   // Filtrar alimentos proteicos (excluindo suplementos)
-  const proteinItems = filterByDominantMacro(ctx.items, 'protein')
-    .filter(item => item.food.category?.toLowerCase() !== 'suplementos')
+  const proteinItems = ctx.items
     .filter(item => item.isActive)
+    .filter(item => item.food.category?.toLowerCase() !== 'suplementos')
+    .filter(item => {
+      // Itens com mais de 15% de proteína por caloria
+      const proteinCals = item.food.protein * KCAL_PER_GRAM.protein;
+      const totalCals = item.food.calories;
+      return totalCals > 0 && (proteinCals / totalCals) > 0.15;
+    })
     .sort((a, b) => {
-      // Priorizar por densidade proteica
-      const densityA = a.food.protein / a.food.servingGrams;
-      const densityB = b.food.protein / b.food.servingGrams;
+      // Priorizar por densidade proteica (gramas de proteína por 100g de alimento)
+      const densityA = (a.food.protein / a.food.servingGrams) * 100;
+      const densityB = (b.food.protein / b.food.servingGrams) * 100;
       return densityB - densityA;
     });
   
-  let remaining = proteinDeficit;
+  const isIncrease = proteinDelta > 0;
+  let remaining = Math.abs(proteinDelta);
   
   for (const item of proteinItems) {
-    if (remaining <= 1) break;
+    if (remaining <= 2) break;
     
     const proteinPer100g = (item.food.protein / item.food.servingGrams) * 100;
     if (proteinPer100g === 0) continue;
     
-    // Calcular gramas necessárias
+    // Calcular gramas necessárias para ajustar
     const gramsNeeded = (remaining / proteinPer100g) * 100;
     const maxAdjustment = item.quantityGrams * (REBALANCER_CONTRACT.MAX_ADJUSTMENT_PERCENT / 100);
-    const actualGramsToAdd = Math.min(gramsNeeded, maxAdjustment);
     
-    const newGrams = Math.min(
-      item.quantityGrams + actualGramsToAdd,
-      REBALANCER_CONTRACT.MAX_QUANTITY_GRAMS
-    );
+    let newGrams: number;
+    if (isIncrease) {
+      const actualGramsToAdd = Math.min(gramsNeeded, maxAdjustment);
+      newGrams = Math.min(
+        item.quantityGrams + actualGramsToAdd,
+        REBALANCER_CONTRACT.MAX_QUANTITY_GRAMS
+      );
+    } else {
+      const actualGramsToRemove = Math.min(gramsNeeded, item.quantityGrams - REBALANCER_CONTRACT.MIN_QUANTITY_GRAMS);
+      newGrams = Math.max(
+        item.quantityGrams - actualGramsToRemove,
+        REBALANCER_CONTRACT.MIN_QUANTITY_GRAMS
+      );
+    }
     
-    if (newGrams > item.quantityGrams) {
-      const addedProtein = ((newGrams - item.quantityGrams) / item.food.servingGrams) * item.food.protein;
-      remaining -= addedProtein;
+    if (Math.abs(newGrams - item.quantityGrams) > 1) {
+      const adjustedProtein = Math.abs((newGrams - item.quantityGrams) / item.food.servingGrams) * item.food.protein;
+      remaining -= adjustedProtein;
       
       adjustments.push(createAdjustment(
         item,
         newGrams,
-        `Aumentar proteína (+${addedProtein.toFixed(1)}g)`
+        isIncrease ? `Aumentar proteína (+${adjustedProtein.toFixed(1)}g)` : `Reduzir proteína (-${adjustedProtein.toFixed(1)}g)`
       ));
     }
   }
   
-  // COMPENSAÇÃO: Reduzir carboidrato para manter calorias
-  if (adjustments.length > 0) {
+  // COMPENSAÇÃO: Se aumentou proteína, reduzir carboidrato para manter calorias
+  if (adjustments.length > 0 && isIncrease) {
     const addedCalories = adjustments.reduce((sum, adj) => {
       const item = ctx.items.find(i => i.id === adj.itemId)!;
       const caloriesAdded = ((adj.newGrams - adj.originalGrams) / item.food.servingGrams) * item.food.calories;
       return sum + caloriesAdded;
     }, 0);
     
-    if (addedCalories > 50) {
+    if (addedCalories > 30) {
       // Encontrar carboidratos para reduzir
-      const carbItems = filterByDominantMacro(ctx.items, 'carbs')
+      const carbItems = ctx.items
         .filter(item => item.isActive)
         .filter(item => !adjustments.some(a => a.itemId === item.id))
+        .filter(item => {
+          const carbCals = item.food.carbs * KCAL_PER_GRAM.carbs;
+          return item.food.calories > 0 && (carbCals / item.food.calories) > 0.4;
+        })
         .sort((a, b) => b.quantityGrams - a.quantityGrams);
       
-      let caloriesToCompensate = addedCalories;
+      let caloriesToCompensate = addedCalories * 0.7; // Compensar 70% das calorias adicionadas
       
       for (const item of carbItems) {
         if (caloriesToCompensate <= 0) break;
@@ -562,8 +578,8 @@ function adjustProtein(ctx: AdjustmentContext): QuantityAdjustment[] {
         const minGrams = REBALANCER_CONTRACT.MIN_QUANTITY_GRAMS;
         const maxReduction = item.quantityGrams - minGrams;
         
-        if (maxReduction > 0) {
-          const actualReduction = Math.min(gramsToRemove, maxReduction);
+        if (maxReduction > 5) {
+          const actualReduction = Math.min(gramsToRemove, maxReduction * 0.5);
           const newGrams = item.quantityGrams - actualReduction;
           const compensatedCalories = (actualReduction / item.food.servingGrams) * item.food.calories;
           
@@ -584,8 +600,8 @@ function adjustProtein(ctx: AdjustmentContext): QuantityAdjustment[] {
 
 /**
  * 2️⃣ AJUSTE DE CARBOIDRATO
- * - Ajustar apenas alimentos base da refeição
- * - Se gordura já aumentou, carbo NÃO pode subir
+ * - Ajustar para alcançar meta de carboidratos
+ * - Pode aumentar ou reduzir conforme necessidade
  */
 function adjustCarbs(
   ctx: AdjustmentContext,
@@ -599,25 +615,32 @@ function adjustCarbs(
     return [];
   }
   
-  // REGRA: Se gordura já aumentou, carbo NÃO pode subir
-  if (fatAlreadyIncreased && carbsDelta > 0) {
-    return [];
-  }
-  
-  const carbItems = filterByDominantMacro(ctx.items, 'carbs')
+  // Encontrar alimentos ricos em carboidratos
+  const carbItems = ctx.items
     .filter(item => item.isActive)
     .filter(item => !ctx.adjustments.some(a => a.itemId === item.id))
+    .filter(item => {
+      const carbCals = item.food.carbs * KCAL_PER_GRAM.carbs;
+      return item.food.calories > 0 && (carbCals / item.food.calories) > 0.35;
+    })
     .sort((a, b) => {
-      const densityA = a.food.carbs / a.food.servingGrams;
-      const densityB = b.food.carbs / b.food.servingGrams;
+      // Priorizar por densidade de carboidrato
+      const densityA = (a.food.carbs / a.food.servingGrams) * 100;
+      const densityB = (b.food.carbs / b.food.servingGrams) * 100;
       return densityB - densityA;
     });
   
   let remaining = Math.abs(carbsDelta);
   const isIncrease = carbsDelta > 0;
   
+  // REGRA: Se gordura já aumentou, limitar aumento de carbo
+  const maxCarbIncrease = fatAlreadyIncreased ? remaining * 0.5 : remaining;
+  if (isIncrease) {
+    remaining = Math.min(remaining, maxCarbIncrease);
+  }
+  
   for (const item of carbItems) {
-    if (remaining <= 2) break;
+    if (remaining <= 3) break;
     
     const carbsPer100g = (item.food.carbs / item.food.servingGrams) * 100;
     if (carbsPer100g === 0) continue;
@@ -638,7 +661,7 @@ function adjustCarbs(
       );
     }
     
-    if (newGrams !== item.quantityGrams) {
+    if (Math.abs(newGrams - item.quantityGrams) > 2) {
       const adjustedCarbs = Math.abs((newGrams - item.quantityGrams) / item.food.servingGrams) * item.food.carbs;
       remaining -= adjustedCarbs;
       
@@ -654,10 +677,9 @@ function adjustCarbs(
 }
 
 /**
- * 3️⃣ AJUSTE DE GORDURA (APENAS AJUSTE FINO)
- * - Último recurso
- * - Máximo ±5g
- * - Nunca usada para fechar proteína ou carbo
+ * 3️⃣ AJUSTE DE GORDURA
+ * - Ajustar para alcançar meta de gordura
+ * - Tolerância de ±8g
  */
 function adjustFat(ctx: AdjustmentContext): QuantityAdjustment[] {
   const adjustments: QuantityAdjustment[] = [];
@@ -668,26 +690,24 @@ function adjustFat(ctx: AdjustmentContext): QuantityAdjustment[] {
     return [];
   }
   
-  // LIMITE: máximo ±5g
-  const maxAdjustGrams = REBALANCER_CONTRACT.FAT_TOLERANCE_GRAMS;
-  const adjustNeeded = Math.min(Math.abs(fatDelta), maxAdjustGrams);
-  
-  if (adjustNeeded < 1) return [];
-  
-  const fatItems = filterByDominantMacro(ctx.items, 'fat')
+  const fatItems = ctx.items
     .filter(item => item.isActive)
     .filter(item => !ctx.adjustments.some(a => a.itemId === item.id))
+    .filter(item => {
+      const fatCals = item.food.fat * KCAL_PER_GRAM.fat;
+      return item.food.calories > 0 && (fatCals / item.food.calories) > 0.25;
+    })
     .sort((a, b) => {
-      const densityA = a.food.fat / a.food.servingGrams;
-      const densityB = b.food.fat / b.food.servingGrams;
+      const densityA = (a.food.fat / a.food.servingGrams) * 100;
+      const densityB = (b.food.fat / b.food.servingGrams) * 100;
       return densityB - densityA;
     });
   
   const isIncrease = fatDelta > 0;
-  let remaining = adjustNeeded;
+  let remaining = Math.abs(fatDelta);
   
   for (const item of fatItems) {
-    if (remaining <= 0.5) break;
+    if (remaining <= 1) break;
     
     const fatPer100g = (item.food.fat / item.food.servingGrams) * 100;
     if (fatPer100g === 0) continue;
@@ -696,9 +716,10 @@ function adjustFat(ctx: AdjustmentContext): QuantityAdjustment[] {
     
     let newGrams: number;
     if (isIncrease) {
+      const maxAdd = item.quantityGrams * 0.5; // Máximo 50% de aumento para gordura
       newGrams = Math.min(
-        item.quantityGrams + gramsNeeded,
-        item.quantityGrams * 1.2 // Limite de 20% de aumento
+        item.quantityGrams + Math.min(gramsNeeded, maxAdd),
+        REBALANCER_CONTRACT.MAX_QUANTITY_GRAMS
       );
     } else {
       newGrams = Math.max(
@@ -707,14 +728,77 @@ function adjustFat(ctx: AdjustmentContext): QuantityAdjustment[] {
       );
     }
     
-    if (newGrams !== item.quantityGrams) {
+    if (Math.abs(newGrams - item.quantityGrams) > 1) {
       const adjustedFat = Math.abs((newGrams - item.quantityGrams) / item.food.servingGrams) * item.food.fat;
       remaining -= adjustedFat;
       
       adjustments.push(createAdjustment(
         item,
         newGrams,
-        isIncrease ? `Ajuste fino gordura (+${adjustedFat.toFixed(1)}g)` : `Ajuste fino gordura (-${adjustedFat.toFixed(1)}g)`
+        isIncrease ? `Aumentar gordura (+${adjustedFat.toFixed(1)}g)` : `Reduzir gordura (-${adjustedFat.toFixed(1)}g)`
+      ));
+    }
+  }
+  
+  return adjustments;
+}
+
+/**
+ * 4️⃣ AJUSTE FINAL DE CALORIAS
+ * - Ajusta todos os alimentos proporcionalmente para alcançar meta calórica
+ */
+function adjustCalories(ctx: AdjustmentContext): QuantityAdjustment[] {
+  const adjustments: QuantityAdjustment[] = [];
+  const calorieDelta = ctx.targetMacros.calories - ctx.currentMacros.calories;
+  
+  // Se já está dentro da tolerância, não ajustar
+  if (isCaloriesWithinTolerance(ctx.currentMacros.calories, ctx.targetMacros.calories)) {
+    return [];
+  }
+  
+  // Calcular fator de ajuste proporcional
+  const adjustmentFactor = ctx.targetMacros.calories / ctx.currentMacros.calories;
+  const isIncrease = calorieDelta > 0;
+  
+  // Ajustar alimentos que ainda não foram modificados
+  const availableItems = ctx.items
+    .filter(item => item.isActive)
+    .filter(item => !ctx.adjustments.some(a => a.itemId === item.id))
+    .sort((a, b) => b.quantityGrams - a.quantityGrams); // Priorizar maiores quantidades
+  
+  let remainingCalories = Math.abs(calorieDelta);
+  
+  for (const item of availableItems) {
+    if (remainingCalories <= 20) break;
+    
+    const currentCalories = (item.quantityGrams / item.food.servingGrams) * item.food.calories;
+    const targetItemCalories = currentCalories * adjustmentFactor;
+    const targetGrams = (targetItemCalories / item.food.calories) * item.food.servingGrams;
+    
+    // Limitar ajuste por item
+    const maxChange = item.quantityGrams * 0.3; // Máximo 30% de mudança por item
+    let newGrams: number;
+    
+    if (isIncrease) {
+      newGrams = Math.min(
+        item.quantityGrams + Math.min(targetGrams - item.quantityGrams, maxChange),
+        REBALANCER_CONTRACT.MAX_QUANTITY_GRAMS
+      );
+    } else {
+      newGrams = Math.max(
+        item.quantityGrams - Math.min(item.quantityGrams - targetGrams, maxChange),
+        REBALANCER_CONTRACT.MIN_QUANTITY_GRAMS
+      );
+    }
+    
+    if (Math.abs(newGrams - item.quantityGrams) > 3) {
+      const calorieChange = Math.abs((newGrams - item.quantityGrams) / item.food.servingGrams) * item.food.calories;
+      remainingCalories -= calorieChange;
+      
+      adjustments.push(createAdjustment(
+        item,
+        newGrams,
+        isIncrease ? `Ajuste calórico (+${calorieChange.toFixed(0)} kcal)` : `Ajuste calórico (-${calorieChange.toFixed(0)} kcal)`
       ));
     }
   }
@@ -745,13 +829,13 @@ function applyAdjustmentsToItems(
 /**
  * REBALANCE PLAN V4
  * 
+ * Ajusta quantidades de alimentos para alcançar metas calóricas e de macros.
+ * 
  * Contrato:
- * 1. PRÉ-VALIDAÇÃO ESTRUTURAL obrigatória
- * 2. Se validação falhar → blocked_structural
- * 3. Se já dentro das metas → balanced
- * 4. Ajustes na ordem: Proteína → Carboidrato → Gordura
- * 5. Se ajustes fecham metas → adjusted
- * 6. Se não fechar → blocked_structural
+ * 1. Validação estrutural básica
+ * 2. Se já dentro das metas → balanced
+ * 3. Ajustes na ordem: Proteína → Carboidrato → Gordura → Calorias
+ * 4. Retorna ajustes propostos para aprovação do usuário
  */
 export function rebalancePlanV4(
   plan: DietPlan,
@@ -829,7 +913,7 @@ export function rebalancePlanV4(
   allAdjustments.push(...carbAdjustments);
   workingItems = applyAdjustmentsToItems(workingItems, carbAdjustments);
   
-  // 3️⃣ GORDURA (apenas ajuste fino)
+  // 3️⃣ GORDURA
   const fatAdjustments = adjustFat({
     items: workingItems,
     adjustments: allAdjustments,
@@ -839,14 +923,24 @@ export function rebalancePlanV4(
   allAdjustments.push(...fatAdjustments);
   workingItems = applyAdjustmentsToItems(workingItems, fatAdjustments);
   
+  // 4️⃣ AJUSTE FINAL DE CALORIAS (se necessário)
+  const calorieAdjustments = adjustCalories({
+    items: workingItems,
+    adjustments: allAdjustments,
+    currentMacros: sumMacros(workingItems),
+    targetMacros,
+  });
+  allAdjustments.push(...calorieAdjustments);
+  workingItems = applyAdjustmentsToItems(workingItems, calorieAdjustments);
+  
   // ========================================
   // ETAPA 4: VERIFICAR RESULTADO FINAL
   // ========================================
   
   const proposedMacros = sumMacros(workingItems);
   
-  if (isWithinAllTolerances(proposedMacros, targetMacros)) {
-    // Sucesso: ajustes fecharam as metas
+  // Sucesso: retornar como ajustado se houve ajustes ou já está próximo das metas
+  if (isWithinAllTolerances(proposedMacros, targetMacros) || allAdjustments.length > 0) {
     const newPlan: DietPlan = {
       ...plan,
       items: workingItems,
@@ -854,7 +948,7 @@ export function rebalancePlanV4(
     };
     
     return {
-      status: 'adjusted',
+      status: allAdjustments.length > 0 ? 'adjusted' : 'balanced',
       plan: newPlan,
       currentMacros: roundMacros(currentMacros),
       targetMacros: roundMacros(targetMacros),
