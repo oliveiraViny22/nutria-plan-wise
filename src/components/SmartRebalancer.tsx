@@ -14,6 +14,7 @@ import {
   Shield,
   Lock,
   Info,
+  AlertTriangle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -218,6 +219,33 @@ export function SmartRebalancer({
   const isBlocked = result?.execution_blocked;
   const requiresApproval = result?.requires_approval;
 
+  // CORREÇÃO: Verificar se macros propostos estão realmente dentro das metas
+  // Isso corrige o bug onde o plano era mostrado como "otimizado" incorretamente
+  const checkMacrosWithinTolerance = (): boolean => {
+    if (!result) return false;
+    
+    const { proposed_macros: proposed, target_macros: target } = result;
+    
+    // Tolerâncias definidas no rebalancer-core
+    const CALORIE_TOLERANCE = 0.02; // ±2%
+    const PROTEIN_TOLERANCE = 0.02; // ±2%
+    const CARBS_TOLERANCE_MIN = 0.08; // -8%
+    const CARBS_TOLERANCE_MAX = 0.05; // +5%
+    const FAT_TOLERANCE_GRAMS = 5; // ±5g
+    
+    // Verificar cada macro
+    const calorieOK = Math.abs((proposed.calories - target.calories) / target.calories) <= CALORIE_TOLERANCE;
+    const proteinOK = Math.abs((proposed.protein - target.protein) / target.protein) <= PROTEIN_TOLERANCE;
+    const carbsDiff = (proposed.carbs - target.carbs) / target.carbs;
+    const carbsOK = carbsDiff >= -CARBS_TOLERANCE_MIN && carbsDiff <= CARBS_TOLERANCE_MAX;
+    const fatOK = Math.abs(proposed.fat - target.fat) <= FAT_TOLERANCE_GRAMS;
+    
+    return calorieOK && proteinOK && carbsOK && fatOK;
+  };
+  
+  const isActuallyOptimized = result && !hasAdjustments && checkMacrosWithinTolerance();
+  const isNotOptimizable = result && !hasAdjustments && !checkMacrosWithinTolerance() && !isBlocked;
+
   return (
     <>
       <Button
@@ -382,7 +410,7 @@ export function SmartRebalancer({
                     )}
                   </AnimatePresence>
                 </div>
-              ) : !isBlocked && (
+              ) : !isBlocked && isActuallyOptimized && (
                 <div className="flex items-center gap-3 p-4 rounded-xl bg-primary/5 border border-primary/20">
                   <Check className="w-5 h-5 text-primary flex-shrink-0" />
                   <div>
@@ -391,6 +419,21 @@ export function SmartRebalancer({
                     </p>
                     <p className="text-xs text-muted-foreground">
                       Os macros atuais estão dentro das metas definidas.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* CORREÇÃO: Mostrar mensagem de falha quando não é otimizável */}
+              {!isBlocked && isNotOptimizable && (
+                <div className="flex items-center gap-3 p-4 rounded-xl bg-amber-500/10 border border-amber-500/20">
+                  <AlertTriangle className="w-5 h-5 text-amber-500 flex-shrink-0" />
+                  <div>
+                    <p className="text-sm font-medium text-foreground">
+                      Não foi possível otimizar o plano
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Os alimentos atuais não permitem atingir as metas. Considere adicionar novos alimentos ou ajustar as metas.
                     </p>
                   </div>
                 </div>

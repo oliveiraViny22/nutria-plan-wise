@@ -131,6 +131,17 @@ export interface ControlledFailureDetails {
   userMessage: string;
 }
 
+/**
+ * Status do plano após rebalanceamento.
+ * ESSENCIAL: Diferencia "já otimizado" de "não otimizável".
+ */
+export type PlanStatus = 
+  | 'already_balanced'      // Plano já está dentro das metas
+  | 'optimized'             // Ajustes aplicáveis, resultado válido
+  | 'partially_optimized'   // Ajustes aplicáveis, mas macros fora de tolerância
+  | 'blocked_structural'    // Estrutura do plano impede otimização
+  | 'blocked_energy';       // Equação energética inviável
+
 export interface RebalanceSnapshot {
   planId: string;
   version: number;
@@ -141,6 +152,12 @@ export interface RebalanceSnapshot {
   supplementNeeds: SupplementNeed[];
   isValid: boolean;
   validationErrors: string[];
+  
+  /** Status detalhado do plano após tentativa de rebalanceamento */
+  planStatus: PlanStatus;
+  
+  /** Mensagem amigável para o usuário baseada no status */
+  statusMessage: string;
   
   // NOVO: Indicador de falha controlada para fluxo híbrido
   controlledFailure?: ControlledFailureDetails;
@@ -401,24 +418,112 @@ export function calculateDeltas(current: MacroTargets, target: MacroTargets): Ma
 
 /**
  * Verifica se os macros já estão dentro da tolerância.
+ * CORRIGIDO: Usa tolerâncias específicas por macro (assimétricas para carbs, absolutas para gordura).
  */
 export function isWithinTolerance(
   current: MacroTargets,
   target: MacroTargets,
   tolerancePercent: number
 ): boolean {
-  const check = (current: number, target: number): boolean => {
-    if (target === 0) return current === 0;
-    const diffPercent = Math.abs((current - target) / target) * 100;
+  // Calorias: ±tolerancePercent (normalmente 2%)
+  const calorieOK = (() => {
+    if (target.calories === 0) return current.calories === 0;
+    const diffPercent = Math.abs((current.calories - target.calories) / target.calories) * 100;
     return diffPercent <= tolerancePercent;
-  };
+  })();
   
-  return (
-    check(current.protein, target.protein) &&
-    check(current.carbs, target.carbs) &&
-    check(current.fat, target.fat) &&
-    check(current.calories, target.calories)
-  );
+  // Proteína: ±PROTEIN_TOLERANCE_PERCENT (2%)
+  const proteinOK = (() => {
+    if (target.protein === 0) return current.protein === 0;
+    const diffPercent = Math.abs((current.protein - target.protein) / target.protein) * 100;
+    return diffPercent <= PROTEIN_TOLERANCE_PERCENT;
+  })();
+  
+  // Carboidrato: tolerância ASSIMÉTRICA (-8% a +5%)
+  const carbsOK = (() => {
+    if (target.carbs === 0) return current.carbs === 0;
+    const diffPercent = ((current.carbs - target.carbs) / target.carbs) * 100;
+    return diffPercent >= -CARBS_TOLERANCE_MIN_PERCENT && diffPercent <= CARBS_TOLERANCE_MAX_PERCENT;
+  })();
+  
+  // Gordura: ±FAT_TOLERANCE_GRAMS (5g) - ABSOLUTO, não percentual
+  const fatOK = Math.abs(current.fat - target.fat) <= FAT_TOLERANCE_GRAMS;
+  
+  return calorieOK && proteinOK && carbsOK && fatOK;
+}
+
+/**
+ * Verifica se macros propostos estão dentro das tolerâncias.
+ * Retorna um objeto detalhado com status de cada macro.
+ * ESSENCIAL: Esta é a validação FINAL que determina se o plano é válido.
+ */
+export interface MacroValidationResult {
+  isValid: boolean;
+  calorieOK: boolean;
+  proteinOK: boolean;
+  carbsOK: boolean;
+  fatOK: boolean;
+  errors: string[];
+}
+
+export function validateFinalMacros(
+  proposed: MacroTargets,
+  target: MacroTargets
+): MacroValidationResult {
+  const errors: string[] = [];
+  
+  // Calorias: ±2%
+  const calorieOK = (() => {
+    if (target.calories === 0) return proposed.calories === 0;
+    const diffPercent = Math.abs((proposed.calories - target.calories) / target.calories) * 100;
+    const ok = diffPercent <= CALORIE_TOLERANCE_PERCENT;
+    if (!ok) {
+      errors.push(`Calorias: ${Math.round(proposed.calories)} vs meta ${target.calories} (${diffPercent.toFixed(1)}% de diferença, máx: ±${CALORIE_TOLERANCE_PERCENT}%)`);
+    }
+    return ok;
+  })();
+  
+  // Proteína: ±2%
+  const proteinOK = (() => {
+    if (target.protein === 0) return proposed.protein === 0;
+    const diffPercent = Math.abs((proposed.protein - target.protein) / target.protein) * 100;
+    const ok = diffPercent <= PROTEIN_TOLERANCE_PERCENT;
+    if (!ok) {
+      errors.push(`Proteína: ${Math.round(proposed.protein)}g vs meta ${target.protein}g (${diffPercent.toFixed(1)}% de diferença, máx: ±${PROTEIN_TOLERANCE_PERCENT}%)`);
+    }
+    return ok;
+  })();
+  
+  // Carboidrato: -8% a +5%
+  const carbsOK = (() => {
+    if (target.carbs === 0) return proposed.carbs === 0;
+    const diffPercent = ((proposed.carbs - target.carbs) / target.carbs) * 100;
+    const ok = diffPercent >= -CARBS_TOLERANCE_MIN_PERCENT && diffPercent <= CARBS_TOLERANCE_MAX_PERCENT;
+    if (!ok) {
+      if (diffPercent < -CARBS_TOLERANCE_MIN_PERCENT) {
+        errors.push(`Carboidrato: ${Math.round(proposed.carbs)}g vs meta ${target.carbs}g (${diffPercent.toFixed(1)}% abaixo, mín: -${CARBS_TOLERANCE_MIN_PERCENT}%)`);
+      } else {
+        errors.push(`Carboidrato: ${Math.round(proposed.carbs)}g vs meta ${target.carbs}g (+${diffPercent.toFixed(1)}% acima, máx: +${CARBS_TOLERANCE_MAX_PERCENT}%)`);
+      }
+    }
+    return ok;
+  })();
+  
+  // Gordura: ±5g (absoluto)
+  const fatDiff = proposed.fat - target.fat;
+  const fatOK = Math.abs(fatDiff) <= FAT_TOLERANCE_GRAMS;
+  if (!fatOK) {
+    errors.push(`Gordura: ${Math.round(proposed.fat)}g vs meta ${target.fat}g (${fatDiff > 0 ? '+' : ''}${fatDiff.toFixed(1)}g, máx: ±${FAT_TOLERANCE_GRAMS}g)`);
+  }
+  
+  return {
+    isValid: calorieOK && proteinOK && carbsOK && fatOK,
+    calorieOK,
+    proteinOK,
+    carbsOK,
+    fatOK,
+    errors,
+  };
 }
 
 /**
@@ -1037,6 +1142,7 @@ export function rebalancePlan(
   const currentMacros = sumMacros(firstOptionItems);
   
   // ===== PASSO 3: VERIFICAR SE JÁ ESTÁ BALANCEADO =====
+  // CORREÇÃO CRÍTICA: Usar validação rigorosa com tolerâncias específicas por macro
   if (isWithinTolerance(currentMacros, target, opts.tolerancePercent)) {
     return {
       planId: plan.id,
@@ -1048,6 +1154,8 @@ export function rebalancePlan(
       supplementNeeds: [],
       isValid: true,
       validationErrors: [],
+      planStatus: 'already_balanced',
+      statusMessage: 'Seu plano já está otimizado! Os macros atuais estão dentro das metas definidas.',
     };
   }
   
@@ -1066,6 +1174,8 @@ export function rebalancePlan(
       supplementNeeds: [],
       isValid: false,
       validationErrors: energyResult.errors,
+      planStatus: 'blocked_energy',
+      statusMessage: 'Não foi possível otimizar: a combinação de metas calóricas e de proteína é matematicamente inviável com os alimentos atuais.',
     };
   }
   
@@ -1275,12 +1385,40 @@ export function rebalancePlan(
     };
   }
   
-  // IMPORTANTE: Se apenas macros secundários estão fora da tolerância,
-  // considerar como VÁLIDO (não acionar falha controlada)
-  const onlySecondaryMacrosOff = hasValidationFailures && !hasPrimaryMacroFailure;
-  const effectivelyValid = validationErrors.length === 0 || onlySecondaryMacrosOff;
+  // ===== PASSO 10: VALIDAÇÃO FINAL RIGOROSA =====
+  // CORREÇÃO CRÍTICA: isValid é determinado EXCLUSIVAMENTE pela validação de macros,
+  // NÃO pela quantidade de ajustes ou igualdade entre atual e proposto
+  const finalValidation = validateFinalMacros(roundMacros(proposedMacros), target);
   
-  // ===== PASSO 10: RETORNAR SNAPSHOT IMUTÁVEL =====
+  // Determinar status do plano baseado na validação
+  let planStatus: PlanStatus;
+  let statusMessage: string;
+  
+  if (controlledFailure) {
+    planStatus = 'blocked_structural';
+    statusMessage = controlledFailure.userMessage;
+  } else if (finalValidation.isValid) {
+    if (allAdjustments.length > 0) {
+      planStatus = 'optimized';
+      statusMessage = 'Ajustes calculados com sucesso! O plano agora atinge suas metas.';
+    } else {
+      // Caso raro: nenhum ajuste mas proposto está válido (pode acontecer por arredondamento)
+      planStatus = 'already_balanced';
+      statusMessage = 'Seu plano já está otimizado! Os macros atuais estão dentro das metas definidas.';
+    }
+  } else {
+    // Macros propostos fora da tolerância, mas sem falha controlada
+    planStatus = 'partially_optimized';
+    statusMessage = `Não foi possível otimizar completamente: ${finalValidation.errors.join('; ')}`;
+  }
+  
+  // Combinar erros de validação
+  const allValidationErrors = [
+    ...validationErrors,
+    ...finalValidation.errors.filter(e => !validationErrors.includes(e)),
+  ];
+  
+  // ===== PASSO 11: RETORNAR SNAPSHOT IMUTÁVEL =====
   return {
     planId: plan.id,
     version: plan.version + 1,
@@ -1289,10 +1427,11 @@ export function rebalancePlan(
     proposedMacros: roundMacros(proposedMacros),
     adjustments: allAdjustments,
     supplementNeeds,
-    // REGRA 5 AJUSTADA: Usar effectivelyValid para não falhar por macros secundários
-    isValid: effectivelyValid,
-    // Manter todos os erros para logging/debug, mas não bloquear por erros de macros secundários
-    validationErrors: effectivelyValid ? [] : validationErrors,
+    // CORREÇÃO: isValid baseado EXCLUSIVAMENTE na validação de tolerâncias
+    isValid: finalValidation.isValid,
+    validationErrors: allValidationErrors,
+    planStatus,
+    statusMessage,
     controlledFailure,
   };
 }

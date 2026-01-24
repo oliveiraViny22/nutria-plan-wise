@@ -25,6 +25,7 @@ import {
   RebalanceSnapshot,
   QuantityAdjustment,
   SupplementNeed,
+  PlanStatus,
 } from '@/lib/rebalancer-core';
 
 // =====================================================
@@ -63,10 +64,14 @@ export interface RebalanceProposal {
   supplementNeeds: SupplementNeed[];
   isValid: boolean;
   validationErrors: string[];
+  /** Status detalhado do plano */
+  planStatus: PlanStatus;
+  /** Mensagem amigável para o usuário */
+  statusMessage: string;
 }
 
 // Re-export types
-export type { MacroTargets } from '@/lib/rebalancer-core';
+export type { MacroTargets, PlanStatus } from '@/lib/rebalancer-core';
 
 // =====================================================
 // FUNÇÕES DE TRANSFORMAÇÃO
@@ -238,6 +243,8 @@ function transformToProposal(
     supplementNeeds: snapshot.supplementNeeds,
     isValid: snapshot.isValid,
     validationErrors: snapshot.validationErrors,
+    planStatus: snapshot.planStatus,
+    statusMessage: snapshot.statusMessage,
   };
 }
 
