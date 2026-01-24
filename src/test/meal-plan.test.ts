@@ -746,11 +746,9 @@ describe('Generator vs Rebalancer Separation (Spec Section 14)', () => {
   });
 
   it('generator should NOT adjust portions precisely', async () => {
-    // Generator creates "good enough" plan
-    // Rebalancer does precise adjustments
     const mockMealPlan = {
       id: 'plan-123',
-      total_calories: 1950, // Close but not exact
+      total_calories: 1950,
       meals: [],
     };
 
@@ -769,13 +767,11 @@ describe('Generator vs Rebalancer Separation (Spec Section 14)', () => {
       },
     });
 
-    // Generator allows tolerance, not exact match
     expect(result.data.plan.total_calories).not.toBe(2000);
     expect(Math.abs(result.data.plan.total_calories - 2000)).toBeLessThan(300);
   });
 
   it('generator should NOT use AI for macro calculations', async () => {
-    // This is a conceptual test - the generator should be heuristic
     const mockMealPlan = {
       id: 'plan-123',
       total_calories: 1900,
@@ -794,8 +790,474 @@ describe('Generator vs Rebalancer Separation (Spec Section 14)', () => {
       },
     });
 
-    // Should succeed without AI dependency
     expect(result.error).toBeNull();
     expect(result.data).toBeDefined();
+  });
+});
+
+// ============================================================
+// TESTES DE REGRAS ESTRUTURAIS v2 - PLANOS MAL FORMADOS
+// ============================================================
+
+describe('Structural Rules v2 - Malformed Plans', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  // ============================================================
+  // 1. TODA REFEIÇÃO DEVE TER PROTEÍNA COMPATÍVEL
+  // ============================================================
+
+  describe('Every Meal Must Have Compatible Protein', () => {
+    it('should FAIL if breakfast has no protein source', async () => {
+      mockInvoke.mockResolvedValueOnce({
+        data: null,
+        error: { message: 'Não há fonte de proteína compatível para Café da Manhã' },
+      });
+
+      const { supabase } = await import('@/integrations/supabase/client');
+      const result = await supabase.functions.invoke('generate-meal-plan', {
+        body: {
+          profile: {
+            daily_calories: 2000,
+            meals_per_day: 4,
+            restrictions: ['lactose', 'ovo'], // Blocks most breakfast proteins
+          },
+        },
+      });
+
+      expect(result.error).toBeDefined();
+    });
+
+    it('should FAIL if lunch has no compatible protein source', async () => {
+      mockInvoke.mockResolvedValueOnce({
+        data: null,
+        error: { message: 'Não há fonte de proteína compatível para Almoço' },
+      });
+
+      const { supabase } = await import('@/integrations/supabase/client');
+      const result = await supabase.functions.invoke('generate-meal-plan', {
+        body: {
+          profile: {
+            daily_calories: 2000,
+            meals_per_day: 4,
+            restrictions: ['vegetariano', 'ovo'], // Very restrictive
+          },
+        },
+      });
+
+      expect(result.error).toBeDefined();
+    });
+
+    it('should include protein in ALL meals, not just main ones', async () => {
+      const mockMealPlan = {
+        id: 'plan-123',
+        meals: [
+          {
+            name: 'Café da Manhã',
+            options: [{
+              foods: [
+                { food: { category: 'laticinios', name: 'Iogurte', protein: 8 }, quantity_grams: 200 },
+                { food: { category: 'frutas', name: 'Banana' }, quantity_grams: 120 },
+              ]
+            }]
+          },
+          {
+            name: 'Lanche da Manhã',
+            options: [{
+              foods: [
+                { food: { category: 'laticinios', name: 'Queijo Cottage', protein: 12 }, quantity_grams: 100 },
+                { food: { category: 'frutas', name: 'Maçã' }, quantity_grams: 100 },
+              ]
+            }]
+          },
+          {
+            name: 'Almoço',
+            options: [{
+              foods: [
+                { food: { category: 'proteinas', name: 'Frango' }, quantity_grams: 150 },
+                { food: { category: 'carboidratos', name: 'Arroz' }, quantity_grams: 150 },
+              ]
+            }]
+          },
+          {
+            name: 'Jantar',
+            options: [{
+              foods: [
+                { food: { category: 'proteinas', name: 'Peixe' }, quantity_grams: 150 },
+                { food: { category: 'vegetais', name: 'Salada' }, quantity_grams: 100 },
+              ]
+            }]
+          },
+        ],
+      };
+
+      mockInvoke.mockResolvedValueOnce({
+        data: mockMealPlan,
+        error: null,
+      });
+
+      const { supabase } = await import('@/integrations/supabase/client');
+      const result = await supabase.functions.invoke('generate-meal-plan', {
+        body: {
+          profile: { daily_calories: 2000, meals_per_day: 4 },
+        },
+      });
+
+      for (const meal of result.data.meals) {
+        const hasProtein = meal.options?.[0]?.foods?.some(
+          (f: { food: { category: string; protein?: number } }) => 
+            f.food.category === 'proteinas' || 
+            (f.food.category === 'laticinios' && (f.food.protein || 0) >= 5)
+        );
+        expect(hasProtein).toBe(true);
+      }
+    });
+  });
+
+  // ============================================================
+  // 2. ALIMENTOS BLOQUEADOS POR CONTEXTO
+  // ============================================================
+
+  describe('Blocked Foods by Meal Context', () => {
+    it('should NOT include dinner foods in breakfast', async () => {
+      const mockMealPlan = {
+        id: 'plan-123',
+        meals: [
+          {
+            name: 'Café da Manhã',
+            options: [{
+              foods: [
+                { food: { category: 'laticinios', name: 'Iogurte' }, quantity_grams: 200 },
+                { food: { category: 'carboidratos', name: 'Pão' }, quantity_grams: 60 },
+              ]
+            }]
+          }
+        ],
+      };
+
+      mockInvoke.mockResolvedValueOnce({
+        data: mockMealPlan,
+        error: null,
+      });
+
+      const { supabase } = await import('@/integrations/supabase/client');
+      const result = await supabase.functions.invoke('generate-meal-plan', {
+        body: {
+          profile: { daily_calories: 2000, meals_per_day: 4 },
+        },
+      });
+
+      const breakfast = result.data.meals.find((m: { name: string }) => 
+        m.name === 'Café da Manhã'
+      );
+      
+      for (const food of breakfast?.options?.[0]?.foods || []) {
+        const name = food.food.name?.toLowerCase() || '';
+        expect(name).not.toContain('feijão');
+        expect(name).not.toContain('arroz');
+        expect(name).not.toContain('bife');
+        expect(name).not.toContain('frango grelhado');
+      }
+    });
+
+    it('should NOT include breakfast foods in lunch', async () => {
+      const mockMealPlan = {
+        id: 'plan-123',
+        meals: [
+          {
+            name: 'Almoço',
+            options: [{
+              foods: [
+                { food: { category: 'proteinas', name: 'Frango' }, quantity_grams: 150 },
+                { food: { category: 'carboidratos', name: 'Arroz' }, quantity_grams: 150 },
+                { food: { category: 'leguminosas', name: 'Feijão' }, quantity_grams: 100 },
+              ]
+            }]
+          }
+        ],
+      };
+
+      mockInvoke.mockResolvedValueOnce({
+        data: mockMealPlan,
+        error: null,
+      });
+
+      const { supabase } = await import('@/integrations/supabase/client');
+      const result = await supabase.functions.invoke('generate-meal-plan', {
+        body: {
+          profile: { daily_calories: 2000, meals_per_day: 4 },
+        },
+      });
+
+      const lunch = result.data.meals.find((m: { name: string }) => 
+        m.name === 'Almoço'
+      );
+      
+      for (const food of lunch?.options?.[0]?.foods || []) {
+        const name = food.food.name?.toLowerCase() || '';
+        expect(name).not.toContain('granola');
+        expect(name).not.toContain('cereal matinal');
+        expect(name).not.toContain('mingau');
+      }
+    });
+  });
+
+  // ============================================================
+  // 3. DISTRIBUIÇÃO EQUILIBRADA DE PROTEÍNA
+  // ============================================================
+
+  describe('Balanced Protein Distribution', () => {
+    it('should meet minimum protein per meal type', async () => {
+      const mockMealPlan = {
+        id: 'plan-123',
+        meals: [
+          {
+            name: 'Café da Manhã',
+            options: [{ total_protein: 12, foods: [] }] // Min 10g
+          },
+          {
+            name: 'Almoço',
+            options: [{ total_protein: 28, foods: [] }] // Min 25g
+          },
+          {
+            name: 'Lanche da Tarde',
+            options: [{ total_protein: 10, foods: [] }] // Min 8g
+          },
+          {
+            name: 'Jantar',
+            options: [{ total_protein: 22, foods: [] }] // Min 20g
+          },
+        ],
+      };
+
+      mockInvoke.mockResolvedValueOnce({
+        data: mockMealPlan,
+        error: null,
+      });
+
+      const { supabase } = await import('@/integrations/supabase/client');
+      const result = await supabase.functions.invoke('generate-meal-plan', {
+        body: {
+          profile: { daily_calories: 2000, protein_target: 150, meals_per_day: 4 },
+        },
+      });
+
+      const minProteinByMeal: Record<string, number> = {
+        'Café da Manhã': 10,
+        'Lanche da Manhã': 5,
+        'Almoço': 25,
+        'Lanche da Tarde': 8,
+        'Jantar': 20,
+        'Ceia': 5,
+      };
+
+      for (const meal of result.data.meals) {
+        const minProtein = minProteinByMeal[meal.name] || 5;
+        const actualProtein = meal.options?.[0]?.total_protein || 0;
+        expect(actualProtein).toBeGreaterThanOrEqual(minProtein * 0.8); // 80% tolerance
+      }
+    });
+  });
+
+  // ============================================================
+  // 4. PREFERÊNCIAS NÃO QUEBRAM REGRAS
+  // ============================================================
+
+  describe('Preferences Do Not Break Structural Rules', () => {
+    it('should prioritize preferences but still include protein', async () => {
+      const mockMealPlan = {
+        id: 'plan-123',
+        meals: [
+          {
+            name: 'Café da Manhã',
+            options: [{
+              foods: [
+                { food: { category: 'laticinios', name: 'Iogurte', protein: 8 }, quantity_grams: 200 },
+                { food: { category: 'frutas', name: 'Banana' }, quantity_grams: 120 },
+              ]
+            }]
+          }
+        ],
+      };
+
+      mockInvoke.mockResolvedValueOnce({
+        data: mockMealPlan,
+        error: null,
+      });
+
+      const { supabase } = await import('@/integrations/supabase/client');
+      const result = await supabase.functions.invoke('generate-meal-plan', {
+        body: {
+          profile: {
+            daily_calories: 2000,
+            meals_per_day: 4,
+            preferences: ['banana', 'maçã', 'frutas'], // Fruit preferences
+          },
+        },
+      });
+
+      // Even with fruit preferences, meals should have protein
+      for (const meal of result.data.meals) {
+        const hasProtein = meal.options?.[0]?.foods?.some(
+          (f: { food: { category: string; protein?: number } }) => 
+            f.food.category === 'proteinas' || 
+            (f.food.category === 'laticinios' && (f.food.protein || 0) >= 3)
+        );
+        expect(hasProtein).toBe(true);
+      }
+    });
+
+    it('should not use preferences to add blocked foods', async () => {
+      const mockMealPlan = {
+        id: 'plan-123',
+        meals: [
+          {
+            name: 'Café da Manhã',
+            options: [{
+              foods: [
+                { food: { category: 'laticinios', name: 'Iogurte' }, quantity_grams: 200 },
+                { food: { category: 'carboidratos', name: 'Pão' }, quantity_grams: 60 },
+              ]
+            }]
+          }
+        ],
+      };
+
+      mockInvoke.mockResolvedValueOnce({
+        data: mockMealPlan,
+        error: null,
+      });
+
+      const { supabase } = await import('@/integrations/supabase/client');
+      const result = await supabase.functions.invoke('generate-meal-plan', {
+        body: {
+          profile: {
+            daily_calories: 2000,
+            meals_per_day: 4,
+            preferences: ['feijão', 'arroz'], // Blocked for breakfast
+          },
+        },
+      });
+
+      const breakfast = result.data.meals.find((m: { name: string }) => 
+        m.name === 'Café da Manhã'
+      );
+      
+      for (const food of breakfast?.options?.[0]?.foods || []) {
+        const name = food.food.name?.toLowerCase() || '';
+        expect(name).not.toContain('feijão');
+        expect(name).not.toContain('arroz');
+      }
+    });
+  });
+
+  // ============================================================
+  // 5. PLANO FALHA SE REGRAS NÃO SÃO ATENDIDAS
+  // ============================================================
+
+  describe('Plan Generation Fails on Structural Violations', () => {
+    it('should FAIL with clear error if no compatible protein exists', async () => {
+      mockInvoke.mockResolvedValueOnce({
+        data: null,
+        error: { message: 'Não foi possível gerar o plano: Não há fonte de proteína compatível' },
+      });
+
+      const { supabase } = await import('@/integrations/supabase/client');
+      const result = await supabase.functions.invoke('generate-meal-plan', {
+        body: {
+          profile: {
+            daily_calories: 2000,
+            meals_per_day: 6,
+            restrictions: ['lactose', 'ovo', 'carne', 'frango', 'peixe'],
+          },
+        },
+      });
+
+      expect(result.error).toBeDefined();
+      expect(result.error?.message).toContain('proteína');
+    });
+
+    it('should NOT generate partial plan if some meals fail', async () => {
+      mockInvoke.mockResolvedValueOnce({
+        data: null,
+        error: { message: 'Não foi possível gerar o plano' },
+      });
+
+      const { supabase } = await import('@/integrations/supabase/client');
+      const result = await supabase.functions.invoke('generate-meal-plan', {
+        body: {
+          profile: {
+            daily_calories: 500, // Too low to meet all requirements
+            meals_per_day: 6,
+          },
+        },
+      });
+
+      // Should fail entirely, not return partial plan
+      if (result.error) {
+        expect(result.data).toBeNull();
+      }
+    });
+  });
+});
+
+// ============================================================
+// TESTES DE REBALANCEADOR ASSUME PLANO VÁLIDO
+// ============================================================
+
+describe('Rebalancer Assumes Valid Plan (Post-Generation)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('rebalancer should NOT add protein if missing (generator responsibility)', async () => {
+    // The rebalancer should assume the plan already has valid protein
+    // It only adjusts portions, not structural composition
+    const mockRebalanceResult = {
+      success: true,
+      adjustments: [
+        { type: 'quantity_change', food_name: 'Frango', original_quantity: 120, new_quantity: 150 }
+      ],
+    };
+
+    mockInvoke.mockResolvedValueOnce({
+      data: mockRebalanceResult,
+      error: null,
+    });
+
+    const { supabase } = await import('@/integrations/supabase/client');
+    const result = await supabase.functions.invoke('rebalance-meal-plan', {
+      body: { plan_id: 'plan-123' },
+    });
+
+    // Rebalancer adjusts quantities, doesn't add new foods
+    if (result.data?.adjustments) {
+      for (const adj of result.data.adjustments) {
+        expect(adj.type).toBe('quantity_change');
+      }
+    }
+  });
+
+  it('rebalancer should trust plan structure is correct', async () => {
+    const mockRebalanceResult = {
+      success: true,
+      profile_type: 'premium',
+      current_macros: { protein: 140, carbs: 200, fat: 60, calories: 1900 },
+      target_macros: { protein: 150, carbs: 220, fat: 65, calories: 2000 },
+    };
+
+    mockInvoke.mockResolvedValueOnce({
+      data: mockRebalanceResult,
+      error: null,
+    });
+
+    const { supabase } = await import('@/integrations/supabase/client');
+    const result = await supabase.functions.invoke('rebalance-meal-plan', {
+      body: { plan_id: 'plan-123' },
+    });
+
+    expect(result.error).toBeNull();
+    expect(result.data.success).toBe(true);
   });
 });

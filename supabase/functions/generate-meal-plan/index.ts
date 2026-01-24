@@ -1,9 +1,15 @@
 // ============================================================
-// GERADOR DE PLANO ALIMENTAR - VERSÃO CANÔNICA
+// GERADOR DE PLANO ALIMENTAR - VERSÃO CANÔNICA v2
 // ============================================================
 // RESPONSABILIDADE: Criar a PRIMEIRA versão do plano.
 // NÃO otimiza continuamente (isso é do rebalanceador).
 // NÃO usa IA para cálculos - é puramente heurístico.
+// ============================================================
+// REGRAS ESTRUTURAIS (v2):
+// 1. TODA refeição deve ter fonte de proteína compatível
+// 2. Alimentos bloqueados por contexto NUNCA entram
+// 3. Proteína distribuída equilibradamente (mínimo por refeição)
+// 4. Se regras não forem atendidas, plano NÃO é gerado
 // ============================================================
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
@@ -38,7 +44,7 @@ const logStep = (step: string, details?: unknown) => {
 };
 
 // ============================================================
-// INTERFACES (LINHAS 1-30 DA SPEC)
+// INTERFACES
 // ============================================================
 
 interface Food {
@@ -52,7 +58,6 @@ interface Food {
   category: string;
   processing_level: string;
   status: string;
-  // Campos de conversão de unidades
   unit_name: string | null;
   unit_weight_grams: number | null;
   unit_increment: number;
@@ -96,7 +101,7 @@ interface GeneratorInput {
 }
 
 // ============================================================
-// VALIDAÇÕES INICIAIS (LINHAS 1-30 DA SPEC)
+// VALIDAÇÕES INICIAIS
 // ============================================================
 
 interface ValidationResult {
@@ -118,19 +123,16 @@ function assertValidTargets(targets: MacroTargets): ValidationResult {
     return { valid: false, error: "Gordura deve estar entre 0 e 300g" };
   }
   
-  // Coerência de macros (soma aproximada das calorias)
   const calculatedCals = (targets.protein * 4) + (targets.carbs * 4) + (targets.fat * 9);
   const tolerance = targets.calories * 0.15;
   if (Math.abs(calculatedCals - targets.calories) > tolerance) {
     logStep("Warning: macro sum doesn't match calories", { calculatedCals, targetCals: targets.calories });
-    // Não invalida, apenas avisa
   }
   
   return { valid: true };
 }
 
 function assertValidPreferences(preferences: string[], restrictions: string[]): ValidationResult {
-  // Verifica se preferências e restrições são arrays de strings válidas
   if (!Array.isArray(preferences) || !Array.isArray(restrictions)) {
     return { valid: false, error: "Preferências e restrições devem ser arrays" };
   }
@@ -138,7 +140,7 @@ function assertValidPreferences(preferences: string[], restrictions: string[]): 
 }
 
 // ============================================================
-// DEFINIÇÃO DA ESTRUTURA DO DIA (LINHAS 30-60 DA SPEC)
+// ESTRUTURA DO DIA
 // ============================================================
 
 const MEAL_TYPES = [
@@ -179,8 +181,141 @@ function buildMealSkeleton(mealsPerDay: number): MealType[] {
 }
 
 // ============================================================
-// DISTRIBUIÇÃO DE MACROS POR REFEIÇÃO (LINHAS 60-90 DA SPEC)
-// Regras: soma = target total, proteína bem distribuída
+// CONTEXTO DE REFEIÇÃO - REGRAS RÍGIDAS (v2)
+// ============================================================
+// BLOQUEIO ABSOLUTO: Alimentos em 'blocked' NUNCA entram
+// PREFERIDOS: Alimentos em 'preferred' têm prioridade
+// PROTEÍNAS COMPATÍVEIS: Define fontes de proteína válidas por refeição
+// ============================================================
+
+interface MealContextRules {
+  preferred: string[];           // Keywords que indicam alimentos preferidos
+  blocked: string[];             // Keywords que BLOQUEIAM o alimento (regra rígida)
+  proteinSources: string[];      // Keywords de proteínas VÁLIDAS para esta refeição
+  minProteinGrams: number;       // Mínimo de proteína (g) para esta refeição
+}
+
+const MEAL_CONTEXT_RULES_V2: Record<MealType, MealContextRules> = {
+  // Café da manhã: ovos, laticínios, frios leves
+  breakfast: {
+    preferred: [
+      'pão', 'tapioca', 'aveia', 'granola', 'cereal', 'torrada',
+      'ovo', 'queijo', 'iogurte', 'leite', 'requeijão', 'cottage',
+      'banana', 'maçã', 'mamão', 'morango', 'laranja',
+      'mel', 'cuscuz', 'mingau', 'presunto', 'peito de peru'
+    ],
+    blocked: [
+      'feijão', 'feijoada', 'arroz branco', 'arroz integral',
+      'macarrão', 'lasanha', 'strogonoff', 'bife', 'frango grelhado',
+      'carne moída', 'almôndega', 'costela', 'alcatra', 'patinho',
+      'batata doce', 'mandioca', 'inhame', 'purê', 'farofa',
+      'tilápia', 'salmão', 'sardinha', 'camarão'
+    ],
+    proteinSources: [
+      'ovo', 'queijo', 'iogurte', 'leite', 'cottage', 'requeijão',
+      'presunto', 'peito de peru', 'cream cheese', 'whey', 'albumina'
+    ],
+    minProteinGrams: 10,
+  },
+  
+  // Lanche da manhã: laticínios, oleaginosas
+  morning_snack: {
+    preferred: [
+      'banana', 'maçã', 'pera', 'uva', 'morango', 'mamão',
+      'castanha', 'amêndoa', 'nozes', 'amendoim',
+      'iogurte', 'queijo', 'cottage', 'barra de cereal'
+    ],
+    blocked: [
+      'arroz', 'feijão', 'macarrão', 'carne', 'frango', 'peixe', 'bife',
+      'batata', 'mandioca', 'purê', 'feijoada', 'strogonoff'
+    ],
+    proteinSources: [
+      'iogurte', 'queijo', 'cottage', 'castanha', 'amêndoa', 'amendoim',
+      'nozes', 'whey', 'ovo'
+    ],
+    minProteinGrams: 5,
+  },
+  
+  // Almoço: refeição principal completa
+  lunch: {
+    preferred: [
+      'arroz', 'feijão', 'lentilha', 'grão-de-bico', 'macarrão',
+      'frango', 'carne', 'peixe', 'bife', 'filé', 'lombo', 'alcatra',
+      'tilápia', 'salmão', 'atum', 'sardinha', 'camarão',
+      'salada', 'alface', 'tomate', 'brócolis', 'couve',
+      'batata doce', 'batata inglesa', 'mandioca', 'purê'
+    ],
+    blocked: [
+      'granola', 'cereal matinal', 'mingau', 'iogurte doce',
+      'mel', 'geleia', 'biscoito doce', 'chocolate'
+    ],
+    proteinSources: [
+      'frango', 'carne', 'peixe', 'bife', 'filé', 'lombo', 'alcatra',
+      'patinho', 'tilápia', 'salmão', 'atum', 'sardinha', 'camarão',
+      'ovo', 'carne moída', 'frango desfiado', 'peito de frango'
+    ],
+    minProteinGrams: 25,
+  },
+  
+  // Lanche da tarde: similar ao da manhã
+  afternoon_snack: {
+    preferred: [
+      'banana', 'maçã', 'pera', 'abacate', 'castanha', 'amêndoa',
+      'iogurte', 'queijo', 'cottage', 'pão integral', 'tapioca',
+      'sanduíche', 'vitamina'
+    ],
+    blocked: [
+      'arroz', 'feijão', 'macarrão', 'carne grelhada', 'feijoada',
+      'batata doce', 'mandioca', 'purê', 'strogonoff'
+    ],
+    proteinSources: [
+      'iogurte', 'queijo', 'cottage', 'ovo', 'presunto', 'peito de peru',
+      'whey', 'amendoim', 'castanha', 'pasta de amendoim'
+    ],
+    minProteinGrams: 8,
+  },
+  
+  // Jantar: refeição principal, pode ser mais leve
+  dinner: {
+    preferred: [
+      'frango', 'peixe', 'carne', 'bife', 'filé', 'omelete', 'ovo',
+      'tilápia', 'salmão', 'atum', 'salada', 'alface', 'tomate',
+      'brócolis', 'abobrinha', 'legumes', 'arroz', 'batata doce',
+      'purê', 'quinoa', 'sopa', 'caldo'
+    ],
+    blocked: [
+      'pão francês', 'tapioca', 'granola', 'cereal matinal',
+      'iogurte doce', 'mel', 'geleia', 'biscoito doce', 'mingau',
+      'feijoada' // jantar geralmente mais leve
+    ],
+    proteinSources: [
+      'frango', 'peixe', 'carne', 'bife', 'filé', 'ovo', 'omelete',
+      'tilápia', 'salmão', 'atum', 'sardinha', 'peito de frango'
+    ],
+    minProteinGrams: 20,
+  },
+  
+  // Ceia: leve, laticínios
+  supper: {
+    preferred: [
+      'iogurte', 'leite', 'queijo cottage', 'queijo branco',
+      'chá', 'banana', 'maçã', 'mamão', 'aveia', 'granola',
+      'castanha', 'amêndoa', 'nozes'
+    ],
+    blocked: [
+      'arroz', 'feijão', 'macarrão', 'carne', 'frango', 'peixe', 'bife',
+      'batata', 'mandioca', 'legumes refogados', 'salada completa'
+    ],
+    proteinSources: [
+      'iogurte', 'leite', 'queijo', 'cottage', 'whey', 'caseína',
+      'castanha', 'amêndoa', 'nozes'
+    ],
+    minProteinGrams: 5,
+  }
+};
+
+// ============================================================
+// DISTRIBUIÇÃO DE MACROS POR REFEIÇÃO
 // ============================================================
 
 interface MealMacroDistribution {
@@ -194,7 +329,6 @@ function distributeMacros(
   targets: MacroTargets, 
   meals: MealType[]
 ): Record<MealType, MealMacroDistribution> {
-  // Percentuais fixos baseados no tipo de refeição
   const percentages: Record<MealType, number> = {
     breakfast: 0.20,
     morning_snack: 0.08,
@@ -204,7 +338,6 @@ function distributeMacros(
     supper: 0.07,
   };
   
-  // Ajusta percentuais para somar 100% apenas para as refeições selecionadas
   const activeMeals = meals.filter(m => percentages[m] > 0);
   const totalPercent = activeMeals.reduce((sum, m) => sum + percentages[m], 0);
   
@@ -212,9 +345,16 @@ function distributeMacros(
   
   for (const meal of meals) {
     const adjustedPercent = percentages[meal] / totalPercent;
+    const context = MEAL_CONTEXT_RULES_V2[meal];
+    
+    // Garantir mínimo de proteína por refeição
+    const baseProtein = Math.round(targets.protein * adjustedPercent);
+    const minProtein = context?.minProteinGrams || 5;
+    const proteinForMeal = Math.max(baseProtein, minProtein);
+    
     result[meal] = {
       calories: Math.round(targets.calories * adjustedPercent),
-      protein: Math.round(targets.protein * adjustedPercent),
+      protein: proteinForMeal,
       carbs: Math.round(targets.carbs * adjustedPercent),
       fat: Math.round(targets.fat * adjustedPercent),
     };
@@ -225,7 +365,6 @@ function distributeMacros(
 
 // ============================================================
 // CONVERSÃO DETERMINÍSTICA DE UNIDADES
-// Princípio: Gramas são verdade nutricional, unidades são apresentação
 // ============================================================
 
 function convertGramsToUnit(
@@ -257,7 +396,7 @@ function convertGramsToUnit(
     return {
       success: true,
       displayQty: roundedUnits,
-      displayUnit: '', // Será preenchido com unit_name
+      displayUnit: '',
       calculatedGrams: finalGrams,
     };
   } else {
@@ -300,108 +439,8 @@ function applyUnitConversion(food: Food, quantityGrams: number): FoodWithDisplay
 }
 
 // ============================================================
-// SELEÇÃO DE ALIMENTOS (LINHAS 90-130 DA SPEC)
-// REGRA CRÍTICA: Apenas categorias canônicas, apenas approved + active
+// SELEÇÃO DE ALIMENTOS (REGRAS v2)
 // ============================================================
-
-/**
- * Definição de contexto de refeição para filtragem inteligente
- * Alimentos são filtrados baseado em palavras-chave apropriadas para cada tipo de refeição
- */
-interface MealContext {
-  preferred: string[];  // Palavras-chave que indicam alimentos preferidos
-  avoided: string[];    // Palavras-chave que indicam alimentos a evitar
-}
-
-const MEAL_CONTEXT_RULES: Record<string, MealContext> = {
-  // Café da manhã: pães, cereais, frutas, laticínios, ovos
-  breakfast: {
-    preferred: [
-      'pão', 'tapioca', 'aveia', 'granola', 'cereal', 'biscoito', 'torrada',
-      'ovo', 'queijo', 'iogurte', 'leite', 'manteiga', 'requeijão', 'cream cheese',
-      'banana', 'maçã', 'mamão', 'morango', 'laranja', 'melão', 'manga',
-      'mel', 'geleia', 'cuscuz', 'mingau', 'café', 'chocolate',
-      'presunto', 'peito de peru', 'cottage'
-    ],
-    avoided: [
-      'feijão', 'arroz', 'macarrão', 'lasanha', 'strogonoff', 'feijoada',
-      'bife', 'frango grelhado', 'carne moída', 'almôndega', 'file', 'costela',
-      'salada', 'alface', 'tomate', 'pepino', 'brócolis', 'couve',
-      'batata doce', 'mandioca', 'inhame', 'purê', 'farofa'
-    ]
-  },
-  // Lanche da manhã: frutas, oleaginosas, laticínios leves
-  morning_snack: {
-    preferred: [
-      'banana', 'maçã', 'pera', 'uva', 'morango', 'mamão', 'melão', 'laranja',
-      'castanha', 'amêndoa', 'nozes', 'amendoim', 'mix de nuts',
-      'iogurte', 'queijo', 'cottage', 'whey',
-      'barra de cereal', 'granola', 'aveia'
-    ],
-    avoided: [
-      'arroz', 'feijão', 'macarrão', 'carne', 'frango', 'peixe', 'bife',
-      'batata', 'mandioca', 'purê', 'salada completa'
-    ]
-  },
-  // Almoço: refeição completa com proteína, carboidrato, leguminosas, vegetais
-  lunch: {
-    preferred: [
-      'arroz', 'feijão', 'lentilha', 'grão-de-bico', 'macarrão', 'nhoque',
-      'frango', 'carne', 'peixe', 'bife', 'filé', 'costela', 'lombo', 'alcatra',
-      'tilápia', 'salmão', 'atum', 'sardinha', 'camarão',
-      'salada', 'alface', 'tomate', 'pepino', 'cenoura', 'brócolis', 'couve',
-      'batata doce', 'batata inglesa', 'mandioca', 'inhame', 'purê',
-      'farofa', 'vinagrete', 'legumes'
-    ],
-    avoided: [
-      'pão', 'tapioca', 'granola', 'cereal matinal', 'mingau',
-      'iogurte doce', 'mel', 'geleia', 'biscoito doce'
-    ]
-  },
-  // Lanche da tarde: similar ao lanche da manhã, com opções leves
-  afternoon_snack: {
-    preferred: [
-      'banana', 'maçã', 'pera', 'uva', 'morango', 'mamão', 'abacate',
-      'castanha', 'amêndoa', 'nozes', 'amendoim', 'pasta de amendoim',
-      'iogurte', 'queijo', 'cottage', 'whey',
-      'pão integral', 'tapioca', 'crepioca', 'wrap',
-      'sanduíche', 'vitamina', 'smoothie'
-    ],
-    avoided: [
-      'arroz', 'feijão', 'macarrão', 'carne grelhada', 'feijoada',
-      'batata doce', 'mandioca', 'purê'
-    ]
-  },
-  // Jantar: similar ao almoço, mas pode ser mais leve
-  dinner: {
-    preferred: [
-      'frango', 'peixe', 'carne', 'bife', 'filé', 'omelete', 'ovo',
-      'tilápia', 'salmão', 'atum',
-      'salada', 'alface', 'tomate', 'pepino', 'brócolis', 'abobrinha', 'legumes',
-      'arroz', 'batata doce', 'purê', 'quinoa',
-      'sopa', 'caldo', 'creme'
-    ],
-    avoided: [
-      'pão francês', 'tapioca', 'granola', 'cereal matinal',
-      'iogurte doce', 'mel', 'geleia', 'biscoito doce', 'mingau',
-      'feijão', 'feijoada' // jantar geralmente mais leve, sem feijão pesado
-    ]
-  },
-  // Ceia: leve, laticínios, frutas
-  supper: {
-    preferred: [
-      'iogurte', 'leite', 'queijo cottage', 'queijo branco',
-      'chá', 'chocolate quente', 'vitamina',
-      'banana', 'maçã', 'mamão', 'melão',
-      'aveia', 'granola', 'mel',
-      'castanha', 'amêndoa', 'nozes'
-    ],
-    avoided: [
-      'arroz', 'feijão', 'macarrão', 'carne', 'frango', 'peixe', 'bife',
-      'batata', 'mandioca', 'salada completa', 'legumes refogados'
-    ]
-  }
-};
 
 function fetchEligibleFoods(
   allFoods: Food[],
@@ -420,7 +459,7 @@ function fetchEligibleFoods(
       return false;
     }
     
-    // 3. Nível de processamento deve ser in_natura ou minimamente_processado
+    // 3. Nível de processamento deve ser válido
     if (!isSubstitutableLevel(f.processing_level)) {
       return false;
     }
@@ -441,74 +480,109 @@ function fetchEligibleFoods(
 }
 
 /**
- * Filtra alimentos por contexto de refeição
- * Retorna alimentos apropriados para o tipo de refeição específico
+ * REGRA RÍGIDA: Verifica se alimento está bloqueado para o tipo de refeição
+ */
+function isFoodBlockedForMeal(food: Food, mealType: MealType): boolean {
+  const context = MEAL_CONTEXT_RULES_V2[mealType];
+  if (!context) return false;
+  
+  const foodName = food.name.toLowerCase();
+  
+  // Verifica se alguma keyword de bloqueio está presente no nome
+  return context.blocked.some(keyword => foodName.includes(keyword.toLowerCase()));
+}
+
+/**
+ * Verifica se o alimento é uma fonte de proteína compatível com a refeição
+ */
+function isCompatibleProteinSource(food: Food, mealType: MealType): boolean {
+  const context = MEAL_CONTEXT_RULES_V2[mealType];
+  if (!context) return false;
+  
+  const foodName = food.name.toLowerCase();
+  const category = (food.category || '').toLowerCase();
+  
+  // Deve ser categoria proteínas ou laticínios com proteína significativa
+  if (category !== 'proteinas' && category !== 'laticinios' && category !== 'gorduras') {
+    return false;
+  }
+  
+  // Verificar se é fonte de proteína válida para esta refeição
+  return context.proteinSources.some(keyword => foodName.includes(keyword.toLowerCase()));
+}
+
+/**
+ * Filtra alimentos por contexto de refeição (regras rígidas)
  */
 function filterFoodsByMealContext(
   foods: Food[],
   mealType: MealType
 ): Food[] {
-  const context = MEAL_CONTEXT_RULES[mealType];
+  const context = MEAL_CONTEXT_RULES_V2[mealType];
   if (!context) return foods;
   
-  // Primeiro, tentar encontrar alimentos preferidos para esta refeição
-  const preferredFoods = foods.filter(f => {
-    const name = f.name.toLowerCase();
-    // Verificar se o alimento NÃO está na lista de evitados
-    const isAvoided = context.avoided.some(keyword => name.includes(keyword.toLowerCase()));
-    if (isAvoided) return false;
-    
-    // Verificar se o alimento está na lista de preferidos
-    const isPreferred = context.preferred.some(keyword => name.includes(keyword.toLowerCase()));
-    return isPreferred;
-  });
+  // REGRA RÍGIDA: Remover todos os alimentos bloqueados
+  const notBlocked = foods.filter(f => !isFoodBlockedForMeal(f, mealType));
   
-  // Se houver alimentos preferidos suficientes, usar apenas eles
-  if (preferredFoods.length >= 3) {
-    return preferredFoods;
+  if (notBlocked.length === 0) {
+    logStep("Warning: all foods blocked for meal type", { mealType });
+    return foods; // Fallback extremo
   }
   
-  // Caso contrário, usar todos os alimentos que não são evitados
-  const notAvoidedFoods = foods.filter(f => {
+  // Priorizar alimentos preferidos
+  const preferred = notBlocked.filter(f => {
     const name = f.name.toLowerCase();
-    return !context.avoided.some(keyword => name.includes(keyword.toLowerCase()));
+    return context.preferred.some(keyword => name.includes(keyword.toLowerCase()));
   });
   
-  // Se ainda não houver alimentos suficientes, incluir todos (fallback)
-  if (notAvoidedFoods.length < 3) {
-    logStep("Fallback: not enough context-filtered foods", { mealType, notAvoided: notAvoidedFoods.length });
-    return foods;
+  // Se houver preferidos suficientes, usar apenas eles
+  if (preferred.length >= 5) {
+    return preferred;
   }
   
-  return notAvoidedFoods;
+  return notBlocked;
 }
 
-// ============================================================
-// MONTAGEM DA REFEIÇÃO (LINHAS 130-180 DA SPEC)
-// Proteína quase sempre presente, gordura opcional, vegetais livres
-// ============================================================
-
-function pickFoodFromCategory(
+/**
+ * Busca fonte de proteína COMPATÍVEL para a refeição
+ */
+function findCompatibleProteinSource(
   foods: Food[],
-  category: FoodCategory,
+  mealType: MealType,
   usedIds: Set<string>,
-  preferences: string[],
-  mealType?: MealType
+  preferences: string[]
 ): Food | null {
-  // Primeiro, filtrar por categoria
+  const context = MEAL_CONTEXT_RULES_V2[mealType];
+  if (!context) return null;
+  
+  // Primeiro, buscar proteínas da categoria correta que não estão bloqueadas
   let candidates = foods.filter(f => {
-    const cat = (f.category || '').toLowerCase();
-    return cat === category && !usedIds.has(f.id);
+    if (usedIds.has(f.id)) return false;
+    if (isFoodBlockedForMeal(f, mealType)) return false;
+    
+    const category = (f.category || '').toLowerCase();
+    const foodName = f.name.toLowerCase();
+    
+    // Verificar se é fonte de proteína válida
+    const isValidSource = context.proteinSources.some(keyword => 
+      foodName.includes(keyword.toLowerCase())
+    );
+    
+    // Aceitar proteínas ou laticínios com proteína significativa
+    if (category === 'proteinas' && isValidSource) return true;
+    if (category === 'laticinios' && isValidSource && f.protein >= 5) return true;
+    
+    // Para café da manhã e lanches, aceitar ovos e laticínios gerais
+    if (['breakfast', 'morning_snack', 'afternoon_snack', 'supper'].includes(mealType)) {
+      if (category === 'laticinios' && f.protein >= 3) return true;
+    }
+    
+    return false;
   });
   
-  if (candidates.length === 0) return null;
-  
-  // Aplicar filtro de contexto de refeição se disponível
-  if (mealType) {
-    const contextFiltered = filterFoodsByMealContext(candidates, mealType);
-    if (contextFiltered.length > 0) {
-      candidates = contextFiltered;
-    }
+  if (candidates.length === 0) {
+    logStep("No compatible protein found for meal", { mealType });
+    return null;
   }
   
   // Priorizar preferências do usuário
@@ -517,13 +591,46 @@ function pickFoodFromCategory(
   );
   
   const pool = preferred.length > 0 ? preferred : candidates;
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
+function pickFoodFromCategory(
+  foods: Food[],
+  category: FoodCategory,
+  usedIds: Set<string>,
+  preferences: string[],
+  mealType: MealType
+): Food | null {
+  // Filtrar por categoria e aplicar regras de contexto
+  let candidates = foods.filter(f => {
+    const cat = (f.category || '').toLowerCase();
+    if (cat !== category) return false;
+    if (usedIds.has(f.id)) return false;
+    
+    // REGRA RÍGIDA: Bloquear alimentos incompatíveis
+    if (isFoodBlockedForMeal(f, mealType)) return false;
+    
+    return true;
+  });
   
-  // Adicionar aleatoriedade para variedade
+  if (candidates.length === 0) return null;
+  
+  // Aplicar filtro de contexto (preferências)
+  const contextFiltered = filterFoodsByMealContext(candidates, mealType);
+  if (contextFiltered.length > 0) {
+    candidates = contextFiltered;
+  }
+  
+  // Priorizar preferências do usuário (nunca quebrar regras estruturais)
+  const preferred = candidates.filter(f => 
+    preferences.some(p => f.name.toLowerCase().includes(p.toLowerCase()))
+  );
+  
+  const pool = preferred.length > 0 ? preferred : candidates;
   return pool[Math.floor(Math.random() * pool.length)];
 }
 
 function calculateDefaultPortion(food: Food, targetMacro: MealMacroDistribution): number {
-  // Porções médias e plausíveis por categoria (em gramas)
   const defaultPortions: Record<string, number> = {
     proteinas: 120,
     carboidratos: 150,
@@ -538,17 +645,28 @@ function calculateDefaultPortion(food: Food, targetMacro: MealMacroDistribution)
   const category = (food.category || '').toLowerCase();
   let portion = defaultPortions[category] || 100;
   
-  // Ajuste grosso baseado na meta calórica (não tentar fechar exato)
-  // Isso é heurístico, não preciso - o rebalanceador fará o ajuste fino
   const foodCalPerGram = food.calories > 0 ? food.calories / 100 : 1;
-  const targetCalsForThis = targetMacro.calories * 0.25; // ~25% da refeição
+  const targetCalsForThis = targetMacro.calories * 0.25;
   const suggestedPortion = targetCalsForThis / foodCalPerGram;
   
-  // Clamp para valores razoáveis
   portion = Math.round(Math.min(Math.max(suggestedPortion, portion * 0.5), portion * 2) / 10) * 10;
   portion = Math.min(500, Math.max(20, portion));
   
   return portion;
+}
+
+// ============================================================
+// MONTAGEM DA REFEIÇÃO (REGRAS ESTRUTURAIS v2)
+// ============================================================
+// REGRA 1: TODA refeição DEVE ter fonte de proteína compatível
+// REGRA 2: Proteína deve atingir mínimo definido para o tipo
+// REGRA 3: Se não for possível, retornar FALHA (não gerar plano)
+// ============================================================
+
+interface MealBuildResult {
+  success: boolean;
+  option?: MealOption;
+  error?: string;
 }
 
 function buildMealOption(
@@ -558,7 +676,8 @@ function buildMealOption(
   preferences: string[],
   usedFoodIds: Set<string>,
   optionNumber: number
-): MealOption {
+): MealBuildResult {
+  const context = MEAL_CONTEXT_RULES_V2[mealType];
   const categoryPriorities = MEAL_CATEGORY_PRIORITIES[mealType] || 
                              MEAL_CATEGORY_PRIORITIES[MEAL_NAMES[mealType]] || 
                              ['proteinas', 'carboidratos', 'vegetais'];
@@ -569,13 +688,40 @@ function buildMealOption(
   let totalCarbs = 0;
   let totalFat = 0;
   
-  // Para almoço e jantar, proteína é obrigatória
-  const isMainMeal = mealType === 'lunch' || mealType === 'dinner';
+  // REGRA 1: Primeiro, garantir fonte de proteína compatível
+  const proteinSource = findCompatibleProteinSource(foods, mealType, usedFoodIds, preferences);
   
+  if (!proteinSource) {
+    return {
+      success: false,
+      error: `Não há fonte de proteína compatível para ${MEAL_NAMES[mealType]}`,
+    };
+  }
+  
+  usedFoodIds.add(proteinSource.id);
+  
+  // Calcular porção de proteína para atingir mínimo
+  const minProtein = context?.minProteinGrams || 10;
+  const proteinPer100g = proteinSource.protein;
+  const minPortionForProtein = proteinPer100g > 0 ? (minProtein / proteinPer100g) * 100 : 100;
+  const defaultPortion = calculateDefaultPortion(proteinSource, targetMacro);
+  const proteinPortion = Math.max(Math.round(minPortionForProtein / 10) * 10, defaultPortion);
+  
+  const proteinConverted = applyUnitConversion(proteinSource, proteinPortion);
+  
+  const proteinMultiplier = proteinConverted.calculated_grams / 100;
+  totalCalories += proteinSource.calories * proteinMultiplier;
+  totalProtein += proteinSource.protein * proteinMultiplier;
+  totalCarbs += proteinSource.carbs * proteinMultiplier;
+  totalFat += proteinSource.fat * proteinMultiplier;
+  
+  mealFoods.push(proteinConverted);
+  
+  // Agora adicionar outros alimentos por categoria (exceto proteínas, já adicionada)
   for (const category of categoryPriorities) {
     if (!isValidCategory(category)) continue;
+    if (category === 'proteinas') continue; // Já adicionamos
     
-    // Passar mealType para filtrar alimentos por contexto de refeição
     const food = pickFoodFromCategory(foods, category, usedFoodIds, preferences, mealType);
     if (!food) continue;
     
@@ -584,48 +730,40 @@ function buildMealOption(
     const portion = calculateDefaultPortion(food, targetMacro);
     const converted = applyUnitConversion(food, portion);
     
-    // Calcular macros baseado em gramas calculados
     const multiplier = converted.calculated_grams / 100;
     totalCalories += food.calories * multiplier;
-    totalProtein += Number(food.protein) * multiplier;
-    totalCarbs += Number(food.carbs) * multiplier;
-    totalFat += Number(food.fat) * multiplier;
+    totalProtein += food.protein * multiplier;
+    totalCarbs += food.carbs * multiplier;
+    totalFat += food.fat * multiplier;
     
     mealFoods.push(converted);
   }
   
-  // Garantir que refeições principais tenham proteína
-  if (isMainMeal && !mealFoods.some(f => (f.food.category || '').toLowerCase() === 'proteinas')) {
-    // Passar mealType para filtrar proteína apropriada
-    const protein = pickFoodFromCategory(foods, 'proteinas', usedFoodIds, preferences, mealType);
-    if (protein) {
-      usedFoodIds.add(protein.id);
-      const portion = calculateDefaultPortion(protein, targetMacro);
-      const converted = applyUnitConversion(protein, portion);
-      
-      const multiplier = converted.calculated_grams / 100;
-      totalCalories += protein.calories * multiplier;
-      totalProtein += Number(protein.protein) * multiplier;
-      totalCarbs += Number(protein.carbs) * multiplier;
-      totalFat += Number(protein.fat) * multiplier;
-      
-      mealFoods.unshift(converted); // Proteína primeiro
-    }
+  // VALIDAÇÃO: Verificar se atingimos proteína mínima
+  if (totalProtein < minProtein * 0.8) { // 80% de tolerância
+    logStep("Warning: meal below protein minimum", { 
+      mealType, 
+      totalProtein, 
+      minProtein 
+    });
   }
   
   return {
-    option_number: optionNumber,
-    name: optionNumber === 1 ? 'Opção Principal' : `Opção ${optionNumber}`,
-    foods: mealFoods,
-    total_calories: Math.round(totalCalories),
-    total_protein: Math.round(totalProtein * 10) / 10,
-    total_carbs: Math.round(totalCarbs * 10) / 10,
-    total_fat: Math.round(totalFat * 10) / 10,
+    success: true,
+    option: {
+      option_number: optionNumber,
+      name: optionNumber === 1 ? 'Opção Principal' : `Opção ${optionNumber}`,
+      foods: mealFoods,
+      total_calories: Math.round(totalCalories),
+      total_protein: Math.round(totalProtein * 10) / 10,
+      total_carbs: Math.round(totalCarbs * 10) / 10,
+      total_fat: Math.round(totalFat * 10) / 10,
+    },
   };
 }
 
 // ============================================================
-// VALIDAÇÃO GERAL DO PLANO (LINHAS 270-300 DA SPEC)
+// VALIDAÇÃO GERAL DO PLANO (v2)
 // ============================================================
 
 interface PlanValidation {
@@ -654,19 +792,15 @@ function validatePlan(
           errors.push(`Porção zero em ${meal.name}: ${food.food.name}`);
         }
       }
-    }
-    
-    // 3. Refeições principais devem ter proteína
-    const mealType = meal.name.toLowerCase();
-    const isMainMeal = mealType.includes('almoço') || mealType.includes('jantar') || 
-                       mealType === 'lunch' || mealType === 'dinner';
-    
-    if (isMainMeal) {
-      const hasProtein = meal.options[0]?.foods.some(f => 
-        (f.food.category || '').toLowerCase() === 'proteinas'
-      );
+      
+      // 3. REGRA v2: TODA refeição deve ter proteína
+      const hasProtein = option.foods.some(f => {
+        const cat = (f.food.category || '').toLowerCase();
+        return cat === 'proteinas' || (cat === 'laticinios' && f.food.protein >= 5);
+      });
+      
       if (!hasProtein) {
-        warnings.push(`${meal.name} sem fonte de proteína`);
+        errors.push(`${meal.name} sem fonte de proteína`);
       }
     }
   }
@@ -679,7 +813,15 @@ function validatePlan(
     warnings.push(`Calorias totais (${totalCalories}) diferem ${Math.round(calorieError * 100)}% da meta (${targets.calories})`);
   }
   
-  // 5. Verificar categorias canônicas
+  // 5. Proteína total
+  const totalProtein = meals.reduce((sum, m) => sum + (m.options[0]?.total_protein || 0), 0);
+  const proteinError = Math.abs(totalProtein - targets.protein) / targets.protein;
+  
+  if (proteinError > 0.20) {
+    warnings.push(`Proteína total (${Math.round(totalProtein)}g) difere ${Math.round(proteinError * 100)}% da meta (${targets.protein}g)`);
+  }
+  
+  // 6. Verificar categorias canônicas
   for (const meal of meals) {
     for (const option of meal.options) {
       for (const food of option.foods) {
@@ -710,7 +852,7 @@ serve(async (req) => {
   }
 
   try {
-    logStep("Function started");
+    logStep("Function started - v2 with structural rules");
     
     // Parse e validação do input
     let body: unknown;
@@ -738,13 +880,13 @@ serve(async (req) => {
     const profileData = profile as Record<string, unknown>;
     
     // ============================================================
-    // VALIDAÇÕES INICIAIS (LINHAS 1-30 DA SPEC)
+    // VALIDAÇÕES INICIAIS
     // ============================================================
     
     const targets: MacroTargets = {
       calories: validate.isInRange(profileData.daily_calories, 500, 10000) 
         ? profileData.daily_calories as number 
-        : 0, // Zero para falhar validação se não informado
+        : 0,
       protein: validate.isInRange(profileData.protein_target, 0, 500) 
         ? profileData.protein_target as number 
         : 0,
@@ -876,7 +1018,7 @@ serve(async (req) => {
     logStep("User plan meal options limit", { mealOptionsLimit });
     
     // ============================================================
-    // BUSCAR ALIMENTOS (LINHAS 90-130 DA SPEC)
+    // BUSCAR ALIMENTOS
     // ============================================================
     
     const { data: allFoods, error: foodsError } = await supabase
@@ -910,7 +1052,7 @@ serve(async (req) => {
     }
     
     // ============================================================
-    // DEFINIÇÃO DA ESTRUTURA DO DIA (LINHAS 30-60 DA SPEC)
+    // DEFINIÇÃO DA ESTRUTURA DO DIA
     // ============================================================
     
     const mealSkeleton = buildMealSkeleton(mealsPerDay);
@@ -922,7 +1064,7 @@ serve(async (req) => {
     });
     
     // ============================================================
-    // MONTAGEM DAS REFEIÇÕES (LINHAS 130-270 DA SPEC)
+    // MONTAGEM DAS REFEIÇÕES (REGRAS ESTRUTURAIS v2)
     // ============================================================
     
     const generatedMeals: Array<{ 
@@ -932,6 +1074,8 @@ serve(async (req) => {
       sortOrder: number;
     }> = [];
     
+    const buildErrors: string[] = [];
+    
     for (let sortOrder = 0; sortOrder < mealSkeleton.length; sortOrder++) {
       const mealType = mealSkeleton[sortOrder];
       const mealTarget = mealTargets[mealType];
@@ -939,8 +1083,8 @@ serve(async (req) => {
       const options: MealOption[] = [];
       const usedFoodIds = new Set<string>();
       
-      // Opção 1 (principal)
-      const option1 = buildMealOption(
+      // Opção 1 (principal) - DEVE funcionar ou falhar o plano
+      const result1 = buildMealOption(
         eligibleFoods,
         mealType,
         mealTarget,
@@ -948,11 +1092,17 @@ serve(async (req) => {
         usedFoodIds,
         1
       );
-      options.push(option1);
+      
+      if (!result1.success || !result1.option) {
+        buildErrors.push(result1.error || `Falha ao montar ${MEAL_NAMES[mealType]}`);
+        continue;
+      }
+      
+      options.push(result1.option);
       
       // Opções 2+ (equivalentes)
       for (let optNum = 2; optNum <= mealOptionsLimit; optNum++) {
-        const optionN = buildMealOption(
+        const resultN = buildMealOption(
           eligibleFoods,
           mealType,
           mealTarget,
@@ -960,7 +1110,10 @@ serve(async (req) => {
           usedFoodIds,
           optNum
         );
-        options.push(optionN);
+        
+        if (resultN.success && resultN.option) {
+          options.push(resultN.option);
+        }
       }
       
       generatedMeals.push({
@@ -971,8 +1124,18 @@ serve(async (req) => {
       });
     }
     
+    // REGRA v2: Se alguma refeição falhou, NÃO gerar o plano
+    if (buildErrors.length > 0) {
+      logStep("Plan generation failed - structural rules not met", { errors: buildErrors });
+      return createErrorResponse(
+        `Não foi possível gerar o plano: ${buildErrors.join("; ")}`,
+        400,
+        corsHeaders
+      );
+    }
+    
     // ============================================================
-    // VALIDAÇÃO GERAL (LINHAS 270-300 DA SPEC)
+    // VALIDAÇÃO GERAL
     // ============================================================
     
     const planValidation = validatePlan(generatedMeals, targets);
@@ -999,14 +1162,13 @@ serve(async (req) => {
     const totalCarbs = generatedMeals.reduce((sum, m) => sum + (m.options[0]?.total_carbs || 0), 0);
     const totalFat = generatedMeals.reduce((sum, m) => sum + (m.options[0]?.total_fat || 0), 0);
     
-    // STATUS = 'draft' conforme spec (linha 11: plano nasce editável)
     const { data: plan, error: planError } = await supabase.from("diet_plans").insert({
       user_id: targetUserId,
       total_calories: Math.round(totalCalories),
       total_protein: Math.round(totalProtein * 10) / 10,
       total_carbs: Math.round(totalCarbs * 10) / 10,
       total_fat: Math.round(totalFat * 10) / 10,
-      status: 'draft', // REGRA: plano nasce como draft, não active
+      status: 'draft',
     }).select().single();
 
     if (planError || !plan) {
@@ -1058,7 +1220,7 @@ serve(async (req) => {
           continue;
         }
 
-        // Salvar alimentos da opção (schema v2: meal_option_foods)
+        // Salvar alimentos da opção
         for (const foodItem of option.foods) {
           await supabase.from("meal_option_foods").insert({ 
             meal_option_id: savedOption.id, 
@@ -1077,6 +1239,7 @@ serve(async (req) => {
       planId: plan.id, 
       meals: generatedMeals.length,
       totalCalories,
+      totalProtein,
     });
 
     return createSuccessResponse({ 
