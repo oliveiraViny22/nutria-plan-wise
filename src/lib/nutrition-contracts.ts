@@ -46,20 +46,20 @@ export const GENERATOR_CONTRACT = {
 // =====================================================
 
 export const REBALANCER_CONTRACT = {
-  /** Tolerância calórica ABSOLUTA: ±5% (mais flexível para ajustes práticos) */
-  CALORIE_TOLERANCE_PERCENT: 5,
+  /** SEM tolerância calórica: deve atingir a meta exata */
+  CALORIE_TOLERANCE_PERCENT: 0,
   
-  /** Tolerância de proteína: ±5% */
-  PROTEIN_TOLERANCE_PERCENT: 5,
+  /** SEM tolerância de proteína: deve atingir a meta exata */
+  PROTEIN_TOLERANCE_PERCENT: 0,
   
-  /** Tolerância de carboidrato para baixo: -10% (flexível para redução) */
-  CARBS_MIN_TOLERANCE_PERCENT: 10,
+  /** SEM tolerância de carboidrato para baixo */
+  CARBS_MIN_TOLERANCE_PERCENT: 0,
   
-  /** Tolerância de carboidrato para cima: +10% */
-  CARBS_MAX_TOLERANCE_PERCENT: 10,
+  /** SEM tolerância de carboidrato para cima */
+  CARBS_MAX_TOLERANCE_PERCENT: 0,
   
-  /** Tolerância de gordura: ±8g ABSOLUTO */
-  FAT_TOLERANCE_GRAMS: 8,
+  /** SEM tolerância de gordura: deve atingir a meta exata */
+  FAT_TOLERANCE_GRAMS: 0,
   
   /** Máximo ajuste por alimento: 100% (dobrar ou zerar) */
   MAX_ADJUSTMENT_PERCENT: 100,
@@ -239,8 +239,8 @@ export interface RebalancerValidationResult {
 }
 
 /**
- * Valida se macros propostos atendem os contratos do rebalanceador.
- * ESSENCIAL: Esta é a validação FINAL.
+ * Valida se macros propostos atingem as metas EXATAS.
+ * ESSENCIAL: Esta é a validação FINAL - sem tolerâncias.
  */
 export function validateRebalancedMacros(
   proposed: MacroTargets,
@@ -248,44 +248,43 @@ export function validateRebalancedMacros(
 ): RebalancerValidationResult {
   const errors: string[] = [];
   
-  // Calorias: ±2%
-  const calorieDiff = Math.abs((proposed.calories - target.calories) / target.calories) * 100;
-  const calorieOK = calorieDiff <= REBALANCER_CONTRACT.CALORIE_TOLERANCE_PERCENT;
+  // Calorias: valor exato
+  const calorieOK = Math.round(proposed.calories) === Math.round(target.calories);
   if (!calorieOK) {
+    const diff = proposed.calories - target.calories;
     errors.push(
       `Calorias: ${Math.round(proposed.calories)} vs ${target.calories} ` +
-      `(${calorieDiff.toFixed(1)}% diff, max: ±${REBALANCER_CONTRACT.CALORIE_TOLERANCE_PERCENT}%)`
+      `(diferença: ${diff > 0 ? '+' : ''}${Math.round(diff)} kcal)`
     );
   }
   
-  // Proteína: ±2%
-  const proteinDiff = Math.abs((proposed.protein - target.protein) / target.protein) * 100;
-  const proteinOK = proteinDiff <= REBALANCER_CONTRACT.PROTEIN_TOLERANCE_PERCENT;
+  // Proteína: valor exato
+  const proteinOK = Math.round(proposed.protein) === Math.round(target.protein);
   if (!proteinOK) {
+    const diff = proposed.protein - target.protein;
     errors.push(
       `Proteína: ${Math.round(proposed.protein)}g vs ${target.protein}g ` +
-      `(${proteinDiff.toFixed(1)}% diff, max: ±${REBALANCER_CONTRACT.PROTEIN_TOLERANCE_PERCENT}%)`
+      `(diferença: ${diff > 0 ? '+' : ''}${Math.round(diff)}g)`
     );
   }
   
-  // Carboidrato: -8% a +5% (assimétrico)
-  const carbsDiffPercent = ((proposed.carbs - target.carbs) / target.carbs) * 100;
-  const carbsOK = carbsDiffPercent >= -REBALANCER_CONTRACT.CARBS_MIN_TOLERANCE_PERCENT && 
-                  carbsDiffPercent <= REBALANCER_CONTRACT.CARBS_MAX_TOLERANCE_PERCENT;
+  // Carboidrato: valor exato
+  const carbsOK = Math.round(proposed.carbs) === Math.round(target.carbs);
   if (!carbsOK) {
+    const diff = proposed.carbs - target.carbs;
     errors.push(
       `Carboidratos: ${Math.round(proposed.carbs)}g vs ${target.carbs}g ` +
-      `(${carbsDiffPercent > 0 ? '+' : ''}${carbsDiffPercent.toFixed(1)}%)`
+      `(diferença: ${diff > 0 ? '+' : ''}${Math.round(diff)}g)`
     );
   }
   
-  // Gordura: ±5g absoluto
-  const fatDiff = Math.abs(proposed.fat - target.fat);
-  const fatOK = fatDiff <= REBALANCER_CONTRACT.FAT_TOLERANCE_GRAMS;
+  // Gordura: valor exato
+  const fatOK = Math.round(proposed.fat) === Math.round(target.fat);
   if (!fatOK) {
+    const diff = proposed.fat - target.fat;
     errors.push(
       `Gordura: ${Math.round(proposed.fat)}g vs ${target.fat}g ` +
-      `(diff: ${fatDiff.toFixed(1)}g, max: ±${REBALANCER_CONTRACT.FAT_TOLERANCE_GRAMS}g)`
+      `(diferença: ${diff > 0 ? '+' : ''}${Math.round(diff)}g)`
     );
   }
   
@@ -300,13 +299,17 @@ export function validateRebalancedMacros(
 }
 
 /**
- * Verifica se um plano já está otimizado.
+ * Verifica se um plano já está na meta exata.
  * CRÍTICO: Não confundir "já otimizado" com "não otimizável".
  */
 export function isPlanAlreadyOptimized(
   current: MacroTargets,
   target: MacroTargets
 ): boolean {
-  const result = validateRebalancedMacros(current, target);
-  return result.isValid;
+  return (
+    Math.round(current.calories) === Math.round(target.calories) &&
+    Math.round(current.protein) === Math.round(target.protein) &&
+    Math.round(current.carbs) === Math.round(target.carbs) &&
+    Math.round(current.fat) === Math.round(target.fat)
+  );
 }

@@ -40,6 +40,22 @@ export const GENERATOR_CONTRACT = {
 } as const;
 
 // =====================================================
+// CONTRATOS DO REBALANCEADOR (SEM TOLERÂNCIAS)
+// =====================================================
+
+export const REBALANCER_CONTRACT = {
+  /** SEM tolerância: deve atingir meta exata */
+  CALORIE_TOLERANCE_PERCENT: 0,
+  PROTEIN_TOLERANCE_PERCENT: 0,
+  CARBS_TOLERANCE_PERCENT: 0,
+  FAT_TOLERANCE_GRAMS: 0,
+  
+  /** Limites de quantidade */
+  MIN_QUANTITY_GRAMS: 5,
+  MAX_QUANTITY_GRAMS: 600,
+} as const;
+
+// =====================================================
 // TIPOS
 // =====================================================
 

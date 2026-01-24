@@ -3,12 +3,12 @@
 // =====================================================
 // 
 // CONTRATO:
-// - Ajusta QUANTIDADES de alimentos para atingir metas
-// - Prioriza alcançar calorias e macros diários
+// - Ajusta QUANTIDADES de alimentos para atingir metas EXATAS
+// - Garante calorias e macros diários sem tolerância
 // - Mantém estrutura do plano (não troca alimentos)
 //
 // REGRAS:
-// - Tolerâncias: Cal ±5%, Prot ±5%, Carbo ±10%, Gord ±8g
+// - SEM tolerâncias: valores devem ser exatos
 // - Ordem de ajuste: Proteína → Carboidrato → Gordura → Calorias
 // - NUNCA troca alimentos ou adiciona suplementos
 // =====================================================
@@ -165,38 +165,35 @@ function fatPercentOfCalories(fatGrams: number, totalCalories: number): number {
 }
 
 // =====================================================
-// TOLERÂNCIAS
+// VERIFICAÇÃO DE METAS (SEM TOLERÂNCIA)
 // =====================================================
 
-function isCaloriesWithinTolerance(current: number, target: number): boolean {
+function isCaloriesOnTarget(current: number, target: number): boolean {
   if (target === 0) return current === 0;
-  const diff = Math.abs((current - target) / target) * 100;
-  return diff <= REBALANCER_CONTRACT.CALORIE_TOLERANCE_PERCENT;
+  // Valor exato (arredondado)
+  return Math.round(current) === Math.round(target);
 }
 
-function isProteinWithinTolerance(current: number, target: number): boolean {
+function isProteinOnTarget(current: number, target: number): boolean {
   if (target === 0) return current === 0;
-  const diff = Math.abs((current - target) / target) * 100;
-  return diff <= REBALANCER_CONTRACT.PROTEIN_TOLERANCE_PERCENT;
+  return Math.round(current) === Math.round(target);
 }
 
-function isCarbsWithinTolerance(current: number, target: number): boolean {
+function isCarbsOnTarget(current: number, target: number): boolean {
   if (target === 0) return current === 0;
-  const diffPercent = ((current - target) / target) * 100;
-  return diffPercent >= -REBALANCER_CONTRACT.CARBS_MIN_TOLERANCE_PERCENT && 
-         diffPercent <= REBALANCER_CONTRACT.CARBS_MAX_TOLERANCE_PERCENT;
+  return Math.round(current) === Math.round(target);
 }
 
-function isFatWithinTolerance(current: number, target: number): boolean {
-  return Math.abs(current - target) <= REBALANCER_CONTRACT.FAT_TOLERANCE_GRAMS;
+function isFatOnTarget(current: number, target: number): boolean {
+  return Math.round(current) === Math.round(target);
 }
 
-function isWithinAllTolerances(current: MacroTargets, target: MacroTargets): boolean {
+function isOnTarget(current: MacroTargets, target: MacroTargets): boolean {
   return (
-    isCaloriesWithinTolerance(current.calories, target.calories) &&
-    isProteinWithinTolerance(current.protein, target.protein) &&
-    isCarbsWithinTolerance(current.carbs, target.carbs) &&
-    isFatWithinTolerance(current.fat, target.fat)
+    isCaloriesOnTarget(current.calories, target.calories) &&
+    isProteinOnTarget(current.protein, target.protein) &&
+    isCarbsOnTarget(current.carbs, target.carbs) &&
+    isFatOnTarget(current.fat, target.fat)
   );
 }
 
@@ -487,8 +484,8 @@ function adjustProtein(ctx: AdjustmentContext): QuantityAdjustment[] {
   const adjustments: QuantityAdjustment[] = [];
   const proteinDelta = ctx.targetMacros.protein - ctx.currentMacros.protein;
   
-  // Se já está dentro da tolerância, não ajustar
-  if (isProteinWithinTolerance(ctx.currentMacros.protein, ctx.targetMacros.protein)) {
+  // Se já atingiu a meta, não ajustar
+  if (isProteinOnTarget(ctx.currentMacros.protein, ctx.targetMacros.protein)) {
     return [];
   }
   
@@ -610,8 +607,8 @@ function adjustCarbs(
   const adjustments: QuantityAdjustment[] = [];
   const carbsDelta = ctx.targetMacros.carbs - ctx.currentMacros.carbs;
   
-  // Se já está dentro da tolerância, não ajustar
-  if (isCarbsWithinTolerance(ctx.currentMacros.carbs, ctx.targetMacros.carbs)) {
+  // Se já atingiu a meta, não ajustar
+  if (isCarbsOnTarget(ctx.currentMacros.carbs, ctx.targetMacros.carbs)) {
     return [];
   }
   
@@ -678,15 +675,14 @@ function adjustCarbs(
 
 /**
  * 3️⃣ AJUSTE DE GORDURA
- * - Ajustar para alcançar meta de gordura
- * - Tolerância de ±8g
+ * - Ajustar para alcançar meta exata de gordura
  */
 function adjustFat(ctx: AdjustmentContext): QuantityAdjustment[] {
   const adjustments: QuantityAdjustment[] = [];
   const fatDelta = ctx.targetMacros.fat - ctx.currentMacros.fat;
   
-  // Se já está dentro da tolerância, não ajustar
-  if (isFatWithinTolerance(ctx.currentMacros.fat, ctx.targetMacros.fat)) {
+  // Se já atingiu a meta, não ajustar
+  if (isFatOnTarget(ctx.currentMacros.fat, ctx.targetMacros.fat)) {
     return [];
   }
   
@@ -751,8 +747,8 @@ function adjustCalories(ctx: AdjustmentContext): QuantityAdjustment[] {
   const adjustments: QuantityAdjustment[] = [];
   const calorieDelta = ctx.targetMacros.calories - ctx.currentMacros.calories;
   
-  // Se já está dentro da tolerância, não ajustar
-  if (isCaloriesWithinTolerance(ctx.currentMacros.calories, ctx.targetMacros.calories)) {
+  // Se já atingiu a meta, não ajustar
+  if (isCaloriesOnTarget(ctx.currentMacros.calories, ctx.targetMacros.calories)) {
     return [];
   }
   
@@ -867,7 +863,7 @@ export function rebalancePlanV4(
   // ETAPA 2: VERIFICAR SE JÁ ESTÁ BALANCEADO
   // ========================================
   
-  if (isWithinAllTolerances(currentMacros, targetMacros)) {
+  if (isOnTarget(currentMacros, targetMacros)) {
     return {
       status: 'balanced',
       plan: { ...plan, version: plan.version + 1 },
@@ -939,8 +935,8 @@ export function rebalancePlanV4(
   
   const proposedMacros = sumMacros(workingItems);
   
-  // Sucesso: retornar como ajustado se houve ajustes ou já está próximo das metas
-  if (isWithinAllTolerances(proposedMacros, targetMacros) || allAdjustments.length > 0) {
+  // Sucesso: retornar como ajustado se houve ajustes ou já atingiu as metas
+  if (isOnTarget(proposedMacros, targetMacros) || allAdjustments.length > 0) {
     const newPlan: DietPlan = {
       ...plan,
       items: workingItems,
@@ -964,24 +960,24 @@ export function rebalancePlanV4(
   // Gerar mensagem explicativa
   const problems: string[] = [];
   
-  if (!isCaloriesWithinTolerance(proposedMacros.calories, targetMacros.calories)) {
-    const diff = ((proposedMacros.calories - targetMacros.calories) / targetMacros.calories) * 100;
-    problems.push(`Calorias: ${diff > 0 ? '+' : ''}${diff.toFixed(1)}% (máx: ±${REBALANCER_CONTRACT.CALORIE_TOLERANCE_PERCENT}%)`);
+  if (!isCaloriesOnTarget(proposedMacros.calories, targetMacros.calories)) {
+    const diff = proposedMacros.calories - targetMacros.calories;
+    problems.push(`Calorias: ${diff > 0 ? '+' : ''}${Math.round(diff)} kcal (meta: ${targetMacros.calories})`);
   }
   
-  if (!isProteinWithinTolerance(proposedMacros.protein, targetMacros.protein)) {
-    const diff = ((proposedMacros.protein - targetMacros.protein) / targetMacros.protein) * 100;
-    problems.push(`Proteína: ${diff > 0 ? '+' : ''}${diff.toFixed(1)}% (máx: ±${REBALANCER_CONTRACT.PROTEIN_TOLERANCE_PERCENT}%)`);
+  if (!isProteinOnTarget(proposedMacros.protein, targetMacros.protein)) {
+    const diff = proposedMacros.protein - targetMacros.protein;
+    problems.push(`Proteína: ${diff > 0 ? '+' : ''}${Math.round(diff)}g (meta: ${targetMacros.protein}g)`);
   }
   
-  if (!isCarbsWithinTolerance(proposedMacros.carbs, targetMacros.carbs)) {
-    const diff = ((proposedMacros.carbs - targetMacros.carbs) / targetMacros.carbs) * 100;
-    problems.push(`Carboidrato: ${diff > 0 ? '+' : ''}${diff.toFixed(1)}%`);
+  if (!isCarbsOnTarget(proposedMacros.carbs, targetMacros.carbs)) {
+    const diff = proposedMacros.carbs - targetMacros.carbs;
+    problems.push(`Carboidrato: ${diff > 0 ? '+' : ''}${Math.round(diff)}g (meta: ${targetMacros.carbs}g)`);
   }
   
-  if (!isFatWithinTolerance(proposedMacros.fat, targetMacros.fat)) {
+  if (!isFatOnTarget(proposedMacros.fat, targetMacros.fat)) {
     const diff = proposedMacros.fat - targetMacros.fat;
-    problems.push(`Gordura: ${diff > 0 ? '+' : ''}${diff.toFixed(1)}g (máx: ±${REBALANCER_CONTRACT.FAT_TOLERANCE_GRAMS}g)`);
+    problems.push(`Gordura: ${diff > 0 ? '+' : ''}${Math.round(diff)}g (meta: ${targetMacros.fat}g)`);
   }
   
   return {
@@ -998,4 +994,4 @@ export function rebalancePlanV4(
 // EXPORTS AUXILIARES
 // =====================================================
 
-export { sumMacros, roundMacros, isWithinAllTolerances };
+export { sumMacros, roundMacros, isOnTarget };
