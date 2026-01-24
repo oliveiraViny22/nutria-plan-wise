@@ -89,27 +89,22 @@ describe('Contrato Nutricional (KCAL/g)', () => {
 // TESTES - REGRA 1: TETO CALÓRICO ABSOLUTO
 // =====================================================
 
-describe('REGRA 1: Teto Calórico Absoluto (±2%)', () => {
-  it('deve aceitar calorias dentro da tolerância de +2%', () => {
-    const result = validateCalorieCeiling(2040, 2000); // +2%
+describe('REGRA 1: Calorias Exatas (Sem Tolerância)', () => {
+  it('deve aceitar calorias exatas', () => {
+    const result = validateCalorieCeiling(2000, 2000);
     expect(result.isValid).toBe(true);
   });
 
-  it('deve aceitar calorias dentro da tolerância de -2%', () => {
-    const result = validateCalorieCeiling(1960, 2000); // -2%
-    expect(result.isValid).toBe(true);
+  it('deve rejeitar calorias diferentes da meta', () => {
+    const result = validateCalorieCeiling(2050, 2000);
+    expect(result.isValid).toBe(false);
+    expect(result.error).toContain('Calorias fora da meta');
   });
 
-  it('deve rejeitar calorias acima de +2%', () => {
-    const result = validateCalorieCeiling(2050, 2000); // +2.5%
+  it('deve rejeitar calorias abaixo da meta', () => {
+    const result = validateCalorieCeiling(1900, 2000);
     expect(result.isValid).toBe(false);
-    expect(result.error).toContain('ESTOURO CALÓRICO');
-  });
-
-  it('deve rejeitar calorias abaixo de -2%', () => {
-    const result = validateCalorieCeiling(1900, 2000); // -5%
-    expect(result.isValid).toBe(false);
-    expect(result.error).toContain('DÉFICIT CALÓRICO EXCESSIVO');
+    expect(result.error).toContain('Calorias fora da meta');
   });
 
   it('rebalancePlan não deve propor calorias acima do teto', () => {
@@ -344,25 +339,20 @@ describe('REGRA 4: Carboidrato e Gordura Nunca Sobem Juntos', () => {
 // TESTES - REGRA 5: GORDURA É AJUSTE FINO (±5g)
 // =====================================================
 
-describe('REGRA 5: Gordura É Ajuste Fino (±5g)', () => {
-  it('deve aceitar gordura dentro da tolerância de +5g', () => {
-    const result = validateFatTolerance(55, 50); // +5g
+describe('REGRA 5: Gordura Exata (Sem Tolerância)', () => {
+  it('deve aceitar gordura exata', () => {
+    const result = validateFatTolerance(50, 50);
     expect(result.isValid).toBe(true);
   });
 
-  it('deve aceitar gordura dentro da tolerância de -5g', () => {
-    const result = validateFatTolerance(45, 50); // -5g
-    expect(result.isValid).toBe(true);
-  });
-
-  it('deve rejeitar gordura acima de +5g da meta', () => {
-    const result = validateFatTolerance(60, 50); // +10g
+  it('deve rejeitar gordura diferente da meta', () => {
+    const result = validateFatTolerance(55, 50);
     expect(result.isValid).toBe(false);
-    expect(result.error).toContain('Gordura fora da tolerância');
+    expect(result.error).toContain('Gordura fora da meta');
   });
 
-  it('FAT_TOLERANCE_GRAMS deve ser 5', () => {
-    expect(FAT_TOLERANCE_GRAMS).toBe(5);
+  it('FAT_TOLERANCE_GRAMS deve ser 0 (sem tolerância)', () => {
+    expect(FAT_TOLERANCE_GRAMS).toBe(0);
   });
 });
 
@@ -728,18 +718,18 @@ describe('Funções auxiliares', () => {
   });
 
   describe('isWithinTolerance', () => {
-    it('deve retornar true quando todos os macros estão dentro da tolerância', () => {
+    it('deve retornar true quando todos os macros são exatos', () => {
       const current: MacroTargets = { protein: 100, carbs: 200, fat: 50, calories: 1800 };
-      const target: MacroTargets = { protein: 101, carbs: 202, fat: 50.5, calories: 1810 };
+      const target: MacroTargets = { protein: 100, carbs: 200, fat: 50, calories: 1800 };
 
-      expect(isWithinTolerance(current, target, 2)).toBe(true);
+      expect(isWithinTolerance(current, target, 0)).toBe(true);
     });
 
-    it('deve retornar false quando algum macro está fora da tolerância', () => {
+    it('deve retornar false quando algum macro está diferente', () => {
       const current: MacroTargets = { protein: 100, carbs: 200, fat: 50, calories: 1800 };
       const target: MacroTargets = { protein: 120, carbs: 200, fat: 50, calories: 1800 };
 
-      expect(isWithinTolerance(current, target, 2)).toBe(false);
+      expect(isWithinTolerance(current, target, 0)).toBe(false);
     });
   });
 

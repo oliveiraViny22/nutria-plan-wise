@@ -33,17 +33,16 @@ export const KCAL_PER_GRAM = {
   fat: 9,
 } as const;
 
-export const CALORIE_TOLERANCE_PERCENT = 2; // ±2% é o teto absoluto
-export const FAT_TOLERANCE_GRAMS = 5; // Gordura não pode exceder meta em mais de ±5g
+export const CALORIE_TOLERANCE_PERCENT = 0; // SEM tolerância - valor exato
+export const FAT_TOLERANCE_GRAMS = 0; // SEM tolerância - valor exato
 
 // =====================================================
-// TOLERÂNCIAS ASSIMÉTRICAS (REGRA 2 - NOVA)
+// SEM TOLERÂNCIAS - VALORES EXATOS OBRIGATÓRIOS
 // =====================================================
-// Carboidrato é macro flexível - pode ceder para viabilizar proteína
-// Proteína e calorias são prioridade absoluta
-export const CARBS_TOLERANCE_MIN_PERCENT = 8; // Pode ficar até 8% ABAIXO da meta
-export const CARBS_TOLERANCE_MAX_PERCENT = 5; // Pode ficar até 5% ACIMA da meta
-export const PROTEIN_TOLERANCE_PERCENT = 2;   // ±2% (inalterado)
+// Rebalanceador deve garantir valores exatos de macros e calorias
+export const CARBS_TOLERANCE_MIN_PERCENT = 0; // SEM tolerância
+export const CARBS_TOLERANCE_MAX_PERCENT = 0; // SEM tolerância
+export const PROTEIN_TOLERANCE_PERCENT = 0;   // SEM tolerância
 
 // =====================================================
 // TIPOS E INTERFACES
@@ -223,27 +222,19 @@ export function validateQuantities(
 }
 
 /**
- * REGRA 1 - TETO CALÓRICO ABSOLUTO
- * Valida que as calorias propostas estão dentro de ±2% da meta.
+ * REGRA 1 - CALORIAS EXATAS
+ * Valida que as calorias propostas são exatamente iguais à meta.
  */
 export function validateCalorieCeiling(
   proposedCalories: number,
   targetCalories: number
 ): { isValid: boolean; error: string | null } {
-  const maxCalories = targetCalories * (1 + CALORIE_TOLERANCE_PERCENT / 100);
-  const minCalories = targetCalories * (1 - CALORIE_TOLERANCE_PERCENT / 100);
+  const diff = Math.round(proposedCalories) - Math.round(targetCalories);
   
-  if (proposedCalories > maxCalories) {
+  if (diff !== 0) {
     return {
       isValid: false,
-      error: `ESTOURO CALÓRICO: ${Math.round(proposedCalories)} kcal excedem o teto de ${Math.round(maxCalories)} kcal (+${((proposedCalories / targetCalories - 1) * 100).toFixed(1)}%)`
-    };
-  }
-  
-  if (proposedCalories < minCalories) {
-    return {
-      isValid: false,
-      error: `DÉFICIT CALÓRICO EXCESSIVO: ${Math.round(proposedCalories)} kcal abaixo do mínimo de ${Math.round(minCalories)} kcal`
+      error: `Calorias fora da meta: ${Math.round(proposedCalories)} kcal vs meta ${Math.round(targetCalories)} kcal (diferença: ${diff > 0 ? '+' : ''}${diff} kcal)`
     };
   }
   
@@ -268,87 +259,62 @@ export function validateNoSimultaneousIncrease(
 }
 
 /**
- * REGRA 5 - GORDURA É AJUSTE FINO (±5g da meta)
+ * REGRA 5 - GORDURA EXATA
+ * Valida que a gordura proposta é exatamente igual à meta.
  */
 export function validateFatTolerance(
   proposedFat: number,
   targetFat: number
 ): { isValid: boolean; error: string | null } {
-  const diff = proposedFat - targetFat;
-  if (Math.abs(diff) > FAT_TOLERANCE_GRAMS) {
+  const diff = Math.round(proposedFat) - Math.round(targetFat);
+  if (diff !== 0) {
     return {
       isValid: false,
-      error: `Gordura fora da tolerância: ${proposedFat.toFixed(1)}g vs meta ${targetFat}g (diferença: ${diff > 0 ? '+' : ''}${diff.toFixed(1)}g, max: ±${FAT_TOLERANCE_GRAMS}g)`
+      error: `Gordura fora da meta: ${Math.round(proposedFat)}g vs meta ${Math.round(targetFat)}g (diferença: ${diff > 0 ? '+' : ''}${diff}g)`
     };
   }
   return { isValid: true, error: null };
 }
 
 /**
- * Valida que os macros propostos estão dentro da tolerância.
- * REGRA 2: Usa tolerâncias ASSIMÉTRICAS para carboidrato.
+ * Valida que os macros propostos são EXATAMENTE iguais às metas.
+ * SEM tolerâncias - valores devem ser exatos.
  */
 export function validateMacrosWithinTolerance(
   proposed: MacroTargets,
   target: MacroTargets,
-  tolerancePercent: number
+  _tolerancePercent: number // Ignorado - sem tolerância
 ): { isValid: boolean; errors: string[] } {
   const errors: string[] = [];
   
-  const checkTolerance = (
-    name: string,
-    proposed: number,
-    target: number,
-    tolerance: number
-  ) => {
-    if (target === 0) return;
-    const diff = Math.abs(proposed - target);
-    const diffPercent = (diff / target) * 100;
-    if (diffPercent > tolerance) {
-      errors.push(`${name}: ${proposed.toFixed(0)} vs meta ${target} (${diffPercent.toFixed(1)}% de diferença)`);
+  const checkExact = (name: string, proposed: number, target: number) => {
+    const diff = Math.round(proposed) - Math.round(target);
+    if (diff !== 0) {
+      errors.push(`${name}: ${Math.round(proposed)} vs meta ${Math.round(target)} (diferença: ${diff > 0 ? '+' : ''}${diff})`);
     }
   };
   
-  // REGRA 2: Tolerância assimétrica para carboidrato
-  const checkCarbsTolerance = (proposed: number, target: number) => {
-    if (target === 0) return;
-    const diff = proposed - target;
-    const diffPercent = (diff / target) * 100;
-    
-    // Pode ficar até CARBS_TOLERANCE_MIN_PERCENT abaixo OU CARBS_TOLERANCE_MAX_PERCENT acima
-    if (diffPercent < -CARBS_TOLERANCE_MIN_PERCENT) {
-      errors.push(`Carboidrato: ${proposed.toFixed(0)} vs meta ${target} (${diffPercent.toFixed(1)}% abaixo do mínimo)`);
-    } else if (diffPercent > CARBS_TOLERANCE_MAX_PERCENT) {
-      errors.push(`Carboidrato: ${proposed.toFixed(0)} vs meta ${target} (+${diffPercent.toFixed(1)}% acima do máximo)`);
-    }
-  };
-  
-  checkTolerance('Proteína', proposed.protein, target.protein, PROTEIN_TOLERANCE_PERCENT);
-  checkCarbsTolerance(proposed.carbs, target.carbs);
-  // Gordura usa ±5g absoluto, não percentual - validada separadamente
-  checkTolerance('Calorias', proposed.calories, target.calories, tolerancePercent);
+  checkExact('Proteína', proposed.protein, target.protein);
+  checkExact('Carboidrato', proposed.carbs, target.carbs);
+  checkExact('Gordura', proposed.fat, target.fat);
+  checkExact('Calorias', proposed.calories, target.calories);
   
   return { isValid: errors.length === 0, errors };
 }
 
 /**
- * REGRA 2: Verifica se carboidrato está dentro da tolerância assimétrica.
- * Retorna true se carboidrato pode ceder mais.
+ * Verifica se carboidrato atingiu a meta exata.
  */
 export function canCarbsYield(currentCarbs: number, targetCarbs: number): boolean {
-  if (targetCarbs === 0) return false;
-  const minCarbs = targetCarbs * (1 - CARBS_TOLERANCE_MIN_PERCENT / 100);
-  return currentCarbs > minCarbs;
+  return Math.round(currentCarbs) !== Math.round(targetCarbs);
 }
 
 /**
- * REGRA 4 REFORÇADA: Verifica se gordura pode aumentar.
- * Bloqueia aumento se carboidrato está abaixo do mínimo aceitável.
+ * Verifica se gordura pode aumentar (sem tolerância).
  */
 export function canFatIncrease(proposedCarbs: number, targetCarbs: number): boolean {
-  if (targetCarbs === 0) return true;
-  const minCarbs = targetCarbs * (1 - CARBS_TOLERANCE_MIN_PERCENT / 100);
-  return proposedCarbs >= minCarbs;
+  // Com tolerância zero, sempre pode ajustar se não está na meta
+  return Math.round(proposedCarbs) >= Math.round(targetCarbs);
 }
 
 // =====================================================
@@ -417,37 +383,19 @@ export function calculateDeltas(current: MacroTargets, target: MacroTargets): Ma
 }
 
 /**
- * Verifica se os macros já estão dentro da tolerância.
- * CORRIGIDO: Usa tolerâncias específicas por macro (assimétricas para carbs, absolutas para gordura).
+ * Verifica se os macros atingiram as metas EXATAS.
+ * SEM tolerâncias - valores devem ser exatos.
  */
 export function isWithinTolerance(
   current: MacroTargets,
   target: MacroTargets,
-  tolerancePercent: number
+  _tolerancePercent: number // Ignorado - sem tolerância
 ): boolean {
-  // Calorias: ±tolerancePercent (normalmente 2%)
-  const calorieOK = (() => {
-    if (target.calories === 0) return current.calories === 0;
-    const diffPercent = Math.abs((current.calories - target.calories) / target.calories) * 100;
-    return diffPercent <= tolerancePercent;
-  })();
-  
-  // Proteína: ±PROTEIN_TOLERANCE_PERCENT (2%)
-  const proteinOK = (() => {
-    if (target.protein === 0) return current.protein === 0;
-    const diffPercent = Math.abs((current.protein - target.protein) / target.protein) * 100;
-    return diffPercent <= PROTEIN_TOLERANCE_PERCENT;
-  })();
-  
-  // Carboidrato: tolerância ASSIMÉTRICA (-8% a +5%)
-  const carbsOK = (() => {
-    if (target.carbs === 0) return current.carbs === 0;
-    const diffPercent = ((current.carbs - target.carbs) / target.carbs) * 100;
-    return diffPercent >= -CARBS_TOLERANCE_MIN_PERCENT && diffPercent <= CARBS_TOLERANCE_MAX_PERCENT;
-  })();
-  
-  // Gordura: ±FAT_TOLERANCE_GRAMS (5g) - ABSOLUTO, não percentual
-  const fatOK = Math.abs(current.fat - target.fat) <= FAT_TOLERANCE_GRAMS;
+  // Valores exatos (arredondados)
+  const calorieOK = Math.round(current.calories) === Math.round(target.calories);
+  const proteinOK = Math.round(current.protein) === Math.round(target.protein);
+  const carbsOK = Math.round(current.carbs) === Math.round(target.carbs);
+  const fatOK = Math.round(current.fat) === Math.round(target.fat);
   
   return calorieOK && proteinOK && carbsOK && fatOK;
 }
@@ -472,48 +420,29 @@ export function validateFinalMacros(
 ): MacroValidationResult {
   const errors: string[] = [];
   
-  // Calorias: ±2%
-  const calorieOK = (() => {
-    if (target.calories === 0) return proposed.calories === 0;
-    const diffPercent = Math.abs((proposed.calories - target.calories) / target.calories) * 100;
-    const ok = diffPercent <= CALORIE_TOLERANCE_PERCENT;
-    if (!ok) {
-      errors.push(`Calorias: ${Math.round(proposed.calories)} vs meta ${target.calories} (${diffPercent.toFixed(1)}% de diferença, máx: ±${CALORIE_TOLERANCE_PERCENT}%)`);
-    }
-    return ok;
-  })();
+  // Valores exatos (arredondados)
+  const calorieDiff = Math.round(proposed.calories) - Math.round(target.calories);
+  const calorieOK = calorieDiff === 0;
+  if (!calorieOK) {
+    errors.push(`Calorias: ${Math.round(proposed.calories)} vs meta ${Math.round(target.calories)} (diferença: ${calorieDiff > 0 ? '+' : ''}${calorieDiff} kcal)`);
+  }
   
-  // Proteína: ±2%
-  const proteinOK = (() => {
-    if (target.protein === 0) return proposed.protein === 0;
-    const diffPercent = Math.abs((proposed.protein - target.protein) / target.protein) * 100;
-    const ok = diffPercent <= PROTEIN_TOLERANCE_PERCENT;
-    if (!ok) {
-      errors.push(`Proteína: ${Math.round(proposed.protein)}g vs meta ${target.protein}g (${diffPercent.toFixed(1)}% de diferença, máx: ±${PROTEIN_TOLERANCE_PERCENT}%)`);
-    }
-    return ok;
-  })();
+  const proteinDiff = Math.round(proposed.protein) - Math.round(target.protein);
+  const proteinOK = proteinDiff === 0;
+  if (!proteinOK) {
+    errors.push(`Proteína: ${Math.round(proposed.protein)}g vs meta ${Math.round(target.protein)}g (diferença: ${proteinDiff > 0 ? '+' : ''}${proteinDiff}g)`);
+  }
   
-  // Carboidrato: -8% a +5%
-  const carbsOK = (() => {
-    if (target.carbs === 0) return proposed.carbs === 0;
-    const diffPercent = ((proposed.carbs - target.carbs) / target.carbs) * 100;
-    const ok = diffPercent >= -CARBS_TOLERANCE_MIN_PERCENT && diffPercent <= CARBS_TOLERANCE_MAX_PERCENT;
-    if (!ok) {
-      if (diffPercent < -CARBS_TOLERANCE_MIN_PERCENT) {
-        errors.push(`Carboidrato: ${Math.round(proposed.carbs)}g vs meta ${target.carbs}g (${diffPercent.toFixed(1)}% abaixo, mín: -${CARBS_TOLERANCE_MIN_PERCENT}%)`);
-      } else {
-        errors.push(`Carboidrato: ${Math.round(proposed.carbs)}g vs meta ${target.carbs}g (+${diffPercent.toFixed(1)}% acima, máx: +${CARBS_TOLERANCE_MAX_PERCENT}%)`);
-      }
-    }
-    return ok;
-  })();
+  const carbsDiff = Math.round(proposed.carbs) - Math.round(target.carbs);
+  const carbsOK = carbsDiff === 0;
+  if (!carbsOK) {
+    errors.push(`Carboidrato: ${Math.round(proposed.carbs)}g vs meta ${Math.round(target.carbs)}g (diferença: ${carbsDiff > 0 ? '+' : ''}${carbsDiff}g)`);
+  }
   
-  // Gordura: ±5g (absoluto)
-  const fatDiff = proposed.fat - target.fat;
-  const fatOK = Math.abs(fatDiff) <= FAT_TOLERANCE_GRAMS;
+  const fatDiff = Math.round(proposed.fat) - Math.round(target.fat);
+  const fatOK = fatDiff === 0;
   if (!fatOK) {
-    errors.push(`Gordura: ${Math.round(proposed.fat)}g vs meta ${target.fat}g (${fatDiff > 0 ? '+' : ''}${fatDiff.toFixed(1)}g, máx: ±${FAT_TOLERANCE_GRAMS}g)`);
+    errors.push(`Gordura: ${Math.round(proposed.fat)}g vs meta ${Math.round(target.fat)}g (diferença: ${fatDiff > 0 ? '+' : ''}${fatDiff}g)`);
   }
   
   return {
@@ -527,15 +456,14 @@ export function validateFinalMacros(
 }
 
 /**
- * Calcula o "orçamento calórico" disponível após um delta de macro.
- * Usado para garantir que ajustes de proteína sejam compensados.
+ * Calcula o "orçamento calórico" disponível.
+ * Com tolerância zero, o orçamento é exato.
  */
 export function calculateCalorieBudget(
   currentCalories: number,
   targetCalories: number
 ): number {
-  const maxCalories = targetCalories * (1 + CALORIE_TOLERANCE_PERCENT / 100);
-  return maxCalories - currentCalories;
+  return Math.round(targetCalories) - Math.round(currentCalories);
 }
 
 // =====================================================
