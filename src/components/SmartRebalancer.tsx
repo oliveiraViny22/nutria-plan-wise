@@ -262,7 +262,7 @@ export function SmartRebalancer({
         ) : (
           <>
             <Sparkles className="w-4 h-4" />
-            Otimizar plano automaticamente
+            Rebalanceador V3 - Smart
           </>
         )}
       </Button>
