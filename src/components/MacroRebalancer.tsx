@@ -270,7 +270,7 @@ export function MacroRebalancer({
         ) : (
           <>
             <Sparkles className="w-4 h-4" />
-            Otimizar plano para atingir macros
+            Rebalanceador V2 - Core
           </>
         )}
       </Button>

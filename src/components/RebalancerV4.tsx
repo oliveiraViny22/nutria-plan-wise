@@ -257,7 +257,7 @@ export function RebalancerV4({
         ) : (
           <>
             <Sparkles className="w-4 h-4" />
-            Otimizar plano para atingir macros
+            Rebalanceador V4 - Estrutural
           </>
         )}
       </Button>
