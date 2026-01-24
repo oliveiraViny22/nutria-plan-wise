@@ -43,6 +43,7 @@ import { AdherenceWidget } from '@/components/AdherenceWidget';
 import { GoalsProjectionCard } from '@/components/GoalsProjectionCard';
 import { HydrationTipCard } from '@/components/HydrationTipCard';
 import { OnboardingTutorial } from '@/components/OnboardingTutorial';
+import { DashboardSkeleton } from '@/components/DashboardSkeleton';
 import { useTutorial } from '@/hooks/useTutorial';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserRole } from '@/hooks/useUserRole';
@@ -295,6 +296,11 @@ export default function Dashboard() {
         </div>
       </header>
 
+      {loading ? (
+        <main className="container mx-auto px-3 sm:px-4 py-4 sm:py-6 pb-20 sm:pb-24">
+          <DashboardSkeleton />
+        </main>
+      ) : (
       <main className="container mx-auto px-3 sm:px-4 py-4 sm:py-6 space-y-4 sm:space-y-6 pb-20 sm:pb-24">
         {/* Linked Student Read-Only Notice */}
         {isLinkedStudent && (
@@ -455,11 +461,7 @@ export default function Dashboard() {
         )}
 
         {/* Meals Section */}
-        {loading ? (
-          <div className="flex items-center justify-center py-12">
-            <Loader2 className="w-8 h-8 animate-spin text-primary" />
-          </div>
-        ) : isLinkedStudent && !planReleased ? (
+        {isLinkedStudent && !planReleased ? (
           // Linked student without released plan
           <motion.section
             initial={{ opacity: 0, y: 20 }}
@@ -586,6 +588,7 @@ export default function Dashboard() {
           </p>
         </motion.section>
       </main>
+      )}
 
       {/* Upgrade Dialog */}
       <UpgradeDialog
