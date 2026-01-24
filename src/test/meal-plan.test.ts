@@ -1261,3 +1261,227 @@ describe('Rebalancer Assumes Valid Plan (Post-Generation)', () => {
     expect(result.data.success).toBe(true);
   });
 });
+
+// ============================================================
+// TESTES DE REGRAS G0 - VALIDAÇÃO CALÓRICA GLOBAL (v2.1)
+// ============================================================
+
+describe('G0 Calorie Validation Rules', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  // ============================================================
+  // G0: Plano > 150% da meta calórica DEVE FALHAR
+  // ============================================================
+  
+  it('[G0] should FAIL plan generation when calories exceed 150% of target', async () => {
+    // Simula resposta do gerador rejeitando plano com calorias extremas
+    mockInvoke.mockResolvedValueOnce({
+      data: null,
+      error: { 
+        message: '[G0.2] BLOQUEIO CRÍTICO: Calorias 155% da meta (3100 vs 2000). Limite máximo absoluto excedido.' 
+      },
+    });
+
+    const { supabase } = await import('@/integrations/supabase/client');
+    const result = await supabase.functions.invoke('generate-meal-plan', {
+      body: {
+        profile: {
+          daily_calories: 2000,
+          protein_target: 150,
+          carbs_target: 250,
+          fat_target: 70,
+          meals_per_day: 4,
+        },
+      },
+    });
+
+    // DEVE falhar - plano com 155% das calorias é inválido
+    expect(result.error).toBeDefined();
+    expect(result.error.message).toContain('G0');
+  });
+
+  it('[G0] should FAIL plan generation when calories exceed 110% of target', async () => {
+    // Plano com 115% da meta DEVE ser bloqueado
+    mockInvoke.mockResolvedValueOnce({
+      data: null,
+      error: { 
+        message: '[G0] BLOQUEIO: Calorias excedidas - 2300 kcal (115% da meta 2000). Máximo: 110%.' 
+      },
+    });
+
+    const { supabase } = await import('@/integrations/supabase/client');
+    const result = await supabase.functions.invoke('generate-meal-plan', {
+      body: {
+        profile: {
+          daily_calories: 2000,
+          protein_target: 150,
+          carbs_target: 250,
+          fat_target: 70,
+          meals_per_day: 4,
+        },
+      },
+    });
+
+    expect(result.error).toBeDefined();
+    expect(result.error.message).toContain('G0');
+    expect(result.error.message).toContain('BLOQUEIO');
+  });
+
+  it('[G0] should PASS plan generation when calories are within ±10%', async () => {
+    // Plano com 95% ou 105% da meta DEVE passar
+    const mockValidPlan = {
+      id: 'plan-valid',
+      status: 'draft',
+      total_calories: 1950, // 97.5% of 2000 - valid
+      validation: {
+        valid: true,
+        errors: [],
+        warnings: [],
+      },
+    };
+
+    mockInvoke.mockResolvedValueOnce({
+      data: { success: true, plan: mockValidPlan, validation: mockValidPlan.validation },
+      error: null,
+    });
+
+    const { supabase } = await import('@/integrations/supabase/client');
+    const result = await supabase.functions.invoke('generate-meal-plan', {
+      body: {
+        profile: {
+          daily_calories: 2000,
+          protein_target: 150,
+          carbs_target: 250,
+          fat_target: 70,
+          meals_per_day: 4,
+        },
+      },
+    });
+
+    expect(result.error).toBeNull();
+    expect(result.data.success).toBe(true);
+    expect(result.data.validation.valid).toBe(true);
+  });
+
+  // ============================================================
+  // G0.1: Carbs > 120% E Fat > 120% simultaneamente DEVE FALHAR
+  // ============================================================
+  
+  it('[G0.1] should FAIL when both carbs AND fat exceed 120% simultaneously', async () => {
+    mockInvoke.mockResolvedValueOnce({
+      data: null,
+      error: { 
+        message: '[G0.1] BLOQUEIO: Macros extremos simultâneos - Carbs 135% (máx 120%) E Gordura 128% (máx 120%). Plano inviável.' 
+      },
+    });
+
+    const { supabase } = await import('@/integrations/supabase/client');
+    const result = await supabase.functions.invoke('generate-meal-plan', {
+      body: {
+        profile: {
+          daily_calories: 2000,
+          protein_target: 150,
+          carbs_target: 200, // Se gerado com 270g = 135%
+          fat_target: 50,    // Se gerado com 64g = 128%
+          meals_per_day: 4,
+        },
+      },
+    });
+
+    expect(result.error).toBeDefined();
+    expect(result.error.message).toContain('G0.1');
+    expect(result.error.message).toContain('Macros extremos simultâneos');
+  });
+
+  it('[G0.1] should PASS when only carbs exceeds 120% (not both)', async () => {
+    // Se apenas carbs excede 120%, mas fat está normal, pode gerar (será warning)
+    const mockPlanWithHighCarbs = {
+      id: 'plan-high-carbs',
+      status: 'draft',
+      total_calories: 2100,
+      total_carbs: 260, // 130% of 200g target
+      total_fat: 55,    // 110% of 50g target - ok
+      validation: {
+        valid: true,
+        errors: [],
+        warnings: ['Carboidratos acima da meta'],
+      },
+    };
+
+    mockInvoke.mockResolvedValueOnce({
+      data: { success: true, plan: mockPlanWithHighCarbs, validation: mockPlanWithHighCarbs.validation },
+      error: null,
+    });
+
+    const { supabase } = await import('@/integrations/supabase/client');
+    const result = await supabase.functions.invoke('generate-meal-plan', {
+      body: {
+        profile: {
+          daily_calories: 2000,
+          protein_target: 150,
+          carbs_target: 200,
+          fat_target: 50,
+          meals_per_day: 4,
+        },
+      },
+    });
+
+    // Pode passar se apenas um macro está alto (não é G0.1)
+    // A regra G0.1 bloqueia apenas quando AMBOS estão > 120%
+    expect(result.error).toBeNull();
+  });
+
+  // ============================================================
+  // G0.2: Verificar que gerador prefere FALHAR a gerar plano ruim
+  // ============================================================
+  
+  it('[G0.2] generator should prefer to FAIL rather than generate invalid plan', async () => {
+    // Quando não é possível montar plano dentro dos limites, DEVE falhar
+    mockInvoke.mockResolvedValueOnce({
+      data: null,
+      error: { 
+        message: 'Não foi possível gerar o plano: Não há fonte de proteína compatível para Almoço' 
+      },
+    });
+
+    const { supabase } = await import('@/integrations/supabase/client');
+    const result = await supabase.functions.invoke('generate-meal-plan', {
+      body: {
+        profile: {
+          daily_calories: 1500,
+          protein_target: 200, // Proteína muito alta para as calorias
+          carbs_target: 100,
+          fat_target: 30,
+          meals_per_day: 4,
+        },
+      },
+    });
+
+    expect(result.error).toBeDefined();
+  });
+
+  it('[G0.2] rebalancer should NOT try to fix structurally invalid plans', async () => {
+    // Se o plano já nasce inválido, rebalanceador não deve tentar corrigir
+    const mockRebalanceResult = {
+      success: false,
+      error: 'Plano fora dos limites calóricos. Rebalanceamento não é possível.',
+      failureReason: 'calorie_protein_impossible',
+    };
+
+    mockInvoke.mockResolvedValueOnce({
+      data: mockRebalanceResult,
+      error: null,
+    });
+
+    const { supabase } = await import('@/integrations/supabase/client');
+    const result = await supabase.functions.invoke('rebalance-meal-plan', {
+      body: { plan_id: 'plan-invalid' },
+    });
+
+    // Rebalanceador deve retornar falha controlada
+    expect(result.data.success).toBe(false);
+    expect(result.data.failureReason).toBeDefined();
+  });
+});

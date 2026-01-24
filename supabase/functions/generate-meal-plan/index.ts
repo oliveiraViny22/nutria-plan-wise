@@ -1,17 +1,22 @@
 // ============================================================
-// GERADOR DE PLANO ALIMENTAR - VERSÃO CANÔNICA v2
+// GERADOR DE PLANO ALIMENTAR - VERSÃO CANÔNICA v2.1
 // ============================================================
 // RESPONSABILIDADE: Criar a PRIMEIRA versão do plano.
 // NÃO otimiza continuamente (isso é do rebalanceador).
 // NÃO usa IA para cálculos - é puramente heurístico.
 // ============================================================
-// REGRAS ESTRUTURAIS (v2):
+// REGRAS ESTRUTURAIS (v2.1):
 // 1. TODA refeição deve ter fonte de proteína compatível
 // 2. Alimentos bloqueados por contexto NUNCA entram
 // 3. Proteína distribuída equilibradamente (mínimo por refeição)
 // 4. Se regras não forem atendidas, plano NÃO é gerado
 // 5. [G7] Carboidratos totais ≥ 90% da meta (validação pré-save)
 // 6. [G7] Refeições principais devem ter fonte de carb base (não apenas frutas)
+// ============================================================
+// REGRAS DE BLOQUEIO CALÓRICO (v2.1):
+// 7. [G0] Calorias totais DEVEM estar dentro de ±10% da meta
+// 8. [G0.1] Carbs > 120% E Fat > 120% simultaneamente = BLOQUEIO
+// 9. [G0.2] Proibido compensar com excesso - plano deve FALHAR
 // ============================================================
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
@@ -632,27 +637,41 @@ function pickFoodFromCategory(
   return pool[Math.floor(Math.random() * pool.length)];
 }
 
-function calculateDefaultPortion(food: Food, targetMacro: MealMacroDistribution): number {
+function calculateDefaultPortion(
+  food: Food, 
+  targetMacro: MealMacroDistribution,
+  currentMealCalories: number = 0  // Calorias já acumuladas na refeição
+): number {
+  // G0.2: Porções padrão mais conservadoras para evitar excesso
   const defaultPortions: Record<string, number> = {
-    proteinas: 120,
-    carboidratos: 150,
-    gorduras: 15,
-    vegetais: 100,
-    frutas: 120,
-    laticinios: 200,
-    leguminosas: 100,
-    mistos: 150,
+    proteinas: 100,      // Reduzido de 120
+    carboidratos: 120,   // Reduzido de 150
+    gorduras: 12,        // Reduzido de 15
+    vegetais: 80,        // Reduzido de 100
+    frutas: 100,         // Reduzido de 120
+    laticinios: 150,     // Reduzido de 200
+    leguminosas: 80,     // Reduzido de 100
+    mistos: 100,         // Reduzido de 150
   };
   
   const category = (food.category || '').toLowerCase();
-  let portion = defaultPortions[category] || 100;
+  let portion = defaultPortions[category] || 80;
   
   const foodCalPerGram = food.calories > 0 ? food.calories / 100 : 1;
-  const targetCalsForThis = targetMacro.calories * 0.25;
+  
+  // G0: Calcular quanto ainda pode ser adicionado respeitando o target
+  const remainingCalories = Math.max(0, targetMacro.calories - currentMealCalories);
+  const maxPortionByCalories = remainingCalories > 0 
+    ? (remainingCalories / foodCalPerGram) * 100 
+    : portion;
+  
+  // Usar 20% das calorias restantes da refeição (mais conservador que 25%)
+  const targetCalsForThis = Math.min(targetMacro.calories * 0.20, remainingCalories * 0.5);
   const suggestedPortion = targetCalsForThis / foodCalPerGram;
   
-  portion = Math.round(Math.min(Math.max(suggestedPortion, portion * 0.5), portion * 2) / 10) * 10;
-  portion = Math.min(500, Math.max(20, portion));
+  // G0.2: Limitar mais agressivamente para evitar estourar calorias
+  portion = Math.round(Math.min(suggestedPortion, portion, maxPortionByCalories) / 10) * 10;
+  portion = Math.min(350, Math.max(20, portion));  // Limite máximo reduzido de 500 para 350
   
   return portion;
 }
@@ -756,12 +775,15 @@ function buildMealOption(
   
   usedFoodIds.add(proteinSource.id);
   
-  // Calcular porção de proteína para atingir mínimo
+  // G0.2: Calcular porção de proteína respeitando limite de calorias
   const minProtein = context?.minProteinGrams || 10;
   const proteinPer100g = proteinSource.protein;
   const minPortionForProtein = proteinPer100g > 0 ? (minProtein / proteinPer100g) * 100 : 100;
-  const defaultPortion = calculateDefaultPortion(proteinSource, targetMacro);
-  const proteinPortion = Math.max(Math.round(minPortionForProtein / 10) * 10, defaultPortion);
+  const defaultPortion = calculateDefaultPortion(proteinSource, targetMacro, totalCalories);
+  
+  // G0: Limitar porção de proteína para não estourar calorias
+  const maxProteinPortion = Math.min(250, defaultPortion);  // Máximo 250g para proteína
+  const proteinPortion = Math.min(maxProteinPortion, Math.max(Math.round(minPortionForProtein / 10) * 10, defaultPortion));
   
   const proteinConverted = applyUnitConversion(proteinSource, proteinPortion);
   
@@ -774,7 +796,7 @@ function buildMealOption(
   mealFoods.push(proteinConverted);
   
   // ============================================================
-  // REGRA G7: Para refeições principais, garantir carb base PRIMEIRO
+  // REGRA G7 + G0: Para refeições principais, garantir carb base COM LIMITE
   // ============================================================
   const isMainMeal = MAIN_MEALS_REQUIRING_CARBS.includes(mealType);
   let hasBaseCarb = false;
@@ -785,14 +807,21 @@ function buildMealOption(
     if (baseCarbSource) {
       usedFoodIds.add(baseCarbSource.id);
       
-      // REGRA G7 REFORÇADA: Calcular porção para atingir 70-80% dos carbs da refeição
+      // G0.2: Calcular porção de carb respeitando limite de calorias da refeição
       const carbsPerGram = baseCarbSource.carbs / 100;
+      const carbCalPerGram = baseCarbSource.calories / 100;
       const targetCarbsForMeal = targetMacro.carbs;
-      // Tentar cobrir 75% dos carbs da refeição com fonte base
-      const carbCoverageTarget = targetCarbsForMeal * 0.75;
-      const suggestedPortion = carbsPerGram > 0 ? (carbCoverageTarget / carbsPerGram) * 100 : 150;
-      // Aumentar limite máximo para 400g para fontes de carb densas
-      const carbPortion = Math.min(400, Math.max(80, Math.round(suggestedPortion / 10) * 10));
+      
+      // Calcular calorias restantes disponíveis (deixando espaço para vegetais)
+      const remainingCalories = targetMacro.calories - totalCalories - 50; // Reserva 50 cal para vegetais
+      const maxPortionByCalories = remainingCalories > 0 ? remainingCalories / carbCalPerGram : 100;
+      
+      // Tentar cobrir 60% dos carbs da refeição (reduzido de 75%)
+      const carbCoverageTarget = targetCarbsForMeal * 0.60;
+      const suggestedPortion = carbsPerGram > 0 ? (carbCoverageTarget / carbsPerGram) * 100 : 120;
+      
+      // G0: Limite mais conservador de 280g (reduzido de 400g)
+      const carbPortion = Math.min(280, maxPortionByCalories, Math.max(60, Math.round(suggestedPortion / 10) * 10));
       
       const carbConverted = applyUnitConversion(baseCarbSource, carbPortion);
       
@@ -805,15 +834,19 @@ function buildMealOption(
       mealFoods.push(carbConverted);
       hasBaseCarb = true;
       
-      logStep("G7: Added base carb source", { 
+      logStep("G7+G0: Added base carb source with calorie limit", { 
         mealType, 
         food: baseCarbSource.name, 
         portion: carbPortion,
         carbDensity: baseCarbSource.carbs,
         carbs: baseCarbSource.carbs * carbMultiplier,
+        remainingCalories,
       });
     }
   }
+  
+  // G0: Verificar se ainda há espaço calórico para mais alimentos
+  const remainingCaloriesBudget = targetMacro.calories - totalCalories;
   
   // Agora adicionar outros alimentos por categoria (exceto proteínas, já adicionada)
   for (const category of categoryPriorities) {
@@ -825,12 +858,19 @@ function buildMealOption(
       continue;
     }
     
+    // G0.2: Pular se não há mais espaço calórico significativo
+    if (targetMacro.calories - totalCalories < 30) {
+      logStep("G0: Skipping category - calorie budget exhausted", { category, remaining: targetMacro.calories - totalCalories });
+      break;
+    }
+    
     const food = pickFoodFromCategory(foods, category, usedFoodIds, preferences, mealType);
     if (!food) continue;
     
     usedFoodIds.add(food.id);
     
-    const portion = calculateDefaultPortion(food, targetMacro);
+    // G0.2: Passar calorias acumuladas para calcular porção limitada
+    const portion = calculateDefaultPortion(food, targetMacro, totalCalories);
     const converted = applyUnitConversion(food, portion);
     
     const multiplier = converted.calculated_grams / 100;
@@ -873,6 +913,115 @@ interface PlanValidation {
   valid: boolean;
   errors: string[];
   warnings: string[];
+}
+
+// ============================================================
+// REGRA G0 — VALIDAÇÃO CALÓRICA GLOBAL (BLOQUEANTE)
+// ============================================================
+// G0:   Calorias totais DEVEM estar dentro de ±10% da meta
+// G0.1: Carbs > 120% E Fat > 120% simultaneamente = BLOQUEIO
+// G0.2: Proibido compensar com excesso (não salvar plano ruim)
+// ============================================================
+
+interface G0ValidationResult {
+  valid: boolean;
+  errors: string[];
+  metrics: {
+    totalCalories: number;
+    targetCalories: number;
+    caloriePercent: number;
+    totalCarbs: number;
+    targetCarbs: number;
+    carbsPercent: number;
+    totalFat: number;
+    targetFat: number;
+    fatPercent: number;
+  };
+}
+
+/**
+ * REGRA G0: Valida calorias dentro de ±10% da meta
+ * REGRA G0.1: Bloqueia se carbs > 120% E fat > 120% ao mesmo tempo
+ * REGRA G0.2: Impede planos fora dos limites
+ */
+function validateG0CalorieGlobal(
+  meals: Array<{ name: string; mealType: MealType; options: MealOption[] }>,
+  targets: MacroTargets
+): G0ValidationResult {
+  const errors: string[] = [];
+  
+  // Calcular totais do plano (opção principal de cada refeição)
+  const totalCalories = meals.reduce((sum, meal) => {
+    const primary = meal.options.find(o => o.option_number === 1);
+    return sum + (primary?.total_calories || 0);
+  }, 0);
+  
+  const totalCarbs = meals.reduce((sum, meal) => {
+    const primary = meal.options.find(o => o.option_number === 1);
+    return sum + (primary?.total_carbs || 0);
+  }, 0);
+  
+  const totalFat = meals.reduce((sum, meal) => {
+    const primary = meal.options.find(o => o.option_number === 1);
+    return sum + (primary?.total_fat || 0);
+  }, 0);
+  
+  const caloriePercent = (totalCalories / targets.calories) * 100;
+  const carbsPercent = (totalCarbs / targets.carbs) * 100;
+  const fatPercent = (totalFat / targets.fat) * 100;
+  
+  const metrics = {
+    totalCalories: Math.round(totalCalories),
+    targetCalories: targets.calories,
+    caloriePercent: Math.round(caloriePercent),
+    totalCarbs: Math.round(totalCarbs),
+    targetCarbs: targets.carbs,
+    carbsPercent: Math.round(carbsPercent),
+    totalFat: Math.round(totalFat),
+    targetFat: targets.fat,
+    fatPercent: Math.round(fatPercent),
+  };
+  
+  logStep("G0 Metrics", metrics);
+  
+  // ============================================================
+  // 🔒 REGRA G0: Calorias devem estar dentro de ±10%
+  // ============================================================
+  if (caloriePercent < 90) {
+    errors.push(
+      `[G0] BLOQUEIO: Calorias muito baixas - ${metrics.totalCalories} kcal (${metrics.caloriePercent}% da meta ${targets.calories}). Mínimo: 90%.`
+    );
+  }
+  
+  if (caloriePercent > 110) {
+    errors.push(
+      `[G0] BLOQUEIO: Calorias excedidas - ${metrics.totalCalories} kcal (${metrics.caloriePercent}% da meta ${targets.calories}). Máximo: 110%.`
+    );
+  }
+  
+  // ============================================================
+  // 🔒 REGRA G0.1: Bloquear se carbs > 120% E fat > 120% juntos
+  // ============================================================
+  if (carbsPercent > 120 && fatPercent > 120) {
+    errors.push(
+      `[G0.1] BLOQUEIO: Macros extremos simultâneos - Carbs ${metrics.carbsPercent}% (máx 120%) E Gordura ${metrics.fatPercent}% (máx 120%). Plano inviável.`
+    );
+  }
+  
+  // ============================================================
+  // 🔒 REGRA G0.2: Alertar sobre excessos individuais extremos
+  // ============================================================
+  if (caloriePercent > 150) {
+    errors.push(
+      `[G0.2] BLOQUEIO CRÍTICO: Calorias ${metrics.caloriePercent}% da meta (${metrics.totalCalories} vs ${targets.calories}). Limite máximo absoluto excedido.`
+    );
+  }
+  
+  return {
+    valid: errors.length === 0,
+    errors,
+    metrics,
+  };
 }
 
 // ============================================================
@@ -984,6 +1133,16 @@ function validatePlan(
   const warnings: string[] = [];
   
   // ============================================================
+  // 🔒 REGRA G0 — VALIDAÇÃO CALÓRICA GLOBAL (BLOQUEANTE PRIMEIRO)
+  // ============================================================
+  
+  const g0Validation = validateG0CalorieGlobal(meals, targets);
+  if (!g0Validation.valid) {
+    errors.push(...g0Validation.errors);
+    logStep("G0 validation FAILED - plan will be rejected", g0Validation.metrics);
+  }
+  
+  // ============================================================
   // REGRA G7 — VALIDAÇÃO DE CARBOIDRATO (BLOQUEANTE)
   // ============================================================
   
@@ -1035,15 +1194,7 @@ function validatePlan(
     }
   }
   
-  // 4. Calorias totais aproximadas (±15%)
-  const totalCalories = meals.reduce((sum, m) => sum + (m.options[0]?.total_calories || 0), 0);
-  const calorieError = Math.abs(totalCalories - targets.calories) / targets.calories;
-  
-  if (calorieError > 0.15) {
-    warnings.push(`Calorias totais (${totalCalories}) diferem ${Math.round(calorieError * 100)}% da meta (${targets.calories})`);
-  }
-  
-  // 5. Proteína total
+  // 4. Proteína total (apenas warning, G0 já valida calorias)
   const totalProtein = meals.reduce((sum, m) => sum + (m.options[0]?.total_protein || 0), 0);
   const proteinError = Math.abs(totalProtein - targets.protein) / targets.protein;
   
@@ -1051,7 +1202,7 @@ function validatePlan(
     warnings.push(`Proteína total (${Math.round(totalProtein)}g) difere ${Math.round(proteinError * 100)}% da meta (${targets.protein}g)`);
   }
   
-  // 6. Verificar categorias canônicas
+  // 5. Verificar categorias canônicas
   for (const meal of meals) {
     for (const option of meal.options) {
       for (const food of option.foods) {
