@@ -930,7 +930,7 @@ function buildMealOption(
   
   if (isMainMeal) {
     // G0.1 FIX: Sempre preferir carbs com baixa gordura para evitar excesso simultâneo
-    const baseCarbSource = findBaseCarbSource(foods, mealType, usedFoodIds, preferences, true);
+    const baseCarbSource = findBaseCarbSource(foods, mealType, usedFoodIds, preferences, true, preferredFoods);
     
     if (baseCarbSource) {
       usedFoodIds.add(baseCarbSource.id);
@@ -996,7 +996,7 @@ function buildMealOption(
   const preferLeanProtein = fatBudgetForProtein < targetMacro.fat * 0.5; // Se gastou mais de 50% da gordura
   
   // G0.1 FIX: SEMPRE preferir proteínas magras (default já é true na função)
-  const proteinSource = findCompatibleProteinSource(foods, mealType, usedFoodIds, preferences, true);
+  const proteinSource = findCompatibleProteinSource(foods, mealType, usedFoodIds, preferences, true, preferredFoods);
   
   if (!proteinSource) {
     return {
@@ -1071,7 +1071,7 @@ function buildMealOption(
       continue;
     }
     
-    const food = pickFoodFromCategory(foods, category, usedFoodIds, preferences, mealType);
+    const food = pickFoodFromCategory(foods, category, usedFoodIds, preferences, mealType, preferredFoods);
     if (!food) continue;
     
     // G0.1 FIX: Se o alimento é muito gorduroso e estamos perto do limite, pular
@@ -1782,7 +1782,8 @@ serve(async (req) => {
         mealTarget,
         preferences,
         usedFoodIds,
-        1
+        1,
+        preferredFoods // PASS: Alimentos específicos preferidos pelo usuário
       );
       
       if (!result1.success || !result1.option) {
@@ -1800,7 +1801,8 @@ serve(async (req) => {
           mealTarget,
           preferences,
           usedFoodIds,
-          optNum
+          optNum,
+          preferredFoods // PASS: Alimentos específicos preferidos pelo usuário
         );
         
         if (resultN.success && resultN.option) {

@@ -36,6 +36,8 @@ export interface Profile {
   activity_level: 'sedentary' | 'light' | 'moderate' | 'active' | 'very_active' | null;
   preferences: string[] | null;
   restrictions: string[] | null;
+  preferred_foods: string[] | null;
+  avoided_foods: string[] | null;
   daily_calories: number | null;
   protein_target: number | null;
   carbs_target: number | null;
