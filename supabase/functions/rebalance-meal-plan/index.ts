@@ -992,13 +992,13 @@ serve(async (req: Request) => {
       return createErrorResponse('Perfil não encontrado', 404, corsHeaders);
     }
 
-    // Get diet plan with meals
+    // Get diet plan with meals (accept both 'active' and 'draft' status)
     const { data: dietPlan, error: planError } = await supabaseAdmin
       .from('diet_plans')
       .select('id, user_id, status')
       .eq('id', plan_id)
       .eq('user_id', targetUserId)
-      .eq('status', 'active')
+      .in('status', ['active', 'draft'])
       .single();
 
     if (planError || !dietPlan) {
