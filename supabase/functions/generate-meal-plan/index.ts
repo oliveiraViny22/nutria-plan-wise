@@ -552,12 +552,14 @@ function filterFoodsByMealContext(
 
 /**
  * Busca fonte de proteína COMPATÍVEL para a refeição
+ * @param preferLean - Se true, prioriza fontes magras (menor gordura por proteína)
  */
 function findCompatibleProteinSource(
   foods: Food[],
   mealType: MealType,
   usedIds: Set<string>,
-  preferences: string[]
+  preferences: string[],
+  preferLean: boolean = false
 ): Food | null {
   const context = MEAL_CONTEXT_RULES_V2[mealType];
   if (!context) return null;
@@ -590,6 +592,21 @@ function findCompatibleProteinSource(
   if (candidates.length === 0) {
     logStep("No compatible protein found for meal", { mealType });
     return null;
+  }
+  
+  // G7 FIX: Se preferLean, ordenar por razão proteína/gordura (maior = mais magro)
+  if (preferLean) {
+    candidates.sort((a, b) => {
+      const ratioA = a.fat > 0 ? a.protein / a.fat : a.protein * 10;
+      const ratioB = b.fat > 0 ? b.protein / b.fat : b.protein * 10;
+      return ratioB - ratioA; // Maior ratio primeiro (mais magro)
+    });
+    // Pegar apenas os top 5 mais magros
+    candidates = candidates.slice(0, Math.min(5, candidates.length));
+    logStep("Preferring lean protein sources", { 
+      mealType, 
+      topCandidates: candidates.slice(0, 3).map(c => ({ name: c.name, protein: c.protein, fat: c.fat }))
+    });
   }
   
   // Priorizar preferências do usuário
@@ -776,44 +793,13 @@ function buildMealOption(
   let totalCarbs = 0;
   let totalFat = 0;
   
-  // REGRA 1: Primeiro, garantir fonte de proteína compatível
-  const proteinSource = findCompatibleProteinSource(foods, mealType, usedFoodIds, preferences);
-  
-  if (!proteinSource) {
-    return {
-      success: false,
-      error: `Não há fonte de proteína compatível para ${MEAL_NAMES[mealType]}`,
-    };
-  }
-  
-  usedFoodIds.add(proteinSource.id);
-  
-  // G0.2: Calcular porção de proteína respeitando limite de calorias
-  const minProtein = context?.minProteinGrams || 10;
-  const proteinPer100g = proteinSource.protein;
-  const minPortionForProtein = proteinPer100g > 0 ? (minProtein / proteinPer100g) * 100 : 100;
-  const defaultPortion = calculateDefaultPortion(proteinSource, targetMacro, totalCalories);
-  
-  // G0: Limite de proteína escalado para metas calóricas altas
-  const maxProteinPortion = targetMacro.calories > 900 ? 350 : 
-                            targetMacro.calories > 600 ? 300 : 250;
-  const proteinPortion = Math.min(maxProteinPortion, Math.max(Math.round(minPortionForProtein / 10) * 10, defaultPortion));
-  
-  const proteinConverted = applyUnitConversion(proteinSource, proteinPortion);
-  
-  const proteinMultiplier = proteinConverted.calculated_grams / 100;
-  totalCalories += proteinSource.calories * proteinMultiplier;
-  totalProtein += proteinSource.protein * proteinMultiplier;
-  totalCarbs += proteinSource.carbs * proteinMultiplier;
-  totalFat += proteinSource.fat * proteinMultiplier;
-  
-  mealFoods.push(proteinConverted);
-  
-  // ============================================================
-  // REGRA G7 + G0: Para refeições principais, garantir carb base COM LIMITE
-  // ============================================================
   const isMainMeal = MAIN_MEALS_REQUIRING_CARBS.includes(mealType);
   let hasBaseCarb = false;
+  
+  // ============================================================
+  // G7 FIX: Para refeições principais, adicionar CARB PRIMEIRO
+  // Isso garante que carboidratos tenham prioridade no orçamento
+  // ============================================================
   
   if (isMainMeal) {
     const baseCarbSource = findBaseCarbSource(foods, mealType, usedFoodIds, preferences);
@@ -821,27 +807,27 @@ function buildMealOption(
     if (baseCarbSource) {
       usedFoodIds.add(baseCarbSource.id);
       
-      // G0.2: Calcular porção de carb respeitando limite de calorias da refeição
+      // G7: Calcular porção de carb GARANTIDA antes de proteína
       const carbsPerGram = baseCarbSource.carbs / 100;
       const carbCalPerGram = baseCarbSource.calories / 100;
       const targetCarbsForMeal = targetMacro.carbs;
       
-      // Calcular calorias restantes disponíveis (reserva mínima para vegetais)
-      const remainingCalories = targetMacro.calories - totalCalories - 30; // Reserva 30 cal para vegetais
-      const maxPortionByCalories = remainingCalories > 0 ? remainingCalories / carbCalPerGram : 120;
+      // Reservar 40% do orçamento calórico para proteína
+      // Isso deixa 60% disponível para carbs (mais generoso)
+      const carbCalorieBudget = targetMacro.calories * 0.55; // 55% para carbs
+      const maxPortionByCalories = carbCalorieBudget / carbCalPerGram;
       
-      // Escalar cobertura de carbs baseado na meta calórica
-      // Metas altas (>800 kcal) precisam de mais carbs por refeição - aumentar cobertura
-      const carbCoveragePercent = targetMacro.calories > 900 ? 0.85 : 
-                                  targetMacro.calories > 700 ? 0.80 : 0.70;
+      // Escalar cobertura de carbs baseado na meta
+      // Metas altas precisam de mais carbs - garantir 90%+ da meta
+      const carbCoveragePercent = targetMacro.carbs > 100 ? 0.95 : 0.85;
       const carbCoverageTarget = targetCarbsForMeal * carbCoveragePercent;
       const suggestedPortion = carbsPerGram > 0 ? (carbCoverageTarget / carbsPerGram) * 100 : 180;
       
-      // Limites escalados: metas altas permitem porções maiores
-      const maxCarbPortion = targetMacro.calories > 1000 ? 500 : 
-                             targetMacro.calories > 800 ? 450 : 
-                             targetMacro.calories > 600 ? 400 : 320;
-      const carbPortion = Math.min(maxCarbPortion, maxPortionByCalories, Math.max(100, Math.round(suggestedPortion / 10) * 10));
+      // Limites escalados: permitir porções bem generosas para atingir meta
+      const maxCarbPortion = targetMacro.calories > 1000 ? 550 : 
+                             targetMacro.calories > 800 ? 500 : 
+                             targetMacro.calories > 600 ? 450 : 350;
+      const carbPortion = Math.min(maxCarbPortion, maxPortionByCalories, Math.max(120, Math.round(suggestedPortion / 10) * 10));
       
       const carbConverted = applyUnitConversion(baseCarbSource, carbPortion);
       
@@ -854,21 +840,77 @@ function buildMealOption(
       mealFoods.push(carbConverted);
       hasBaseCarb = true;
       
-      logStep("G7+G0: Added base carb source with calorie limit", { 
+      logStep("G7: Added base carb source FIRST", { 
         mealType, 
         food: baseCarbSource.name, 
         portion: carbPortion,
         carbDensity: baseCarbSource.carbs,
         carbs: baseCarbSource.carbs * carbMultiplier,
-        remainingCalories,
+        caloriesUsed: baseCarbSource.calories * carbMultiplier,
+        budgetRemaining: targetMacro.calories - totalCalories,
       });
     }
   }
   
+  // ============================================================
+  // REGRA 1: Agora adicionar fonte de proteína DENTRO do restante
+  // Priorizar fontes MAGRAS quando orçamento de gordura é apertado
+  // ============================================================
+  
+  // Calcular orçamento restante de gordura
+  const remainingFatBudget = targetMacro.fat - totalFat;
+  const preferLeanProtein = remainingFatBudget < targetMacro.fat * 0.5; // Se gastou mais de 50% da gordura
+  
+  const proteinSource = findCompatibleProteinSource(foods, mealType, usedFoodIds, preferences, preferLeanProtein);
+  
+  if (!proteinSource) {
+    return {
+      success: false,
+      error: `Não há fonte de proteína compatível para ${MEAL_NAMES[mealType]}`,
+    };
+  }
+  
+  usedFoodIds.add(proteinSource.id);
+  
+  // G0.2: Calcular porção de proteína respeitando limite de calorias RESTANTES
+  const minProtein = context?.minProteinGrams || 10;
+  const proteinPer100g = proteinSource.protein;
+  const minPortionForProtein = proteinPer100g > 0 ? (minProtein / proteinPer100g) * 100 : 100;
+  
+  // Usar calorias restantes para limitar proteína
+  const remainingCalories = targetMacro.calories - totalCalories - 50; // Reserva 50 cal para vegetais
+  const proteinCalPerGram = proteinSource.calories / 100;
+  const maxPortionByCalories = remainingCalories > 0 ? (remainingCalories * 0.7) / proteinCalPerGram : 150;
+  
+  // Limite baseado na meta, não escalar tanto para metas altas
+  const maxProteinPortion = targetMacro.calories > 900 ? 280 : 
+                            targetMacro.calories > 600 ? 250 : 220;
+  const proteinPortion = Math.min(maxProteinPortion, maxPortionByCalories, 
+                                  Math.max(Math.round(minPortionForProtein / 10) * 10, 100));
+  
+  const proteinConverted = applyUnitConversion(proteinSource, proteinPortion);
+  
+  const proteinMultiplier = proteinConverted.calculated_grams / 100;
+  totalCalories += proteinSource.calories * proteinMultiplier;
+  totalProtein += proteinSource.protein * proteinMultiplier;
+  totalCarbs += proteinSource.carbs * proteinMultiplier;
+  totalFat += proteinSource.fat * proteinMultiplier;
+  
+  mealFoods.push(proteinConverted);
+  
+  logStep("Added protein source after carbs", {
+    mealType,
+    food: proteinSource.name,
+    portion: proteinPortion,
+    protein: proteinSource.protein * proteinMultiplier,
+    fat: proteinSource.fat * proteinMultiplier,
+    caloriesUsed: proteinSource.calories * proteinMultiplier,
+  });
+  
   // G0: Verificar se ainda há espaço calórico para mais alimentos
   const remainingCaloriesBudget = targetMacro.calories - totalCalories;
   
-  // Agora adicionar outros alimentos por categoria (exceto proteínas, já adicionada)
+  // Agora adicionar outros alimentos por categoria (exceto proteínas e carbs base)
   for (const category of categoryPriorities) {
     if (!isValidCategory(category)) continue;
     if (category === 'proteinas') continue; // Já adicionamos
