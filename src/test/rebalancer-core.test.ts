@@ -902,4 +902,95 @@ describe('Cenários Realistas de Rebalanceamento', () => {
     // Deve sinalizar a impossibilidade
     expect(result.supplementNeeds.length > 0 || result.validationErrors.length > 0).toBe(true);
   });
+
+  // =====================================================
+  // TESTE DE QA: NENHUM AJUSTE + MACROS FORA DAS METAS
+  // =====================================================
+  // Cenário crítico para validar correção do bug onde plano era
+  // marcado como "otimizado" incorretamente
+  
+  it('QA: nenhum ajuste possível + macros fora das metas → NÃO deve marcar como otimizado', () => {
+    // Criar um alimento misto que não permite ajuste útil
+    const mixedFood = createFood({
+      id: 'mixed-1',
+      name: 'Refeição Pronta',
+      calories: 400,
+      protein: 25,
+      carbs: 40,
+      fat: 15,
+      category: 'mistos', // Usar categoria canônica válida
+    });
+
+    const items: PlanItem[] = [
+      createPlanItem({ id: 'item-1', food: mixedFood, quantityGrams: 200 }),
+    ];
+
+    const plan = createPlan(items);
+    
+    // Macros atuais aproximados: P=50g, C=80g, G=30g, Cal=800kcal
+    // Meta muito diferente que não pode ser atingida
+    const target: MacroTargets = {
+      protein: 150,   // Precisa de +100g proteína
+      carbs: 80,
+      fat: 30,
+      calories: 900,  // Mas com limite calórico restrito
+    };
+
+    const result = rebalancePlan(plan, target, { allowSupplements: true });
+
+    // VALIDAÇÃO CRÍTICA: Se ajustes não puderam resolver o problema,
+    // o plano NÃO deve ser marcado como válido/otimizado
+    
+    // Verificar que o status NÃO é 'already_balanced' ou 'optimized' se macros estão fora
+    const proposedProteinDiff = Math.abs(result.proposedMacros.protein - target.protein);
+    const proteinOutOfTolerance = proposedProteinDiff > (target.protein * 0.02); // >2%
+    
+    if (proteinOutOfTolerance) {
+      // Se proteína está fora da tolerância, plano NÃO deve ser válido
+      expect(result.isValid).toBe(false);
+      expect(result.planStatus).not.toBe('already_balanced');
+      expect(result.planStatus).not.toBe('optimized');
+      
+      // Deve ter uma mensagem explicando o problema
+      expect(result.statusMessage.length).toBeGreaterThan(0);
+    }
+  });
+
+  it('QA: ausência de ajustes NÃO implica plano válido', () => {
+    // Cenário: plano com poucos alimentos onde ajuste não ajuda
+    const carbFood = createFood({
+      id: 'carb-1',
+      name: 'Arroz',
+      calories: 130,
+      protein: 2.7,
+      carbs: 28,
+      fat: 0.3,
+      category: 'carboidratos',
+    });
+
+    const items: PlanItem[] = [
+      createPlanItem({ id: 'item-1', food: carbFood, quantityGrams: 150 }),
+    ];
+
+    const plan = createPlan(items);
+    
+    // Macros atuais: P=4g, C=42g, G=0.45g, Cal=195kcal
+    // Meta com proteína muito alta
+    const target: MacroTargets = {
+      protein: 100,   // Impossível sem fonte proteica
+      carbs: 50,
+      fat: 20,
+      calories: 600,
+    };
+
+    const result = rebalancePlan(plan, target, { allowSupplements: true });
+
+    // Mesmo que nenhum ajuste seja aplicado,
+    // o plano NÃO deve ser considerado válido
+    expect(result.isValid).toBe(false);
+    
+    // Deve indicar que há problema estrutural ou energético
+    expect(['blocked_structural', 'blocked_energy', 'partially_optimized']).toContain(result.planStatus);
+  });
 });
+

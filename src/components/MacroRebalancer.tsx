@@ -35,6 +35,7 @@ import {
   RebalanceProposal,
   MacroTargets,
   FoodAdjustment,
+  PlanStatus,
 } from '@/hooks/useMacroRebalancer';
 
 // Export the new SmartRebalancer for use in new code
@@ -246,6 +247,12 @@ export function MacroRebalancer({
   const hasAdjustments = proposal && proposal.adjustments.length > 0;
   const hasSupplementNeeds = proposal && proposal.supplementNeeds && proposal.supplementNeeds.length > 0;
   const hasValidationErrors = proposal && !proposal.isValid;
+  
+  // CORREÇÃO: Usar planStatus para determinar se o plano está realmente otimizado
+  const isAlreadyBalanced = proposal?.planStatus === 'already_balanced';
+  const isPartiallyOptimized = proposal?.planStatus === 'partially_optimized';
+  const isBlockedStructural = proposal?.planStatus === 'blocked_structural';
+  const isBlockedEnergy = proposal?.planStatus === 'blocked_energy';
 
   return (
     <>
@@ -331,7 +338,7 @@ export function MacroRebalancer({
               </div>
 
               {/* Adjustments Summary */}
-              {hasAdjustments ? (
+              {hasAdjustments && (
                 <div className="space-y-3">
                   <button
                     onClick={() => setShowDetails(!showDetails)}
@@ -374,18 +381,37 @@ export function MacroRebalancer({
                     )}
                   </AnimatePresence>
                 </div>
-              ) : (
-                <div className="flex items-center gap-3 p-4 rounded-xl bg-primary/5 border border-primary/20">
-                  <Check className="w-5 h-5 text-primary flex-shrink-0" />
-                  <div>
-                    <p className="text-sm font-medium text-foreground">
-                      Seu plano já está otimizado!
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      Os macros atuais estão dentro das metas definidas.
-                    </p>
-                  </div>
-                </div>
+              )}
+
+              {/* Status do Plano - CORRIGIDO para usar planStatus */}
+              {!hasAdjustments && (
+                <>
+                  {isAlreadyBalanced ? (
+                    <div className="flex items-center gap-3 p-4 rounded-xl bg-primary/5 border border-primary/20">
+                      <Check className="w-5 h-5 text-primary flex-shrink-0" />
+                      <div>
+                        <p className="text-sm font-medium text-foreground">
+                          Seu plano já está otimizado!
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Os macros atuais estão dentro das metas definidas.
+                        </p>
+                      </div>
+                    </div>
+                  ) : (isPartiallyOptimized || isBlockedStructural || isBlockedEnergy) ? (
+                    <div className="flex items-center gap-3 p-4 rounded-xl bg-amber-500/10 border border-amber-500/20">
+                      <AlertTriangle className="w-5 h-5 text-amber-500 flex-shrink-0" />
+                      <div>
+                        <p className="text-sm font-medium text-foreground">
+                          Não foi possível otimizar o plano
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {proposal?.statusMessage}
+                        </p>
+                      </div>
+                    </div>
+                  ) : null}
+                </>
               )}
 
               {/* Supplement Needs (sinalização, não adição automática) */}
