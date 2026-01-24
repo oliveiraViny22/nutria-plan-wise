@@ -145,8 +145,10 @@ export default function Dashboard() {
             fat_target: profile?.fat_target,
             preferences: profile?.preferences,
             restrictions: profile?.restrictions,
+            preferred_foods: profile?.preferred_foods || [],
+            avoided_foods: profile?.avoided_foods || [],
             goal: profile?.goal,
-            meals_per_day: (profile as any)?.meals_per_day || 4,
+            meals_per_day: profile?.meals_per_day || 4,
           },
         },
       });
