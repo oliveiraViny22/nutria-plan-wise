@@ -504,6 +504,7 @@ export default function Dashboard() {
                     fat: currentFat,
                     calories: currentCalories,
                   }}
+                  userGoal={profile?.goal as 'gain_muscle' | 'lose_weight' | 'maintain' | undefined}
                   onComplete={fetchCurrentPlan}
                   compact
                 />

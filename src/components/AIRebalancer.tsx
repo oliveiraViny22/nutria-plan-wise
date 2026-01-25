@@ -58,6 +58,7 @@ interface AIRebalancerProps {
   planId: string;
   targets: MacroTargets;
   currentMacros: MacroTargets;
+  userGoal?: 'gain_muscle' | 'lose_weight' | 'maintain';
   onComplete: () => void;
   compact?: boolean;
 }
@@ -211,6 +212,7 @@ export function AIRebalancer({
   planId,
   targets,
   currentMacros,
+  userGoal,
   onComplete,
   compact = false,
 }: AIRebalancerProps) {
@@ -227,7 +229,7 @@ export function AIRebalancer({
     
     try {
       const { data, error } = await supabase.functions.invoke('ai-rebalance', {
-        body: { planId, targets },
+        body: { planId, targets, goal: userGoal || 'maintain' },
       });
 
       if (error) throw error;
