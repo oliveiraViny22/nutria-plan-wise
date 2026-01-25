@@ -266,13 +266,88 @@ export default function MealDetail() {
     setCurrentOptionId(null);
   }, [resetSubstitution]);
 
-  // Handler para "Não gosto" - adiciona à lista de evitados
-  const handleDislike = useCallback(async (food: Food) => {
-    const success = await addToAvoided(food.name);
-    if (success) {
-      // Opcionalmente, poderia recarregar os dados para refletir mudanças futuras
+  // Handler para "Não gosto" - adiciona à lista de evitados E substitui automaticamente
+  const handleDislike = useCallback(async (optionFood: MealOptionFood, optionId: string) => {
+    const food = optionFood.food as Food;
+    if (!food) return;
+    
+    // 1. Adicionar aos evitados primeiro
+    const addedToAvoided = await addToAvoided(food.name);
+    if (!addedToAvoided) return; // Se falhou, não continuar
+    
+    // 2. Verificar se pode substituir automaticamente
+    if (!can_substitute || substitutionLimitReached || !checkCanSubstitute(food)) {
+      toast.info('Alimento adicionado aos evitados. Você pode substituí-lo manualmente depois.');
+      return;
     }
-  }, [addToAvoided]);
+    
+    // 3. Buscar candidatos para substituição automática
+    if (allFoods.length === 0) {
+      toast.info('Alimento adicionado aos evitados. Atualize a página para ver as substituições disponíveis.');
+      return;
+    }
+    
+    // Usar o serviço de substituição diretamente para encontrar o melhor candidato
+    const { findSubstituteCandidates } = await import('@/lib/substitution-service');
+    const candidatesList = findSubstituteCandidates(food, optionFood.quantity_grams, allFoods);
+    
+    if (candidatesList.length === 0) {
+      toast.info('Alimento adicionado aos evitados. Não há substitutos equivalentes disponíveis.');
+      return;
+    }
+    
+    // 4. Pegar o melhor candidato (primeiro da lista ordenada por score)
+    const bestCandidate = candidatesList[0];
+    
+    // 5. Executar a substituição automaticamente
+    try {
+      // Validar limite no backend antes de persistir
+      const { data: session } = await supabase.auth.getSession();
+      if (!session?.session?.access_token) {
+        toast.info('Alimento adicionado aos evitados. Faça login para substituir.');
+        return;
+      }
+      
+      const validateResponse = await supabase.functions.invoke('validate-usage', {
+        body: { feature: 'substitution', increment: false },
+      });
+      
+      if (validateResponse.error || !validateResponse.data?.allowed) {
+        toast.info('Alimento adicionado aos evitados. Limite de substituições atingido.');
+        return;
+      }
+      
+      // Atualizar meal_option_food com novo alimento e quantidade
+      const { error: updateError } = await supabase
+        .from('meal_option_foods')
+        .update({
+          food_id: bestCandidate.food.id,
+          quantity_grams: bestCandidate.newPortionGrams,
+        })
+        .eq('id', optionFood.id);
+      
+      if (updateError) throw updateError;
+      
+      // Recalcular totais da opção
+      await recalculateOptionTotals(optionId);
+      
+      // Incrementar uso de substituição
+      await supabase.functions.invoke('validate-usage', {
+        body: { feature: 'substitution', increment: true },
+      });
+      
+      toast.success(
+        `"${food.name}" substituído por "${bestCandidate.food.name}" automaticamente!`,
+        { duration: 4000 }
+      );
+      
+      // Recarregar dados
+      await fetchMealData();
+    } catch (err: any) {
+      console.error('Error auto-substituting:', err);
+      toast.info('Alimento adicionado aos evitados. Erro ao substituir automaticamente.');
+    }
+  }, [addToAvoided, can_substitute, substitutionLimitReached, checkCanSubstitute, allFoods, fetchMealData]);
 
   const recalculateOptionTotals = async (optionId: string) => {
     const { data: foods } = await supabase
@@ -438,7 +513,7 @@ export default function MealDetail() {
                               </TooltipProvider>
                             )}
                             
-                            {/* Botão "Não gosto" - adiciona à lista de evitados */}
+                            {/* Botão "Não gosto" - adiciona à lista de evitados e substitui automaticamente */}
                             {canEdit && (
                               <TooltipProvider>
                                 <Tooltip>
@@ -447,14 +522,14 @@ export default function MealDetail() {
                                       variant="ghost" 
                                       size="sm" 
                                       className="text-xs text-muted-foreground" 
-                                      onClick={() => handleDislike(food)}
+                                      onClick={() => handleDislike(optionFood, option.id)}
                                       disabled={addingToAvoided}
                                     >
                                       <ThumbsDown className="w-3 h-3 mr-1" />Não gosto
                                     </Button>
                                   </TooltipTrigger>
                                   <TooltipContent>
-                                    <p className="text-xs">Adicionar à lista de alimentos evitados</p>
+                                    <p className="text-xs">Adicionar aos evitados e substituir automaticamente</p>
                                   </TooltipContent>
                                 </Tooltip>
                               </TooltipProvider>
