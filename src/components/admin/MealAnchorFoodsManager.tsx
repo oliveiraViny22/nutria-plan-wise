@@ -88,10 +88,20 @@ export function MealAnchorFoodsManager() {
     },
   });
 
+  // Helper to get paired meal type (lunch <-> dinner)
+  const getPairedMealType = (mealType: string): string | null => {
+    if (mealType === "lunch") return "dinner";
+    if (mealType === "dinner") return "lunch";
+    return null;
+  };
+
   // Create/Update mutation
   const saveMutation = useMutation({
     mutationFn: async (data: typeof formData & { id?: string }) => {
+      const pairedMealType = getPairedMealType(data.meal_type);
+      
       if (data.id) {
+        // Update main anchor
         const { error } = await supabase
           .from("meal_anchor_foods")
           .update({
@@ -105,7 +115,40 @@ export function MealAnchorFoodsManager() {
           .eq("id", data.id);
 
         if (error) throw error;
+
+        // If lunch/dinner, also update paired anchor
+        if (pairedMealType) {
+          // Check if paired anchor exists
+          const { data: existing } = await supabase
+            .from("meal_anchor_foods")
+            .select("id")
+            .eq("meal_type", pairedMealType)
+            .eq("option_number", data.option_number)
+            .eq("role_name", data.role_name)
+            .single();
+
+          if (existing) {
+            await supabase
+              .from("meal_anchor_foods")
+              .update({
+                food_id: data.food_id,
+                default_quantity_grams: data.default_quantity_grams,
+                sort_order: data.sort_order,
+              })
+              .eq("id", existing.id);
+          } else {
+            await supabase.from("meal_anchor_foods").insert({
+              meal_type: pairedMealType,
+              option_number: data.option_number,
+              food_id: data.food_id,
+              role_name: data.role_name,
+              default_quantity_grams: data.default_quantity_grams,
+              sort_order: data.sort_order,
+            });
+          }
+        }
       } else {
+        // Insert main anchor
         const { error } = await supabase.from("meal_anchor_foods").insert({
           meal_type: data.meal_type,
           option_number: data.option_number,
@@ -116,11 +159,27 @@ export function MealAnchorFoodsManager() {
         });
 
         if (error) throw error;
+
+        // If lunch/dinner, also insert paired anchor
+        if (pairedMealType) {
+          await supabase.from("meal_anchor_foods").insert({
+            meal_type: pairedMealType,
+            option_number: data.option_number,
+            food_id: data.food_id,
+            role_name: data.role_name,
+            default_quantity_grams: data.default_quantity_grams,
+            sort_order: data.sort_order,
+          });
+        }
       }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["meal-anchor-foods"] });
-      toast.success(editingAnchor ? "Âncora atualizada!" : "Âncora criada!");
+      const pairedMealType = getPairedMealType(formData.meal_type);
+      const message = pairedMealType 
+        ? `Âncora ${editingAnchor ? "atualizada" : "criada"} para almoço e jantar!`
+        : `Âncora ${editingAnchor ? "atualizada" : "criada"}!`;
+      toast.success(message);
       setDialogOpen(false);
       resetForm();
     },
