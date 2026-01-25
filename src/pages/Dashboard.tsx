@@ -37,7 +37,7 @@ import {
 import { CalorieRing } from '@/components/CalorieRing';
 import { MacroChart } from '@/components/MacroChart';
 import { AIRebalancer } from '@/components/AIRebalancer';
-import { UsageLimits } from '@/components/UsageLimits';
+
 import { UpgradeDialog } from '@/components/UpgradeDialog';
 import { AdherenceWidget } from '@/components/AdherenceWidget';
 import { GoalsProjectionCard } from '@/components/GoalsProjectionCard';
@@ -435,9 +435,11 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Goals Projection + Hydration Tip - Side by Side */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <GoalsProjectionCard />
+          {/* Goals Projection + Hydration Tip - Compact Row */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="sm:col-span-2">
+              <GoalsProjectionCard />
+            </div>
             <HydrationTipCard />
           </div>
         </motion.section>
@@ -458,52 +460,55 @@ export default function Dashboard() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
-            className="space-y-3"
           >
-            <Button
-              variant="hero"
-              size="lg"
-              className="w-full"
-              onClick={generateMealPlan}
-              disabled={generating}
-            >
-              {generating ? (
-                <>
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                  Gerando plano...
-                </>
-              ) : currentDietPlan ? (
-                <>
-                  <RefreshCw className="w-5 h-5" />
-                  Gerar novo plano
-                </>
-              ) : (
-                <>
-                  <UtensilsCrossed className="w-5 h-5" />
-                  Gerar plano alimentar
-                </>
-              )}
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                variant={currentDietPlan ? "outline" : "hero"}
+                size="default"
+                className="flex-1"
+                onClick={generateMealPlan}
+                disabled={generating}
+              >
+                {generating ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span className="hidden sm:inline">Gerando...</span>
+                  </>
+                ) : currentDietPlan ? (
+                  <>
+                    <RefreshCw className="w-4 h-4" />
+                    <span className="hidden sm:inline">Novo plano</span>
+                    <span className="sm:hidden">Novo</span>
+                  </>
+                ) : (
+                  <>
+                    <UtensilsCrossed className="w-4 h-4" />
+                    Gerar plano
+                  </>
+                )}
+              </Button>
 
-            {/* Otimizar Plano - apenas se pode editar */}
-            {currentDietPlan && permissions.can_adjust && (
-              <AIRebalancer
-                planId={currentDietPlan.id}
-                targets={{
-                  protein: profile?.protein_target || 150,
-                  carbs: profile?.carbs_target || 250,
-                  fat: profile?.fat_target || 65,
-                  calories: profile?.daily_calories || 2000,
-                }}
-                currentMacros={{
-                  protein: currentProtein,
-                  carbs: currentCarbs,
-                  fat: currentFat,
-                  calories: currentCalories,
-                }}
-                onComplete={fetchCurrentPlan}
-              />
-            )}
+              {/* Otimizar Plano - apenas se pode editar */}
+              {currentDietPlan && permissions.can_adjust && (
+                <AIRebalancer
+                  planId={currentDietPlan.id}
+                  targets={{
+                    protein: profile?.protein_target || 150,
+                    carbs: profile?.carbs_target || 250,
+                    fat: profile?.fat_target || 65,
+                    calories: profile?.daily_calories || 2000,
+                  }}
+                  currentMacros={{
+                    protein: currentProtein,
+                    carbs: currentCarbs,
+                    fat: currentFat,
+                    calories: currentCalories,
+                  }}
+                  onComplete={fetchCurrentPlan}
+                  compact
+                />
+              )}
+            </div>
           </motion.section>
         )}
 
@@ -620,14 +625,6 @@ export default function Dashboard() {
           </motion.section>
         )}
 
-        {/* Usage Limits */}
-        <motion.section
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 }}
-        >
-          <UsageLimits />
-        </motion.section>
 
         {/* Disclaimer and Help */}
         <motion.section

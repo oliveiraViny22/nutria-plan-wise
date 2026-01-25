@@ -215,7 +215,7 @@ export const ACTIVITY_LEVELS = {
 export const GOALS = {
   lose_weight: { label: 'Perder Peso', calorieAdjustment: -500 },
   maintain: { label: 'Manter Peso', calorieAdjustment: 0 },
-  gain_muscle: { label: 'Ganhar Massa', calorieAdjustment: 300 },
+  gain_muscle: { label: 'Ganhar Massa', calorieAdjustment: 500 },
 } as const;
 
 export const FOOD_PREFERENCES = [
