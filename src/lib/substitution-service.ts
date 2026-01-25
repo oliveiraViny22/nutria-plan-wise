@@ -435,12 +435,51 @@ export function findSubstituteCandidates(
   availableFoods: Food[],
   options?: SubstituteOptions
 ): SubstituteCandidate[] {
-  // Filtrar candidatos válidos
-  const validCandidates = availableFoods.filter(food => 
-    isValidCandidate(food, sourceFood, options)
-  );
+  // Debug: verificar por que candidatos são rejeitados
+  let rejectionStats = {
+    sameId: 0,
+    notSubstitutable: 0,
+    differentCategory: 0,
+  };
+  
+  // Filtrar candidatos válidos com logging detalhado
+  const validCandidates = availableFoods.filter(food => {
+    // Não pode ser o mesmo alimento
+    if (food.id === sourceFood.id) {
+      rejectionStats.sameId++;
+      return false;
+    }
+    
+    // Candidato precisa ser substituível
+    const blockReason = getSubstitutionBlockReason(food);
+    if (blockReason) {
+      rejectionStats.notSubstitutable++;
+      return false;
+    }
+    
+    // Por padrão, mesma categoria é obrigatória
+    if (!options?.allowCrossCategory) {
+      if (food.category !== sourceFood.category) {
+        rejectionStats.differentCategory++;
+        return false;
+      }
+    }
+    
+    return true;
+  });
+  
+  console.log('[findSubstituteCandidates] Source:', sourceFood.name, 'category:', sourceFood.category);
+  console.log('[findSubstituteCandidates] Available foods:', availableFoods.length);
+  console.log('[findSubstituteCandidates] Rejection stats:', rejectionStats);
+  console.log('[findSubstituteCandidates] Valid candidates:', validCandidates.length);
   
   if (validCandidates.length === 0) {
+    // Log some examples of why foods were rejected
+    const sampleFoods = availableFoods.slice(0, 5);
+    console.log('[findSubstituteCandidates] Sample foods:');
+    sampleFoods.forEach(f => {
+      console.log(`  - ${f.name}: category=${f.category}, processing=${f.processing_level}, blockReason=${getSubstitutionBlockReason(f)}`);
+    });
     return [];
   }
   
