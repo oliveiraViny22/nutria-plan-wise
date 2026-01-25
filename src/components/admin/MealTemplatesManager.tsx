@@ -101,6 +101,9 @@ export function MealTemplatesManager() {
     priority: 1,
   });
 
+  // Meal type order for sorting
+  const MEAL_TYPE_ORDER = MEAL_TYPES.map(m => m.value);
+
   // Fetch templates with roles and categories
   const { data: templates, isLoading } = useQuery({
     queryKey: ["meal-templates"],
@@ -108,7 +111,6 @@ export function MealTemplatesManager() {
       const { data: templatesData, error: tError } = await supabase
         .from("meal_templates")
         .select("*")
-        .order("meal_type")
         .order("name");
 
       if (tError) throw tError;
@@ -133,11 +135,19 @@ export function MealTemplatesManager() {
         categories: categoriesData?.filter((c) => c.role_id === role.id) || [],
       }));
 
-      // Map roles to templates
-      return templatesData?.map((template) => ({
+      // Map roles to templates and sort by meal order
+      const templatesWithRoles = templatesData?.map((template) => ({
         ...template,
         roles: rolesWithCategories?.filter((r) => r.template_id === template.id) || [],
       })) as (MealTemplate & { roles: MealTemplateRole[] })[];
+
+      // Sort by meal type order (breakfast -> morning_snack -> lunch -> etc.)
+      return templatesWithRoles?.sort((a, b) => {
+        const orderA = MEAL_TYPE_ORDER.indexOf(a.meal_type);
+        const orderB = MEAL_TYPE_ORDER.indexOf(b.meal_type);
+        if (orderA !== orderB) return orderA - orderB;
+        return a.name.localeCompare(b.name);
+      });
     },
   });
 
