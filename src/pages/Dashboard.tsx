@@ -19,6 +19,7 @@ import {
   Lock,
   Eye,
   ClipboardCheck,
+  Sparkles,
   Shield,
   HelpCircle,
   Layers,
@@ -130,6 +131,8 @@ export default function Dashboard() {
     }
   };
 
+  const [generatingV5, setGeneratingV5] = useState(false);
+
   const generateMealPlan = async () => {
     // Verificar permissões antes de gerar
     if (!permissions.can_create_plan || isLimitReached('diet')) {
@@ -176,6 +179,55 @@ export default function Dashboard() {
       }
     } finally {
       setGenerating(false);
+    }
+  };
+
+  const generateMealPlanV5 = async () => {
+    // Verificar permissões antes de gerar
+    if (!permissions.can_create_plan || isLimitReached('diet')) {
+      setShowUpgradeDialog(true);
+      setUpgradeFeature('diet');
+      setUpgradeLimit(usage?.diets.limit || 0);
+      toast.error(`Limite de dietas atingido (${usage?.diets.used}/${usage?.diets.limit})`);
+      return;
+    }
+
+    setGeneratingV5(true);
+    try {
+      const response = await supabase.functions.invoke('generate-meal-plan-v5', {
+        body: {
+          profile: {
+            daily_calories: profile?.daily_calories,
+            protein_target: profile?.protein_target,
+            carbs_target: profile?.carbs_target,
+            fat_target: profile?.fat_target,
+            preferences: profile?.preferences,
+            restrictions: profile?.restrictions,
+            preferred_foods: profile?.preferred_foods || [],
+            avoided_foods: profile?.avoided_foods || [],
+            goal: profile?.goal,
+            meals_per_day: profile?.meals_per_day || 4,
+          },
+        },
+      });
+
+      if (response.error) throw response.error;
+
+      toast.success('Plano alimentar v5 gerado com sucesso! ✨');
+      await fetchCurrentPlan();
+      await refreshUsage();
+    } catch (error: any) {
+      console.error('Error generating plan v5:', error);
+      // Check for limit error from backend
+      if (error?.context?.status === 403) {
+        toast.error('Limite de dietas atingido. Faça upgrade para continuar.');
+        setShowUpgradeDialog(true);
+        setUpgradeFeature('diet');
+      } else {
+        toast.error('Erro ao gerar plano alimentar v5');
+      }
+    } finally {
+      setGeneratingV5(false);
     }
   };
 
@@ -467,7 +519,7 @@ export default function Dashboard() {
                 size="default"
                 className="flex-1 min-w-[120px]"
                 onClick={generateMealPlan}
-                disabled={generating}
+                disabled={generating || generatingV5}
               >
                 {generating ? (
                   <>
@@ -484,6 +536,29 @@ export default function Dashboard() {
                   <>
                     <UtensilsCrossed className="w-4 h-4" />
                     Gerar plano
+                  </>
+                )}
+              </Button>
+
+              {/* Botão Gerador V5 */}
+              <Button
+                variant="default"
+                size="default"
+                className="flex-1 min-w-[120px] bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70"
+                onClick={generateMealPlanV5}
+                disabled={generating || generatingV5}
+              >
+                {generatingV5 ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span className="hidden sm:inline">Gerando v5...</span>
+                    <span className="sm:hidden">v5...</span>
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-4 h-4" />
+                    <span className="hidden sm:inline">Gerar v5</span>
+                    <span className="sm:hidden">v5</span>
                   </>
                 )}
               </Button>
