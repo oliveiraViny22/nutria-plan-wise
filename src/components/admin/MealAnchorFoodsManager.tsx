@@ -258,13 +258,29 @@ export function MealAnchorFoodsManager() {
   const getMealLabel = (type: string) => MEAL_TYPES.find((m) => m.value === type)?.label || type;
   const getRoleLabel = (role: string) => ROLE_NAMES.find((r) => r.value === role)?.label || role;
 
-  // Group anchors by meal type
+  // Group anchors by meal type, merging lunch/dinner into single group
   const groupedAnchors = anchors?.reduce((acc, anchor) => {
-    const key = `${anchor.meal_type}-${anchor.option_number}`;
+    // Normalize lunch/dinner to a single key
+    const normalizedMealType = (anchor.meal_type === "lunch" || anchor.meal_type === "dinner") 
+      ? "lunch_dinner" 
+      : anchor.meal_type;
+    const key = `${normalizedMealType}-${anchor.option_number}`;
     if (!acc[key]) acc[key] = [];
-    acc[key].push(anchor);
+    // Only add if not already present (avoid duplicates from lunch+dinner pairs)
+    const exists = acc[key].some(a => 
+      a.role_name === anchor.role_name && a.food_id === anchor.food_id
+    );
+    if (!exists) {
+      acc[key].push(anchor);
+    }
     return acc;
   }, {} as Record<string, AnchorFood[]>) || {};
+
+  const getMealGroupLabel = (key: string) => {
+    if (key.startsWith("lunch_dinner")) return "Almoço + Jantar";
+    const mealType = key.split("-")[0];
+    return getMealLabel(mealType);
+  };
 
   return (
     <Card>
@@ -417,11 +433,11 @@ export function MealAnchorFoodsManager() {
         ) : (
           <div className="space-y-6">
             {Object.entries(groupedAnchors).map(([key, items]) => {
-              const [mealType, optionNum] = key.split("-");
+              const optionNum = key.split("-")[1];
               return (
                 <div key={key} className="space-y-2">
                   <div className="flex items-center gap-2">
-                    <Badge variant="secondary">{getMealLabel(mealType)}</Badge>
+                    <Badge variant="secondary">{getMealGroupLabel(key)}</Badge>
                     <Badge variant="outline">Opção {optionNum}</Badge>
                   </div>
                   <Table>
