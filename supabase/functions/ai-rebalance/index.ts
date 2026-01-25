@@ -329,58 +329,75 @@ serve(async (req) => {
     const carbsPercent = Math.round((currentMacros.carbs / targets.carbs) * 100);
     const fatPercent = Math.round((currentMacros.fat / targets.fat) * 100);
 
-    const systemPrompt = `Você é um nutricionista expert em ajuste de planos alimentares, especializado em otimização de macros para diferentes objetivos (hipertrofia, cutting, manutenção).
+    const systemPrompt = `Você é um nutricionista MATEMÁTICO expert em ajuste de planos alimentares. Sua especialidade é calcular ajustes EXATOS de porções para atingir metas nutricionais com PRECISÃO DE 99%+.
 
-Sua tarefa é analisar um plano alimentar e propor ajustes de porções para atingir metas específicas de macronutrientes, RESPEITANDO AS MARGENS DE TOLERÂNCIA DO OBJETIVO DO USUÁRIO.
+VOCÊ DEVE FAZER CÁLCULOS MATEMÁTICOS PRECISOS:
+1. Calcule a diferença exata entre macros atuais e metas
+2. Para cada macro fora da faixa, calcule EXATAMENTE quantos gramas de cada alimento ajustar
+3. Use a fórmula: gramas_adicionais = (diferença_macro * 100) / (macro_por_100g_do_alimento)
+4. Considere o impacto cruzado: ajustar proteína também afeta calorias/gordura
 
-REGRAS IMPORTANTES:
-1. Só ajuste porções de alimentos existentes - NÃO adicione nem remova alimentos
-2. Mantenha proporções razoáveis (mínimo 20g, máximo 400g por alimento)
-3. PRIORIZE os macronutrientes de acordo com o objetivo (ex: proteína em cutting é sagrada)
-4. Considere a palatabilidade - não faça ajustes extremos
-5. Para proteína: ajuste carnes, ovos, laticínios, leguminosas
-6. Para carboidratos: ajuste arroz, batata, pães, frutas
-7. Para gordura: ajuste azeite, castanhas, queijos
-8. Se já está dentro da faixa IDEAL, NÃO FORCE ajustes desnecessários
-9. Se estiver fora da faixa ACEITÁVEL, priorize voltar para a faixa
-10. Sempre explique o raciocínio considerando o objetivo`;
+REGRAS CRÍTICAS:
+1. O OBJETIVO É ATINGIR 99-101% DE CADA META - não 95%, não 105%, mas 99-101%
+2. Faça múltiplos ajustes simultâneos se necessário para equilibrar todos os macros
+3. Priorize alimentos com maior concentração do macro que precisa ajustar
+4. Mantenha proporções razoáveis (mínimo 20g, máximo 400g por alimento)
+5. Se um ajuste prejudica outro macro, compense com outro alimento
+6. Para proteína: carnes, ovos, laticínios, leguminosas
+7. Para carboidratos: arroz, batata, pães, frutas
+8. Para gordura: azeite, castanhas, queijos
+9. VALIDE seus cálculos antes de responder - some os macros propostos e confirme que atingem 99%+`;
 
-    const userPrompt = `Analise este plano alimentar e proponha ajustes para atingir as metas, CONSIDERANDO O OBJETIVO ESPECÍFICO DO USUÁRIO.
+    const userPrompt = `TAREFA: Calcular ajustes EXATOS para atingir 99-101% de cada meta nutricional.
 
 ${goalContext}
 
-METAS DO USUÁRIO:
-- Calorias: ${targets.calories} kcal
-- Proteína: ${targets.protein}g
-- Carboidratos: ${targets.carbs}g
-- Gordura: ${targets.fat}g
+═══════════════════════════════════════════════════════════
+METAS (100% = objetivo)
+═══════════════════════════════════════════════════════════
+• Calorias: ${targets.calories} kcal
+• Proteína: ${targets.protein}g  
+• Carboidratos: ${targets.carbs}g
+• Gordura: ${targets.fat}g
 
-MACROS ATUAIS DO PLANO:
-- Calorias: ${currentMacros.calories} kcal (${caloriesPercent}% da meta, diferença: ${targets.calories - currentMacros.calories})
-- Proteína: ${currentMacros.protein}g (${proteinPercent}% da meta, diferença: ${targets.protein - currentMacros.protein}g)
-- Carboidratos: ${currentMacros.carbs}g (${carbsPercent}% da meta, diferença: ${targets.carbs - currentMacros.carbs}g)
-- Gordura: ${currentMacros.fat}g (${fatPercent}% da meta, diferença: ${targets.fat - currentMacros.fat}g)
+═══════════════════════════════════════════════════════════
+SITUAÇÃO ATUAL (precisa chegar a 99-101%)
+═══════════════════════════════════════════════════════════
+• Calorias: ${currentMacros.calories} kcal (${caloriesPercent}%) → FALTAM ${targets.calories - currentMacros.calories} kcal
+• Proteína: ${currentMacros.protein}g (${proteinPercent}%) → FALTAM ${targets.protein - currentMacros.protein}g
+• Carboidratos: ${currentMacros.carbs}g (${carbsPercent}%) → FALTAM ${targets.carbs - currentMacros.carbs}g
+• Gordura: ${currentMacros.fat}g (${fatPercent}%) → FALTAM ${targets.fat - currentMacros.fat}g
 
-REFEIÇÕES DO PLANO:
+═══════════════════════════════════════════════════════════
+ALIMENTOS DISPONÍVEIS (valores por 100g)
+═══════════════════════════════════════════════════════════
 ${JSON.stringify(mealDetails, null, 2)}
 
-INSTRUÇÕES ESPECÍFICAS:
-1. Verifique se cada macro está dentro da faixa ACEITÁVEL para o objetivo
-2. Se estiver fora, proponha ajustes para voltar à faixa
-3. Priorize os macros de acordo com a hierarquia do objetivo
-4. Gere warnings se algum ajuste comprometer outro macro crítico
+═══════════════════════════════════════════════════════════
+INSTRUÇÕES DE CÁLCULO
+═══════════════════════════════════════════════════════════
+1. Para cada macro fora de 99-101%, identifique os melhores alimentos para ajustar
+2. Calcule: gramas_necessários = (diferença * 100) / macro_por_100g
+3. Distribua o ajuste entre múltiplos alimentos se necessário
+4. VERIFIQUE: some todos os macros após ajustes e confirme 99-101%
+5. Se um ajuste desbalanceia outro macro, adicione ajuste compensatório
 
-Retorne um JSON com a estrutura:
+EXEMPLO DE CÁLCULO:
+- Faltam 20g de proteína
+- Frango tem 31g proteína/100g
+- Gramas necessários = (20 * 100) / 31 = 64.5g → arredondar para 65g
+
+RETORNE JSON:
 {
   "adjustments": [
     {
       "foodItemId": "id do meal_option_food",
-      "newGrams": número,
-      "reason": "explicação curta relacionada ao objetivo"
+      "newGrams": número calculado,
+      "reason": "Adicionar Xg para +Yg proteína (cálculo: ...)"
     }
   ],
-  "explanation": "explicação geral da estratégia considerando o objetivo",
-  "warnings": ["avisos sobre macros fora da faixa ideal ou riscos"]
+  "explanation": "Resumo: após ajustes, macros ficam em X% cal, Y% prot, Z% carb, W% fat",
+  "warnings": ["avisos se algum macro não atingiu 99%"]
 }`;
 
     // Chamar Lovable AI
