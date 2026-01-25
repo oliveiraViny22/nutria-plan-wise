@@ -547,12 +547,20 @@ async function savePlan(
     totalFat += meal.totals.fat;
   }
 
-  // Desativar planos anteriores
-  await supabase
+  // Desativar planos anteriores (crítico para unique constraint)
+  const { error: deactivateError } = await supabase
     .from("diet_plans")
     .update({ status: "inactive" })
     .eq("user_id", userId)
     .eq("status", "active");
+
+  if (deactivateError) {
+    log("Erro ao desativar planos anteriores", { error: deactivateError.message });
+    throw new Error(`Falha ao desativar plano existente: ${deactivateError.message}`);
+  }
+
+  // Pequeno delay para garantir que a transação anterior foi commitada
+  await new Promise(resolve => setTimeout(resolve, 100));
 
   // Criar novo plano
   const { data: dietPlan, error: planError } = await supabase
