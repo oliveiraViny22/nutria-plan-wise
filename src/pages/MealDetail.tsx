@@ -189,14 +189,14 @@ export default function MealDetail() {
     }
   };
 
-  const fetchAllFoods = async () => {
+  const fetchAllFoods = useCallback(async () => {
     const { data } = await supabase
       .from('foods')
       .select('*')
       .eq('is_active', true)
       .order('name');
     if (data) setAllFoods(data as Food[]);
-  };
+  }, []);
 
   useEffect(() => {
     fetchMealData();
@@ -225,12 +225,25 @@ export default function MealDetail() {
       return;
     }
     
+    // Verificar se a lista de alimentos foi carregada
+    if (allFoods.length === 0) {
+      toast.error('Aguarde o carregamento dos alimentos...');
+      fetchAllFoods();
+      return;
+    }
+    
+    console.log('[MealDetail] Opening substitution modal:', {
+      foodName: food.name,
+      foodCategory: food.category,
+      allFoodsCount: allFoods.length,
+    });
+    
     setSelectedMealOptionFood(optionFood);
     setCurrentOptionId(optionId);
     resetSubstitution();
     findCandidates(food, optionFood.quantity_grams, allFoods);
     setShowSubstituteModal(true);
-  }, [allFoods, findCandidates, resetSubstitution, can_substitute, substitutionLimitReached]);
+  }, [allFoods, findCandidates, resetSubstitution, can_substitute, substitutionLimitReached, fetchAllFoods]);
 
   const handleSelectCandidate = useCallback((candidateId: string) => {
     selectCandidate(candidateId);
