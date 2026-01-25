@@ -46,12 +46,21 @@ interface AdjustmentProposal {
 
 interface AIRebalanceResult {
   success: boolean;
+  alreadyOptimized?: boolean;
   currentMacros: MacroTargets;
   targetMacros: MacroTargets;
-  proposedMacros: MacroTargets;
-  adjustments: AdjustmentProposal[];
-  explanation: string;
-  warnings: string[];
+  proposedMacros?: MacroTargets;
+  adjustments?: AdjustmentProposal[];
+  explanation?: string;
+  warnings?: string[];
+  message?: string;
+  warning?: string;
+  currentPercentages?: {
+    calories: number;
+    protein: number;
+    carbs: number;
+    fat: number;
+  };
 }
 
 interface AIRebalancerProps {
@@ -409,7 +418,8 @@ export function AIRebalancer({
     setShowDetails(false);
   };
 
-  const hasAdjustments = result && result.adjustments.length > 0;
+  const hasAdjustments = result && result.adjustments && result.adjustments.length > 0;
+  const isAlreadyOptimized = result && result.alreadyOptimized;
 
   return (
     <>
@@ -437,146 +447,217 @@ export function AIRebalancer({
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Sparkles className="w-5 h-5 text-primary" />
-              Proposta de Otimização
+              {isAlreadyOptimized ? (
+                <Check className="w-5 h-5 text-primary" />
+              ) : (
+                <Sparkles className="w-5 h-5 text-primary" />
+              )}
+              {isAlreadyOptimized ? 'Plano Otimizado' : 'Proposta de Otimização'}
             </DialogTitle>
             <DialogDescription>
-              Análise inteligente do seu plano com sugestões personalizadas
+              {isAlreadyOptimized 
+                ? 'Seu plano já está alinhado com suas metas'
+                : 'Análise inteligente do seu plano com sugestões personalizadas'
+              }
             </DialogDescription>
           </DialogHeader>
 
           {result && (
             <div className="space-y-4">
-              {/* Macro Comparison Grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <MacroComparisonCard
-                  label="Proteína"
-                  current={result.currentMacros.protein}
-                  target={result.targetMacros.protein}
-                  proposed={result.proposedMacros.protein}
-                  colorVar="protein"
-                />
-                <MacroComparisonCard
-                  label="Carboidrato"
-                  current={result.currentMacros.carbs}
-                  target={result.targetMacros.carbs}
-                  proposed={result.proposedMacros.carbs}
-                  colorVar="carbs"
-                />
-                <MacroComparisonCard
-                  label="Gordura"
-                  current={result.currentMacros.fat}
-                  target={result.targetMacros.fat}
-                  proposed={result.proposedMacros.fat}
-                  colorVar="fat"
-                />
-                <MacroComparisonCard
-                  label="Calorias"
-                  current={result.currentMacros.calories}
-                  target={result.targetMacros.calories}
-                  proposed={result.proposedMacros.calories}
-                  unit="kcal"
-                  colorVar="primary"
-                />
-              </div>
+              {/* ALREADY OPTIMIZED - Show special message */}
+              {isAlreadyOptimized ? (
+                <>
+                  {/* Current percentages display */}
+                  {result.currentPercentages && (
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="p-3 rounded-xl bg-primary/10 border border-primary/20 text-center">
+                        <div className="text-2xl font-bold text-primary">{result.currentPercentages.calories}%</div>
+                        <div className="text-xs text-muted-foreground">Calorias</div>
+                      </div>
+                      <div className="p-3 rounded-xl bg-protein/10 border border-protein/20 text-center">
+                        <div className="text-2xl font-bold text-protein">{result.currentPercentages.protein}%</div>
+                        <div className="text-xs text-muted-foreground">Proteína</div>
+                      </div>
+                      <div className="p-3 rounded-xl bg-carbs/10 border border-carbs/20 text-center">
+                        <div className="text-2xl font-bold text-carbs">{result.currentPercentages.carbs}%</div>
+                        <div className="text-xs text-muted-foreground">Carboidratos</div>
+                      </div>
+                      <div className="p-3 rounded-xl bg-fat/10 border border-fat/20 text-center">
+                        <div className="text-2xl font-bold text-fat">{result.currentPercentages.fat}%</div>
+                        <div className="text-xs text-muted-foreground">Gordura</div>
+                      </div>
+                    </div>
+                  )}
 
-              {/* AI Explanation */}
-              {result.explanation && (
-                <div className="flex items-start gap-3 p-4 rounded-xl bg-primary/5 border border-primary/20">
-                  <Lightbulb className="w-5 h-5 text-primary shrink-0 mt-0.5" />
-                  <div>
-                    <p className="text-sm font-medium text-foreground mb-1">Estratégia da IA</p>
-                    <p className="text-sm text-muted-foreground">{result.explanation}</p>
+                  {/* Success message */}
+                  <div className="flex items-start gap-3 p-4 rounded-xl bg-primary/5 border border-primary/20">
+                    <Check className="w-6 h-6 text-primary shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-semibold text-foreground mb-1">
+                        Seu plano já está dentro das metas! 🎉
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        {result.message}
+                      </p>
+                    </div>
                   </div>
-                </div>
-              )}
 
-              {/* Warnings */}
-              {result.warnings && result.warnings.length > 0 && (
-                <Alert className="bg-amber-500/10 border-amber-500/20">
-                  <AlertTriangle className="h-4 w-4 text-amber-500" />
-                  <AlertDescription className="text-amber-700 dark:text-amber-300">
-                    <ul className="list-disc list-inside text-sm">
-                      {result.warnings.map((w, i) => (
-                        <li key={i}>{w}</li>
-                      ))}
-                    </ul>
-                  </AlertDescription>
-                </Alert>
-              )}
+                  {/* Warning about rebalancing */}
+                  <Alert className="bg-amber-500/10 border-amber-500/20">
+                    <AlertTriangle className="h-5 w-5 text-amber-500" />
+                    <AlertDescription className="text-amber-700 dark:text-amber-300">
+                      <p className="text-sm font-medium mb-1">Por que não otimizar?</p>
+                      <p className="text-sm">
+                        {result.warning}
+                      </p>
+                    </AlertDescription>
+                  </Alert>
+                </>
+              ) : (
+                <>
+                  {/* Macro Comparison Grid - Only show when there are adjustments */}
+                  {result.proposedMacros && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <MacroComparisonCard
+                        label="Proteína"
+                        current={result.currentMacros.protein}
+                        target={result.targetMacros.protein}
+                        proposed={result.proposedMacros.protein}
+                        colorVar="protein"
+                      />
+                      <MacroComparisonCard
+                        label="Carboidrato"
+                        current={result.currentMacros.carbs}
+                        target={result.targetMacros.carbs}
+                        proposed={result.proposedMacros.carbs}
+                        colorVar="carbs"
+                      />
+                      <MacroComparisonCard
+                        label="Gordura"
+                        current={result.currentMacros.fat}
+                        target={result.targetMacros.fat}
+                        proposed={result.proposedMacros.fat}
+                        colorVar="fat"
+                      />
+                      <MacroComparisonCard
+                        label="Calorias"
+                        current={result.currentMacros.calories}
+                        target={result.targetMacros.calories}
+                        proposed={result.proposedMacros.calories}
+                        unit="kcal"
+                        colorVar="primary"
+                      />
+                    </div>
+                  )}
 
-              {/* Adjustments List */}
-              {hasAdjustments && (
-                <div className="space-y-3">
-                  <button
-                    onClick={() => setShowDetails(!showDetails)}
-                    className="w-full flex items-center justify-between p-3 rounded-xl bg-muted/50 hover:bg-muted transition-colors"
-                  >
-                    <span className="text-sm font-medium text-foreground">
-                      {result.adjustments.length} ajustes propostos
-                    </span>
-                    {showDetails ? (
-                      <ChevronUp className="w-4 h-4 text-muted-foreground" />
-                    ) : (
-                      <ChevronDown className="w-4 h-4 text-muted-foreground" />
-                    )}
-                  </button>
+                  {/* AI Explanation */}
+                  {result.explanation && (
+                    <div className="flex items-start gap-3 p-4 rounded-xl bg-primary/5 border border-primary/20">
+                      <Lightbulb className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-sm font-medium text-foreground mb-1">Estratégia da IA</p>
+                        <p className="text-sm text-muted-foreground">{result.explanation}</p>
+                      </div>
+                    </div>
+                  )}
 
-                  <AnimatePresence>
-                    {showDetails && (
-                      <motion.div
-                        initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: 'auto', opacity: 1 }}
-                        exit={{ height: 0, opacity: 0 }}
-                        className="overflow-hidden"
-                      >
-                        <div className="bg-card rounded-xl border border-border/50">
-                          {result.adjustments.map((adj, i) => (
-                            <AdjustmentItem key={adj.mealOptionFoodId} adjustment={adj} index={i} />
+                  {/* Warnings */}
+                  {result.warnings && result.warnings.length > 0 && (
+                    <Alert className="bg-amber-500/10 border-amber-500/20">
+                      <AlertTriangle className="h-4 w-4 text-amber-500" />
+                      <AlertDescription className="text-amber-700 dark:text-amber-300">
+                        <ul className="list-disc list-inside text-sm">
+                          {result.warnings.map((w, i) => (
+                            <li key={i}>{w}</li>
                           ))}
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
-              )}
+                        </ul>
+                      </AlertDescription>
+                    </Alert>
+                  )}
 
-              {/* No adjustments message */}
-              {!hasAdjustments && (
-                <div className="flex items-center gap-3 p-4 rounded-xl bg-primary/5 border border-primary/20">
-                  <Check className="w-5 h-5 text-primary shrink-0" />
-                  <div>
-                    <p className="text-sm font-medium text-foreground">
-                      Seu plano já está otimizado!
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      A IA não encontrou ajustes necessários.
-                    </p>
-                  </div>
-                </div>
+                  {/* Adjustments List */}
+                  {hasAdjustments && result.adjustments && (
+                    <div className="space-y-3">
+                      <button
+                        onClick={() => setShowDetails(!showDetails)}
+                        className="w-full flex items-center justify-between p-3 rounded-xl bg-muted/50 hover:bg-muted transition-colors"
+                      >
+                        <span className="text-sm font-medium text-foreground">
+                          {result.adjustments.length} ajustes propostos
+                        </span>
+                        {showDetails ? (
+                          <ChevronUp className="w-4 h-4 text-muted-foreground" />
+                        ) : (
+                          <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                        )}
+                      </button>
+
+                      <AnimatePresence>
+                        {showDetails && (
+                          <motion.div
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: 'auto', opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            className="overflow-hidden"
+                          >
+                            <div className="bg-card rounded-xl border border-border/50">
+                              {result.adjustments.map((adj, i) => (
+                                <AdjustmentItem key={adj.mealOptionFoodId} adjustment={adj} index={i} />
+                              ))}
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                  )}
+
+                  {/* No adjustments message */}
+                  {!hasAdjustments && !isAlreadyOptimized && (
+                    <div className="flex items-center gap-3 p-4 rounded-xl bg-primary/5 border border-primary/20">
+                      <Check className="w-5 h-5 text-primary shrink-0" />
+                      <div>
+                        <p className="text-sm font-medium text-foreground">
+                          Seu plano já está otimizado!
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          A IA não encontrou ajustes necessários.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           )}
 
           <DialogFooter className="gap-2 sm:gap-0">
-            <Button variant="outline" onClick={handleCancel} disabled={applying}>
-              <X className="w-4 h-4 mr-2" />
-              Cancelar
-            </Button>
-            {hasAdjustments && (
-              <Button onClick={handleConfirm} disabled={applying}>
-                {applying ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Aplicando...
-                  </>
-                ) : (
-                  <>
-                    <Check className="w-4 h-4 mr-2" />
-                    Aplicar ajustes
-                  </>
-                )}
+            {isAlreadyOptimized ? (
+              <Button onClick={handleCancel} className="w-full sm:w-auto">
+                <Check className="w-4 h-4 mr-2" />
+                Entendi, vou seguir o plano
               </Button>
+            ) : (
+              <>
+                <Button variant="outline" onClick={handleCancel} disabled={applying}>
+                  <X className="w-4 h-4 mr-2" />
+                  Cancelar
+                </Button>
+                {hasAdjustments && (
+                  <Button onClick={handleConfirm} disabled={applying}>
+                    {applying ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Aplicando...
+                      </>
+                    ) : (
+                      <>
+                        <Check className="w-4 h-4 mr-2" />
+                        Aplicar ajustes
+                      </>
+                    )}
+                  </Button>
+                )}
+              </>
             )}
           </DialogFooter>
         </DialogContent>
