@@ -299,8 +299,16 @@ export function AIRebalancer({
         if (optionFoods) {
           for (const mof of optionFoods) {
             const food = mof.food as any;
-            const baseGrams = food.serving_size?.match(/(\d+)/)?.[1] || 100;
-            const multiplier = mof.quantity_grams / Number(baseGrams);
+            // Priorizar formato "(XXg)" ou "(XXml)", senão "XXg" ou "XXml", fallback 100
+            const servingSize = food.serving_size || '';
+            const parenMatch = servingSize.match(/\((\d+)\s*(g|ml)\)/i);
+            const directMatch = servingSize.match(/^(\d+)\s*(g|ml)$/i);
+            const baseGrams = parenMatch 
+              ? parseInt(parenMatch[1], 10) 
+              : directMatch 
+                ? parseInt(directMatch[1], 10) 
+                : 100;
+            const multiplier = mof.quantity_grams / baseGrams;
             
             totals.calories += food.calories * multiplier;
             totals.protein += food.protein * multiplier;
