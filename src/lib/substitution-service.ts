@@ -474,18 +474,7 @@ export function findSubstituteCandidates(
     return true;
   });
   
-  console.log('[findSubstituteCandidates] Source:', sourceFood.name, 'category:', sourceFood.category);
-  console.log('[findSubstituteCandidates] Available foods:', availableFoods.length);
-  console.log('[findSubstituteCandidates] Rejection stats:', rejectionStats);
-  console.log('[findSubstituteCandidates] Valid candidates:', validCandidates.length);
-  
   if (validCandidates.length === 0) {
-    // Log some examples of why foods were rejected
-    const sampleFoods = availableFoods.slice(0, 5);
-    console.log('[findSubstituteCandidates] Sample foods:');
-    sampleFoods.forEach(f => {
-      console.log(`  - ${f.name}: category=${f.category}, processing=${f.processing_level}, blockReason=${getSubstitutionBlockReason(f)}`);
-    });
     return [];
   }
   
