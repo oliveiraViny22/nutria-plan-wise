@@ -7,11 +7,9 @@
 
 import {
   PlanItem,
-  MacroTargets,
   PlannedDeltas,
   QuantityAdjustment,
   StrategyContext,
-  calculateNutrients,
   KCAL_PER_GRAM,
   REBALANCER_CONTRACT,
 } from './types';
@@ -84,33 +82,40 @@ function adjustItemForMacro(
   targetDelta: number,
   macro: 'protein' | 'carbs' | 'fat'
 ): AdjustmentResult {
-  const macroPer100g = (item.food[macro] / item.food.servingGrams) * 100;
-  if (macroPer100g < 1) {
+  // Calcular quanto do macro temos por grama de alimento
+  // food[macro] é o valor para servingGrams, então:
+  const macroPerGram = item.food[macro] / item.food.servingGrams;
+  
+  if (macroPerGram < 0.01) {
     return { adjustment: null, actualDelta: 0 };
   }
   
-  // Calcular gramas necessárias
-  const gramsNeeded = (Math.abs(targetDelta) / macroPer100g) * 100;
+  // Calcular quantos gramas de alimento precisamos ajustar para atingir o delta
+  const gramsNeeded = Math.abs(targetDelta) / macroPerGram;
   const isIncrease = targetDelta > 0;
   
-  // Aplicar limites de ajuste
+  // Aplicar limites de ajuste baseado na quantidade atual
   const maxAdjust = item.quantityGrams * (REBALANCER_CONTRACT.MAX_ADJUSTMENT_PERCENT / 100);
   
   let newGrams: number;
   if (isIncrease) {
+    // Precisamos adicionar mais alimento
     const toAdd = Math.min(gramsNeeded, maxAdjust);
     newGrams = item.quantityGrams + toAdd;
     newGrams = Math.min(newGrams, REBALANCER_CONTRACT.MAX_QUANTITY_GRAMS);
   } else {
-    const toRemove = Math.min(gramsNeeded, item.quantityGrams - REBALANCER_CONTRACT.MIN_QUANTITY_GRAMS);
+    // Precisamos reduzir alimento
+    const maxRemove = item.quantityGrams - REBALANCER_CONTRACT.MIN_QUANTITY_GRAMS;
+    const toRemove = Math.min(gramsNeeded, maxRemove);
     newGrams = item.quantityGrams - toRemove;
     newGrams = Math.max(newGrams, REBALANCER_CONTRACT.MIN_QUANTITY_GRAMS);
   }
   
   // Calcular delta real alcançado
   const gramsDiff = newGrams - item.quantityGrams;
-  const actualDelta = (gramsDiff / item.food.servingGrams) * item.food[macro];
+  const actualDelta = gramsDiff * macroPerGram;
   
+  // Se a mudança é muito pequena, não vale a pena
   if (Math.abs(gramsDiff) < 2) {
     return { adjustment: null, actualDelta: 0 };
   }
