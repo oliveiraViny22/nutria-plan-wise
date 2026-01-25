@@ -6,50 +6,167 @@ import {
   TrendingUp,
   Minus,
   Info,
+  Target,
+  Flame,
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useAuth } from '@/contexts/AuthContext';
-import { GOALS } from '@/lib/types';
+import { GOALS, ACTIVITY_LEVELS } from '@/lib/types';
 
 interface ScenarioProjection {
   label: string;
-  extraKcal: number;
+  dailySurplus: number;
   projections: {
     days: number;
     weightChange: number;
+    fatGain?: number; // % of weight gain that's fat
   }[];
+  isRecommended?: boolean;
+  description: string;
+}
+
+// Calculate BMR using Mifflin-St Jeor formula
+function calculateBMR(weight: number, height: number, age: number, sex: string): number {
+  const base = 10 * weight + 6.25 * height - 5 * age;
+  return sex === 'female' ? base - 161 : base + 5;
+}
+
+// Calculate TDEE (Total Daily Energy Expenditure)
+function calculateTDEE(bmr: number, activityLevel: string): number {
+  const multiplier = ACTIVITY_LEVELS[activityLevel as keyof typeof ACTIVITY_LEVELS]?.multiplier || 1.55;
+  return Math.round(bmr * multiplier);
 }
 
 export function GoalsProjectionCard() {
   const { profile } = useAuth();
 
-  // Calculate projections for different calorie scenarios
-  const scenarios = useMemo((): ScenarioProjection[] => {
-    if (!profile?.goal) return [];
+  // Calculate TDEE and actual caloric difference
+  const { tdee, actualSurplus, scenarios } = useMemo(() => {
+    if (!profile?.weight || !profile?.goal || !profile?.height || !profile?.age) {
+      return { tdee: 0, actualSurplus: 0, scenarios: [] };
+    }
 
-    const goalConfig = GOALS[profile.goal as keyof typeof GOALS];
-    const baseCalorieChange = goalConfig?.calorieAdjustment || 0;
+    const bmr = calculateBMR(
+      profile.weight,
+      profile.height,
+      profile.age,
+      profile.sex || 'male'
+    );
+    const calculatedTDEE = calculateTDEE(bmr, profile.activity_level || 'moderate');
+    
+    // Get actual daily calories from diet plan or profile
+    const dietCalories = profile.daily_calories || calculatedTDEE;
+    const currentSurplus = dietCalories - calculatedTDEE;
 
     // 1kg of fat ≈ 7700 kcal
-    const calculateProjections = (extraKcal: number) => {
-      const dailyChange = baseCalorieChange + extraKcal;
-      const kgPerDay = dailyChange / 7700;
+    // 1kg of muscle ≈ 5500 kcal (muscle is less calorie-dense)
+    const KCAL_PER_KG_FAT = 7700;
+    const KCAL_PER_KG_MUSCLE = 5500;
+
+    const calculateProjections = (dailySurplus: number): ScenarioProjection['projections'] => {
+      // For muscle gain, estimate body composition based on surplus size
+      // Smaller surplus = higher muscle:fat ratio (cleaner gains)
+      // Larger surplus = more fat storage
+      const getFatPercentage = (surplus: number) => {
+        if (surplus <= 0) return 0; // Weight loss is primarily fat
+        if (surplus <= 200) return 0.25; // 25% fat, 75% muscle (very clean)
+        if (surplus <= 350) return 0.35; // 35% fat, 65% muscle (clean)
+        if (surplus <= 500) return 0.50; // 50% fat, 50% muscle (moderate)
+        return 0.65; // 65% fat, 35% muscle (aggressive bulk)
+      };
+
+      const fatPct = getFatPercentage(dailySurplus);
+      const musclePct = 1 - fatPct;
+      
+      // Weighted average kcal per kg based on composition
+      const effectiveKcalPerKg = dailySurplus > 0
+        ? (fatPct * KCAL_PER_KG_FAT) + (musclePct * KCAL_PER_KG_MUSCLE)
+        : KCAL_PER_KG_FAT; // Weight loss is mostly fat
+
+      const kgPerDay = dailySurplus / effectiveKcalPerKg;
       
       return [
-        { days: 7, weightChange: kgPerDay * 7 },
-        { days: 30, weightChange: kgPerDay * 30 },
-        { days: 90, weightChange: kgPerDay * 90 },
+        { days: 7, weightChange: kgPerDay * 7, fatGain: fatPct * 100 },
+        { days: 30, weightChange: kgPerDay * 30, fatGain: fatPct * 100 },
+        { days: 90, weightChange: kgPerDay * 90, fatGain: fatPct * 100 },
       ];
     };
 
-    return [
-      { label: 'Plano Atual', extraKcal: 0, projections: calculateProjections(0) },
-      { label: '+300 kcal', extraKcal: 300, projections: calculateProjections(300) },
-      { label: '+500 kcal', extraKcal: 500, projections: calculateProjections(500) },
-    ];
-  }, [profile?.goal]);
+    // Define scenarios based on goal
+    let scenarioDefinitions: Omit<ScenarioProjection, 'projections'>[];
+    
+    if (profile.goal === 'gain_muscle') {
+      scenarioDefinitions = [
+        { 
+          label: 'Lean Bulk', 
+          dailySurplus: 200, 
+          isRecommended: true,
+          description: 'Ganho lento, máxima proporção muscular'
+        },
+        { 
+          label: 'Ganho Moderado', 
+          dailySurplus: 350, 
+          description: 'Equilíbrio entre velocidade e qualidade'
+        },
+        { 
+          label: 'Bulk Agressivo', 
+          dailySurplus: 500, 
+          description: 'Ganho rápido, maior acúmulo de gordura'
+        },
+      ];
+    } else if (profile.goal === 'lose_weight') {
+      scenarioDefinitions = [
+        { 
+          label: 'Déficit Leve', 
+          dailySurplus: -300, 
+          description: 'Perda sustentável, preserva músculo'
+        },
+        { 
+          label: 'Déficit Moderado', 
+          dailySurplus: -500, 
+          isRecommended: true,
+          description: 'Balanço ideal para maioria'
+        },
+        { 
+          label: 'Déficit Agressivo', 
+          dailySurplus: -750, 
+          description: 'Perda rápida, risco de perda muscular'
+        },
+      ];
+    } else {
+      scenarioDefinitions = [
+        { 
+          label: 'Manutenção', 
+          dailySurplus: 0, 
+          isRecommended: true,
+          description: 'Peso estável'
+        },
+        { 
+          label: 'Recomposição +', 
+          dailySurplus: 100, 
+          description: 'Leve superávit para ganho muscular'
+        },
+        { 
+          label: 'Recomposição -', 
+          dailySurplus: -100, 
+          description: 'Leve déficit para perda de gordura'
+        },
+      ];
+    }
+
+    const calculatedScenarios: ScenarioProjection[] = scenarioDefinitions.map(scenario => ({
+      ...scenario,
+      projections: calculateProjections(scenario.dailySurplus),
+    }));
+
+    return { 
+      tdee: calculatedTDEE, 
+      actualSurplus: currentSurplus,
+      scenarios: calculatedScenarios,
+    };
+  }, [profile]);
 
   const getGoalIcon = () => {
     if (!profile?.goal) return <Minus className="w-4 h-4" />;
@@ -78,7 +195,7 @@ export function GoalsProjectionCard() {
     return 'text-muted-foreground';
   };
 
-  if (!profile?.weight || !profile?.goal) {
+  if (!profile?.weight || !profile?.goal || !profile?.height || !profile?.age) {
     return null;
   }
 
@@ -100,45 +217,87 @@ export function GoalsProjectionCard() {
             </Badge>
           </div>
 
-          {/* Current Weight */}
-          <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
-            <div className="w-9 h-9 rounded-full bg-background flex items-center justify-center">
-              {getGoalIcon()}
-            </div>
-            <div>
+          {/* Current Stats */}
+          <div className="grid grid-cols-3 gap-2">
+            <div className="flex flex-col items-center p-2 bg-muted/50 rounded-lg">
+              <div className="w-7 h-7 rounded-full bg-background flex items-center justify-center mb-1">
+                {getGoalIcon()}
+              </div>
               <p className="text-[10px] text-muted-foreground">Peso atual</p>
-              <p className="text-base font-bold">{profile.weight.toFixed(1).replace('.', ',')} kg</p>
+              <p className="text-sm font-bold">{profile.weight.toFixed(1).replace('.', ',')} kg</p>
             </div>
+            <div className="flex flex-col items-center p-2 bg-muted/50 rounded-lg">
+              <div className="w-7 h-7 rounded-full bg-background flex items-center justify-center mb-1">
+                <Flame className="w-4 h-4 text-orange-500" />
+              </div>
+              <p className="text-[10px] text-muted-foreground">TDEE</p>
+              <p className="text-sm font-bold">{tdee} kcal</p>
+            </div>
+            <div className="flex flex-col items-center p-2 bg-muted/50 rounded-lg">
+              <div className="w-7 h-7 rounded-full bg-background flex items-center justify-center mb-1">
+                <Target className="w-4 h-4 text-primary" />
+              </div>
+              <p className="text-[10px] text-muted-foreground">Dieta</p>
+              <p className="text-sm font-bold">{profile.daily_calories || tdee} kcal</p>
+            </div>
+          </div>
+
+          {/* Current Surplus/Deficit Badge */}
+          <div className="flex justify-center">
+            <Badge 
+              variant={actualSurplus > 0 ? 'default' : actualSurplus < 0 ? 'secondary' : 'outline'}
+              className="text-xs"
+            >
+              {actualSurplus > 0 ? '+' : ''}{actualSurplus} kcal/dia 
+              ({actualSurplus > 0 ? 'superávit' : actualSurplus < 0 ? 'déficit' : 'manutenção'})
+            </Badge>
           </div>
 
           {/* Scenarios Grid */}
           <div className="space-y-3">
             {/* Header Row */}
-            <div className="grid grid-cols-4 gap-2 text-[10px] text-muted-foreground">
-              <div></div>
+            <div className="grid grid-cols-5 gap-1 text-[9px] text-muted-foreground">
+              <div className="col-span-2"></div>
               <div className="text-center">7 dias</div>
               <div className="text-center">30 dias</div>
               <div className="text-center">90 dias</div>
             </div>
 
             {/* Scenario Rows */}
-            {scenarios.map((scenario, idx) => (
+            {scenarios.map((scenario) => (
               <div
                 key={scenario.label}
-                className={`grid grid-cols-4 gap-2 p-2 rounded-lg ${
-                  idx === 0 ? 'bg-primary/10 border border-primary/20' : 'bg-muted/30'
+                className={`grid grid-cols-5 gap-1 p-2 rounded-lg transition-colors ${
+                  scenario.isRecommended 
+                    ? 'bg-primary/10 border border-primary/20' 
+                    : 'bg-muted/30 hover:bg-muted/50'
                 }`}
               >
-                <div className="flex items-center">
-                  <span className={`text-xs font-medium ${idx === 0 ? 'text-primary' : 'text-muted-foreground'}`}>
-                    {scenario.label}
+                <div className="col-span-2 flex flex-col justify-center">
+                  <div className="flex items-center gap-1">
+                    <span className={`text-xs font-medium ${scenario.isRecommended ? 'text-primary' : 'text-foreground'}`}>
+                      {scenario.label}
+                    </span>
+                    {scenario.isRecommended && (
+                      <Badge variant="outline" className="text-[8px] px-1 py-0 h-4">
+                        Ideal
+                      </Badge>
+                    )}
+                  </div>
+                  <span className="text-[9px] text-muted-foreground">
+                    {scenario.dailySurplus > 0 ? '+' : ''}{scenario.dailySurplus} kcal
                   </span>
                 </div>
                 {scenario.projections.map((proj) => (
-                  <div key={proj.days} className="text-center">
+                  <div key={proj.days} className="text-center flex flex-col justify-center">
                     <p className={`text-xs font-semibold ${getChangeColor(proj.weightChange, profile.goal!)}`}>
                       {formatChange(proj.weightChange)}
                     </p>
+                    {profile.goal === 'gain_muscle' && proj.fatGain !== undefined && proj.fatGain > 0 && (
+                      <p className="text-[8px] text-muted-foreground">
+                        {Math.round(proj.fatGain)}% gordura
+                      </p>
+                    )}
                   </div>
                 ))}
               </div>
@@ -149,10 +308,16 @@ export function GoalsProjectionCard() {
           <Alert className="bg-muted/30 border-muted">
             <Info className="h-3 w-3" />
             <AlertDescription className="text-[10px] text-muted-foreground leading-relaxed">
-              <strong>Estimativa baseada em:</strong> 1kg de gordura ≈ 7.700 kcal. O ajuste calórico do seu objetivo 
-              ({GOALS[profile.goal as keyof typeof GOALS]?.calorieAdjustment > 0 ? '+' : ''}
-              {GOALS[profile.goal as keyof typeof GOALS]?.calorieAdjustment} kcal/dia) é projetado linearmente. 
-              Resultados reais variam conforme metabolismo, composição corporal e adesão ao plano.
+              <strong>Metodologia:</strong> TDEE calculado via Mifflin-St Jeor ({profile.weight}kg, {profile.height}cm, {profile.age} anos). 
+              {profile.goal === 'gain_muscle' && (
+                <> Para ganho de massa limpa, recomenda-se superávit de 200-350 kcal/dia para maximizar proporção muscular (~65-75% do ganho).</>
+              )}
+              {profile.goal === 'lose_weight' && (
+                <> Déficit de 500 kcal/dia resulta em ~0,5kg/semana de perda sustentável.</>
+              )}
+              {profile.goal === 'maintain' && (
+                <> Manutenção com variação de ±100 kcal permite recomposição corporal gradual.</>
+              )}
             </AlertDescription>
           </Alert>
         </CardContent>
