@@ -94,67 +94,26 @@ export function GoalsProjectionCard() {
       ];
     };
 
-    // Define scenarios based on goal
-    let scenarioDefinitions: Omit<ScenarioProjection, 'projections'>[];
-    
-    if (profile.goal === 'gain_muscle') {
-      scenarioDefinitions = [
-        { 
-          label: 'Lean Bulk', 
-          dailySurplus: 200, 
-          isRecommended: true,
-          description: 'Ganho lento, máxima proporção muscular'
-        },
-        { 
-          label: 'Ganho Moderado', 
-          dailySurplus: 350, 
-          description: 'Equilíbrio entre velocidade e qualidade'
-        },
-        { 
-          label: 'Bulk Agressivo', 
-          dailySurplus: 500, 
-          description: 'Ganho rápido, maior acúmulo de gordura'
-        },
-      ];
-    } else if (profile.goal === 'lose_weight') {
-      scenarioDefinitions = [
-        { 
-          label: 'Déficit Leve', 
-          dailySurplus: -300, 
-          description: 'Perda sustentável, preserva músculo'
-        },
-        { 
-          label: 'Déficit Moderado', 
-          dailySurplus: -500, 
-          isRecommended: true,
-          description: 'Balanço ideal para maioria'
-        },
-        { 
-          label: 'Déficit Agressivo', 
-          dailySurplus: -750, 
-          description: 'Perda rápida, risco de perda muscular'
-        },
-      ];
-    } else {
-      scenarioDefinitions = [
-        { 
-          label: 'Manutenção', 
-          dailySurplus: 0, 
-          isRecommended: true,
-          description: 'Peso estável'
-        },
-        { 
-          label: 'Recomposição +', 
-          dailySurplus: 100, 
-          description: 'Leve superávit para ganho muscular'
-        },
-        { 
-          label: 'Recomposição -', 
-          dailySurplus: -100, 
-          description: 'Leve déficit para perda de gordura'
-        },
-      ];
-    }
+    // Define scenarios based on current plan + additional calories
+    // Shows: current plan, +300 kcal, +500 kcal
+    const scenarioDefinitions: Omit<ScenarioProjection, 'projections'>[] = [
+      { 
+        label: 'Plano Atual', 
+        dailySurplus: currentSurplus, 
+        isRecommended: true,
+        description: `${dietCalories} kcal/dia`
+      },
+      { 
+        label: '+300 kcal', 
+        dailySurplus: currentSurplus + 300, 
+        description: `${dietCalories + 300} kcal/dia`
+      },
+      { 
+        label: '+500 kcal', 
+        dailySurplus: currentSurplus + 500, 
+        description: `${dietCalories + 500} kcal/dia`
+      },
+    ];
 
     const calculatedScenarios: ScenarioProjection[] = scenarioDefinitions.map(scenario => ({
       ...scenario,
