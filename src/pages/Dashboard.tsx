@@ -36,9 +36,6 @@ import {
 
 import { CalorieRing } from '@/components/CalorieRing';
 import { MacroChart } from '@/components/MacroChart';
-import { MacroRebalancer, SmartRebalancer } from '@/components/MacroRebalancer';
-import { RebalancerV4 } from '@/components/RebalancerV4';
-import { RebalancerV5 } from '@/components/RebalancerV5';
 import { AIRebalancer } from '@/components/AIRebalancer';
 import { UsageLimits } from '@/components/UsageLimits';
 import { UpgradeDialog } from '@/components/UpgradeDialog';
@@ -497,90 +494,24 @@ export default function Dashboard() {
               )}
             </Button>
 
-            {/* Macro Rebalancers - apenas se pode editar */}
+            {/* Otimizar Plano - apenas se pode editar */}
             {currentDietPlan && permissions.can_adjust && (
-              <div className="grid grid-cols-1 gap-2">
-                <MacroRebalancer
-                  planId={currentDietPlan.id}
-                  targets={{
-                    protein: profile?.protein_target || 150,
-                    carbs: profile?.carbs_target || 250,
-                    fat: profile?.fat_target || 65,
-                    calories: profile?.daily_calories || 2000,
-                  }}
-                  currentMacros={{
-                    protein: currentProtein,
-                    carbs: currentCarbs,
-                    fat: currentFat,
-                    calories: currentCalories,
-                  }}
-                  onComplete={fetchCurrentPlan}
-                />
-                <SmartRebalancer
-                  planId={currentDietPlan.id}
-                  targetMacros={{
-                    protein: profile?.protein_target || 150,
-                    carbs: profile?.carbs_target || 250,
-                    fat: profile?.fat_target || 65,
-                    calories: profile?.daily_calories || 2000,
-                  }}
-                  currentMacros={{
-                    protein: currentProtein,
-                    carbs: currentCarbs,
-                    fat: currentFat,
-                    calories: currentCalories,
-                  }}
-                  onComplete={fetchCurrentPlan}
-                />
-                <RebalancerV4
-                  planId={currentDietPlan.id}
-                  targets={{
-                    protein: profile?.protein_target || 150,
-                    carbs: profile?.carbs_target || 250,
-                    fat: profile?.fat_target || 65,
-                    calories: profile?.daily_calories || 2000,
-                  }}
-                  currentMacros={{
-                    protein: currentProtein,
-                    carbs: currentCarbs,
-                    fat: currentFat,
-                    calories: currentCalories,
-                  }}
-                  onComplete={fetchCurrentPlan}
-                />
-                <RebalancerV5
-                  planId={currentDietPlan.id}
-                  targets={{
-                    protein: profile?.protein_target || 150,
-                    carbs: profile?.carbs_target || 250,
-                    fat: profile?.fat_target || 65,
-                    calories: profile?.daily_calories || 2000,
-                  }}
-                  currentMacros={{
-                    protein: currentProtein,
-                    carbs: currentCarbs,
-                    fat: currentFat,
-                    calories: currentCalories,
-                  }}
-                  onComplete={fetchCurrentPlan}
-                />
-                <AIRebalancer
-                  planId={currentDietPlan.id}
-                  targets={{
-                    protein: profile?.protein_target || 150,
-                    carbs: profile?.carbs_target || 250,
-                    fat: profile?.fat_target || 65,
-                    calories: profile?.daily_calories || 2000,
-                  }}
-                  currentMacros={{
-                    protein: currentProtein,
-                    carbs: currentCarbs,
-                    fat: currentFat,
-                    calories: currentCalories,
-                  }}
-                  onComplete={fetchCurrentPlan}
-                />
-              </div>
+              <AIRebalancer
+                planId={currentDietPlan.id}
+                targets={{
+                  protein: profile?.protein_target || 150,
+                  carbs: profile?.carbs_target || 250,
+                  fat: profile?.fat_target || 65,
+                  calories: profile?.daily_calories || 2000,
+                }}
+                currentMacros={{
+                  protein: currentProtein,
+                  carbs: currentCarbs,
+                  fat: currentFat,
+                  calories: currentCalories,
+                }}
+                onComplete={fetchCurrentPlan}
+              />
             )}
           </motion.section>
         )}
