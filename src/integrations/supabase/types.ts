@@ -484,6 +484,115 @@ export type Database = {
           },
         ]
       }
+      meal_role_food_categories: {
+        Row: {
+          category: string
+          created_at: string
+          id: string
+          priority: number
+          role_id: string
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          id?: string
+          priority?: number
+          role_id: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          id?: string
+          priority?: number
+          role_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meal_role_food_categories_role_id_fkey"
+            columns: ["role_id"]
+            isOneToOne: false
+            referencedRelation: "meal_template_roles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      meal_template_roles: {
+        Row: {
+          created_at: string
+          id: string
+          is_required: boolean
+          max_quantity_grams: number
+          min_quantity_grams: number
+          role_name: string
+          sort_order: number
+          template_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_required?: boolean
+          max_quantity_grams?: number
+          min_quantity_grams?: number
+          role_name: string
+          sort_order?: number
+          template_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_required?: boolean
+          max_quantity_grams?: number
+          min_quantity_grams?: number
+          role_name?: string
+          sort_order?: number
+          template_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meal_template_roles_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "meal_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      meal_templates: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean
+          max_items: number
+          meal_type: string
+          min_items: number
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          max_items?: number
+          meal_type: string
+          min_items?: number
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          max_items?: number
+          meal_type?: string
+          min_items?: number
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       meals: {
         Row: {
           created_at: string
