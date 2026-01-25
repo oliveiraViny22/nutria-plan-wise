@@ -513,32 +513,31 @@ export default function Dashboard() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
           >
-            <div className="flex flex-wrap gap-2">
-              {/* Botão Gerador V5 */}
+            <div className="grid grid-cols-2 gap-2">
+              {/* Botão Gerar Plano Alimentar */}
               <Button
                 variant="default"
                 size="default"
-                className="flex-1 min-w-[120px] bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70"
+                className="w-full bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70"
                 onClick={generateMealPlanV5}
                 disabled={generating || generatingV5}
               >
                 {generatingV5 ? (
                   <>
                     <Loader2 className="w-4 h-4 animate-spin" />
-                    <span className="hidden sm:inline">Gerando v5...</span>
-                    <span className="sm:hidden">v5...</span>
+                    <span className="hidden sm:inline">Gerando...</span>
                   </>
                 ) : (
                   <>
-                    <Sparkles className="w-4 h-4" />
-                    <span className="hidden sm:inline">Gerar v5</span>
-                    <span className="sm:hidden">v5</span>
+                    <UtensilsCrossed className="w-4 h-4" />
+                    <span className="hidden sm:inline">Gerar Plano</span>
+                    <span className="sm:hidden">Gerar</span>
                   </>
                 )}
               </Button>
 
-              {/* Otimizar Plano - apenas se pode editar */}
-              {currentDietPlan && permissions.can_adjust && (
+              {/* Otimizar Plano Alimentar - apenas se pode editar */}
+              {currentDietPlan && permissions.can_adjust ? (
                 <AIRebalancer
                   planId={currentDietPlan.id}
                   targets={{
@@ -557,6 +556,8 @@ export default function Dashboard() {
                   onComplete={fetchCurrentPlan}
                   compact
                 />
+              ) : (
+                <div /> // Placeholder para manter grid quando otimizar não disponível
               )}
             </div>
           </motion.section>

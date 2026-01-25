@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Sparkles,
+  Settings2,
   ChevronDown,
   ChevronUp,
   Check,
@@ -10,6 +10,7 @@ import {
   ArrowRight,
   AlertTriangle,
   Lightbulb,
+  Sparkles,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -424,21 +425,22 @@ export function AIRebalancer({
   return (
     <>
       <Button
-        variant="default"
+        variant="outline"
         size={compact ? "default" : "default"}
-        className={compact ? "gap-2 bg-gradient-to-r from-primary to-primary/80" : "w-full gap-2 bg-gradient-to-r from-primary to-primary/80"}
+        className={compact ? "w-full gap-2" : "w-full gap-2"}
         onClick={handleOptimize}
         disabled={loading}
       >
         {loading ? (
           <>
             <Loader2 className="w-4 h-4 animate-spin" />
-            {!compact && <span>Analisando...</span>}
+            <span className="hidden sm:inline">Analisando...</span>
           </>
         ) : (
           <>
-            <Sparkles className="w-4 h-4" />
-            {compact ? <span className="hidden sm:inline">Otimizar</span> : 'Otimizar Plano'}
+            <Settings2 className="w-4 h-4" />
+            <span className="hidden sm:inline">Otimizar Plano</span>
+            <span className="sm:hidden">Otimizar</span>
           </>
         )}
       </Button>
