@@ -15,7 +15,8 @@ import {
   Calendar,
   Ruler,
   Weight,
-  UserCircle
+  UserCircle,
+  Apple
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -49,6 +50,7 @@ import {
 import { ObjectiveChangeWizard } from '@/components/ObjectiveChangeWizard';
 import { StudentObjectiveRequestDialog } from '@/components/StudentObjectiveRequestDialog';
 import { UpgradeDialog } from '@/components/UpgradeDialog';
+import { FoodPreferencesManager } from '@/components/FoodPreferencesManager';
 import { useLinkedStudent } from '@/hooks/useLinkedStudent';
 import { useSubscription } from '@/hooks/useSubscription';
 
@@ -233,7 +235,7 @@ export default function Profile() {
       <main className="container mx-auto px-3 sm:px-4 py-4 sm:py-6 pb-20 sm:pb-24 max-w-4xl">
         <Tabs defaultValue="personal" className="space-y-4 sm:space-y-6">
           {/* Tabs */}
-          <TabsList className="grid w-full grid-cols-3 h-auto">
+          <TabsList className="grid w-full grid-cols-4 h-auto">
             <TabsTrigger value="personal" className="text-xs sm:text-sm py-2 sm:py-2.5 px-1 sm:px-3">
               <User className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
               <span className="hidden xs:inline">Dados</span>
@@ -245,6 +247,10 @@ export default function Profile() {
             <TabsTrigger value="diet" className="text-xs sm:text-sm py-2 sm:py-2.5 px-1 sm:px-3">
               <Utensils className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
               <span className="hidden xs:inline">Dieta</span>
+            </TabsTrigger>
+            <TabsTrigger value="foods" className="text-xs sm:text-sm py-2 sm:py-2.5 px-1 sm:px-3">
+              <Apple className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+              <span className="hidden xs:inline">Alimentos</span>
             </TabsTrigger>
           </TabsList>
 
@@ -528,6 +534,20 @@ export default function Profile() {
                   </div>
                 </CardContent>
               </Card>
+            </motion.div>
+          </TabsContent>
+
+          {/* Foods Preferences Tab */}
+          <TabsContent value="foods">
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+            >
+              <FoodPreferencesManager
+                preferredFoods={profile?.preferred_foods || []}
+                avoidedFoods={profile?.avoided_foods || []}
+                onUpdate={() => refreshProfile()}
+              />
             </motion.div>
           </TabsContent>
 
