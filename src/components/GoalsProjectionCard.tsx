@@ -163,134 +163,75 @@ export function GoalsProjectionCard() {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
     >
-      <Card className="card-elevated overflow-hidden">
-        <CardContent className="p-4 space-y-4">
-          {/* Header */}
+      <Card className="card-elevated overflow-hidden h-full">
+        <CardContent className="p-3 space-y-2">
+          {/* Header - Compact */}
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Scale className="w-4 h-4 text-primary" />
-              <span className="text-sm font-medium">Projeção de Peso</span>
+            <div className="flex items-center gap-1.5">
+              <Scale className="w-3.5 h-3.5 text-primary" />
+              <span className="text-xs font-medium">Projeção</span>
             </div>
-            <Badge variant="secondary" className="text-xs">
-              {GOALS[profile.goal as keyof typeof GOALS]?.label || 'Meta'}
-            </Badge>
-          </div>
-
-          {/* Current Stats */}
-          <div className="grid grid-cols-3 gap-2">
-            <div className="flex flex-col items-center p-2 bg-muted/50 rounded-lg">
-              <div className="w-7 h-7 rounded-full bg-background flex items-center justify-center mb-1">
-                {getGoalIcon()}
-              </div>
-              <p className="text-[10px] text-muted-foreground">Peso atual</p>
-              <p className="text-sm font-bold">{profile.weight.toFixed(1).replace('.', ',')} kg</p>
-            </div>
-            <div className="flex flex-col items-center p-2 bg-muted/50 rounded-lg">
-              <div className="w-7 h-7 rounded-full bg-background flex items-center justify-center mb-1">
-                <Flame className="w-4 h-4 text-orange-500" />
-              </div>
-              <p className="text-[10px] text-muted-foreground">TDEE</p>
-              <p className="text-sm font-bold">{tdee} kcal</p>
-            </div>
-            <div className="flex flex-col items-center p-2 bg-muted/50 rounded-lg">
-              <div className="w-7 h-7 rounded-full bg-background flex items-center justify-center mb-1">
-                <Target className="w-4 h-4 text-primary" />
-              </div>
-              <p className="text-[10px] text-muted-foreground">Dieta</p>
-              <p className="text-sm font-bold">{profile.daily_calories || tdee} kcal</p>
+            <div className="flex items-center gap-1.5">
+              {getGoalIcon()}
+              <Badge variant="outline" className="text-[9px] px-1.5 py-0 h-4">
+                {actualSurplus > 0 ? '+' : ''}{actualSurplus} kcal
+              </Badge>
             </div>
           </div>
 
-          {/* Current Surplus/Deficit Badge */}
-          <div className="flex justify-center">
-            <Badge 
-              variant={actualSurplus > 0 ? 'default' : actualSurplus < 0 ? 'secondary' : 'outline'}
-              className="text-xs"
-            >
-              {actualSurplus > 0 ? '+' : ''}{actualSurplus} kcal/dia 
-              ({actualSurplus > 0 ? 'superávit' : actualSurplus < 0 ? 'déficit' : 'manutenção'})
-            </Badge>
+          {/* Compact Stats Row */}
+          <div className="flex items-center justify-between text-[10px] text-muted-foreground bg-muted/30 rounded-md px-2 py-1.5">
+            <span>{profile.weight?.toFixed(0)}kg</span>
+            <span className="text-orange-500">TDEE: {tdee}</span>
+            <span className="text-primary">Dieta: {profile.daily_calories || tdee}</span>
           </div>
 
-          {/* Scenarios Grid */}
-          <div className="space-y-3">
-            {/* Header Row */}
-            <div className="grid grid-cols-5 gap-1 text-[9px] text-muted-foreground">
+          {/* Compact Scenarios Table */}
+          <div className="space-y-1">
+            {/* Header */}
+            <div className="grid grid-cols-5 gap-0.5 text-[8px] text-muted-foreground px-1">
               <div className="col-span-2"></div>
-              <div className="text-center">7 dias</div>
-              <div className="text-center">30 dias</div>
-              <div className="text-center">90 dias</div>
+              <div className="text-center">7d</div>
+              <div className="text-center">30d</div>
+              <div className="text-center">90d</div>
             </div>
 
-            {/* Scenario Rows */}
+            {/* Rows */}
             {scenarios.map((scenario) => (
               <div
                 key={scenario.label}
-                className={`grid grid-cols-5 gap-1 p-2 rounded-lg transition-colors ${
+                className={`grid grid-cols-5 gap-0.5 py-1 px-1 rounded text-[10px] ${
                   scenario.isRecommended 
-                    ? 'bg-primary/10 border border-primary/20' 
-                    : 'bg-muted/30 hover:bg-muted/50'
+                    ? 'bg-primary/10' 
+                    : 'bg-muted/20'
                 }`}
               >
-                <div className="col-span-2 flex flex-col justify-center">
-                  <div className="flex items-center gap-1">
-                    <span className={`text-xs font-medium ${scenario.isRecommended ? 'text-primary' : 'text-foreground'}`}>
-                      {scenario.label}
-                    </span>
-                    {scenario.isRecommended && (
-                      <Badge variant="outline" className="text-[8px] px-1 py-0 h-4">
-                        Ideal
-                      </Badge>
-                    )}
-                  </div>
-                  <span className="text-[9px] text-muted-foreground">
-                    {scenario.dailySurplus > 0 ? '+' : ''}{scenario.dailySurplus} kcal
+                <div className="col-span-2 flex items-center gap-1">
+                  <span className={`font-medium ${scenario.isRecommended ? 'text-primary' : ''}`}>
+                    {scenario.label}
                   </span>
                 </div>
                 {scenario.projections.map((proj) => (
-                  <div key={proj.days} className="text-center flex flex-col justify-center">
-                    <p className={`text-xs font-semibold ${getChangeColor(proj.weightChange, profile.goal!)}`}>
+                  <div key={proj.days} className="text-center">
+                    <span className={`font-semibold ${getChangeColor(proj.weightChange, profile.goal!)}`}>
                       {formatChange(proj.weightChange)}
-                    </p>
-                    {profile.goal === 'gain_muscle' && proj.fatGain !== undefined && proj.fatGain > 0 && (
-                      <p className="text-[8px] text-muted-foreground">
-                        <span className="text-green-600">{Math.round(100 - proj.fatGain)}% músculo</span>
-                        {' · '}
-                        <span className="text-amber-600">{Math.round(proj.fatGain)}% gordura</span>
-                      </p>
-                    )}
+                    </span>
                   </div>
                 ))}
               </div>
             ))}
           </div>
 
-          {/* Methodology Alert */}
-          <Alert className="bg-muted/30 border-muted">
-            <Info className="h-3 w-3" />
-            <AlertDescription className="text-[10px] text-muted-foreground leading-relaxed">
-              <strong>Metodologia:</strong> TDEE calculado via Mifflin-St Jeor ({profile.weight}kg, {profile.height}cm, {profile.age} anos). 
-              {profile.goal === 'gain_muscle' && (
-                <> Para ganho de massa limpa, recomenda-se superávit de 200-350 kcal/dia para maximizar proporção muscular (~65-75% do ganho).</>
-              )}
-              {profile.goal === 'lose_weight' && (
-                <> Déficit de 500 kcal/dia resulta em ~0,5kg/semana de perda sustentável.</>
-              )}
-              {profile.goal === 'maintain' && (
-                <> Manutenção com variação de ±100 kcal permite recomposição corporal gradual.</>
-              )}
-            </AlertDescription>
-          </Alert>
-
-          {/* Disclaimer for muscle gain */}
-          {profile.goal === 'gain_muscle' && (
-            <Alert className="bg-amber-500/10 border-amber-500/20">
-              <Info className="h-3 w-3 text-amber-600" />
-              <AlertDescription className="text-[10px] text-amber-700 dark:text-amber-400 leading-relaxed">
-                <strong>Importante:</strong> As proporções de músculo vs gordura são <em>estimativas teóricas</em>. O resultado real depende principalmente do <strong>treino resistido</strong>, <strong>qualidade do sono</strong>, <strong>consistência</strong> e <strong>genética individual</strong> — não apenas da calculadora.
-              </AlertDescription>
-            </Alert>
-          )}
+          {/* Compact Footer Note */}
+          <p className="text-[8px] text-muted-foreground leading-tight flex items-start gap-1">
+            <Info className="w-2.5 h-2.5 mt-0.5 flex-shrink-0" />
+            <span>
+              Mifflin-St Jeor • 
+              {profile.goal === 'gain_muscle' && ' Proporções músculo/gordura são estimativas teóricas.'}
+              {profile.goal === 'lose_weight' && ' Déficit de 500kcal ≈ 0,5kg/sem.'}
+              {profile.goal === 'maintain' && ' ±100kcal permite recomposição gradual.'}
+            </span>
+          </p>
         </CardContent>
       </Card>
     </motion.div>
