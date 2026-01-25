@@ -164,7 +164,9 @@ function MacroComparisonCard({
 
 function AdjustmentItem({ adjustment, index }: { adjustment: AdjustmentProposal; index: number }) {
   const isIncrease = adjustment.newGrams > adjustment.originalGrams;
-  const diff = adjustment.newGrams - adjustment.originalGrams;
+  const originalRounded = Math.round(adjustment.originalGrams);
+  const newRounded = Math.round(adjustment.newGrams);
+  const diff = newRounded - originalRounded;
 
   return (
     <motion.div 
@@ -190,13 +192,13 @@ function AdjustmentItem({ adjustment, index }: { adjustment: AdjustmentProposal;
         </div>
         <div className="text-right shrink-0">
           <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground line-through">{adjustment.originalGrams}g</span>
+            <span className="text-sm text-muted-foreground line-through">{originalRounded}g</span>
             <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-sm font-semibold ${
               isIncrease 
                 ? 'bg-primary/15 text-primary' 
                 : 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
             }`}>
-              {adjustment.newGrams}g
+              {newRounded}g
               <span className="text-xs opacity-80">
                 ({diff > 0 ? '+' : ''}{diff})
               </span>
