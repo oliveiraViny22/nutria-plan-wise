@@ -223,6 +223,7 @@ export function SubstitutionModal({
     PLAN_LOCKED: 'Este plano está bloqueado e não pode ser modificado.',
     ITEM_NOT_FOUND: 'Item não encontrado na refeição.',
     INVALID_CATEGORY: 'Categoria do alimento não é válida para substituição.',
+    INVALID_PROCESSING_LEVEL: 'Este alimento é processado e não pode ser substituído automaticamente.',
     SUPPLEMENT_NOT_SUBSTITUTABLE: 'Suplementos não podem ser substituídos automaticamente. Consulte um profissional.',
     NO_PERMISSION: 'Você não tem permissão para fazer substituições.',
     NO_CANDIDATES: 'Nenhum alimento equivalente disponível nesta categoria.',
