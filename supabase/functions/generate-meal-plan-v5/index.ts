@@ -547,10 +547,10 @@ async function savePlan(
     totalFat += meal.totals.fat;
   }
 
-  // Desativar planos anteriores (crítico para unique constraint)
+  // Arquivar planos anteriores (status válidos: draft, active, archived, completed)
   const { error: deactivateError } = await supabase
     .from("diet_plans")
-    .update({ status: "inactive" })
+    .update({ status: "archived" })
     .eq("user_id", userId)
     .eq("status", "active");
 
