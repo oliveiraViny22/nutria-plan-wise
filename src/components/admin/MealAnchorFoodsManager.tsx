@@ -62,7 +62,6 @@ export function MealAnchorFoodsManager() {
   const [editingAnchor, setEditingAnchor] = useState<AnchorFood | null>(null);
   const [formData, setFormData] = useState({
     meal_type: "lunch",
-    option_number: 1,
     food_id: "",
     role_name: "carboidrato_base",
     default_quantity_grams: 100,
@@ -106,7 +105,6 @@ export function MealAnchorFoodsManager() {
           .from("meal_anchor_foods")
           .update({
             meal_type: data.meal_type,
-            option_number: data.option_number,
             food_id: data.food_id,
             role_name: data.role_name,
             default_quantity_grams: data.default_quantity_grams,
@@ -123,7 +121,6 @@ export function MealAnchorFoodsManager() {
             .from("meal_anchor_foods")
             .select("id")
             .eq("meal_type", pairedMealType)
-            .eq("option_number", data.option_number)
             .eq("role_name", data.role_name)
             .single();
 
@@ -139,7 +136,6 @@ export function MealAnchorFoodsManager() {
           } else {
             await supabase.from("meal_anchor_foods").insert({
               meal_type: pairedMealType,
-              option_number: data.option_number,
               food_id: data.food_id,
               role_name: data.role_name,
               default_quantity_grams: data.default_quantity_grams,
@@ -151,7 +147,6 @@ export function MealAnchorFoodsManager() {
         // Insert main anchor
         const { error } = await supabase.from("meal_anchor_foods").insert({
           meal_type: data.meal_type,
-          option_number: data.option_number,
           food_id: data.food_id,
           role_name: data.role_name,
           default_quantity_grams: data.default_quantity_grams,
@@ -164,7 +159,6 @@ export function MealAnchorFoodsManager() {
         if (pairedMealType) {
           await supabase.from("meal_anchor_foods").insert({
             meal_type: pairedMealType,
-            option_number: data.option_number,
             food_id: data.food_id,
             role_name: data.role_name,
             default_quantity_grams: data.default_quantity_grams,
@@ -221,7 +215,6 @@ export function MealAnchorFoodsManager() {
   const resetForm = () => {
     setFormData({
       meal_type: "lunch",
-      option_number: 1,
       food_id: "",
       role_name: "carboidrato_base",
       default_quantity_grams: 100,
@@ -234,7 +227,6 @@ export function MealAnchorFoodsManager() {
     setEditingAnchor(anchor);
     setFormData({
       meal_type: anchor.meal_type,
-      option_number: anchor.option_number,
       food_id: anchor.food_id,
       role_name: anchor.role_name,
       default_quantity_grams: anchor.default_quantity_grams,
@@ -258,13 +250,13 @@ export function MealAnchorFoodsManager() {
   const getMealLabel = (type: string) => MEAL_TYPES.find((m) => m.value === type)?.label || type;
   const getRoleLabel = (role: string) => ROLE_NAMES.find((r) => r.value === role)?.label || role;
 
-  // Group anchors by meal type, merging lunch/dinner into single group
+  // Group anchors by meal type only, merging lunch/dinner into single group
   const groupedAnchors = anchors?.reduce((acc, anchor) => {
     // Normalize lunch/dinner to a single key
     const normalizedMealType = (anchor.meal_type === "lunch" || anchor.meal_type === "dinner") 
       ? "lunch_dinner" 
       : anchor.meal_type;
-    const key = `${normalizedMealType}-${anchor.option_number}`;
+    const key = normalizedMealType;
     if (!acc[key]) acc[key] = [];
     // Only add if not already present (avoid duplicates from lunch+dinner pairs)
     const exists = acc[key].some(a => 
@@ -277,9 +269,8 @@ export function MealAnchorFoodsManager() {
   }, {} as Record<string, AnchorFood[]>) || {};
 
   const getMealGroupLabel = (key: string) => {
-    if (key.startsWith("lunch_dinner")) return "Almoço + Jantar";
-    const mealType = key.split("-")[0];
-    return getMealLabel(mealType);
+    if (key === "lunch_dinner") return "Almoço + Jantar";
+    return getMealLabel(key);
   };
 
   return (
@@ -308,48 +299,28 @@ export function MealAnchorFoodsManager() {
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>{editingAnchor ? "Editar" : "Adicionar"} Alimento-Âncora</DialogTitle>
-                <DialogDescription>
-                  Alimentos-âncora são fixos na opção especificada de cada refeição
-                </DialogDescription>
+              <DialogDescription>
+                Alimentos-âncora aparecem em TODAS as opções da refeição selecionada
+              </DialogDescription>
               </DialogHeader>
               <div className="space-y-4 py-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Tipo de Refeição</Label>
-                    <Select
-                      value={formData.meal_type}
-                      onValueChange={(v) => setFormData((p) => ({ ...p, meal_type: v }))}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {MEAL_TYPES.map((m) => (
-                          <SelectItem key={m.value} value={m.value}>
-                            {m.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Opção Nº</Label>
-                    <Select
-                      value={String(formData.option_number)}
-                      onValueChange={(v) => setFormData((p) => ({ ...p, option_number: parseInt(v) }))}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {[1, 2, 3].map((n) => (
-                          <SelectItem key={n} value={String(n)}>
-                            Opção {n}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                <div className="space-y-2">
+                  <Label>Tipo de Refeição</Label>
+                  <Select
+                    value={formData.meal_type}
+                    onValueChange={(v) => setFormData((p) => ({ ...p, meal_type: v }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {MEAL_TYPES.map((m) => (
+                        <SelectItem key={m.value} value={m.value}>
+                          {m.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div className="space-y-2">
@@ -433,13 +404,11 @@ export function MealAnchorFoodsManager() {
         ) : (
           <div className="space-y-6">
             {Object.entries(groupedAnchors).map(([key, items]) => {
-              const optionNum = key.split("-")[1];
               return (
                 <div key={key} className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <Badge variant="secondary">{getMealGroupLabel(key)}</Badge>
-                    <Badge variant="outline">Opção {optionNum}</Badge>
-                  </div>
+                  <Badge variant="secondary" className="text-sm">
+                    {getMealGroupLabel(key)}
+                  </Badge>
                   <Table>
                     <TableHeader>
                       <TableRow>
