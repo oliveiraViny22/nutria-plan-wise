@@ -23,6 +23,7 @@ import { getCategoryLabel, getCategoryColor, isValidCategory } from '@/lib/food-
 import { toast } from 'sonner';
 import { SubstitutionModal } from '@/components/SubstitutionModal';
 import { UpgradeDialog } from '@/components/UpgradeDialog';
+import { useAddToAvoided } from '@/components/FoodPreferencesManager';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -135,6 +136,9 @@ export default function MealDetail() {
       fetchMealData();
     },
   });
+  
+  // Hook para adicionar alimento aos evitados
+  const { addToAvoided, adding: addingToAvoided } = useAddToAvoided();
 
   const fetchMealData = async () => {
     if (!mealId) {
@@ -261,6 +265,14 @@ export default function MealDetail() {
     setSelectedMealOptionFood(null);
     setCurrentOptionId(null);
   }, [resetSubstitution]);
+
+  // Handler para "Não gosto" - adiciona à lista de evitados
+  const handleDislike = useCallback(async (food: Food) => {
+    const success = await addToAvoided(food.name);
+    if (success) {
+      // Opcionalmente, poderia recarregar os dados para refletir mudanças futuras
+    }
+  }, [addToAvoided]);
 
   const recalculateOptionTotals = async (optionId: string) => {
     const { data: foods } = await supabase
@@ -416,7 +428,7 @@ export default function MealDetail() {
                                       className="text-xs" 
                                       onClick={() => openSubstituteModal(optionFood, option.id)}
                                     >
-                                      <RefreshCw className="w-3 h-3 mr-1" />Trocar
+                                      <RefreshCw className="w-3 h-3 mr-1" />Substituir
                                     </Button>
                                   </TooltipTrigger>
                                   <TooltipContent>
@@ -426,9 +438,8 @@ export default function MealDetail() {
                               </TooltipProvider>
                             )}
                             
-                            {/* Botão "Não gosto" para alimentos que não são diretamente substituíveis 
-                                OU para dar uma alternativa à remoção */}
-                            {canEdit && !canSub && can_substitute && !substitutionLimitReached && (
+                            {/* Botão "Não gosto" - adiciona à lista de evitados */}
+                            {canEdit && (
                               <TooltipProvider>
                                 <Tooltip>
                                   <TooltipTrigger asChild>
@@ -436,40 +447,19 @@ export default function MealDetail() {
                                       variant="ghost" 
                                       size="sm" 
                                       className="text-xs text-muted-foreground" 
-                                      onClick={() => openSubstituteModal(optionFood, option.id)}
+                                      onClick={() => handleDislike(food)}
+                                      disabled={addingToAvoided}
                                     >
                                       <ThumbsDown className="w-3 h-3 mr-1" />Não gosto
                                     </Button>
                                   </TooltipTrigger>
                                   <TooltipContent>
-                                    <p className="text-xs">Encontrar alternativa equivalente</p>
-                                  </TooltipContent>
-                                </Tooltip>
-                              </TooltipProvider>
-                            )}
-                            
-                            {/* Segundo botão "Não gosto" para alimentos substituíveis - alternativa à remoção */}
-                            {canSub && canEdit && (
-                              <TooltipProvider>
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <Button 
-                                      variant="ghost" 
-                                      size="sm" 
-                                      className="text-xs text-muted-foreground" 
-                                      onClick={() => openSubstituteModal(optionFood, option.id)}
-                                    >
-                                      <ThumbsDown className="w-3 h-3 mr-1" />Não gosto
-                                    </Button>
-                                  </TooltipTrigger>
-                                  <TooltipContent>
-                                    <p className="text-xs">Encontrar alternativa equivalente</p>
+                                    <p className="text-xs">Adicionar à lista de alimentos evitados</p>
                                   </TooltipContent>
                                 </Tooltip>
                               </TooltipProvider>
                             )}
 
-                            {/* APENAS profissionais veem o botão de remoção direta */}
                             {canRemoveDirectly && (
                               <TooltipProvider>
                                 <Tooltip>
