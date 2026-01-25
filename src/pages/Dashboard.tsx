@@ -37,7 +37,6 @@ import {
 import { CalorieRing } from '@/components/CalorieRing';
 import { MacroChart } from '@/components/MacroChart';
 import { AIRebalancer } from '@/components/AIRebalancer';
-import { AIGeneratePlanButton } from '@/components/AIGeneratePlanButton';
 
 import { UpgradeDialog } from '@/components/UpgradeDialog';
 import { AdherenceWidget } from '@/components/AdherenceWidget';
@@ -488,9 +487,6 @@ export default function Dashboard() {
                   </>
                 )}
               </Button>
-
-              {/* Botão experimental de teste com IA */}
-              <AIGeneratePlanButton onSuccess={fetchCurrentPlan} />
 
               {/* Otimizar Plano - apenas se pode editar */}
               {currentDietPlan && permissions.can_adjust && (
