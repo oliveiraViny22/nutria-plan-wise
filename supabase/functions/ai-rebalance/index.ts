@@ -203,9 +203,7 @@ function calculateMacros(foods: MealOptionFood[]): MacroTargets {
   let calories = 0, protein = 0, carbs = 0, fat = 0;
   
   for (const mof of foods) {
-    // serving_size define a base dos macros no banco
     const servingGrams = parseServingGrams(mof.food.serving_size);
-    // Proporção entre quantidade desejada e porção de referência
     const ratio = mof.quantity_grams / servingGrams;
     
     calories += mof.food.calories * ratio;
@@ -215,10 +213,186 @@ function calculateMacros(foods: MealOptionFood[]): MacroTargets {
   }
   
   return {
-    calories: Math.round(calories),
-    protein: Math.round(protein),
-    carbs: Math.round(carbs),
-    fat: Math.round(fat),
+    calories: Math.round(calories * 10) / 10,
+    protein: Math.round(protein * 10) / 10,
+    carbs: Math.round(carbs * 10) / 10,
+    fat: Math.round(fat * 10) / 10,
+  };
+}
+
+/**
+ * Calcula o percentual de atingimento de cada macro
+ */
+function calculateAccuracy(current: MacroTargets, target: MacroTargets): {
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+  average: number;
+  minAccuracy: number;
+} {
+  const caloriesAcc = target.calories > 0 ? (current.calories / target.calories) * 100 : 100;
+  const proteinAcc = target.protein > 0 ? (current.protein / target.protein) * 100 : 100;
+  const carbsAcc = target.carbs > 0 ? (current.carbs / target.carbs) * 100 : 100;
+  const fatAcc = target.fat > 0 ? (current.fat / target.fat) * 100 : 100;
+  
+  return {
+    calories: Math.round(caloriesAcc * 10) / 10,
+    protein: Math.round(proteinAcc * 10) / 10,
+    carbs: Math.round(carbsAcc * 10) / 10,
+    fat: Math.round(fatAcc * 10) / 10,
+    average: Math.round(((caloriesAcc + proteinAcc + carbsAcc + fatAcc) / 4) * 10) / 10,
+    minAccuracy: Math.min(caloriesAcc, proteinAcc, carbsAcc, fatAcc),
+  };
+}
+
+/**
+ * Calcula contribuição de um alimento por 100g
+ */
+function getFoodContribution(food: MealOptionFood["food"]): MacroTargets {
+  const servingGrams = parseServingGrams(food.serving_size);
+  return {
+    calories: (food.calories / servingGrams) * 100,
+    protein: (food.protein / servingGrams) * 100,
+    carbs: (food.carbs / servingGrams) * 100,
+    fat: (food.fat / servingGrams) * 100,
+  };
+}
+
+interface FoodWithMeta extends MealOptionFood {
+  mealName: string;
+  mealId: string;
+  optionId: string;
+}
+
+/**
+ * REFINAMENTO MATEMÁTICO DETERMINÍSTICO
+ * Ajusta as porções para atingir 99.8%+ de cada meta
+ */
+function refineAdjustmentsToTarget(
+  foods: FoodWithMeta[],
+  currentQuantities: Map<string, number>,
+  targets: MacroTargets,
+  maxIterations: number = 20
+): Map<string, number> {
+  const quantities = new Map(currentQuantities);
+  const TARGET_ACCURACY = 99.8;
+  const MAX_ACCURACY = 100.2;
+  
+  for (let iteration = 0; iteration < maxIterations; iteration++) {
+    // Calcular macros atuais
+    const currentMacros = calculateMacrosFromMap(foods, quantities);
+    const accuracy = calculateAccuracy(currentMacros, targets);
+    
+    // Verificar se já atingiu a precisão desejada
+    if (accuracy.minAccuracy >= TARGET_ACCURACY && accuracy.minAccuracy <= MAX_ACCURACY) {
+      console.log(`Refinamento concluído na iteração ${iteration + 1}: ${accuracy.minAccuracy.toFixed(1)}%`);
+      break;
+    }
+    
+    // Identificar o macro mais distante da meta
+    const deficits = [
+      { macro: 'calories' as const, diff: targets.calories - currentMacros.calories, acc: accuracy.calories },
+      { macro: 'protein' as const, diff: targets.protein - currentMacros.protein, acc: accuracy.protein },
+      { macro: 'carbs' as const, diff: targets.carbs - currentMacros.carbs, acc: accuracy.carbs },
+      { macro: 'fat' as const, diff: targets.fat - currentMacros.fat, acc: accuracy.fat },
+    ];
+    
+    // Ordenar por maior distância da meta (99.8-100.2%)
+    deficits.sort((a, b) => {
+      const aDistance = Math.min(Math.abs(a.acc - TARGET_ACCURACY), Math.abs(a.acc - MAX_ACCURACY));
+      const bDistance = Math.min(Math.abs(b.acc - TARGET_ACCURACY), Math.abs(b.acc - MAX_ACCURACY));
+      return bDistance - aDistance;
+    });
+    
+    const mainDeficit = deficits[0];
+    
+    // Se já está muito próximo, parar
+    if (Math.abs(mainDeficit.diff) < 0.5) {
+      console.log(`Refinamento concluído: diferença mínima atingida`);
+      break;
+    }
+    
+    // Encontrar o melhor alimento para ajustar este macro
+    let bestFood: FoodWithMeta | null = null;
+    let bestGramsChange = 0;
+    let bestImpactScore = Infinity;
+    
+    for (const food of foods) {
+      const contribution = getFoodContribution(food.food);
+      const macroValue = contribution[mainDeficit.macro];
+      
+      if (macroValue <= 0) continue;
+      
+      // Calcular quantos gramas precisamos mudar
+      const gramsNeeded = (mainDeficit.diff * 100) / macroValue;
+      const currentGrams = quantities.get(food.id) || food.quantity_grams;
+      const newGrams = currentGrams + gramsNeeded;
+      
+      // Validar limites
+      if (newGrams < 15 || newGrams > 450) continue;
+      
+      // Calcular impacto nos outros macros
+      let impactScore = 0;
+      for (const otherDeficit of deficits) {
+        if (otherDeficit.macro === mainDeficit.macro) continue;
+        const otherContribution = contribution[otherDeficit.macro];
+        const otherChange = (gramsNeeded / 100) * otherContribution;
+        // Penalizar se o ajuste piora outro macro
+        if ((otherDeficit.diff > 0 && otherChange < 0) || (otherDeficit.diff < 0 && otherChange > 0)) {
+          impactScore += Math.abs(otherChange) * 2;
+        } else {
+          impactScore -= Math.abs(otherChange) * 0.5; // Bonus se ajuda outro macro
+        }
+      }
+      
+      if (impactScore < bestImpactScore) {
+        bestFood = food;
+        bestGramsChange = gramsNeeded;
+        bestImpactScore = impactScore;
+      }
+    }
+    
+    if (bestFood) {
+      const currentGrams = quantities.get(bestFood.id) || bestFood.quantity_grams;
+      const newGrams = Math.round(Math.max(15, Math.min(450, currentGrams + bestGramsChange)));
+      quantities.set(bestFood.id, newGrams);
+    } else {
+      // Sem alimento ideal, tentar ajuste proporcional em todos
+      const scaleFactor = mainDeficit.diff > 0 ? 1.02 : 0.98;
+      for (const food of foods) {
+        const contribution = getFoodContribution(food.food);
+        if (contribution[mainDeficit.macro] > 0) {
+          const currentGrams = quantities.get(food.id) || food.quantity_grams;
+          const newGrams = Math.round(Math.max(15, Math.min(450, currentGrams * scaleFactor)));
+          quantities.set(food.id, newGrams);
+        }
+      }
+    }
+  }
+  
+  return quantities;
+}
+
+function calculateMacrosFromMap(foods: FoodWithMeta[], quantities: Map<string, number>): MacroTargets {
+  let calories = 0, protein = 0, carbs = 0, fat = 0;
+  
+  for (const food of foods) {
+    const grams = quantities.get(food.id) || food.quantity_grams;
+    const servingGrams = parseServingGrams(food.food.serving_size);
+    const ratio = grams / servingGrams;
+    
+    calories += food.food.calories * ratio;
+    protein += food.food.protein * ratio;
+    carbs += food.food.carbs * ratio;
+    fat += food.food.fat * ratio;
+  }
+  
+  return {
+    calories: Math.round(calories * 10) / 10,
+    protein: Math.round(protein * 10) / 10,
+    carbs: Math.round(carbs * 10) / 10,
+    fat: Math.round(fat * 10) / 10,
   };
 }
 
@@ -279,6 +453,7 @@ serve(async (req) => {
 
     // Coletar todos os alimentos da primeira opção de cada refeição
     const allFoods: MealOptionFood[] = [];
+    const allFoodsWithMeta: FoodWithMeta[] = [];
     const mealContexts: { mealId: string; mealName: string; optionId: string; foods: MealOptionFood[] }[] = [];
 
     for (const meal of typedMeals) {
@@ -291,6 +466,15 @@ serve(async (req) => {
           foods: firstOption.meal_option_foods,
         });
         allFoods.push(...firstOption.meal_option_foods);
+        // Adicionar metadados para refinamento
+        for (const food of firstOption.meal_option_foods) {
+          allFoodsWithMeta.push({
+            ...food,
+            mealName: meal.name,
+            mealId: meal.id,
+            optionId: firstOption.id,
+          });
+        }
       }
     }
 
@@ -483,53 +667,98 @@ RETORNE JSON:
 
     const aiResult = JSON.parse(toolCall.function.arguments);
 
-    // Mapear ajustes para o formato completo
-    const adjustments: AdjustmentProposal[] = [];
-    
-    for (const adj of aiResult.adjustments || []) {
-      // Encontrar o alimento original
-      let found = false;
-      for (const ctx of mealContexts) {
-        const food = ctx.foods.find(f => f.id === adj.foodItemId);
-        if (food) {
-          adjustments.push({
-            mealOptionFoodId: food.id,
-            mealId: ctx.mealId,
-            mealOptionId: ctx.optionId,
-            mealName: ctx.mealName,
-            foodName: food.food.name,
-            foodId: food.food_id,
-            originalGrams: food.quantity_grams,
-            newGrams: Math.round(Math.max(20, Math.min(400, adj.newGrams))),
-            reason: adj.reason,
-          });
-          found = true;
-          break;
-        }
-      }
-      if (!found) {
-        console.warn("Food not found for adjustment:", adj.foodItemId);
+    // Criar mapa de quantidades iniciais (baseado na IA)
+    const aiQuantities = new Map<string, number>();
+    for (const food of allFoodsWithMeta) {
+      const adj = aiResult.adjustments?.find((a: { foodItemId: string }) => a.foodItemId === food.id);
+      if (adj) {
+        aiQuantities.set(food.id, Math.round(Math.max(15, Math.min(450, adj.newGrams))));
+      } else {
+        aiQuantities.set(food.id, food.quantity_grams);
       }
     }
 
-    // Calcular macros propostos
-    const proposedFoods = allFoods.map(f => {
-      const adj = adjustments.find(a => a.mealOptionFoodId === f.id);
-      return {
-        ...f,
-        quantity_grams: adj ? adj.newGrams : f.quantity_grams,
-      };
-    });
-    const proposedMacros = calculateMacros(proposedFoods);
+    // Verificar precisão da proposta da IA
+    const aiProposedMacros = calculateMacrosFromMap(allFoodsWithMeta, aiQuantities);
+    const aiAccuracy = calculateAccuracy(aiProposedMacros, targets);
+    
+    console.log(`IA propôs: Cal ${aiAccuracy.calories.toFixed(1)}%, Prot ${aiAccuracy.protein.toFixed(1)}%, Carb ${aiAccuracy.carbs.toFixed(1)}%, Fat ${aiAccuracy.fat.toFixed(1)}%`);
+    
+    // REFINAMENTO MATEMÁTICO: Se a IA não atingiu 99.8%, refinar deterministicamente
+    const TARGET_MIN = 99.5;
+    const TARGET_MAX = 100.5;
+    let finalQuantities = aiQuantities;
+    let refinementApplied = false;
+    
+    if (aiAccuracy.minAccuracy < TARGET_MIN || aiAccuracy.minAccuracy > TARGET_MAX) {
+      console.log(`Aplicando refinamento matemático (accuracy atual: ${aiAccuracy.minAccuracy.toFixed(1)}%)`);
+      finalQuantities = refineAdjustmentsToTarget(allFoodsWithMeta, aiQuantities, targets, 25);
+      refinementApplied = true;
+    }
+
+    // Mapear ajustes finais
+    const adjustments: AdjustmentProposal[] = [];
+    
+    for (const food of allFoodsWithMeta) {
+      const finalGrams = finalQuantities.get(food.id) || food.quantity_grams;
+      
+      // Só incluir se houve mudança significativa (>= 3g)
+      if (Math.abs(finalGrams - food.quantity_grams) >= 3) {
+        const aiAdj = aiResult.adjustments?.find((a: { foodItemId: string; reason?: string }) => a.foodItemId === food.id);
+        const isIncrease = finalGrams > food.quantity_grams;
+        const diff = finalGrams - food.quantity_grams;
+        
+        adjustments.push({
+          mealOptionFoodId: food.id,
+          mealId: food.mealId,
+          mealOptionId: food.optionId,
+          mealName: food.mealName,
+          foodName: food.food.name,
+          foodId: food.food_id,
+          originalGrams: food.quantity_grams,
+          newGrams: Math.round(finalGrams),
+          reason: refinementApplied && !aiAdj
+            ? `Ajuste fino: ${isIncrease ? '+' : ''}${diff}g para atingir 99.8%+`
+            : (aiAdj?.reason || `Ajuste: ${isIncrease ? '+' : ''}${diff}g`),
+        });
+      }
+    }
+
+    // Calcular macros propostos finais
+    const proposedMacros = calculateMacrosFromMap(allFoodsWithMeta, finalQuantities);
+    const finalAccuracy = calculateAccuracy(proposedMacros, targets);
+    
+    console.log(`Final: Cal ${finalAccuracy.calories.toFixed(1)}%, Prot ${finalAccuracy.protein.toFixed(1)}%, Carb ${finalAccuracy.carbs.toFixed(1)}%, Fat ${finalAccuracy.fat.toFixed(1)}%`);
+
+    // Construir explicação com precisão real
+    const explanation = refinementApplied
+      ? `Ajustes calculados com refinamento matemático. Precisão final: Calorias ${finalAccuracy.calories.toFixed(1)}%, Proteína ${finalAccuracy.protein.toFixed(1)}%, Carboidratos ${finalAccuracy.carbs.toFixed(1)}%, Gordura ${finalAccuracy.fat.toFixed(1)}%. ${aiResult.explanation || ''}`
+      : (aiResult.explanation || `Ajustes calculados pela IA. Precisão: ${finalAccuracy.average.toFixed(1)}%`);
+
+    // Warnings
+    const warnings: string[] = aiResult.warnings || [];
+    if (finalAccuracy.minAccuracy < 99) {
+      warnings.push(`Atenção: Precisão de ${finalAccuracy.minAccuracy.toFixed(1)}% em um dos macros. Considere ajustar manualmente.`);
+    }
 
     const response: AIRebalanceResponse = {
       success: true,
-      currentMacros,
+      currentMacros: {
+        calories: Math.round(currentMacros.calories),
+        protein: Math.round(currentMacros.protein),
+        carbs: Math.round(currentMacros.carbs),
+        fat: Math.round(currentMacros.fat),
+      },
       targetMacros: targets,
-      proposedMacros,
+      proposedMacros: {
+        calories: Math.round(proposedMacros.calories),
+        protein: Math.round(proposedMacros.protein),
+        carbs: Math.round(proposedMacros.carbs),
+        fat: Math.round(proposedMacros.fat),
+      },
       adjustments,
-      explanation: aiResult.explanation || "Ajustes calculados pela IA",
-      warnings: aiResult.warnings || [],
+      explanation,
+      warnings,
     };
 
     return new Response(JSON.stringify(response), {
