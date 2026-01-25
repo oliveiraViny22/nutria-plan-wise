@@ -481,6 +481,72 @@ serve(async (req) => {
     // Calcular macros atuais
     const currentMacros = calculateMacros(allFoods);
 
+    // ========================================
+    // VERIFICAÇÃO: Plano já está otimizado?
+    // ========================================
+    // Determinar objetivo do usuário para pegar as tolerâncias corretas
+    const userGoalCheck: UserGoal = goal || 'maintain';
+    const tolerances = GOAL_TOLERANCES[userGoalCheck];
+    
+    // Calcular percentuais atuais para verificação
+    const currentCaloriesPercent = (currentMacros.calories / targets.calories) * 100;
+    const currentProteinPercent = (currentMacros.protein / targets.protein) * 100;
+    const currentCarbsPercent = (currentMacros.carbs / targets.carbs) * 100;
+    const currentFatPercent = (currentMacros.fat / targets.fat) * 100;
+    
+    // Verificar se todos os macros estão dentro da faixa aceitável
+    const caloriesInRange = currentCaloriesPercent >= tolerances.calories.acceptable[0] && 
+                           currentCaloriesPercent <= tolerances.calories.acceptable[1];
+    const proteinInRange = currentProteinPercent >= tolerances.protein.minimum;
+    const carbsInRange = currentCarbsPercent >= tolerances.carbs.acceptable[0] && 
+                        currentCarbsPercent <= tolerances.carbs.acceptable[1];
+    const fatInRange = currentFatPercent >= tolerances.fat.acceptable[0] && 
+                      currentFatPercent <= tolerances.fat.acceptable[1];
+    
+    const allInAcceptableRange = caloriesInRange && proteinInRange && carbsInRange && fatInRange;
+    
+    if (allInAcceptableRange) {
+      console.log(`Plano já otimizado: Cal ${currentCaloriesPercent.toFixed(1)}%, Prot ${currentProteinPercent.toFixed(1)}%, Carb ${currentCarbsPercent.toFixed(1)}%, Fat ${currentFatPercent.toFixed(1)}%`);
+      
+      // Construir mensagem amigável com os percentuais
+      const goalNames: Record<UserGoal, string> = {
+        gain_muscle: 'ganho de massa',
+        lose_weight: 'emagrecimento',
+        maintain: 'manutenção'
+      };
+      
+      const buildOptimizedMessage = () => {
+        const parts: string[] = [];
+        parts.push(`Calorias: ${Math.round(currentCaloriesPercent)}%`);
+        parts.push(`Proteína: ${Math.round(currentProteinPercent)}%`);
+        parts.push(`Carboidratos: ${Math.round(currentCarbsPercent)}%`);
+        parts.push(`Gordura: ${Math.round(currentFatPercent)}%`);
+        return parts.join(', ');
+      };
+      
+      return new Response(JSON.stringify({
+        success: true,
+        alreadyOptimized: true,
+        currentMacros: {
+          calories: Math.round(currentMacros.calories),
+          protein: Math.round(currentMacros.protein),
+          carbs: Math.round(currentMacros.carbs),
+          fat: Math.round(currentMacros.fat),
+        },
+        targetMacros: targets,
+        currentPercentages: {
+          calories: Math.round(currentCaloriesPercent),
+          protein: Math.round(currentProteinPercent),
+          carbs: Math.round(currentCarbsPercent),
+          fat: Math.round(currentFatPercent),
+        },
+        message: `Seu plano já está excelente para ${goalNames[userGoalCheck]}! Você está em ${buildOptimizedMessage()} da meta.`,
+        warning: `Não há necessidade de otimizar novamente. Rebalancear um plano que já está dentro das metas pode desestabilizá-lo e atrapalhar seus resultados. Confie no processo e siga o plano atual!`,
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     // Preparar contexto para a IA
     const mealDetails = mealContexts.map(ctx => ({
       mealName: ctx.mealName,
