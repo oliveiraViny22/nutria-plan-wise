@@ -281,6 +281,16 @@ export function GoalsProjectionCard() {
               )}
             </AlertDescription>
           </Alert>
+
+          {/* Disclaimer for muscle gain */}
+          {profile.goal === 'gain_muscle' && (
+            <Alert className="bg-amber-500/10 border-amber-500/20">
+              <Info className="h-3 w-3 text-amber-600" />
+              <AlertDescription className="text-[10px] text-amber-700 dark:text-amber-400 leading-relaxed">
+                <strong>Importante:</strong> As proporções de músculo vs gordura são <em>estimativas teóricas</em>. O resultado real depende principalmente do <strong>treino resistido</strong>, <strong>qualidade do sono</strong>, <strong>consistência</strong> e <strong>genética individual</strong> — não apenas da calculadora.
+              </AlertDescription>
+            </Alert>
+          )}
         </CardContent>
       </Card>
     </motion.div>
