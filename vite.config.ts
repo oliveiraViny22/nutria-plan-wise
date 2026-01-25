@@ -21,6 +21,7 @@ export default defineConfig(({ mode }) => ({
       includeAssets: ['favicon.ico', 'robots.txt', 'pwa-*.png', 'maskable-icon-*.png'],
       manifest: false, // Using public/manifest.json
       workbox: {
+        maximumFileSizeToCacheInBytes: 3 * 1024 * 1024, // 3 MB
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
         runtimeCaching: [
           {
