@@ -942,25 +942,28 @@ function buildMealOption(
       const fatPerGram = baseCarbSource.fat / 100;
       const targetCarbsForMeal = targetMacro.carbs;
       
-      // CORREÇÃO: Usar apenas 40% do orçamento calórico para carboidratos (deixar 45% para proteína)
-      const carbCalorieBudget = targetMacro.calories * 0.40;
+      // CORREÇÃO v2.3: Usar apenas 35% do orçamento calórico para carboidratos (deixar 50% para proteína)
+      // Para metas altas de proteína, precisamos de mais espaço calórico para proteínas
+      const carbCalorieBudget = targetMacro.calories * 0.35;
       const maxPortionByCalories = carbCalorieBudget / carbCalPerGram;
       
       // Limitar pela gordura da refeição (máx 35% do budget de gordura)
       const maxFatForCarb = targetMacro.fat * 0.35;
       const maxPortionByFat = fatPerGram > 0.1 ? (maxFatForCarb / fatPerGram) * 100 : 500;
       
-      // CORREÇÃO: Cobrir apenas 70% da meta de carbs da refeição (restante vem de frutas/outros)
-      const carbCoveragePercent = 0.70;
+      // CORREÇÃO v2.3: Cobrir apenas 60% da meta de carbs da refeição (restante vem de frutas/outros)
+      // Reduzido de 70% para 60% para deixar mais espaço calórico para proteínas
+      const carbCoveragePercent = 0.60;
       const carbCoverageTarget = targetCarbsForMeal * carbCoveragePercent;
-      const suggestedPortion = carbsPerGram > 0 ? (carbCoverageTarget / carbsPerGram) * 100 : 180;
+      const suggestedPortion = carbsPerGram > 0 ? (carbCoverageTarget / carbsPerGram) * 100 : 160;
       
-      // Limites REDUZIDOS para dar espaço à proteína
-      const maxCarbPortion = targetMacro.calories > 1100 ? 450 : 
-                             targetMacro.calories > 1000 ? 400 : 
-                             targetMacro.calories > 800 ? 350 : 
-                             targetMacro.calories > 600 ? 300 : 250;
-      const carbPortion = Math.min(maxCarbPortion, maxPortionByCalories, maxPortionByFat, Math.max(120, Math.round(suggestedPortion / 10) * 10));
+      // CORREÇÃO v2.3: Limites MAIS REDUZIDOS para evitar excesso de carbs
+      // Reduzidos em ~20% para deixar espaço à proteína
+      const maxCarbPortion = targetMacro.calories > 1100 ? 380 : 
+                             targetMacro.calories > 1000 ? 340 : 
+                             targetMacro.calories > 800 ? 300 : 
+                             targetMacro.calories > 600 ? 260 : 220;
+      const carbPortion = Math.min(maxCarbPortion, maxPortionByCalories, maxPortionByFat, Math.max(100, Math.round(suggestedPortion / 10) * 10));
       
       const carbConverted = applyUnitConversion(baseCarbSource, carbPortion);
       
@@ -1013,9 +1016,12 @@ function buildMealOption(
   const minProtein = context?.minProteinGrams || 10;
   const proteinPer100g = proteinSource.protein;
   
-  // CORREÇÃO: Porção deve atender a META de proteína da refeição (não apenas o mínimo)
-  // Usar 90% da meta de proteína como target (deixar margem para proteína de outros alimentos)
-  const targetProteinForPortion = targetMacro.protein * 0.75; // 75% da meta vem da fonte principal
+  // CORREÇÃO v2.3: Porção deve atender a META de proteína da refeição
+  // Para metas altas (>60g por refeição), a fonte principal deve cobrir 85% da meta
+  // Isso garante que proteínas de 295g/dia (≈60g+ por refeição principal) sejam atingidas
+  const proteinCoveragePercent = targetMacro.protein > 70 ? 0.90 : 
+                                  targetMacro.protein > 50 ? 0.85 : 0.75;
+  const targetProteinForPortion = targetMacro.protein * proteinCoveragePercent;
   const idealPortionForProtein = proteinPer100g > 0 ? (targetProteinForPortion / proteinPer100g) * 100 : 150;
   const minPortionForProtein = proteinPer100g > 0 ? (minProtein / proteinPer100g) * 100 : 100;
   
@@ -1024,18 +1030,22 @@ function buildMealOption(
   const proteinCalPerGram = proteinSource.calories / 100;
   const maxPortionByCalories = remainingCalories > 0 ? (remainingCalories * 0.95) / proteinCalPerGram : 300;
   
-  // Limites mais generosos para metas altas de PROTEÍNA (não apenas calorias)
-  // CORREÇÃO: Escalar limite máximo com base na meta de proteína da refeição
-  const proteinTargetScale = targetMacro.protein > 80 ? 1.8 : targetMacro.protein > 60 ? 1.5 : targetMacro.protein > 40 ? 1.3 : 1.0;
-  const baseMaxPortion = targetMacro.calories > 1000 ? 420 : 
-                         targetMacro.calories > 800 ? 360 : 
-                         targetMacro.calories > 600 ? 300 : 260;
+  // CORREÇÃO v2.3: Limites mais generosos para metas altas de PROTEÍNA
+  // Para metas de 70g+ por refeição, permitir porções maiores
+  const proteinTargetScale = targetMacro.protein > 80 ? 2.2 : 
+                              targetMacro.protein > 70 ? 2.0 :
+                              targetMacro.protein > 60 ? 1.8 : 
+                              targetMacro.protein > 40 ? 1.4 : 1.0;
+  const baseMaxPortion = targetMacro.calories > 1000 ? 450 : 
+                         targetMacro.calories > 800 ? 380 : 
+                         targetMacro.calories > 600 ? 320 : 280;
   const maxProteinPortion = Math.round(baseMaxPortion * proteinTargetScale);
   
-  // PRIORIDADE: Atingir meta de proteína, depois limitar por calorias
+  // PRIORIDADE ABSOLUTA: Atingir meta de proteína
+  // Usar 100% das calorias restantes se necessário para proteína
   const proteinPortion = Math.min(maxProteinPortion, maxPortionByCalories, 
                                   Math.max(Math.round(idealPortionForProtein / 10) * 10, 
-                                           Math.round(minPortionForProtein / 10) * 10, 130));
+                                           Math.round(minPortionForProtein / 10) * 10, 150));
   
   const proteinConverted = applyUnitConversion(proteinSource, proteinPortion);
   
@@ -1134,23 +1144,35 @@ function buildMealOption(
     const maxBoostPercent = isHighCalorieMeal ? 1.0 : 0.6; // 100% ou 60% de aumento
     const maxBoostGrams = isHighCalorieMeal ? 300 : 180; // 300g ou 180g max
     
-    // CORREÇÃO: Priorizar boost em PROTEÍNAS quando carbs já está alto
-    // Verificar se carbs já está próximo/acima da meta
-    const carbsOverMeta = totalCarbs >= targetMacro.carbs * 0.90;
+    // CORREÇÃO v2.3: Priorizar boost em PROTEÍNAS quando carbs está próximo/acima da meta
+    // REGRA: Se carbs >= 80% da meta, NUNCA boostar mais carbs - só proteínas
+    const carbsPercent = (totalCarbs / targetMacro.carbs) * 100;
+    const proteinPercent = (totalProtein / targetMacro.protein) * 100;
+    const carbsNearLimit = carbsPercent >= 80;
+    const proteinBelowTarget = proteinPercent < 90;
     
     for (let i = 0; i < mealFoods.length && boostedCalories < targetBoost; i++) {
       const mealFood = mealFoods[i];
       const food = mealFood.food;
       const category = (food.category || '').toLowerCase();
       
-      // CORREÇÃO: Se carbs já está alto, priorizar APENAS proteínas
+      // CORREÇÃO v2.3: Lógica de seleção mais rigorosa para evitar excesso de carbs
       let isGoodForBoost: boolean;
-      if (carbsOverMeta) {
-        // Carbs alto: só boost em proteínas magras e laticínios magros
+      
+      // PRIORIDADE MÁXIMA: Se proteína está baixa E carbs perto do limite,
+      // APENAS boostar proteínas magras
+      if (proteinBelowTarget && carbsNearLimit) {
+        isGoodForBoost = (category === 'proteinas' && food.fat < 12) ||
+                         (category === 'laticinios' && food.protein >= 10 && food.fat < 8);
+      } 
+      // Se carbs já está >= 80% da meta, NÃO boostar carboidratos
+      else if (carbsNearLimit) {
         isGoodForBoost = (category === 'proteinas' && food.fat < 10) ||
-                         (category === 'laticinios' && food.fat < 6);
-      } else {
-        // Carbs ainda tem espaço: boost em carbs, proteínas e laticínios
+                         (category === 'laticinios' && food.fat < 6) ||
+                         (category === 'frutas' && food.carbs < 15); // Frutas com pouco carb OK
+      } 
+      // Caso normal: carbs ainda tem espaço, boost em tudo
+      else {
         isGoodForBoost = category === 'carboidratos' || 
                          category === 'leguminosas' || 
                          (category === 'proteinas' && food.fat < 10) ||
@@ -1225,7 +1247,13 @@ function buildMealOption(
     const targetBoost2 = (targetMacro.calories - totalCalories) * 0.95;
     let boostedCalories2 = 0;
     
-    // Nesta rodada, considerar TODOS os alimentos
+    // CORREÇÃO v2.3: Na rodada 2, NUNCA boostar carboidratos se já >= 90% da meta
+    // E priorizar APENAS proteínas se proteína está abaixo de 85%
+    const currentCarbsPercent = (totalCarbs / targetMacro.carbs) * 100;
+    const currentProteinPercent = (totalProtein / targetMacro.protein) * 100;
+    const mustPrioritizeProtein = currentProteinPercent < 85;
+    const mustAvoidCarbs = currentCarbsPercent >= 90;
+    
     for (let i = 0; i < mealFoods.length && boostedCalories2 < targetBoost2; i++) {
       const mealFood = mealFoods[i];
       const food = mealFood.food;
@@ -1233,6 +1261,20 @@ function buildMealOption(
       
       // Pular gorduras puras e alimentos muito gordurosos
       if (category === 'gorduras' || food.fat > 15) continue;
+      
+      // CORREÇÃO v2.3: Regras mais rigorosas para rodada 2
+      // Se proteína baixa: APENAS proteínas
+      if (mustPrioritizeProtein) {
+        if (category !== 'proteinas' && !(category === 'laticinios' && food.protein >= 8)) {
+          continue;
+        }
+      }
+      // Se carbs já está alto: NÃO boostar carbs
+      else if (mustAvoidCarbs) {
+        if (category === 'carboidratos' || category === 'leguminosas' || food.carbs > 20) {
+          continue;
+        }
+      }
       
       const currentPortion = mealFood.calculated_grams;
       const maxBoostPortion = Math.min(currentPortion * 0.5, 150); // 50% ou 150g
