@@ -730,10 +730,52 @@ RETORNE JSON:
     
     console.log(`Final: Cal ${finalAccuracy.calories.toFixed(1)}%, Prot ${finalAccuracy.protein.toFixed(1)}%, Carb ${finalAccuracy.carbs.toFixed(1)}%, Fat ${finalAccuracy.fat.toFixed(1)}%`);
 
-    // Construir explicação com precisão real
-    const explanation = refinementApplied
-      ? `Ajustes calculados com refinamento matemático. Precisão final: Calorias ${finalAccuracy.calories.toFixed(1)}%, Proteína ${finalAccuracy.protein.toFixed(1)}%, Carboidratos ${finalAccuracy.carbs.toFixed(1)}%, Gordura ${finalAccuracy.fat.toFixed(1)}%. ${aiResult.explanation || ''}`
-      : (aiResult.explanation || `Ajustes calculados pela IA. Precisão: ${finalAccuracy.average.toFixed(1)}%`);
+    // Construir explicação amigável (sem termos técnicos)
+    const buildFriendlyExplanation = () => {
+      // Identificar quais macros precisavam de ajuste
+      const needed: string[] = [];
+      const fixed: string[] = [];
+      
+      if (Math.abs(100 - (currentMacros.calories / targets.calories * 100)) > 2) {
+        needed.push('calorias');
+        if (finalAccuracy.calories >= 99) fixed.push('calorias');
+      }
+      if (Math.abs(100 - (currentMacros.protein / targets.protein * 100)) > 2) {
+        needed.push('proteína');
+        if (finalAccuracy.protein >= 99) fixed.push('proteína');
+      }
+      if (Math.abs(100 - (currentMacros.carbs / targets.carbs * 100)) > 2) {
+        needed.push('carboidratos');
+        if (finalAccuracy.carbs >= 99) fixed.push('carboidratos');
+      }
+      if (Math.abs(100 - (currentMacros.fat / targets.fat * 100)) > 2) {
+        needed.push('gordura');
+        if (finalAccuracy.fat >= 99) fixed.push('gordura');
+      }
+      
+      // Gerar explicação baseada nos alimentos ajustados
+      const foodAdjustments = adjustments.map(adj => {
+        const isIncrease = adj.newGrams > adj.originalGrams;
+        return `${isIncrease ? 'aumentamos' : 'reduzimos'} ${adj.foodName}`;
+      });
+      
+      if (foodAdjustments.length === 0) {
+        return 'Seu plano já está bem equilibrado! Pequenos ajustes foram feitos para deixá-lo ainda melhor.';
+      }
+      
+      const allFixed = needed.length === fixed.length;
+      const adjustmentText = foodAdjustments.length <= 2 
+        ? foodAdjustments.join(' e ')
+        : `${foodAdjustments.slice(0, -1).join(', ')} e ${foodAdjustments[foodAdjustments.length - 1]}`;
+      
+      if (allFixed) {
+        return `Para atingir suas metas, ${adjustmentText}. Agora seu plano está perfeitamente alinhado com seus objetivos nutricionais.`;
+      }
+      
+      return `Fizemos ajustes estratégicos: ${adjustmentText}. Seu plano agora está muito mais próximo das suas metas.`;
+    };
+    
+    const explanation = buildFriendlyExplanation();
 
     // Warnings
     const warnings: string[] = aiResult.warnings || [];
