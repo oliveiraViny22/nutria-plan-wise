@@ -66,6 +66,117 @@ interface AIRebalanceResponse {
   warnings: string[];
 }
 
+type UserGoal = 'gain_muscle' | 'lose_weight' | 'maintain';
+
+interface GoalTolerances {
+  calories: { ideal: [number, number]; acceptable: [number, number]; warning: string };
+  protein: { ideal: [number, number]; minimum: number; warning: string };
+  carbs: { acceptable: [number, number] };
+  fat: { acceptable: [number, number]; minWarning: string };
+}
+
+const GOAL_TOLERANCES: Record<UserGoal, GoalTolerances> = {
+  gain_muscle: {
+    calories: { 
+      ideal: [98, 102], 
+      acceptable: [95, 105],
+      warning: "Abaixo de 95% compromete ganho muscular; acima de 105% favorece acúmulo de gordura"
+    },
+    protein: { 
+      ideal: [100, 105], 
+      minimum: 95,
+      warning: "Proteína NUNCA pode ficar abaixo de 90% para hipertrofia"
+    },
+    carbs: { acceptable: [90, 110] },
+    fat: { 
+      acceptable: [85, 110],
+      minWarning: "Gordura não pode cair abaixo do piso fisiológico"
+    }
+  },
+  lose_weight: {
+    calories: { 
+      ideal: [90, 92], 
+      acceptable: [88, 94],
+      warning: "Abaixo de 88% causa perda de massa muscular; acima de 95% impede emagrecimento"
+    },
+    protein: { 
+      ideal: [100, 105], 
+      minimum: 95,
+      warning: "Em cutting, proteína é CRÍTICA - não existe margem para baixo"
+    },
+    carbs: { acceptable: [80, 100] },
+    fat: { 
+      acceptable: [80, 100],
+      minWarning: "Gordura deve respeitar piso mínimo fisiológico"
+    }
+  },
+  maintain: {
+    calories: { 
+      ideal: [98, 102], 
+      acceptable: [95, 105],
+      warning: "Manutenção é tolerante, mas evitar desvios extremos"
+    },
+    protein: { 
+      ideal: [95, 100], 
+      minimum: 90,
+      warning: "Proteína pode variar um pouco sem grande impacto"
+    },
+    carbs: { acceptable: [85, 115] },
+    fat: { 
+      acceptable: [80, 120],
+      minWarning: "Gordura é flexível, mas não pode faltar demais"
+    }
+  }
+};
+
+function getGoalContext(goal: UserGoal): string {
+  const tolerances = GOAL_TOLERANCES[goal];
+  const goalNames: Record<UserGoal, string> = {
+    gain_muscle: 'GANHO DE MASSA (hipertrofia/bulking)',
+    lose_weight: 'EMAGRECIMENTO (cutting)',
+    maintain: 'MANUTENÇÃO'
+  };
+
+  return `
+## OBJETIVO DO USUÁRIO: ${goalNames[goal]}
+
+### MARGENS DE TOLERÂNCIA PARA ESTE OBJETIVO:
+
+🔢 CALORIAS:
+- Faixa IDEAL: ${tolerances.calories.ideal[0]}–${tolerances.calories.ideal[1]}% da meta
+- Faixa ACEITÁVEL: ${tolerances.calories.acceptable[0]}–${tolerances.calories.acceptable[1]}%
+- ⚠️ ${tolerances.calories.warning}
+
+🥩 PROTEÍNA:
+- Faixa IDEAL: ${tolerances.protein.ideal[0]}–${tolerances.protein.ideal[1]}% da meta
+- MÍNIMO ABSOLUTO: ${tolerances.protein.minimum}%
+- ⚠️ ${tolerances.protein.warning}
+
+🍚 CARBOIDRATOS:
+- Margem ACEITÁVEL: ${tolerances.carbs.acceptable[0]}–${tolerances.carbs.acceptable[1]}%
+
+🥑 GORDURAS:
+- Margem ACEITÁVEL: ${tolerances.fat.acceptable[0]}–${tolerances.fat.acceptable[1]}%
+- ⚠️ ${tolerances.fat.minWarning}
+
+### PRIORIDADE DE AJUSTE PARA ${goalNames[goal].toUpperCase()}:
+${goal === 'gain_muscle' ? `
+1. CALORIAS devem estar entre 98-102% (CRÍTICO para síntese proteica)
+2. PROTEÍNA deve atingir 100% (fundamento da hipertrofia)
+3. CARBOIDRATOS fornecem energia para treino - manter acima de 90%
+4. GORDURAS são flexíveis desde que não caiam demais` : ''}
+${goal === 'lose_weight' ? `
+1. PROTEÍNA é PRIORIDADE #1 - manter 100%+ para preservar massa magra
+2. CALORIAS devem ficar em déficit controlado (90-92% ideal)
+3. GORDURAS manter no mínimo fisiológico
+4. CARBOIDRATOS são os mais flexíveis para reduzir` : ''}
+${goal === 'maintain' ? `
+1. CALORIAS próximas de 100% (margem ampla de 95-105%)
+2. PROTEÍNA acima de 95% para manter massa
+3. CARBOIDRATOS e GORDURAS são muito flexíveis` : ''}
+`;
+}
+
 /**
  * Extrai o peso base em gramas do serving_size.
  * Os macros no banco são sempre "por porção" onde a porção é definida em serving_size.
@@ -117,7 +228,7 @@ serve(async (req) => {
   }
 
   try {
-    const { planId, targets } = await req.json();
+    const { planId, targets, goal } = await req.json();
 
     if (!planId || !targets) {
       return new Response(
@@ -208,19 +319,35 @@ serve(async (req) => {
       }),
     }));
 
-    const systemPrompt = `Você é um nutricionista expert em ajuste de planos alimentares. Sua tarefa é analisar um plano alimentar e propor ajustes de porções para atingir metas específicas de macronutrientes.
+    // Determinar objetivo do usuário (default: maintain se não fornecido)
+    const userGoal: UserGoal = goal || 'maintain';
+    const goalContext = getGoalContext(userGoal);
+    
+    // Calcular percentuais atuais
+    const caloriesPercent = Math.round((currentMacros.calories / targets.calories) * 100);
+    const proteinPercent = Math.round((currentMacros.protein / targets.protein) * 100);
+    const carbsPercent = Math.round((currentMacros.carbs / targets.carbs) * 100);
+    const fatPercent = Math.round((currentMacros.fat / targets.fat) * 100);
+
+    const systemPrompt = `Você é um nutricionista expert em ajuste de planos alimentares, especializado em otimização de macros para diferentes objetivos (hipertrofia, cutting, manutenção).
+
+Sua tarefa é analisar um plano alimentar e propor ajustes de porções para atingir metas específicas de macronutrientes, RESPEITANDO AS MARGENS DE TOLERÂNCIA DO OBJETIVO DO USUÁRIO.
 
 REGRAS IMPORTANTES:
 1. Só ajuste porções de alimentos existentes - NÃO adicione nem remova alimentos
 2. Mantenha proporções razoáveis (mínimo 20g, máximo 400g por alimento)
-3. Priorize ajustes em alimentos ricos no macronutriente em déficit
+3. PRIORIZE os macronutrientes de acordo com o objetivo (ex: proteína em cutting é sagrada)
 4. Considere a palatabilidade - não faça ajustes extremos
 5. Para proteína: ajuste carnes, ovos, laticínios, leguminosas
 6. Para carboidratos: ajuste arroz, batata, pães, frutas
 7. Para gordura: ajuste azeite, castanhas, queijos
-8. Sempre explique o raciocínio dos ajustes`;
+8. Se já está dentro da faixa IDEAL, NÃO FORCE ajustes desnecessários
+9. Se estiver fora da faixa ACEITÁVEL, priorize voltar para a faixa
+10. Sempre explique o raciocínio considerando o objetivo`;
 
-    const userPrompt = `Analise este plano alimentar e proponha ajustes para atingir as metas.
+    const userPrompt = `Analise este plano alimentar e proponha ajustes para atingir as metas, CONSIDERANDO O OBJETIVO ESPECÍFICO DO USUÁRIO.
+
+${goalContext}
 
 METAS DO USUÁRIO:
 - Calorias: ${targets.calories} kcal
@@ -229,13 +356,19 @@ METAS DO USUÁRIO:
 - Gordura: ${targets.fat}g
 
 MACROS ATUAIS DO PLANO:
-- Calorias: ${currentMacros.calories} kcal (diferença: ${targets.calories - currentMacros.calories})
-- Proteína: ${currentMacros.protein}g (diferença: ${targets.protein - currentMacros.protein}g)
-- Carboidratos: ${currentMacros.carbs}g (diferença: ${targets.carbs - currentMacros.carbs}g)
-- Gordura: ${currentMacros.fat}g (diferença: ${targets.fat - currentMacros.fat}g)
+- Calorias: ${currentMacros.calories} kcal (${caloriesPercent}% da meta, diferença: ${targets.calories - currentMacros.calories})
+- Proteína: ${currentMacros.protein}g (${proteinPercent}% da meta, diferença: ${targets.protein - currentMacros.protein}g)
+- Carboidratos: ${currentMacros.carbs}g (${carbsPercent}% da meta, diferença: ${targets.carbs - currentMacros.carbs}g)
+- Gordura: ${currentMacros.fat}g (${fatPercent}% da meta, diferença: ${targets.fat - currentMacros.fat}g)
 
 REFEIÇÕES DO PLANO:
 ${JSON.stringify(mealDetails, null, 2)}
+
+INSTRUÇÕES ESPECÍFICAS:
+1. Verifique se cada macro está dentro da faixa ACEITÁVEL para o objetivo
+2. Se estiver fora, proponha ajustes para voltar à faixa
+3. Priorize os macros de acordo com a hierarquia do objetivo
+4. Gere warnings se algum ajuste comprometer outro macro crítico
 
 Retorne um JSON com a estrutura:
 {
@@ -243,11 +376,11 @@ Retorne um JSON com a estrutura:
     {
       "foodItemId": "id do meal_option_food",
       "newGrams": número,
-      "reason": "explicação curta"
+      "reason": "explicação curta relacionada ao objetivo"
     }
   ],
-  "explanation": "explicação geral da estratégia usada",
-  "warnings": ["avisos importantes se houver"]
+  "explanation": "explicação geral da estratégia considerando o objetivo",
+  "warnings": ["avisos sobre macros fora da faixa ideal ou riscos"]
 }`;
 
     // Chamar Lovable AI
