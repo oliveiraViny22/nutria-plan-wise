@@ -190,7 +190,11 @@ export default function MealDetail() {
   };
 
   const fetchAllFoods = async () => {
-    const { data } = await supabase.from('foods').select('*').order('name');
+    const { data } = await supabase
+      .from('foods')
+      .select('*')
+      .eq('is_active', true)
+      .order('name');
     if (data) setAllFoods(data as Food[]);
   };
 

@@ -82,6 +82,7 @@ export type SubstituteError =
   | 'PLAN_LOCKED'
   | 'ITEM_NOT_FOUND'
   | 'INVALID_CATEGORY'
+  | 'INVALID_PROCESSING_LEVEL'
   | 'SUPPLEMENT_NOT_SUBSTITUTABLE'
   | 'NO_PERMISSION'
   | 'NO_CANDIDATES'
@@ -140,15 +141,29 @@ export function validateGovernanceGates(
  * Verifica se um alimento pode ser usado em substituições automáticas
  */
 export function canBeSubstituted(food: Food): boolean {
+  const reason = getSubstitutionBlockReason(food);
+  return reason === null;
+}
+
+/**
+ * Retorna o motivo pelo qual um alimento não pode ser substituído, ou null se permitido
+ */
+export function getSubstitutionBlockReason(food: Food): SubstituteError | null {
   // Suplementos não podem ser auto-substituídos
-  if (food.category === 'suplementos') return false;
+  if (food.category === 'suplementos') {
+    return 'SUPPLEMENT_NOT_SUBSTITUTABLE';
+  }
 
   // Categoria precisa ser canônica
-  if (!food.category || !isValidCategory(food.category)) return false;
+  if (!food.category || !isValidCategory(food.category)) {
+    return 'INVALID_CATEGORY';
+  }
 
   // Verificar nível de processamento
   const processingLevel = food.processing_level;
-  if (!processingLevel) return true; // Permitir se não definido
+  if (!processingLevel) {
+    return null; // Permitir se não definido
+  }
 
   // Normalizar para comparação
   const normalizedLevel = processingLevel.toLowerCase().replace(/\s+/g, '_');
@@ -159,7 +174,11 @@ export function canBeSubstituted(food: Food): boolean {
     'minimamente_processado',
   ];
 
-  return allowedLevels.includes(normalizedLevel);
+  if (!allowedLevels.includes(normalizedLevel)) {
+    return 'INVALID_PROCESSING_LEVEL';
+  }
+  
+  return null;
 }
 
 /**
@@ -485,11 +504,9 @@ export function substituteItem(
   }
   
   // 2. Validar item de origem
-  if (!canBeSubstituted(sourceFood)) {
-    if (sourceFood.category === 'suplementos') {
-      return { success: false, error: 'SUPPLEMENT_NOT_SUBSTITUTABLE' };
-    }
-    return { success: false, error: 'INVALID_CATEGORY' };
+  const blockReason = getSubstitutionBlockReason(sourceFood);
+  if (blockReason) {
+    return { success: false, error: blockReason };
   }
   
   // 3. Buscar candidatos
