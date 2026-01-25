@@ -530,21 +530,28 @@ function validateStructure(meals: MealResult[]): StructuralValidation {
 }
 
 // =====================================================
-// SALVAR PLANO
+// SALVAR PLANO COM MÚLTIPLAS OPÇÕES
 // =====================================================
 
-async function savePlan(
+interface MealWithOptions {
+  mealType: string;
+  options: MealResult[];
+}
+
+async function savePlanWithOptions(
   supabase: any,
   userId: string,
-  meals: MealResult[]
+  mealsWithOptions: MealWithOptions[]
 ): Promise<string> {
-  // Calcular totais do plano
+  // Calcular totais do plano (baseado na primeira opção de cada refeição)
   let totalCals = 0, totalProt = 0, totalCarbs = 0, totalFat = 0;
-  for (const meal of meals) {
-    totalCals += meal.totals.calories;
-    totalProt += meal.totals.protein;
-    totalCarbs += meal.totals.carbs;
-    totalFat += meal.totals.fat;
+  for (const mealData of mealsWithOptions) {
+    if (mealData.options[0]) {
+      totalCals += mealData.options[0].totals.calories;
+      totalProt += mealData.options[0].totals.protein;
+      totalCarbs += mealData.options[0].totals.carbs;
+      totalFat += mealData.options[0].totals.fat;
+    }
   }
 
   // Arquivar planos anteriores (status válidos: draft, active, archived, completed)
@@ -581,65 +588,83 @@ async function savePlan(
     throw new Error(planError.message);
   }
 
-  // Criar refeições
-  for (let i = 0; i < meals.length; i++) {
-    const meal = meals[i];
+  // Criar refeições com múltiplas opções
+  for (let i = 0; i < mealsWithOptions.length; i++) {
+    const mealWithOpts = mealsWithOptions[i];
+    const firstOption = mealWithOpts.options[0];
+    
+    if (!firstOption) continue;
 
     const { data: mealData, error: mealError } = await supabase
       .from("meals")
       .insert({
         diet_plan_id: dietPlan.id,
-        name: meal.meal_name,
+        name: firstOption.meal_name,
         sort_order: i + 1,
-        total_calories: meal.totals.calories,
-        total_protein: meal.totals.protein,
-        total_carbs: meal.totals.carbs,
-        total_fat: meal.totals.fat,
+        total_calories: firstOption.totals.calories,
+        total_protein: firstOption.totals.protein,
+        total_carbs: firstOption.totals.carbs,
+        total_fat: firstOption.totals.fat,
       })
       .select()
       .single();
 
     if (mealError) {
-      log("Erro ao criar refeição", { mealName: meal.meal_name, error: mealError.message });
+      log("Erro ao criar refeição", { mealName: firstOption.meal_name, error: mealError.message });
       throw new Error(mealError.message);
     }
 
-    // Criar opção de refeição
-    const { data: optionData, error: optionError } = await supabase
-      .from("meal_options")
-      .insert({
-        meal_id: mealData.id,
-        option_number: 1,
-        name: "Opção Principal",
-        total_calories: meal.totals.calories,
-        total_protein: meal.totals.protein,
-        total_carbs: meal.totals.carbs,
-        total_fat: meal.totals.fat,
-      })
-      .select()
-      .single();
+    // Criar todas as opções desta refeição
+    for (let optIdx = 0; optIdx < mealWithOpts.options.length; optIdx++) {
+      const option = mealWithOpts.options[optIdx];
+      const optionNumber = optIdx + 1;
+      const optionName = optionNumber === 1 ? "Opção Principal" : `Opção ${optionNumber}`;
 
-    if (optionError) {
-      log("Erro ao criar opção", { mealName: meal.meal_name, error: optionError.message });
-      throw new Error(optionError.message);
-    }
+      const { data: optionData, error: optionError } = await supabase
+        .from("meal_options")
+        .insert({
+          meal_id: mealData.id,
+          option_number: optionNumber,
+          name: optionName,
+          total_calories: option.totals.calories,
+          total_protein: option.totals.protein,
+          total_carbs: option.totals.carbs,
+          total_fat: option.totals.fat,
+        })
+        .select()
+        .single();
 
-    // Adicionar alimentos
-    for (const food of meal.foods) {
-      const { error: foodItemError } = await supabase.from("meal_option_foods").insert({
-        meal_option_id: optionData.id,
-        food_id: food.food.id,
-        quantity_grams: food.quantity_grams,
-        display_quantity: food.display_quantity,
-        display_unit: food.display_unit,
-        calculated_grams: food.quantity_grams,
-        unit_locked: true,
-      });
-      
-      if (foodItemError) {
-        log("Erro ao inserir alimento", { foodId: food.food.id, foodName: food.food.name, error: foodItemError.message });
-        throw new Error(foodItemError.message);
+      if (optionError) {
+        log("Erro ao criar opção", { mealName: option.meal_name, optionNumber, error: optionError.message });
+        throw new Error(optionError.message);
       }
+
+      // Adicionar alimentos desta opção
+      for (const food of option.foods) {
+        const { error: foodItemError } = await supabase.from("meal_option_foods").insert({
+          meal_option_id: optionData.id,
+          food_id: food.food.id,
+          quantity_grams: food.quantity_grams,
+          display_quantity: food.display_quantity,
+          display_unit: food.display_unit,
+          calculated_grams: food.quantity_grams,
+          unit_locked: true,
+        });
+
+        if (foodItemError) {
+          log("Erro ao inserir alimento", { 
+            foodId: food.food.id, 
+            foodName: food.food.name, 
+            optionNumber,
+            error: foodItemError.message 
+          });
+          throw new Error(foodItemError.message);
+        }
+      }
+
+      log(`Opção ${optionNumber} salva para ${option.meal_name}`, { 
+        foods: option.foods.length 
+      });
     }
   }
 
@@ -677,13 +702,13 @@ serve(async (req) => {
 
     log("Iniciando geração v5", { userId: user.id });
 
-    // Carregar perfil
-    const { data: profile, error: profileError } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("user_id", user.id)
-      .single();
+    // Carregar perfil e limites do plano em paralelo
+    const [profileResult, planLimitsResult] = await Promise.all([
+      supabase.from("profiles").select("*").eq("user_id", user.id).single(),
+      supabase.rpc("get_user_plan", { _user_id: user.id }),
+    ]);
 
+    const { data: profile, error: profileError } = profileResult;
     if (profileError || !profile) {
       return createErrorResponse(CLIENT_ERRORS.NOT_FOUND, 404, corsHeaders);
     }
@@ -691,6 +716,11 @@ serve(async (req) => {
     if (!profile.onboarding_completed) {
       return createErrorResponse("Complete o onboarding primeiro", 400, corsHeaders);
     }
+
+    // Determinar limite de opções do plano
+    const planData = planLimitsResult.data?.[0];
+    const mealOptionsLimit = planData?.meal_options_limit ?? 1;
+    log("Limite de opções do plano", { mealOptionsLimit, planName: planData?.plan_name });
 
     // Determinar refeições
     const mealsPerDay = profile.meals_per_day || 4;
@@ -703,7 +733,7 @@ serve(async (req) => {
     };
     const mealTypes = mealTypesMap[mealsPerDay] || mealTypesMap[4];
 
-    log("Configuração", { mealsPerDay, mealTypes });
+    log("Configuração", { mealsPerDay, mealTypes, mealOptionsLimit });
 
     // Carregar templates e âncoras em paralelo
     const [templates, anchorFoods] = await Promise.all([
@@ -732,9 +762,12 @@ serve(async (req) => {
 
     log("Alimentos elegíveis", { count: eligibleFoods.length });
 
-    // Gerar refeições
+    // Gerar refeições com múltiplas opções
     const usedGlobalIds = new Set<string>();
-    const meals: MealResult[] = [];
+    const mealsWithOptions: Array<{
+      mealType: string;
+      options: MealResult[];
+    }> = [];
 
     for (const mealType of mealTypes) {
       const templateData = templates.get(mealType);
@@ -744,27 +777,47 @@ serve(async (req) => {
         continue;
       }
 
-      // Obter âncoras para esta refeição (opção 1)
-      const mealAnchors = anchorFoods.get(`${mealType}-1`) || [];
+      const mealOptions: MealResult[] = [];
 
-      const meal = buildMealWithAnchors(
-        mealType,
-        1, // opção 1 usa âncoras
-        templateData,
-        eligibleFoods,
-        usedGlobalIds,
-        profile.preferred_foods || [],
-        mealAnchors
-      );
-      meals.push(meal);
+      // Gerar N opções para esta refeição
+      for (let optNum = 1; optNum <= mealOptionsLimit; optNum++) {
+        // Opção 1 usa âncoras, demais variam os alimentos
+        const mealAnchors = optNum === 1 ? (anchorFoods.get(`${mealType}-1`) || []) : [];
+        
+        // Para opções 2+, usar set separado para variar alimentos
+        const optionUsedIds = optNum === 1 
+          ? new Set(usedGlobalIds) 
+          : new Set([...usedGlobalIds, ...mealOptions.flatMap(m => m.foods.map(f => f.food.id))]);
 
-      log(`Refeição gerada`, {
-        type: mealType,
-        items: meal.foods.length,
-        anchors: mealAnchors.length,
-        cals: meal.totals.calories,
-      });
+        const meal = buildMealWithAnchors(
+          mealType,
+          optNum,
+          templateData,
+          eligibleFoods,
+          optionUsedIds,
+          profile.preferred_foods || [],
+          mealAnchors
+        );
+        mealOptions.push(meal);
+
+        log(`Opção ${optNum} gerada para ${mealType}`, {
+          items: meal.foods.length,
+          cals: meal.totals.calories,
+        });
+      }
+
+      mealsWithOptions.push({ mealType, options: mealOptions });
+      
+      // Adicionar IDs da primeira opção ao global (para variar entre refeições)
+      if (mealOptions[0]) {
+        for (const food of mealOptions[0].foods) {
+          usedGlobalIds.add(food.food.id);
+        }
+      }
     }
+
+    // Para compatibilidade, extrair primeira opção de cada refeição
+    const meals: MealResult[] = mealsWithOptions.map(m => m.options[0]);
 
     // Validar estrutura
     const validation = validateStructure(meals);
@@ -781,10 +834,10 @@ serve(async (req) => {
 
     log("Validação estrutural OK");
 
-    // Salvar plano (NÃO ajustado - será feito pelo rebalanceador)
-    const planId = await savePlan(supabase, user.id, meals);
+    // Salvar plano com todas as opções (NÃO ajustado - será feito pelo rebalanceador)
+    const planId = await savePlanWithOptions(supabase, user.id, mealsWithOptions);
 
-    log("Plano salvo", { planId });
+    log("Plano salvo", { planId, optionsPerMeal: mealOptionsLimit });
 
     // Calcular totais finais
     let totalCals = 0, totalProt = 0, totalCarbs = 0, totalFat = 0;
@@ -798,8 +851,9 @@ serve(async (req) => {
     return createSuccessResponse(
       {
         plan_id: planId,
-        message: "Plano estrutural gerado. Execute o rebalanceador para ajustar macros.",
+        message: `Plano estrutural gerado com ${mealOptionsLimit} opção(ões) por refeição. Execute o rebalanceador para ajustar macros.`,
         requires_rebalancing: true,
+        options_per_meal: mealOptionsLimit,
         totals: {
           calories: totalCals,
           protein: totalProt,
@@ -812,11 +866,12 @@ serve(async (req) => {
           carbs: profile.carbs_target,
           fat: profile.fat_target,
         },
-        meals: meals.map((m) => ({
-          type: m.meal_type,
-          name: m.meal_name,
-          items: m.foods.length,
-          calories: m.totals.calories,
+        meals: mealsWithOptions.map((m) => ({
+          type: m.mealType,
+          name: m.options[0]?.meal_name || MEAL_NAMES[m.mealType],
+          options: m.options.length,
+          items_per_option: m.options.map(o => o.foods.length),
+          calories: m.options[0]?.totals.calories || 0,
         })),
       },
       corsHeaders
