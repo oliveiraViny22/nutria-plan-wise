@@ -514,32 +514,6 @@ export default function Dashboard() {
             transition={{ delay: 0.2 }}
           >
             <div className="flex flex-wrap gap-2">
-              <Button
-                variant={currentDietPlan ? "outline" : "hero"}
-                size="default"
-                className="flex-1 min-w-[120px]"
-                onClick={generateMealPlan}
-                disabled={generating || generatingV5}
-              >
-                {generating ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    <span className="hidden sm:inline">Gerando...</span>
-                  </>
-                ) : currentDietPlan ? (
-                  <>
-                    <RefreshCw className="w-4 h-4" />
-                    <span className="hidden sm:inline">Novo plano</span>
-                    <span className="sm:hidden">Novo</span>
-                  </>
-                ) : (
-                  <>
-                    <UtensilsCrossed className="w-4 h-4" />
-                    Gerar plano
-                  </>
-                )}
-              </Button>
-
               {/* Botão Gerador V5 */}
               <Button
                 variant="default"
