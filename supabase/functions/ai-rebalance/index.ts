@@ -772,7 +772,25 @@ RETORNE JSON:
       if (Math.abs(finalGrams - food.quantity_grams) >= 3) {
         const aiAdj = aiResult.adjustments?.find((a: { foodItemId: string; reason?: string }) => a.foodItemId === food.id);
         const isIncrease = finalGrams > food.quantity_grams;
-        const diff = finalGrams - food.quantity_grams;
+        const diff = Math.round(finalGrams - food.quantity_grams);
+        
+        // Gerar razão sem mencionar porcentagens técnicas
+        let reason = '';
+        if (aiAdj?.reason) {
+          // Limpar razão da IA para remover detalhes técnicos
+          reason = aiAdj.reason
+            .replace(/\d+\.?\d*%/g, '') // Remove porcentagens
+            .replace(/para atingir \d+/gi, '')
+            .replace(/cálculo:.*$/gi, '')
+            .replace(/\s+/g, ' ')
+            .trim();
+          // Se ficou vazia após limpeza, gerar uma nova
+          if (reason.length < 10) {
+            reason = `${isIncrease ? 'Aumentar' : 'Reduzir'} porção em ${Math.abs(diff)}g`;
+          }
+        } else {
+          reason = `${isIncrease ? 'Aumentar' : 'Reduzir'} porção em ${Math.abs(diff)}g`;
+        }
         
         adjustments.push({
           mealOptionFoodId: food.id,
@@ -783,9 +801,7 @@ RETORNE JSON:
           foodId: food.food_id,
           originalGrams: food.quantity_grams,
           newGrams: Math.round(finalGrams),
-          reason: refinementApplied && !aiAdj
-            ? `Ajuste fino: ${isIncrease ? '+' : ''}${diff}g para atingir 99.8%+`
-            : (aiAdj?.reason || `Ajuste: ${isIncrease ? '+' : ''}${diff}g`),
+          reason,
         });
       }
     }
@@ -796,49 +812,70 @@ RETORNE JSON:
     
     console.log(`Final: Cal ${finalAccuracy.calories.toFixed(1)}%, Prot ${finalAccuracy.protein.toFixed(1)}%, Carb ${finalAccuracy.carbs.toFixed(1)}%, Fat ${finalAccuracy.fat.toFixed(1)}%`);
 
-    // Construir explicação amigável (sem termos técnicos)
+    // Construir explicação amigável com validação de limites
     const buildFriendlyExplanation = () => {
-      // Identificar quais macros precisavam de ajuste
-      const needed: string[] = [];
-      const fixed: string[] = [];
+      const goalNames: Record<UserGoal, string> = {
+        gain_muscle: 'ganho de massa',
+        lose_weight: 'emagrecimento',
+        maintain: 'manutenção'
+      };
       
-      if (Math.abs(100 - (currentMacros.calories / targets.calories * 100)) > 2) {
-        needed.push('calorias');
-        if (finalAccuracy.calories >= 99) fixed.push('calorias');
-      }
-      if (Math.abs(100 - (currentMacros.protein / targets.protein * 100)) > 2) {
-        needed.push('proteína');
-        if (finalAccuracy.protein >= 99) fixed.push('proteína');
-      }
-      if (Math.abs(100 - (currentMacros.carbs / targets.carbs * 100)) > 2) {
-        needed.push('carboidratos');
-        if (finalAccuracy.carbs >= 99) fixed.push('carboidratos');
-      }
-      if (Math.abs(100 - (currentMacros.fat / targets.fat * 100)) > 2) {
-        needed.push('gordura');
-        if (finalAccuracy.fat >= 99) fixed.push('gordura');
-      }
+      // Verificar se os macros propostos estão dentro dos limites aceitáveis
+      const proposedCalPercent = Math.round((proposedMacros.calories / targets.calories) * 100);
+      const proposedProtPercent = Math.round((proposedMacros.protein / targets.protein) * 100);
+      const proposedCarbsPercent = Math.round((proposedMacros.carbs / targets.carbs) * 100);
+      const proposedFatPercent = Math.round((proposedMacros.fat / targets.fat) * 100);
+      
+      const calInRange = proposedCalPercent >= tolerances.calories.acceptable[0] && 
+                         proposedCalPercent <= tolerances.calories.acceptable[1];
+      const protInRange = proposedProtPercent >= tolerances.protein.minimum;
+      const carbsInRange = proposedCarbsPercent >= tolerances.carbs.acceptable[0] && 
+                          proposedCarbsPercent <= tolerances.carbs.acceptable[1];
+      const fatInRange = proposedFatPercent >= tolerances.fat.acceptable[0] && 
+                        proposedFatPercent <= tolerances.fat.acceptable[1];
+      
+      const allWithinLimits = calInRange && protInRange && carbsInRange && fatInRange;
       
       // Gerar explicação baseada nos alimentos ajustados
-      const foodAdjustments = adjustments.map(adj => {
-        const isIncrease = adj.newGrams > adj.originalGrams;
-        return `${isIncrease ? 'aumentamos' : 'reduzimos'} ${adj.foodName}`;
-      });
+      const increases = adjustments.filter(adj => adj.newGrams > adj.originalGrams);
+      const decreases = adjustments.filter(adj => adj.newGrams < adj.originalGrams);
       
-      if (foodAdjustments.length === 0) {
-        return 'Seu plano já está bem equilibrado! Pequenos ajustes foram feitos para deixá-lo ainda melhor.';
+      let adjustmentSummary = '';
+      if (increases.length > 0 && decreases.length > 0) {
+        const increaseNames = increases.slice(0, 2).map(a => a.foodName).join(' e ');
+        const decreaseNames = decreases.slice(0, 2).map(a => a.foodName).join(' e ');
+        adjustmentSummary = `Aumentamos ${increaseNames} e reduzimos ${decreaseNames}`;
+      } else if (increases.length > 0) {
+        const names = increases.slice(0, 3).map(a => a.foodName).join(', ');
+        adjustmentSummary = `Aumentamos as porções de ${names}`;
+      } else if (decreases.length > 0) {
+        const names = decreases.slice(0, 3).map(a => a.foodName).join(', ');
+        adjustmentSummary = `Reduzimos as porções de ${names}`;
       }
       
-      const allFixed = needed.length === fixed.length;
-      const adjustmentText = foodAdjustments.length <= 2 
-        ? foodAdjustments.join(' e ')
-        : `${foodAdjustments.slice(0, -1).join(', ')} e ${foodAdjustments[foodAdjustments.length - 1]}`;
-      
-      if (allFixed) {
-        return `Para atingir suas metas, ${adjustmentText}. Agora seu plano está perfeitamente alinhado com seus objetivos nutricionais.`;
+      // Construir explicação com validação de limites
+      if (adjustments.length === 0) {
+        return 'Seu plano já está bem equilibrado. Não foram necessários ajustes significativos.';
       }
       
-      return `Fizemos ajustes estratégicos: ${adjustmentText}. Seu plano agora está muito mais próximo das suas metas.`;
+      let explanation = adjustmentSummary + '. ';
+      
+      if (allWithinLimits) {
+        explanation += `Com esses ajustes, seu plano fica dentro dos limites recomendados para ${goalNames[userGoal]}: `;
+        explanation += `calorias em ${proposedCalPercent}% da meta (faixa aceitável: ${tolerances.calories.acceptable[0]}-${tolerances.calories.acceptable[1]}%), `;
+        explanation += `proteína em ${proposedProtPercent}% (mínimo: ${tolerances.protein.minimum}%).`;
+      } else {
+        const issues: string[] = [];
+        if (!calInRange) issues.push(`calorias (${proposedCalPercent}%)`);
+        if (!protInRange) issues.push(`proteína (${proposedProtPercent}%)`);
+        if (!carbsInRange) issues.push(`carboidratos (${proposedCarbsPercent}%)`);
+        if (!fatInRange) issues.push(`gordura (${proposedFatPercent}%)`);
+        
+        explanation += `A maioria dos macros está adequada, mas ${issues.join(' e ')} `;
+        explanation += `podem precisar de ajuste manual para otimizar ainda mais seu plano para ${goalNames[userGoal]}.`;
+      }
+      
+      return explanation;
     };
     
     const explanation = buildFriendlyExplanation();
