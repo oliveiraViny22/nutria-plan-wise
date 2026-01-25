@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -12,7 +12,8 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Loader2, Plus, Trash2, Edit2, Anchor, UtensilsCrossed, Save } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Loader2, Plus, Trash2, Edit2, Anchor, UtensilsCrossed, Save, Coffee, Apple, Sun, Moon } from "lucide-react";
 import { SingleFoodSelect } from "@/components/SingleFoodSelect";
 
 
@@ -250,14 +251,43 @@ export function MealAnchorFoodsManager() {
   const getMealLabel = (type: string) => MEAL_TYPES.find((m) => m.value === type)?.label || type;
   const getRoleLabel = (role: string) => ROLE_NAMES.find((r) => r.value === role)?.label || role;
 
-  // Group anchors by meal type only, merging lunch/dinner into single group
+  // Tab configuration for grouping meals
+  const TAB_CONFIG = [
+    { 
+      key: "breakfast", 
+      label: "Café da Manhã", 
+      icon: Coffee,
+      mealTypes: ["breakfast"] 
+    },
+    { 
+      key: "snacks", 
+      label: "Lanches", 
+      icon: Apple,
+      mealTypes: ["morning_snack", "afternoon_snack"] 
+    },
+    { 
+      key: "lunch_dinner", 
+      label: "Almoço + Jantar", 
+      icon: Sun,
+      mealTypes: ["lunch", "dinner"] 
+    },
+    { 
+      key: "supper", 
+      label: "Ceia", 
+      icon: Moon,
+      mealTypes: ["supper"] 
+    },
+  ];
+
+  // Group anchors by tab categories
   const groupedAnchors = anchors?.reduce((acc, anchor) => {
-    // Normalize lunch/dinner to a single key
-    const normalizedMealType = (anchor.meal_type === "lunch" || anchor.meal_type === "dinner") 
-      ? "lunch_dinner" 
-      : anchor.meal_type;
-    const key = normalizedMealType;
+    // Find which tab this meal type belongs to
+    const tab = TAB_CONFIG.find(t => t.mealTypes.includes(anchor.meal_type));
+    if (!tab) return acc;
+    
+    const key = tab.key;
     if (!acc[key]) acc[key] = [];
+    
     // Only add if not already present (avoid duplicates from lunch+dinner pairs)
     const exists = acc[key].some(a => 
       a.role_name === anchor.role_name && a.food_id === anchor.food_id
@@ -267,11 +297,6 @@ export function MealAnchorFoodsManager() {
     }
     return acc;
   }, {} as Record<string, AnchorFood[]>) || {};
-
-  const getMealGroupLabel = (key: string) => {
-    if (key === "lunch_dinner") return "Almoço + Jantar";
-    return getMealLabel(key);
-  };
 
   return (
     <Card>
@@ -395,96 +420,118 @@ export function MealAnchorFoodsManager() {
           <div className="flex items-center justify-center py-8">
             <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
           </div>
-        ) : Object.keys(groupedAnchors).length === 0 ? (
+        ) : !anchors?.length ? (
           <div className="text-center py-8 text-muted-foreground">
             <UtensilsCrossed className="w-12 h-12 mx-auto mb-4 opacity-50" />
             <p>Nenhum alimento-âncora configurado</p>
             <p className="text-sm">Adicione alimentos fixos para cada refeição</p>
           </div>
         ) : (
-          <div className="space-y-6">
-            {Object.entries(groupedAnchors).map(([key, items]) => {
+          <Tabs defaultValue="breakfast" className="w-full">
+            <TabsList className="grid w-full grid-cols-4 mb-4">
+              {TAB_CONFIG.map((tab) => {
+                const Icon = tab.icon;
+                const count = groupedAnchors[tab.key]?.length || 0;
+                return (
+                  <TabsTrigger key={tab.key} value={tab.key} className="flex items-center gap-1.5 text-xs">
+                    <Icon className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">{tab.label}</span>
+                    {count > 0 && (
+                      <Badge variant="secondary" className="h-5 px-1.5 text-xs">
+                        {count}
+                      </Badge>
+                    )}
+                  </TabsTrigger>
+                );
+              })}
+            </TabsList>
+            
+            {TAB_CONFIG.map((tab) => {
+              const items = groupedAnchors[tab.key] || [];
               return (
-                <div key={key} className="space-y-2">
-                  <Badge variant="secondary" className="text-sm">
-                    {getMealGroupLabel(key)}
-                  </Badge>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Alimento</TableHead>
-                        <TableHead>Papel</TableHead>
-                        <TableHead>Qtd</TableHead>
-                        <TableHead>Ativo</TableHead>
-                        <TableHead className="w-[100px]">Ações</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {items
-                        .sort((a, b) => a.sort_order - b.sort_order)
-                        .map((anchor) => (
-                          <TableRow key={anchor.id}>
-                            <TableCell>
-                              <div>
-                                <p className="font-medium">{anchor.food?.name || "—"}</p>
-                                <p className="text-xs text-muted-foreground">{anchor.food?.category}</p>
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <Badge variant="outline">{getRoleLabel(anchor.role_name)}</Badge>
-                            </TableCell>
-                            <TableCell>{anchor.default_quantity_grams}g</TableCell>
-                            <TableCell>
-                              <Switch
-                                checked={anchor.is_active}
-                                onCheckedChange={(checked) =>
-                                  toggleMutation.mutate({ id: anchor.id, is_active: checked })
-                                }
-                              />
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex items-center gap-1">
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => handleEdit(anchor)}
-                                >
-                                  <Edit2 className="w-4 h-4" />
-                                </Button>
-                                <AlertDialog>
-                                  <AlertDialogTrigger asChild>
-                                    <Button variant="ghost" size="icon">
-                                      <Trash2 className="w-4 h-4 text-destructive" />
-                                    </Button>
-                                  </AlertDialogTrigger>
-                                  <AlertDialogContent>
-                                    <AlertDialogHeader>
-                                      <AlertDialogTitle>Remover âncora?</AlertDialogTitle>
-                                      <AlertDialogDescription>
-                                        Este alimento não será mais fixo nesta refeição.
-                                      </AlertDialogDescription>
-                                    </AlertDialogHeader>
-                                    <AlertDialogFooter>
-                                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                      <AlertDialogAction
-                                        onClick={() => deleteMutation.mutate(anchor.id)}
-                                        className="bg-destructive text-destructive-foreground"
-                                      >
-                                        Remover
-                                      </AlertDialogAction>
-                                    </AlertDialogFooter>
-                                  </AlertDialogContent>
-                                </AlertDialog>
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                    </TableBody>
-                  </Table>
-                </div>
+                <TabsContent key={tab.key} value={tab.key}>
+                  {items.length === 0 ? (
+                    <div className="text-center py-6 text-muted-foreground border rounded-lg">
+                      <p className="text-sm">Nenhuma âncora para {tab.label.toLowerCase()}</p>
+                    </div>
+                  ) : (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Alimento</TableHead>
+                          <TableHead>Papel</TableHead>
+                          <TableHead>Qtd</TableHead>
+                          <TableHead>Ativo</TableHead>
+                          <TableHead className="w-[100px]">Ações</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {items
+                          .sort((a, b) => a.sort_order - b.sort_order)
+                          .map((anchor) => (
+                            <TableRow key={anchor.id}>
+                              <TableCell>
+                                <div>
+                                  <p className="font-medium">{anchor.food?.name || "—"}</p>
+                                  <p className="text-xs text-muted-foreground">{anchor.food?.category}</p>
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <Badge variant="outline">{getRoleLabel(anchor.role_name)}</Badge>
+                              </TableCell>
+                              <TableCell>{anchor.default_quantity_grams}g</TableCell>
+                              <TableCell>
+                                <Switch
+                                  checked={anchor.is_active}
+                                  onCheckedChange={(checked) =>
+                                    toggleMutation.mutate({ id: anchor.id, is_active: checked })
+                                  }
+                                />
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex items-center gap-1">
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => handleEdit(anchor)}
+                                  >
+                                    <Edit2 className="w-4 h-4" />
+                                  </Button>
+                                  <AlertDialog>
+                                    <AlertDialogTrigger asChild>
+                                      <Button variant="ghost" size="icon">
+                                        <Trash2 className="w-4 h-4 text-destructive" />
+                                      </Button>
+                                    </AlertDialogTrigger>
+                                    <AlertDialogContent>
+                                      <AlertDialogHeader>
+                                        <AlertDialogTitle>Remover âncora?</AlertDialogTitle>
+                                        <AlertDialogDescription>
+                                          Este alimento não será mais fixo nesta refeição.
+                                        </AlertDialogDescription>
+                                      </AlertDialogHeader>
+                                      <AlertDialogFooter>
+                                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                        <AlertDialogAction
+                                          onClick={() => deleteMutation.mutate(anchor.id)}
+                                          className="bg-destructive text-destructive-foreground"
+                                        >
+                                          Remover
+                                        </AlertDialogAction>
+                                      </AlertDialogFooter>
+                                    </AlertDialogContent>
+                                  </AlertDialog>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                      </TableBody>
+                    </Table>
+                  )}
+                </TabsContent>
               );
             })}
-          </div>
+          </Tabs>
         )}
       </CardContent>
     </Card>
