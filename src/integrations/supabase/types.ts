@@ -322,6 +322,53 @@ export type Database = {
         }
         Relationships: []
       }
+      meal_anchor_foods: {
+        Row: {
+          created_at: string
+          default_quantity_grams: number
+          food_id: string
+          id: string
+          is_active: boolean
+          meal_type: string
+          option_number: number
+          role_name: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          default_quantity_grams?: number
+          food_id: string
+          id?: string
+          is_active?: boolean
+          meal_type: string
+          option_number?: number
+          role_name: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          default_quantity_grams?: number
+          food_id?: string
+          id?: string
+          is_active?: boolean
+          meal_type?: string
+          option_number?: number
+          role_name?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meal_anchor_foods_food_id_fkey"
+            columns: ["food_id"]
+            isOneToOne: false
+            referencedRelation: "foods"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       meal_logs: {
         Row: {
           calories_consumed: number | null

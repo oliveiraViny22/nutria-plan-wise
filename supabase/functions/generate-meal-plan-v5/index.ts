@@ -162,6 +162,56 @@ function applyUnitConversion(
 }
 
 // =====================================================
+// TIPOS PARA ALIMENTOS-ÂNCORA
+// =====================================================
+
+interface AnchorFood {
+  id: string;
+  meal_type: string;
+  option_number: number;
+  food_id: string;
+  role_name: string;
+  default_quantity_grams: number;
+  sort_order: number;
+  food: Food;
+}
+
+// =====================================================
+// CARREGAR ALIMENTOS-ÂNCORA
+// =====================================================
+
+async function loadAnchorFoods(
+  supabase: any
+): Promise<Map<string, AnchorFood[]>> {
+  const { data: anchors, error } = await supabase
+    .from("meal_anchor_foods")
+    .select(`
+      *,
+      food:foods(id, name, calories, protein, carbs, fat, category, processing_level, is_optional, unit_name, unit_weight_grams, unit_increment, unit_enabled)
+    `)
+    .eq("is_active", true)
+    .order("sort_order");
+
+  if (error) {
+    log("Erro ao carregar âncoras", { error: error.message });
+    return new Map();
+  }
+
+  // Agrupar por meal_type + option_number
+  const result = new Map<string, AnchorFood[]>();
+  for (const anchor of anchors || []) {
+    const key = `${anchor.meal_type}-${anchor.option_number}`;
+    if (!result.has(key)) {
+      result.set(key, []);
+    }
+    result.get(key)!.push(anchor);
+  }
+
+  log("Âncoras carregadas", { count: anchors?.length || 0 });
+  return result;
+}
+
+// =====================================================
 // CARREGAR TEMPLATES
 // =====================================================
 
@@ -307,23 +357,44 @@ function calculateApproximateQuantity(role: TemplateRole): number {
 }
 
 // =====================================================
-// MONTAR REFEIÇÃO
+// MONTAR REFEIÇÃO COM ÂNCORAS
 // =====================================================
 
-function buildMeal(
+function buildMealWithAnchors(
   mealType: string,
+  optionNumber: number,
   templateData: { template: MealTemplate; roles: TemplateRole[] },
   eligibleFoods: Food[],
   usedGlobalIds: Set<string>,
-  preferredFoods: string[]
+  preferredFoods: string[],
+  anchors: AnchorFood[]
 ): MealResult {
   const { template, roles } = templateData;
   const foods: FoodSelection[] = [];
   const usedInMeal = new Set<string>();
+  const filledRoles = new Set<string>();
 
-  // Processar papéis obrigatórios primeiro
-  const requiredRoles = roles.filter((r) => r.is_required);
-  const optionalRoles = roles.filter((r) => !r.is_required);
+  // PASSO 1: Aplicar alimentos-âncora primeiro
+  for (const anchor of anchors) {
+    if (!anchor.food) continue;
+
+    const conversion = applyUnitConversion(anchor.food, anchor.default_quantity_grams);
+    foods.push({
+      food: anchor.food,
+      role_name: anchor.role_name,
+      quantity_grams: conversion.calculated_grams,
+      display_quantity: conversion.display_quantity,
+      display_unit: conversion.display_unit,
+    });
+
+    usedInMeal.add(anchor.food.id);
+    filledRoles.add(anchor.role_name);
+    log(`Âncora aplicada`, { mealType, food: anchor.food.name, role: anchor.role_name });
+  }
+
+  // PASSO 2: Processar papéis obrigatórios NÃO preenchidos por âncoras
+  const requiredRoles = roles.filter((r) => r.is_required && !filledRoles.has(r.role_name));
+  const optionalRoles = roles.filter((r) => !r.is_required && !filledRoles.has(r.role_name));
 
   for (const role of requiredRoles) {
     const food = selectFoodForRole(role, eligibleFoods, new Set([...usedGlobalIds, ...usedInMeal]), preferredFoods);
@@ -612,8 +683,11 @@ serve(async (req) => {
 
     log("Configuração", { mealsPerDay, mealTypes });
 
-    // Carregar templates
-    const templates = await loadTemplatesWithRoles(supabase);
+    // Carregar templates e âncoras em paralelo
+    const [templates, anchorFoods] = await Promise.all([
+      loadTemplatesWithRoles(supabase),
+      loadAnchorFoods(supabase),
+    ]);
     log("Templates carregados", { count: templates.size });
 
     // Carregar alimentos
@@ -648,12 +722,24 @@ serve(async (req) => {
         continue;
       }
 
-      const meal = buildMeal(mealType, templateData, eligibleFoods, usedGlobalIds, profile.preferred_foods || []);
+      // Obter âncoras para esta refeição (opção 1)
+      const mealAnchors = anchorFoods.get(`${mealType}-1`) || [];
+
+      const meal = buildMealWithAnchors(
+        mealType,
+        1, // opção 1 usa âncoras
+        templateData,
+        eligibleFoods,
+        usedGlobalIds,
+        profile.preferred_foods || [],
+        mealAnchors
+      );
       meals.push(meal);
 
       log(`Refeição gerada`, {
         type: mealType,
         items: meal.foods.length,
+        anchors: mealAnchors.length,
         cals: meal.totals.calories,
       });
     }

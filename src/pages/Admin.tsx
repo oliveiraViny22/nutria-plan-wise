@@ -60,6 +60,7 @@ import { PendingFoodsReview } from '@/components/PendingFoodsReview';
 import { useRealtimeSettings } from '@/hooks/useRealtimeSettings';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { ObjectiveChangePoliciesManager } from '@/components/admin/ObjectiveChangePoliciesManager';
+import { MealAnchorFoodsManager } from '@/components/admin/MealAnchorFoodsManager';
 
 
 const CHART_COLORS = [
@@ -1318,6 +1319,9 @@ export default function Admin() {
 
               {/* Food Curation Section */}
               <FoodCuration />
+
+              {/* Meal Anchor Foods Section */}
+              <MealAnchorFoodsManager />
 
               {/* Foods Management Table */}
               <Card>
