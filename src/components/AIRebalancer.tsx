@@ -9,7 +9,6 @@ import {
   Loader2,
   ArrowRight,
   AlertTriangle,
-  Brain,
   Lightbulb,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -417,12 +416,12 @@ export function AIRebalancer({
         {loading ? (
           <>
             <Loader2 className="w-4 h-4 animate-spin" />
-            Analisando com IA...
+            Analisando...
           </>
         ) : (
           <>
-            <Brain className="w-4 h-4" />
-            Rebalancear com IA
+            <Sparkles className="w-4 h-4" />
+            Otimizar Plano
           </>
         )}
       </Button>
@@ -431,8 +430,8 @@ export function AIRebalancer({
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Brain className="w-5 h-5 text-primary" />
-              Ajustes Sugeridos pela IA
+              <Sparkles className="w-5 h-5 text-primary" />
+              Proposta de Otimização
             </DialogTitle>
             <DialogDescription>
               Análise inteligente do seu plano com sugestões personalizadas
