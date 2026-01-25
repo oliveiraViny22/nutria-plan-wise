@@ -232,12 +232,6 @@ export default function MealDetail() {
       return;
     }
     
-    console.log('[MealDetail] Opening substitution modal:', {
-      foodName: food.name,
-      foodCategory: food.category,
-      allFoodsCount: allFoods.length,
-    });
-    
     setSelectedMealOptionFood(optionFood);
     setCurrentOptionId(optionId);
     resetSubstitution();

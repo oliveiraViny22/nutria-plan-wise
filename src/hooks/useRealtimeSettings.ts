@@ -42,8 +42,6 @@ export function useRealtimeSettings(options: UseRealtimeSettingsOptions = {}) {
         },
         (payload) => {
           const newSetting = payload.new as SystemSetting;
-          console.log('[Realtime] Setting updated:', newSetting.key);
-          
           onSettingChange?.(newSetting);
           
           if (showNotifications) {
@@ -63,8 +61,6 @@ export function useRealtimeSettings(options: UseRealtimeSettingsOptions = {}) {
         },
         (payload) => {
           const newSetting = payload.new as SystemSetting;
-          console.log('[Realtime] Setting inserted:', newSetting.key);
-          
           onSettingInsert?.(newSetting);
           
           if (showNotifications) {
@@ -84,8 +80,6 @@ export function useRealtimeSettings(options: UseRealtimeSettingsOptions = {}) {
         },
         (payload) => {
           const oldSetting = payload.old as SystemSetting;
-          console.log('[Realtime] Setting deleted:', oldSetting.key);
-          
           onSettingDelete?.(oldSetting);
           
           if (showNotifications) {
@@ -97,12 +91,9 @@ export function useRealtimeSettings(options: UseRealtimeSettingsOptions = {}) {
           }
         }
       )
-      .subscribe((status) => {
-        console.log('[Realtime] Settings subscription status:', status);
-      });
+      .subscribe();
 
     return () => {
-      console.log('[Realtime] Unsubscribing from settings channel');
       supabase.removeChannel(channel);
     };
   }, [onSettingChange, onSettingInsert, onSettingDelete, showNotifications, toast]);

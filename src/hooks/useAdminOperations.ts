@@ -183,7 +183,6 @@ export function useAdminOperations() {
         throw new Error(error.message || 'Erro ao carregar configurações');
       }
       
-      console.log('[Admin] fetchSettings response:', data);
       setSettings(data?.settings || []);
       return data?.settings || [];
     } catch (error) {

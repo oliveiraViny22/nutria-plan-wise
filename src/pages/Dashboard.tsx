@@ -193,15 +193,6 @@ export default function Dashboard() {
   const currentCarbs = currentDietPlan?.total_carbs || 0;
   const currentFat = currentDietPlan?.total_fat || 0;
 
-  // Debug: log values to verify they're correct
-  console.log('[Dashboard] Diet Plan totals:', {
-    calories: currentCalories,
-    protein: currentProtein,
-    carbs: currentCarbs,
-    fat: currentFat,
-    planId: currentDietPlan?.id,
-  });
-
   return (
     <>
       {/* Tutorial Modal */}
