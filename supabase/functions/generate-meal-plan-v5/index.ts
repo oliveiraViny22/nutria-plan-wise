@@ -269,6 +269,32 @@ async function loadTemplatesWithRoles(
 // FILTRAR ALIMENTOS ELEGÍVEIS
 // =====================================================
 
+// =====================================================
+// LIMITES DE QUANTIDADE POR CATEGORIA
+// =====================================================
+
+const CATEGORY_QUANTITY_LIMITS: Record<string, { min: number; max: number }> = {
+  proteinas: { min: 50, max: 200 },
+  carboidratos: { min: 80, max: 250 },
+  leguminosas: { min: 60, max: 150 },
+  vegetais: { min: 50, max: 200 },
+  frutas: { min: 80, max: 200 },
+  laticinios: { min: 50, max: 200 },
+  gorduras: { min: 10, max: 30 }, // Gorduras são complementos, não itens principais
+};
+
+// Gorduras puras que NÃO devem entrar automaticamente em planos
+// (são temperos/complementos, não itens principais)
+const EXCLUDED_PURE_FATS = [
+  "óleo", "azeite", "manteiga", "creme de leite", "tahine",
+  "banha", "margarina", "gordura"
+];
+
+function isPureFat(foodName: string): boolean {
+  const nameLower = foodName.toLowerCase();
+  return EXCLUDED_PURE_FATS.some(term => nameLower.includes(term));
+}
+
 function filterEligibleFoods(
   allFoods: Food[],
   avoidedFoods: string[],
@@ -284,8 +310,15 @@ function filterEligibleFoods(
     // Excluir alimentos marcados como opcionais (uncommon)
     if (f.is_optional) return false;
 
-    // Excluir alimentos rejeitados explicitamente
     const nameLower = f.name.toLowerCase();
+
+    // Excluir gorduras puras (óleos, manteigas) - são temperos
+    if (category === "gorduras" && isPureFat(f.name)) {
+      log("Excluindo gordura pura", { name: f.name });
+      return false;
+    }
+
+    // Excluir alimentos rejeitados explicitamente
     if (avoidedSet.has(nameLower)) return false;
     for (const avoided of avoidedSet) {
       if (nameLower.includes(avoided)) return false;
@@ -343,17 +376,35 @@ function selectFoodForRole(
 }
 
 // =====================================================
-// CALCULAR QUANTIDADE APROXIMADA
+// CALCULAR QUANTIDADE APROXIMADA COM LIMITES POR CATEGORIA
 // =====================================================
 
-function calculateApproximateQuantity(role: TemplateRole): number {
-  // Usar média entre min e max, com leve randomização
-  const mid = (role.min_quantity_grams + role.max_quantity_grams) / 2;
-  const variance = (role.max_quantity_grams - role.min_quantity_grams) * 0.2;
+function calculateApproximateQuantity(role: TemplateRole, food?: Food): number {
+  // Usar média entre min e max do papel, com leve randomização
+  let mid = (role.min_quantity_grams + role.max_quantity_grams) / 2;
+  let min = role.min_quantity_grams;
+  let max = role.max_quantity_grams;
+
+  // Aplicar limites específicos da categoria do alimento
+  if (food) {
+    const category = (food.category || "").toLowerCase();
+    const catLimits = CATEGORY_QUANTITY_LIMITS[category];
+    if (catLimits) {
+      min = Math.max(min, catLimits.min);
+      max = Math.min(max, catLimits.max);
+      // Recalcular média com limites ajustados
+      mid = (min + max) / 2;
+    }
+  }
+
+  const variance = (max - min) * 0.2;
   const quantity = mid + (Math.random() - 0.5) * variance;
 
+  // Garantir que está dentro dos limites
+  const clamped = Math.max(min, Math.min(max, quantity));
+
   // Arredondar para 5g
-  return Math.round(quantity / 5) * 5;
+  return Math.round(clamped / 5) * 5;
 }
 
 // =====================================================
@@ -400,7 +451,7 @@ function buildMealWithAnchors(
     const food = selectFoodForRole(role, eligibleFoods, new Set([...usedGlobalIds, ...usedInMeal]), preferredFoods);
 
     if (food) {
-      const quantity = calculateApproximateQuantity(role);
+      const quantity = calculateApproximateQuantity(role, food);
       const conversion = applyUnitConversion(food, quantity);
 
       foods.push({
@@ -426,7 +477,7 @@ function buildMealWithAnchors(
     const food = selectFoodForRole(role, eligibleFoods, new Set([...usedGlobalIds, ...usedInMeal]), preferredFoods);
 
     if (food) {
-      const quantity = calculateApproximateQuantity(role);
+      const quantity = calculateApproximateQuantity(role, food);
       const conversion = applyUnitConversion(food, quantity);
 
       foods.push({

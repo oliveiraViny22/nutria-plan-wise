@@ -468,7 +468,7 @@ Para ajustar automaticamente seu plano e atingir suas metas, faça upgrade para 
   const prompt = buildRebalancePrompt(profile, meals, currentMacros, targetMacros, adherence, permissions, profileType);
   
   try {
-    const response = await fetch('https://api.lovable.dev/v1/chat/completions', {
+    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${apiKey}`,
