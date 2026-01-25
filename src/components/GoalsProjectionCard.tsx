@@ -254,7 +254,9 @@ export function GoalsProjectionCard() {
                     </p>
                     {profile.goal === 'gain_muscle' && proj.fatGain !== undefined && proj.fatGain > 0 && (
                       <p className="text-[8px] text-muted-foreground">
-                        {Math.round(proj.fatGain)}% gordura
+                        <span className="text-green-600">{Math.round(100 - proj.fatGain)}% músculo</span>
+                        {' · '}
+                        <span className="text-amber-600">{Math.round(proj.fatGain)}% gordura</span>
                       </p>
                     )}
                   </div>
