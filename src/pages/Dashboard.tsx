@@ -45,12 +45,14 @@ import { GoalsProjectionCard } from '@/components/GoalsProjectionCard';
 import { HydrationTipCard } from '@/components/HydrationTipCard';
 import { OnboardingTutorial } from '@/components/OnboardingTutorial';
 import { DashboardSkeleton } from '@/components/DashboardSkeleton';
+import { LimitReachedAlert } from '@/components/LimitReachedAlert';
 import { useTutorial } from '@/hooks/useTutorial';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useSubscription } from '@/hooks/useSubscription';
 import { useLinkedStudent } from '@/hooks/useLinkedStudent';
 import { useAccountPermissions } from '@/hooks/useAccountPermissions';
+import { useUsageLimits } from '@/hooks/useUsageLimits';
 import { supabase } from '@/integrations/supabase/client';
 import { DietPlan, Meal, GOALS, MEAL_NAMES, MealType } from '@/lib/types';
 import { toast } from 'sonner';
@@ -67,6 +69,7 @@ export default function Dashboard() {
     accountType,
     isSubscribed,
   } = useSubscription();
+  const { usage, isLimitReached, refresh: refreshUsage } = useUsageLimits();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [currentDietPlan, setCurrentDietPlan] = useState<DietPlan | null>(null);
@@ -77,6 +80,7 @@ export default function Dashboard() {
   const [upgradeFeature, setUpgradeFeature] = useState<string>('diet');
   const [upgradeLimit, setUpgradeLimit] = useState<number>(0);
   const [planReleased, setPlanReleased] = useState(false);
+  const [dismissedAlerts, setDismissedAlerts] = useState<Set<string>>(new Set());
 
   // Handle checkout success
   useEffect(() => {
@@ -129,9 +133,11 @@ export default function Dashboard() {
 
   const generateMealPlan = async () => {
     // Verificar permissões antes de gerar
-    if (!permissions.can_create_plan) {
+    if (!permissions.can_create_plan || isLimitReached('diet')) {
       setShowUpgradeDialog(true);
       setUpgradeFeature('diet');
+      setUpgradeLimit(usage?.diets.limit || 0);
+      toast.error(`Limite de dietas atingido (${usage?.diets.used}/${usage?.diets.limit})`);
       return;
     }
 
@@ -158,12 +164,24 @@ export default function Dashboard() {
 
       toast.success('Plano alimentar gerado com sucesso!');
       await fetchCurrentPlan();
+      await refreshUsage();
     } catch (error: any) {
       console.error('Error generating plan:', error);
-      toast.error('Erro ao gerar plano alimentar');
+      // Check for limit error from backend
+      if (error?.context?.status === 403) {
+        toast.error('Limite de dietas atingido. Faça upgrade para continuar.');
+        setShowUpgradeDialog(true);
+        setUpgradeFeature('diet');
+      } else {
+        toast.error('Erro ao gerar plano alimentar');
+      }
     } finally {
       setGenerating(false);
     }
+  };
+
+  const handleDismissAlert = (feature: string) => {
+    setDismissedAlerts(prev => new Set([...prev, feature]));
   };
 
   const handleSignOut = async () => {
@@ -320,6 +338,48 @@ export default function Dashboard() {
               </p>
             </div>
           </motion.div>
+        )}
+
+        {/* Limit Reached Alerts - Show when any limit is hit */}
+        {usage && !isLinkedStudent && (
+          <div className="space-y-3">
+            {isLimitReached('diet') && !dismissedAlerts.has('diet') && (
+              <LimitReachedAlert
+                feature="diet"
+                current={usage.diets.used}
+                limit={usage.diets.limit}
+                planName={subscriptionPlan?.name}
+                onDismiss={() => handleDismissAlert('diet')}
+              />
+            )}
+            {isLimitReached('substitution') && !dismissedAlerts.has('substitution') && (
+              <LimitReachedAlert
+                feature="substitution"
+                current={usage.substitutions.used}
+                limit={usage.substitutions.limit}
+                planName={subscriptionPlan?.name}
+                onDismiss={() => handleDismissAlert('substitution')}
+              />
+            )}
+            {isLimitReached('adjustment') && !dismissedAlerts.has('adjustment') && (
+              <LimitReachedAlert
+                feature="adjustment"
+                current={usage.adjustments.used}
+                limit={usage.adjustments.limit}
+                planName={subscriptionPlan?.name}
+                onDismiss={() => handleDismissAlert('adjustment')}
+              />
+            )}
+            {isLimitReached('chat') && !dismissedAlerts.has('chat') && (
+              <LimitReachedAlert
+                feature="chat"
+                current={usage.chat.used}
+                limit={usage.chat.limit}
+                planName={subscriptionPlan?.name}
+                onDismiss={() => handleDismissAlert('chat')}
+              />
+            )}
+          </div>
         )}
 
         {/* Welcome Section */}
