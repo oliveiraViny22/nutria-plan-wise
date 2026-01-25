@@ -43,21 +43,27 @@ export function DashboardSkeleton() {
           </div>
         </div>
 
-        {/* Goals Projection + Hydration Tip Skeleton */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="card-elevated rounded-xl p-4">
+        {/* Goals Projection + Hydration Tip Skeleton - Compact Row */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="sm:col-span-2 card-elevated rounded-xl p-4">
             <Skeleton className="h-5 w-32 mb-3" />
             <Skeleton className="h-20 w-full" />
           </div>
-          <div className="card-elevated rounded-xl p-4">
-            <Skeleton className="h-5 w-28 mb-3" />
-            <Skeleton className="h-20 w-full" />
+          <div className="card-elevated rounded-xl p-3 flex items-center gap-3">
+            <Skeleton className="h-10 w-10 rounded-lg flex-shrink-0" />
+            <div className="flex-1">
+              <Skeleton className="h-4 w-16 mb-1" />
+              <Skeleton className="h-4 w-24" />
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Generate Button Skeleton */}
-      <Skeleton className="h-12 w-full rounded-lg" />
+      {/* Action Buttons Skeleton - Compact */}
+      <div className="flex gap-2">
+        <Skeleton className="h-10 flex-1 rounded-lg" />
+        <Skeleton className="h-10 w-28 rounded-lg" />
+      </div>
 
       {/* Meals Section Skeleton */}
       <div className="space-y-4">
@@ -76,19 +82,6 @@ export function DashboardSkeleton() {
                 <Skeleton className="h-4 w-48" />
               </div>
               <Skeleton className="h-5 w-5 rounded" />
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Usage Limits Skeleton */}
-      <div className="card-elevated rounded-xl p-4 space-y-3">
-        <Skeleton className="h-5 w-28" />
-        <div className="grid grid-cols-2 gap-3">
-          {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="space-y-1.5">
-              <Skeleton className="h-4 w-20" />
-              <Skeleton className="h-2 w-full rounded-full" />
             </div>
           ))}
         </div>

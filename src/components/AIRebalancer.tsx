@@ -59,6 +59,7 @@ interface AIRebalancerProps {
   targets: MacroTargets;
   currentMacros: MacroTargets;
   onComplete: () => void;
+  compact?: boolean;
 }
 
 function MacroComparisonCard({
@@ -211,6 +212,7 @@ export function AIRebalancer({
   targets,
   currentMacros,
   onComplete,
+  compact = false,
 }: AIRebalancerProps) {
   const { user } = useAuth();
   const [showDialog, setShowDialog] = useState(false);
@@ -409,19 +411,20 @@ export function AIRebalancer({
     <>
       <Button
         variant="default"
-        className="w-full gap-2 bg-gradient-to-r from-primary to-primary/80"
+        size={compact ? "default" : "default"}
+        className={compact ? "gap-2 bg-gradient-to-r from-primary to-primary/80" : "w-full gap-2 bg-gradient-to-r from-primary to-primary/80"}
         onClick={handleOptimize}
         disabled={loading}
       >
         {loading ? (
           <>
             <Loader2 className="w-4 h-4 animate-spin" />
-            Analisando...
+            {!compact && <span>Analisando...</span>}
           </>
         ) : (
           <>
             <Sparkles className="w-4 h-4" />
-            Otimizar Plano
+            {compact ? <span className="hidden sm:inline">Otimizar</span> : 'Otimizar Plano'}
           </>
         )}
       </Button>
