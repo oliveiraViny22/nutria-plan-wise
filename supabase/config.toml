@@ -41,3 +41,6 @@ verify_jwt = false
 
 [functions.ai-rebalance]
 verify_jwt = false
+
+[functions.generate-meal-plan-v4-experimental]
+verify_jwt = false

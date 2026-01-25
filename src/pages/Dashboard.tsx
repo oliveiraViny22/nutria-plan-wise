@@ -37,6 +37,7 @@ import {
 import { CalorieRing } from '@/components/CalorieRing';
 import { MacroChart } from '@/components/MacroChart';
 import { AIRebalancer } from '@/components/AIRebalancer';
+import { AIGeneratePlanButton } from '@/components/AIGeneratePlanButton';
 
 import { UpgradeDialog } from '@/components/UpgradeDialog';
 import { AdherenceWidget } from '@/components/AdherenceWidget';
@@ -461,11 +462,11 @@ export default function Dashboard() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
           >
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <Button
                 variant={currentDietPlan ? "outline" : "hero"}
                 size="default"
-                className="flex-1"
+                className="flex-1 min-w-[120px]"
                 onClick={generateMealPlan}
                 disabled={generating}
               >
@@ -487,6 +488,9 @@ export default function Dashboard() {
                   </>
                 )}
               </Button>
+
+              {/* Botão experimental de teste com IA */}
+              <AIGeneratePlanButton onSuccess={fetchCurrentPlan} />
 
               {/* Otimizar Plano - apenas se pode editar */}
               {currentDietPlan && permissions.can_adjust && (
