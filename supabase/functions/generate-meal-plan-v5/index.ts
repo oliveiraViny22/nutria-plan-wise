@@ -176,13 +176,19 @@ interface AnchorFood {
   food: Food;
 }
 
+// Estrutura para armazenar âncoras agrupadas por papel
+interface AnchorsByRole {
+  role_name: string;
+  anchors: AnchorFood[];
+}
+
 // =====================================================
 // CARREGAR ALIMENTOS-ÂNCORA
 // =====================================================
 
 async function loadAnchorFoods(
   supabase: any
-): Promise<Map<string, AnchorFood[]>> {
+): Promise<Map<string, AnchorsByRole[]>> {
   const { data: anchors, error } = await supabase
     .from("meal_anchor_foods")
     .select(`
@@ -197,17 +203,39 @@ async function loadAnchorFoods(
     return new Map();
   }
 
-  // Agrupar por meal_type + option_number
-  const result = new Map<string, AnchorFood[]>();
+  // Agrupar por meal_type, depois por role_name
+  // Isso permite distribuir âncoras do mesmo papel entre opções diferentes
+  const byMealType = new Map<string, Map<string, AnchorFood[]>>();
+  
   for (const anchor of anchors || []) {
-    const key = `${anchor.meal_type}-${anchor.option_number}`;
-    if (!result.has(key)) {
-      result.set(key, []);
+    if (!anchor.food) continue;
+    
+    if (!byMealType.has(anchor.meal_type)) {
+      byMealType.set(anchor.meal_type, new Map());
     }
-    result.get(key)!.push(anchor);
+    
+    const roleMap = byMealType.get(anchor.meal_type)!;
+    if (!roleMap.has(anchor.role_name)) {
+      roleMap.set(anchor.role_name, []);
+    }
+    roleMap.get(anchor.role_name)!.push(anchor);
   }
 
-  log("Âncoras carregadas", { count: anchors?.length || 0 });
+  // Converter para estrutura final: Map<meal_type, AnchorsByRole[]>
+  const result = new Map<string, AnchorsByRole[]>();
+  
+  for (const [mealType, roleMap] of byMealType.entries()) {
+    const rolesList: AnchorsByRole[] = [];
+    for (const [roleName, anchorList] of roleMap.entries()) {
+      rolesList.push({ role_name: roleName, anchors: anchorList });
+    }
+    result.set(mealType, rolesList);
+  }
+
+  log("Âncoras carregadas", { 
+    count: anchors?.length || 0,
+    meals: Array.from(result.keys()),
+  });
   return result;
 }
 
@@ -408,7 +436,25 @@ function calculateApproximateQuantity(role: TemplateRole, food?: Food): number {
 }
 
 // =====================================================
-// MONTAR REFEIÇÃO COM ÂNCORAS
+// SELECIONAR ÂNCORA PARA UMA OPÇÃO ESPECÍFICA
+// =====================================================
+
+function selectAnchorForOption(
+  anchors: AnchorFood[],
+  optionNumber: number,
+  usedIds: Set<string>
+): AnchorFood | null {
+  // Filtrar âncoras não usadas
+  const available = anchors.filter(a => !usedIds.has(a.food.id));
+  if (available.length === 0) return null;
+  
+  // Para opção 1, pegar o primeiro; para outras opções, distribuir ciclicamente
+  const index = (optionNumber - 1) % available.length;
+  return available[index];
+}
+
+// =====================================================
+// MONTAR REFEIÇÃO COM ÂNCORAS DISTRIBUÍDAS
 // =====================================================
 
 function buildMealWithAnchors(
@@ -418,29 +464,40 @@ function buildMealWithAnchors(
   eligibleFoods: Food[],
   usedGlobalIds: Set<string>,
   preferredFoods: string[],
-  anchors: AnchorFood[]
+  anchorsByRole: AnchorsByRole[],
+  previousOptionsUsedIds: Set<string>
 ): MealResult {
   const { template, roles } = templateData;
   const foods: FoodSelection[] = [];
   const usedInMeal = new Set<string>();
   const filledRoles = new Set<string>();
 
-  // PASSO 1: Aplicar alimentos-âncora primeiro
-  for (const anchor of anchors) {
-    if (!anchor.food) continue;
+  // Criar set combinado de IDs usados (global + opções anteriores desta refeição)
+  const combinedUsedIds = new Set([...usedGlobalIds, ...previousOptionsUsedIds]);
 
-    const conversion = applyUnitConversion(anchor.food, anchor.default_quantity_grams);
-    foods.push({
-      food: anchor.food,
-      role_name: anchor.role_name,
-      quantity_grams: conversion.calculated_grams,
-      display_quantity: conversion.display_quantity,
-      display_unit: conversion.display_unit,
-    });
+  // PASSO 1: Tentar usar âncoras para preencher papéis
+  // Cada opção pega uma âncora diferente do mesmo papel
+  for (const { role_name, anchors } of anchorsByRole) {
+    const anchor = selectAnchorForOption(anchors, optionNumber, combinedUsedIds);
+    
+    if (anchor && anchor.food) {
+      const conversion = applyUnitConversion(anchor.food, anchor.default_quantity_grams);
+      foods.push({
+        food: anchor.food,
+        role_name: role_name,
+        quantity_grams: conversion.calculated_grams,
+        display_quantity: conversion.display_quantity,
+        display_unit: conversion.display_unit,
+      });
 
-    usedInMeal.add(anchor.food.id);
-    filledRoles.add(anchor.role_name);
-    log(`Âncora aplicada`, { mealType, food: anchor.food.name, role: anchor.role_name });
+      usedInMeal.add(anchor.food.id);
+      filledRoles.add(role_name);
+      log(`Âncora aplicada (opção ${optionNumber})`, { 
+        mealType, 
+        food: anchor.food.name, 
+        role: role_name 
+      });
+    }
   }
 
   // PASSO 2: Processar papéis obrigatórios NÃO preenchidos por âncoras
@@ -448,7 +505,12 @@ function buildMealWithAnchors(
   const optionalRoles = roles.filter((r) => !r.is_required && !filledRoles.has(r.role_name));
 
   for (const role of requiredRoles) {
-    const food = selectFoodForRole(role, eligibleFoods, new Set([...usedGlobalIds, ...usedInMeal]), preferredFoods);
+    const food = selectFoodForRole(
+      role, 
+      eligibleFoods, 
+      new Set([...combinedUsedIds, ...usedInMeal]), 
+      preferredFoods
+    );
 
     if (food) {
       const quantity = calculateApproximateQuantity(role, food);
@@ -468,13 +530,18 @@ function buildMealWithAnchors(
     }
   }
 
-  // Processar papéis opcionais se houver espaço
+  // PASSO 3: Processar papéis opcionais se houver espaço
   const itemLimits = ITEM_COUNTS[mealType] || { min: 2, max: 4 };
   const remainingSlots = itemLimits.max - foods.length;
 
   for (let i = 0; i < Math.min(optionalRoles.length, remainingSlots); i++) {
     const role = optionalRoles[i];
-    const food = selectFoodForRole(role, eligibleFoods, new Set([...usedGlobalIds, ...usedInMeal]), preferredFoods);
+    const food = selectFoodForRole(
+      role, 
+      eligibleFoods, 
+      new Set([...combinedUsedIds, ...usedInMeal]), 
+      preferredFoods
+    );
 
     if (food) {
       const quantity = calculateApproximateQuantity(role, food);
@@ -490,11 +557,6 @@ function buildMealWithAnchors(
 
       usedInMeal.add(food.id);
     }
-  }
-
-  // Adicionar alimentos usados ao conjunto global
-  for (const id of usedInMeal) {
-    usedGlobalIds.add(id);
   }
 
   // Calcular totais
@@ -828,31 +890,44 @@ serve(async (req) => {
         continue;
       }
 
+      // Buscar âncoras para este tipo de refeição (agrupadas por role)
+      const mealAnchorsByRole = anchorFoods.get(mealType) || [];
+      
+      log(`Âncoras para ${mealType}`, { 
+        roles: mealAnchorsByRole.map(r => ({ 
+          role: r.role_name, 
+          count: r.anchors.length 
+        })) 
+      });
+
       const mealOptions: MealResult[] = [];
+      
+      // Set para rastrear alimentos usados nas opções anteriores desta refeição
+      const previousOptionsUsedIds = new Set<string>();
 
       // Gerar N opções para esta refeição
       for (let optNum = 1; optNum <= mealOptionsLimit; optNum++) {
-        // Opção 1 usa âncoras, demais variam os alimentos
-        const mealAnchors = optNum === 1 ? (anchorFoods.get(`${mealType}-1`) || []) : [];
-        
-        // Para opções 2+, usar set separado para variar alimentos
-        const optionUsedIds = optNum === 1 
-          ? new Set(usedGlobalIds) 
-          : new Set([...usedGlobalIds, ...mealOptions.flatMap(m => m.foods.map(f => f.food.id))]);
-
         const meal = buildMealWithAnchors(
           mealType,
           optNum,
           templateData,
           eligibleFoods,
-          optionUsedIds,
+          usedGlobalIds,
           profile.preferred_foods || [],
-          mealAnchors
+          mealAnchorsByRole,
+          previousOptionsUsedIds
         );
+        
+        // Adicionar alimentos desta opção ao set de opções anteriores
+        for (const foodSel of meal.foods) {
+          previousOptionsUsedIds.add(foodSel.food.id);
+        }
+        
         mealOptions.push(meal);
 
         log(`Opção ${optNum} gerada para ${mealType}`, {
           items: meal.foods.length,
+          foods: meal.foods.map(f => f.food.name),
           cals: meal.totals.calories,
         });
       }
