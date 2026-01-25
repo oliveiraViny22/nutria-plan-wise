@@ -200,6 +200,34 @@ export const VALIDATION_TOLERANCES = {
 // =====================================================
 
 /**
+ * Filtra apenas a primeira opção de cada refeição.
+ * IMPORTANTE: As opções são alternativas (o usuário escolhe uma),
+ * não devem ser somadas todas juntas.
+ */
+export function getFirstOptionItems(items: PlanItem[]): PlanItem[] {
+  // Agrupar por refeição
+  const itemsByMeal = new Map<string, PlanItem[]>();
+  
+  for (const item of items) {
+    if (!item.isActive) continue;
+    const existing = itemsByMeal.get(item.mealId) || [];
+    existing.push(item);
+    itemsByMeal.set(item.mealId, existing);
+  }
+  
+  const result: PlanItem[] = [];
+  
+  // Para cada refeição, pegar apenas os itens da primeira opção
+  for (const mealItems of itemsByMeal.values()) {
+    const minOption = Math.min(...mealItems.map(i => i.optionNumber));
+    const firstOptionItems = mealItems.filter(i => i.optionNumber === minOption);
+    result.push(...firstOptionItems);
+  }
+  
+  return result;
+}
+
+/**
  * Calcula nutrientes para uma quantidade em gramas.
  */
 export function calculateNutrients(food: FoodItem, grams: number): MacroTargets {
@@ -214,6 +242,8 @@ export function calculateNutrients(food: FoodItem, grams: number): MacroTargets 
 
 /**
  * Soma macros de todos os itens ativos.
+ * IMPORTANTE: Considera apenas a primeira opção de cada refeição para evitar
+ * somar múltiplas opções (que são alternativas, não adições).
  */
 export function sumMacros(items: PlanItem[]): MacroTargets {
   let protein = 0;
@@ -221,13 +251,29 @@ export function sumMacros(items: PlanItem[]): MacroTargets {
   let fat = 0;
   let calories = 0;
   
+  // Agrupar por refeição e pegar apenas a primeira opção de cada
+  const itemsByMeal = new Map<string, PlanItem[]>();
+  
   for (const item of items) {
     if (!item.isActive) continue;
-    const nutrients = calculateNutrients(item.food, item.quantityGrams);
-    protein += nutrients.protein;
-    carbs += nutrients.carbs;
-    fat += nutrients.fat;
-    calories += nutrients.calories;
+    const existing = itemsByMeal.get(item.mealId) || [];
+    existing.push(item);
+    itemsByMeal.set(item.mealId, existing);
+  }
+  
+  // Para cada refeição, somar apenas os itens da primeira opção
+  for (const mealItems of itemsByMeal.values()) {
+    // Encontrar a menor option number (primeira opção)
+    const minOption = Math.min(...mealItems.map(i => i.optionNumber));
+    const firstOptionItems = mealItems.filter(i => i.optionNumber === minOption);
+    
+    for (const item of firstOptionItems) {
+      const nutrients = calculateNutrients(item.food, item.quantityGrams);
+      protein += nutrients.protein;
+      carbs += nutrients.carbs;
+      fat += nutrients.fat;
+      calories += nutrients.calories;
+    }
   }
   
   return { protein, carbs, fat, calories };

@@ -19,6 +19,7 @@ import {
   RebalanceStatus,
   sumMacros,
   roundMacros,
+  getFirstOptionItems,
 } from './types';
 
 import { preValidateStructure } from './pre-validation';
@@ -54,14 +55,20 @@ export function rebalancePlanV5(
   targetMacros: MacroTargets
 ): RebalanceResult {
   const activeItems = plan.items.filter(item => item.isActive);
-  const currentMacros = sumMacros(activeItems);
+  
+  // ========================================
+  // IMPORTANTE: Filtrar apenas primeira opção de cada refeição
+  // As opções são alternativas, não somamos todas juntas!
+  // ========================================
+  const firstOptionItems = getFirstOptionItems(activeItems);
+  const currentMacros = sumMacros(firstOptionItems);
   
   // ========================================
   // ETAPA 1: PRÉ-VALIDAÇÃO ESTRUTURAL
   // Se falhar aqui → não tenta ajustar depois
   // ========================================
   
-  const structuralValidation = preValidateStructure(activeItems, targetMacros);
+  const structuralValidation = preValidateStructure(firstOptionItems, targetMacros);
   
   if (!structuralValidation.isValid) {
     return {
@@ -129,13 +136,14 @@ export function rebalancePlanV5(
   // ========================================
   // ETAPA 5: EXECUTAR AJUSTES
   // Uma única passada, sem recalcular estratégia
+  // IMPORTANTE: Ajusta apenas a primeira opção de cada refeição
   // ========================================
   
-  const adjustments = executeAdjustments(activeItems, plannedDeltas, strategyContext);
+  const adjustments = executeAdjustments(firstOptionItems, plannedDeltas, strategyContext);
   
-  // Aplicar ajustes aos itens
-  const adjustedItems = applyAdjustmentsToItems(activeItems, adjustments);
-  const proposedMacros = sumMacros(adjustedItems);
+  // Aplicar ajustes aos itens da primeira opção
+  const adjustedFirstOptionItems = applyAdjustmentsToItems(firstOptionItems, adjustments);
+  const proposedMacros = sumMacros(adjustedFirstOptionItems);
   
   // ========================================
   // ETAPA 6: VALIDAÇÃO FINAL
@@ -162,10 +170,14 @@ export function rebalancePlanV5(
     reason = `Não foi possível ajustar as quantidades: ${finalValidation.errors.join('; ')}`;
   }
   
-  // Construir resultado final
+  // Construir resultado final - mesclar itens ajustados da primeira opção
+  // com os demais itens não afetados
+  const adjustedItemIds = new Set(adjustedFirstOptionItems.map(i => i.id));
+  const unchangedItems = activeItems.filter(i => !adjustedItemIds.has(i.id));
+  
   const newPlan: DietPlan = {
     ...plan,
-    items: adjustedItems,
+    items: [...adjustedFirstOptionItems, ...unchangedItems],
     version: plan.version + 1,
   };
   
@@ -203,7 +215,7 @@ export type {
   PlannedDeltas,
 } from './types';
 
-export { sumMacros, roundMacros } from './types';
+export { sumMacros, roundMacros, getFirstOptionItems } from './types';
 
 export { preValidateStructure } from './pre-validation';
 export { selectStrategy, isAlreadyBalanced } from './strategy-selector';
