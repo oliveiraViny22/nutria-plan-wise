@@ -136,10 +136,12 @@ export const PROCESSING_LABELS: Record<ProcessingLevel, string> = {
 
 /**
  * Níveis de processamento permitidos para substituições automáticas
+ * Incluímos 'processado' pois alimentos como macarrão/pão são válidos para troca
  */
 export const SUBSTITUTABLE_PROCESSING_LEVELS: ProcessingLevel[] = [
   'in_natura',
   'minimamente_processado',
+  'processado',
 ];
 
 export function isSubstitutableProcessingLevel(level: string | null | undefined): boolean {

@@ -171,28 +171,61 @@ function CandidateItem({
 }) {
   const similarity = getSimilarityLabel(candidate.score);
   const percentage = Math.round(candidate.score * 100);
+  const food = candidate.food;
+  
+  // Calcular macros para a porção sugerida
+  const baseGrams = parseFloat(food.serving_size?.match(/(\d+)/)?.[1] || '100');
+  const multiplier = candidate.newPortionGrams / baseGrams;
+  const portionProtein = Math.round(food.protein * multiplier * 10) / 10;
+  const portionCarbs = Math.round(food.carbs * multiplier * 10) / 10;
+  const portionFat = Math.round(food.fat * multiplier * 10) / 10;
+  const portionCals = Math.round(food.calories * multiplier);
   
   return (
     <motion.button
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      className="w-full text-left p-3 rounded-lg border border-border hover:border-primary/50 hover:bg-muted/50 transition-all duration-200 flex items-center justify-between gap-3"
+      className="w-full text-left p-3 rounded-lg border border-border hover:border-primary/50 hover:bg-muted/50 transition-all duration-200"
       onClick={onSelect}
     >
-      <div className="min-w-0 flex-1">
-        <p className="font-medium text-sm truncate">{candidate.food.name}</p>
-        <p className="text-xs text-muted-foreground">{candidate.newPortionGrams}g</p>
-        <div className="flex items-center gap-2 mt-1">
-          <span className="text-xs text-muted-foreground">
-            {formatDelta(candidate.deltaMacros.calories, ' kcal')}
-          </span>
+      <div className="flex items-start justify-between gap-2 mb-2">
+        <div className="min-w-0 flex-1">
+          <p className="font-medium text-sm truncate">{food.name}</p>
+          <p className="text-xs text-muted-foreground">{candidate.newPortionGrams}g</p>
+        </div>
+        <div className="flex flex-col items-end gap-1 flex-shrink-0">
+          <Badge variant={similarity.variant} className="text-xs">
+            {percentage}%
+          </Badge>
+          <span className="text-[10px] text-muted-foreground">{similarity.label}</span>
         </div>
       </div>
-      <div className="flex flex-col items-end gap-1">
-        <Badge variant={similarity.variant} className="text-xs">
-          {percentage}% similar
+      
+      {/* Tags de macros da porção sugerida */}
+      <div className="flex flex-wrap gap-1">
+        <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+          {portionCals} kcal
         </Badge>
-        <span className="text-[10px] text-muted-foreground">{similarity.label}</span>
+        <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-blue-600 border-blue-200">
+          P: {portionProtein}g
+        </Badge>
+        <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-amber-600 border-amber-200">
+          C: {portionCarbs}g
+        </Badge>
+        <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-rose-600 border-rose-200">
+          G: {portionFat}g
+        </Badge>
+        {/* Delta de calorias */}
+        <Badge 
+          variant="outline" 
+          className={`text-[10px] px-1.5 py-0 ${
+            candidate.deltaMacros.calories === 0 ? 'text-muted-foreground' :
+            candidate.deltaMacros.calories > 0 ? 'text-amber-600 border-amber-200' : 
+            'text-green-600 border-green-200'
+          }`}
+        >
+          {formatDelta(candidate.deltaMacros.calories, ' kcal')}
+        </Badge>
       </div>
     </motion.button>
   );

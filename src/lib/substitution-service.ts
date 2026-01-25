@@ -169,9 +169,12 @@ export function getSubstitutionBlockReason(food: Food): SubstituteError | null {
   const normalizedLevel = processingLevel.toLowerCase().replace(/\s+/g, '_');
   
   // Níveis permitidos para substituição
+  // Incluímos 'processado' pois alimentos como macarrão/pão são válidos para troca
+  // Apenas 'ultraprocessado' e 'suplemento' são bloqueados
   const allowedLevels = [
     'in_natura',
     'minimamente_processado',
+    'processado',
   ];
 
   if (!allowedLevels.includes(normalizedLevel)) {
