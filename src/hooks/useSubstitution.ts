@@ -83,13 +83,20 @@ export function useSubstitution(options?: UseSubstitutionOptions): UseSubstituti
     setProposal(null);
     
     try {
-      // Debug: Log entrada
-      console.log('[Substitution] Source food:', sourceFood.name, sourceFood.category, sourceFood.processing_level);
+      // Debug: Log entrada detalhada
+      console.log('[Substitution] Source food:', {
+        name: sourceFood.name,
+        category: sourceFood.category,
+        processing_level: sourceFood.processing_level,
+      });
       console.log('[Substitution] Available foods count:', availableFoods.length);
       
-      // Filtrar alimentos da mesma categoria para debug
-      const sameCategoryFoods = availableFoods.filter(f => f.category === sourceFood.category && f.id !== sourceFood.id);
-      console.log('[Substitution] Same category foods:', sameCategoryFoods.length);
+      // Filtrar alimentos da mesma categoria para debug (case-insensitive)
+      const normalizedSourceCategory = sourceFood.category?.toLowerCase().trim();
+      const sameCategoryFoods = availableFoods.filter(f => 
+        f.category?.toLowerCase().trim() === normalizedSourceCategory && f.id !== sourceFood.id
+      );
+      console.log('[Substitution] Same category foods (case-insensitive):', sameCategoryFoods.length);
       
       // Criar contexto de governança
       const governanceContext: GovernanceContext = {

@@ -198,9 +198,11 @@ export function isValidCandidate(
   // Candidato precisa ser substituível
   if (!canBeSubstituted(candidate)) return false;
 
-  // Por padrão, mesma categoria é obrigatória
+  // Por padrão, mesma categoria é obrigatória (case-insensitive)
   if (!options?.allowCrossCategory) {
-    if (candidate.category !== sourceFood.category) return false;
+    const normalizedCandidateCategory = candidate.category?.toLowerCase().trim();
+    const normalizedSourceCategory = sourceFood.category?.toLowerCase().trim();
+    if (normalizedCandidateCategory !== normalizedSourceCategory) return false;
   }
 
   // Alimento precisa estar ativo
@@ -442,6 +444,9 @@ export function findSubstituteCandidates(
     differentCategory: 0,
   };
   
+  // Normalizar categoria do source para comparação case-insensitive
+  const normalizedSourceCategory = sourceFood.category?.toLowerCase().trim();
+  
   // Filtrar candidatos válidos com logging detalhado
   const validCandidates = availableFoods.filter(food => {
     // Não pode ser o mesmo alimento
@@ -457,9 +462,10 @@ export function findSubstituteCandidates(
       return false;
     }
     
-    // Por padrão, mesma categoria é obrigatória
+    // Por padrão, mesma categoria é obrigatória (case-insensitive)
     if (!options?.allowCrossCategory) {
-      if (food.category !== sourceFood.category) {
+      const normalizedCandidateCategory = food.category?.toLowerCase().trim();
+      if (normalizedCandidateCategory !== normalizedSourceCategory) {
         rejectionStats.differentCategory++;
         return false;
       }
