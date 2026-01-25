@@ -1320,6 +1320,95 @@ function buildMealOption(
     });
   }
   
+  // ============================================================
+  // G7 FIX v2.4: TERCEIRA RODADA - BOOST FOCADO EM CARBOIDRATOS
+  // Se carbs ainda está abaixo de 90% da meta, boostar APENAS carbs
+  // ============================================================
+  const currentCarbsPercentForG7 = (totalCarbs / targetMacro.carbs) * 100;
+  
+  if (currentCarbsPercentForG7 < 92 && mealFoods.length > 0) { // 92% para ter margem
+    logStep("G7 FIX v2.4: Carbs below threshold, boosting carb sources (round 3)", {
+      mealType,
+      currentCarbs: Math.round(totalCarbs),
+      targetCarbs: targetMacro.carbs,
+      carbsPercent: Math.round(currentCarbsPercentForG7),
+    });
+    
+    // Calcular quanto de carbs precisa adicionar para atingir 95%
+    const targetCarbsPercent = 0.95;
+    const carbDeficit = (targetMacro.carbs * targetCarbsPercent) - totalCarbs;
+    let boostedCarbs = 0;
+    
+    for (let i = 0; i < mealFoods.length && boostedCarbs < carbDeficit; i++) {
+      const mealFood = mealFoods[i];
+      const food = mealFood.food;
+      const category = (food.category || '').toLowerCase();
+      
+      // G7 FIX: APENAS boostar fontes de carboidrato
+      // Priorizar carbs densos e com pouca gordura
+      const isCarbSource = category === 'carboidratos' || 
+                           category === 'leguminosas' ||
+                           (food.carbs > 15 && food.fat < 5); // Densidade de carbs
+      
+      if (!isCarbSource) continue;
+      
+      const currentPortion = mealFood.calculated_grams;
+      const carbsPerGram = food.carbs / 100;
+      const fatPerGram = food.fat / 100;
+      const caloriesPerGram = food.calories / 100;
+      
+      // Calcular quanto carb adicional precisamos
+      const carbsStillNeeded = carbDeficit - boostedCarbs;
+      const portionForCarbs = carbsPerGram > 0 ? (carbsStillNeeded / carbsPerGram) * 100 : 0;
+      
+      // Limites: máx 60% de aumento, máx 200g adicionais
+      const maxBoostPortion = Math.min(currentPortion * 0.6, 200);
+      
+      // Verificar espaço calórico restante (permitir até 105% das calorias)
+      const calorieHeadroom = (targetMacro.calories * 1.05) - totalCalories;
+      const maxBoostByCalories = calorieHeadroom > 0 ? (calorieHeadroom / caloriesPerGram) : 0;
+      
+      // Verificar espaço de gordura (permitir até 110% da gordura)
+      const fatHeadroom = (targetMacro.fat * 1.10) - totalFat;
+      const maxBoostByFat = fatPerGram > 0.05 ? (fatHeadroom / fatPerGram) * 100 : maxBoostPortion;
+      
+      const actualBoost = Math.min(maxBoostPortion, maxBoostByCalories, maxBoostByFat, portionForCarbs);
+      
+      if (actualBoost < 10) continue; // Não vale a pena boost menor que 10g
+      
+      const newPortion = currentPortion + actualBoost;
+      const newConverted = applyUnitConversion(food, newPortion);
+      
+      const oldMultiplier = currentPortion / 100;
+      const newMultiplier = newConverted.calculated_grams / 100;
+      const deltaMultiplier = newMultiplier - oldMultiplier;
+      
+      totalCalories += food.calories * deltaMultiplier;
+      totalProtein += food.protein * deltaMultiplier;
+      totalCarbs += food.carbs * deltaMultiplier;
+      totalFat += food.fat * deltaMultiplier;
+      
+      boostedCarbs += food.carbs * deltaMultiplier;
+      
+      mealFoods[i] = newConverted;
+      
+      logStep("G7 FIX v2.4: Boosted carb portion (round 3)", {
+        food: food.name,
+        oldPortion: currentPortion,
+        newPortion: newConverted.calculated_grams,
+        carbsAdded: Math.round(food.carbs * deltaMultiplier),
+      });
+    }
+    
+    logStep("G7 FIX v2.4: Carb boost round 3 complete", {
+      mealType,
+      finalCarbs: Math.round(totalCarbs),
+      targetCarbs: targetMacro.carbs,
+      boostedBy: Math.round(boostedCarbs),
+      newCarbsPercent: Math.round((totalCarbs / targetMacro.carbs) * 100),
+    });
+  }
+  
   // VALIDAÇÃO: Verificar se atingimos proteína mínima
   if (totalProtein < minProtein * 0.8) { // 80% de tolerância
     logStep("Warning: meal below protein minimum", { 
