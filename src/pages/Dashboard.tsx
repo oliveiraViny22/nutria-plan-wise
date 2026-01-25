@@ -38,6 +38,7 @@ import { CalorieRing } from '@/components/CalorieRing';
 import { MacroChart } from '@/components/MacroChart';
 import { MacroRebalancer, SmartRebalancer } from '@/components/MacroRebalancer';
 import { RebalancerV4 } from '@/components/RebalancerV4';
+import { RebalancerV5 } from '@/components/RebalancerV5';
 import { UsageLimits } from '@/components/UsageLimits';
 import { UpgradeDialog } from '@/components/UpgradeDialog';
 import { AdherenceWidget } from '@/components/AdherenceWidget';
@@ -522,6 +523,22 @@ export default function Dashboard() {
                   onComplete={fetchCurrentPlan}
                 />
                 <RebalancerV4
+                  planId={currentDietPlan.id}
+                  targets={{
+                    protein: profile?.protein_target || 150,
+                    carbs: profile?.carbs_target || 250,
+                    fat: profile?.fat_target || 65,
+                    calories: profile?.daily_calories || 2000,
+                  }}
+                  currentMacros={{
+                    protein: currentProtein,
+                    carbs: currentCarbs,
+                    fat: currentFat,
+                    calories: currentCalories,
+                  }}
+                  onComplete={fetchCurrentPlan}
+                />
+                <RebalancerV5
                   planId={currentDietPlan.id}
                   targets={{
                     protein: profile?.protein_target || 150,
