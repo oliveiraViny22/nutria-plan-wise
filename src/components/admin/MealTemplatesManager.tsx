@@ -13,7 +13,8 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Loader2, Plus, Trash2, Edit2, LayoutTemplate, ChevronDown, ChevronRight, Save, GripVertical } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Loader2, Plus, Trash2, Edit2, LayoutTemplate, ChevronDown, ChevronRight, Save, GripVertical, Coffee, Apple, Sun, Moon } from "lucide-react";
 import { CANONICAL_CATEGORIES, CATEGORY_LABELS, type FoodCategory } from "@/lib/food-categories";
 
 const MEAL_TYPES = [
@@ -103,6 +104,34 @@ export function MealTemplatesManager() {
 
   // Meal type order for sorting
   const MEAL_TYPE_ORDER = MEAL_TYPES.map(m => m.value);
+
+  // Tab configuration for grouping meals
+  const TAB_CONFIG = [
+    { 
+      key: "breakfast", 
+      label: "Café da Manhã", 
+      icon: Coffee,
+      mealTypes: ["breakfast"] 
+    },
+    { 
+      key: "snacks", 
+      label: "Lanches", 
+      icon: Apple,
+      mealTypes: ["morning_snack", "afternoon_snack"] 
+    },
+    { 
+      key: "lunch_dinner", 
+      label: "Almoço + Jantar", 
+      icon: Sun,
+      mealTypes: ["lunch", "dinner"] 
+    },
+    { 
+      key: "supper", 
+      label: "Ceia", 
+      icon: Moon,
+      mealTypes: ["supper"] 
+    },
+  ];
 
   // Fetch templates with roles and categories
   const { data: templates, isLoading } = useQuery({
@@ -475,178 +504,210 @@ export function MealTemplatesManager() {
             <p>Nenhum template configurado</p>
           </div>
         ) : (
-          <div className="space-y-4">
-            {templates.map((template) => (
-              <Collapsible
-                key={template.id}
-                open={expandedTemplates.has(template.id)}
-                onOpenChange={() => toggleExpanded(template.id)}
-              >
-                <div className="border rounded-lg">
-                  <CollapsibleTrigger asChild>
-                    <div className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/50">
-                      <div className="flex items-center gap-3">
-                        {expandedTemplates.has(template.id) ? (
-                          <ChevronDown className="w-4 h-4" />
-                        ) : (
-                          <ChevronRight className="w-4 h-4" />
-                        )}
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium">{template.name}</span>
-                            <Badge variant="secondary">{getMealLabel(template.meal_type)}</Badge>
-                            <Badge variant="outline">{template.roles?.length || 0} papéis</Badge>
-                          </div>
-                          {template.description && (
-                            <p className="text-sm text-muted-foreground">{template.description}</p>
-                          )}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                        <Switch
-                          checked={template.is_active}
-                          onCheckedChange={(checked) => toggleTemplateMutation.mutate({ id: template.id, is_active: checked })}
-                        />
-                        <Button variant="ghost" size="icon" onClick={() => handleEditTemplate(template)}>
-                          <Edit2 className="w-4 h-4" />
-                        </Button>
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button variant="ghost" size="icon">
-                              <Trash2 className="w-4 h-4 text-destructive" />
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Remover template?</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                Isso também removerá todos os papéis e categorias associados.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                              <AlertDialogAction
-                                onClick={() => deleteTemplateMutation.mutate(template.id)}
-                                className="bg-destructive text-destructive-foreground"
-                              >
-                                Remover
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                      </div>
+          <Tabs defaultValue="breakfast" className="w-full">
+            <TabsList className="grid w-full grid-cols-4 mb-4">
+              {TAB_CONFIG.map((tab) => {
+                const Icon = tab.icon;
+                const count = templates?.filter(t => tab.mealTypes.includes(t.meal_type)).length || 0;
+                return (
+                  <TabsTrigger key={tab.key} value={tab.key} className="flex items-center gap-1.5 text-xs">
+                    <Icon className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">{tab.label}</span>
+                    {count > 0 && (
+                      <Badge variant="secondary" className="h-5 px-1.5 text-xs">
+                        {count}
+                      </Badge>
+                    )}
+                  </TabsTrigger>
+                );
+              })}
+            </TabsList>
+            
+            {TAB_CONFIG.map((tab) => {
+              const tabTemplates = templates?.filter(t => tab.mealTypes.includes(t.meal_type)) || [];
+              return (
+                <TabsContent key={tab.key} value={tab.key}>
+                  {tabTemplates.length === 0 ? (
+                    <div className="text-center py-6 text-muted-foreground border rounded-lg">
+                      <p className="text-sm">Nenhum template para {tab.label.toLowerCase()}</p>
                     </div>
-                  </CollapsibleTrigger>
-                  <CollapsibleContent>
-                    <div className="border-t p-4 space-y-4">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium">Papéis (Slots)</span>
-                        <Button size="sm" variant="outline" onClick={() => handleAddRole(template.id)}>
-                          <Plus className="w-4 h-4 mr-1" /> Papel
-                        </Button>
-                      </div>
-                      {template.roles?.length ? (
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead className="w-8">#</TableHead>
-                              <TableHead>Papel</TableHead>
-                              <TableHead>Qtd (g)</TableHead>
-                              <TableHead>Obrigatório</TableHead>
-                              <TableHead>Categorias</TableHead>
-                              <TableHead className="w-24">Ações</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {template.roles
-                              .sort((a, b) => a.sort_order - b.sort_order)
-                              .map((role) => (
-                                <TableRow key={role.id}>
-                                  <TableCell>
-                                    <GripVertical className="w-4 h-4 text-muted-foreground" />
-                                  </TableCell>
-                                  <TableCell>
-                                    <Badge variant="outline">{getRoleLabel(role.role_name)}</Badge>
-                                  </TableCell>
-                                  <TableCell className="text-sm">
-                                    {role.min_quantity_grams}–{role.max_quantity_grams}g
-                                  </TableCell>
-                                  <TableCell>
-                                    {role.is_required ? (
-                                      <Badge className="bg-primary/10 text-primary">Sim</Badge>
-                                    ) : (
-                                      <Badge variant="outline">Não</Badge>
+                  ) : (
+                    <div className="space-y-3">
+                      {tabTemplates.map((template) => (
+                        <Collapsible
+                          key={template.id}
+                          open={expandedTemplates.has(template.id)}
+                          onOpenChange={() => toggleExpanded(template.id)}
+                        >
+                          <div className="border rounded-lg">
+                            <CollapsibleTrigger asChild>
+                              <div className="flex items-center justify-between p-3 cursor-pointer hover:bg-muted/50">
+                                <div className="flex items-center gap-3">
+                                  {expandedTemplates.has(template.id) ? (
+                                    <ChevronDown className="w-4 h-4" />
+                                  ) : (
+                                    <ChevronRight className="w-4 h-4" />
+                                  )}
+                                  <div>
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-medium text-sm">{template.name}</span>
+                                      <Badge variant="outline" className="text-xs">{template.roles?.length || 0} papéis</Badge>
+                                    </div>
+                                    {template.description && (
+                                      <p className="text-xs text-muted-foreground">{template.description}</p>
                                     )}
-                                  </TableCell>
-                                  <TableCell>
-                                    <div className="flex flex-wrap gap-1">
-                                      {role.categories?.map((cat) => (
-                                        <Badge
-                                          key={cat.id}
-                                          variant="secondary"
-                                          className="text-xs cursor-pointer hover:bg-destructive/20"
-                                          onClick={() => deleteCategoryMutation.mutate(cat.id)}
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                                  <Switch
+                                    checked={template.is_active}
+                                    onCheckedChange={(checked) => toggleTemplateMutation.mutate({ id: template.id, is_active: checked })}
+                                  />
+                                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEditTemplate(template)}>
+                                    <Edit2 className="w-4 h-4" />
+                                  </Button>
+                                  <AlertDialog>
+                                    <AlertDialogTrigger asChild>
+                                      <Button variant="ghost" size="icon" className="h-8 w-8">
+                                        <Trash2 className="w-4 h-4 text-destructive" />
+                                      </Button>
+                                    </AlertDialogTrigger>
+                                    <AlertDialogContent>
+                                      <AlertDialogHeader>
+                                        <AlertDialogTitle>Remover template?</AlertDialogTitle>
+                                        <AlertDialogDescription>
+                                          Isso também removerá todos os papéis e categorias associados.
+                                        </AlertDialogDescription>
+                                      </AlertDialogHeader>
+                                      <AlertDialogFooter>
+                                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                        <AlertDialogAction
+                                          onClick={() => deleteTemplateMutation.mutate(template.id)}
+                                          className="bg-destructive text-destructive-foreground"
                                         >
-                                          {CATEGORY_LABELS[cat.category as FoodCategory] || cat.category}
-                                          <span className="ml-1 text-destructive">×</span>
-                                        </Badge>
-                                      ))}
-                                      <Button
-                                        size="sm"
-                                        variant="ghost"
-                                        className="h-5 px-1 text-xs"
-                                        onClick={() => handleAddCategory(role.id)}
-                                      >
-                                        <Plus className="w-3 h-3" />
-                                      </Button>
-                                    </div>
-                                  </TableCell>
-                                  <TableCell>
-                                    <div className="flex gap-1">
-                                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEditRole(role)}>
-                                        <Edit2 className="w-4 h-4" />
-                                      </Button>
-                                      <AlertDialog>
-                                        <AlertDialogTrigger asChild>
-                                          <Button variant="ghost" size="icon" className="h-8 w-8">
-                                            <Trash2 className="w-4 h-4 text-destructive" />
-                                          </Button>
-                                        </AlertDialogTrigger>
-                                        <AlertDialogContent>
-                                          <AlertDialogHeader>
-                                            <AlertDialogTitle>Remover papel?</AlertDialogTitle>
-                                            <AlertDialogDescription>
-                                              Isso também removerá as categorias associadas.
-                                            </AlertDialogDescription>
-                                          </AlertDialogHeader>
-                                          <AlertDialogFooter>
-                                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                            <AlertDialogAction
-                                              onClick={() => deleteRoleMutation.mutate(role.id)}
-                                              className="bg-destructive text-destructive-foreground"
-                                            >
-                                              Remover
-                                            </AlertDialogAction>
-                                          </AlertDialogFooter>
-                                        </AlertDialogContent>
-                                      </AlertDialog>
-                                    </div>
-                                  </TableCell>
-                                </TableRow>
-                              ))}
-                          </TableBody>
-                        </Table>
-                      ) : (
-                        <p className="text-sm text-muted-foreground text-center py-4">
-                          Nenhum papel configurado. Adicione papéis para definir os slots de alimentos.
-                        </p>
-                      )}
+                                          Remover
+                                        </AlertDialogAction>
+                                      </AlertDialogFooter>
+                                    </AlertDialogContent>
+                                  </AlertDialog>
+                                </div>
+                              </div>
+                            </CollapsibleTrigger>
+                            <CollapsibleContent>
+                              <div className="border-t p-4 space-y-4">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-sm font-medium">Papéis (Slots)</span>
+                                  <Button size="sm" variant="outline" onClick={() => handleAddRole(template.id)}>
+                                    <Plus className="w-4 h-4 mr-1" /> Papel
+                                  </Button>
+                                </div>
+                                {template.roles?.length ? (
+                                  <Table>
+                                    <TableHeader>
+                                      <TableRow>
+                                        <TableHead className="w-8">#</TableHead>
+                                        <TableHead>Papel</TableHead>
+                                        <TableHead>Qtd (g)</TableHead>
+                                        <TableHead>Obrigatório</TableHead>
+                                        <TableHead>Categorias</TableHead>
+                                        <TableHead className="w-24">Ações</TableHead>
+                                      </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                      {template.roles
+                                        .sort((a, b) => a.sort_order - b.sort_order)
+                                        .map((role) => (
+                                          <TableRow key={role.id}>
+                                            <TableCell>
+                                              <GripVertical className="w-4 h-4 text-muted-foreground" />
+                                            </TableCell>
+                                            <TableCell>
+                                              <Badge variant="outline">{getRoleLabel(role.role_name)}</Badge>
+                                            </TableCell>
+                                            <TableCell className="text-sm">
+                                              {role.min_quantity_grams}–{role.max_quantity_grams}g
+                                            </TableCell>
+                                            <TableCell>
+                                              {role.is_required ? (
+                                                <Badge className="bg-primary/10 text-primary">Sim</Badge>
+                                              ) : (
+                                                <Badge variant="outline">Não</Badge>
+                                              )}
+                                            </TableCell>
+                                            <TableCell>
+                                              <div className="flex flex-wrap gap-1">
+                                                {role.categories?.map((cat) => (
+                                                  <Badge
+                                                    key={cat.id}
+                                                    variant="secondary"
+                                                    className="text-xs cursor-pointer hover:bg-destructive/20"
+                                                    onClick={() => deleteCategoryMutation.mutate(cat.id)}
+                                                  >
+                                                    {CATEGORY_LABELS[cat.category as FoodCategory] || cat.category}
+                                                    <span className="ml-1 text-destructive">×</span>
+                                                  </Badge>
+                                                ))}
+                                                <Button
+                                                  size="sm"
+                                                  variant="ghost"
+                                                  className="h-5 px-1 text-xs"
+                                                  onClick={() => handleAddCategory(role.id)}
+                                                >
+                                                  <Plus className="w-3 h-3" />
+                                                </Button>
+                                              </div>
+                                            </TableCell>
+                                            <TableCell>
+                                              <div className="flex gap-1">
+                                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEditRole(role)}>
+                                                  <Edit2 className="w-4 h-4" />
+                                                </Button>
+                                                <AlertDialog>
+                                                  <AlertDialogTrigger asChild>
+                                                    <Button variant="ghost" size="icon" className="h-8 w-8">
+                                                      <Trash2 className="w-4 h-4 text-destructive" />
+                                                    </Button>
+                                                  </AlertDialogTrigger>
+                                                  <AlertDialogContent>
+                                                    <AlertDialogHeader>
+                                                      <AlertDialogTitle>Remover papel?</AlertDialogTitle>
+                                                      <AlertDialogDescription>
+                                                        Isso também removerá as categorias associadas.
+                                                      </AlertDialogDescription>
+                                                    </AlertDialogHeader>
+                                                    <AlertDialogFooter>
+                                                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                                      <AlertDialogAction
+                                                        onClick={() => deleteRoleMutation.mutate(role.id)}
+                                                        className="bg-destructive text-destructive-foreground"
+                                                      >
+                                                        Remover
+                                                      </AlertDialogAction>
+                                                    </AlertDialogFooter>
+                                                  </AlertDialogContent>
+                                                </AlertDialog>
+                                              </div>
+                                            </TableCell>
+                                          </TableRow>
+                                        ))}
+                                    </TableBody>
+                                  </Table>
+                                ) : (
+                                  <p className="text-sm text-muted-foreground text-center py-4">
+                                    Nenhum papel configurado. Adicione papéis para definir os slots de alimentos.
+                                  </p>
+                                )}
+                              </div>
+                            </CollapsibleContent>
+                          </div>
+                        </Collapsible>
+                      ))}
                     </div>
-                  </CollapsibleContent>
-                </div>
-              </Collapsible>
-            ))}
-          </div>
+                  )}
+                </TabsContent>
+              );
+            })}
+          </Tabs>
         )}
 
         {/* Role Dialog */}
