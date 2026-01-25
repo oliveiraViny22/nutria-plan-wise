@@ -215,17 +215,6 @@ function CandidateItem({
         <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-rose-600 border-rose-200">
           G: {portionFat}g
         </Badge>
-        {/* Delta de calorias */}
-        <Badge 
-          variant="outline" 
-          className={`text-[10px] px-1.5 py-0 ${
-            candidate.deltaMacros.calories === 0 ? 'text-muted-foreground' :
-            candidate.deltaMacros.calories > 0 ? 'text-amber-600 border-amber-200' : 
-            'text-green-600 border-green-200'
-          }`}
-        >
-          {formatDelta(candidate.deltaMacros.calories, ' kcal')}
-        </Badge>
       </div>
     </motion.button>
   );
