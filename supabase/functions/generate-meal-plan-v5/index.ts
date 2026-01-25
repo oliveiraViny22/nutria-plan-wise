@@ -568,7 +568,10 @@ async function savePlan(
     .select()
     .single();
 
-  if (planError) throw planError;
+  if (planError) {
+    log("Erro ao criar plano", { error: planError.message });
+    throw new Error(planError.message);
+  }
 
   // Criar refeições
   for (let i = 0; i < meals.length; i++) {
@@ -588,7 +591,10 @@ async function savePlan(
       .select()
       .single();
 
-    if (mealError) throw mealError;
+    if (mealError) {
+      log("Erro ao criar refeição", { mealName: meal.meal_name, error: mealError.message });
+      throw new Error(mealError.message);
+    }
 
     // Criar opção de refeição
     const { data: optionData, error: optionError } = await supabase
@@ -605,11 +611,14 @@ async function savePlan(
       .select()
       .single();
 
-    if (optionError) throw optionError;
+    if (optionError) {
+      log("Erro ao criar opção", { mealName: meal.meal_name, error: optionError.message });
+      throw new Error(optionError.message);
+    }
 
     // Adicionar alimentos
     for (const food of meal.foods) {
-      await supabase.from("meal_option_foods").insert({
+      const { error: foodItemError } = await supabase.from("meal_option_foods").insert({
         meal_option_id: optionData.id,
         food_id: food.food.id,
         quantity_grams: food.quantity_grams,
@@ -618,6 +627,11 @@ async function savePlan(
         calculated_grams: food.quantity_grams,
         unit_locked: true,
       });
+      
+      if (foodItemError) {
+        log("Erro ao inserir alimento", { foodId: food.food.id, foodName: food.food.name, error: foodItemError.message });
+        throw new Error(foodItemError.message);
+      }
     }
   }
 
