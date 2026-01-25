@@ -66,24 +66,41 @@ interface AIRebalanceResponse {
   warnings: string[];
 }
 
+/**
+ * Extrai o peso base em gramas do serving_size.
+ * Os macros no banco são sempre "por porção" onde a porção é definida em serving_size.
+ * Se serving_size = "100g", então calories/protein/carbs/fat são por 100g.
+ * Se serving_size = "1 unidade (50g)", então são por 50g.
+ */
 function parseServingGrams(servingSize: string | null): number {
   if (!servingSize) return 100;
+  // Prioriza formato "(XXg)" ou "(XXml)"
+  const parenMatch = servingSize.match(/\((\d+)\s*(g|ml)\)/i);
+  if (parenMatch) return parseInt(parenMatch[1], 10);
+  // Fallback para "XXg" ou "XXml"
   const match = servingSize.match(/(\d+)\s*(g|ml)/i);
   if (match) return parseInt(match[1], 10);
   return 100;
 }
 
+/**
+ * Calcula macros totais a partir dos alimentos.
+ * IMPORTANTE: Os valores de macros no banco são POR PORÇÃO (serving_size).
+ * Para obter o valor real, multiplicamos por (quantity_grams / serving_grams).
+ */
 function calculateMacros(foods: MealOptionFood[]): MacroTargets {
   let calories = 0, protein = 0, carbs = 0, fat = 0;
   
   for (const mof of foods) {
-    const baseGrams = parseServingGrams(mof.food.serving_size);
-    const multiplier = mof.quantity_grams / baseGrams;
+    // serving_size define a base dos macros no banco
+    const servingGrams = parseServingGrams(mof.food.serving_size);
+    // Proporção entre quantidade desejada e porção de referência
+    const ratio = mof.quantity_grams / servingGrams;
     
-    calories += mof.food.calories * multiplier;
-    protein += mof.food.protein * multiplier;
-    carbs += mof.food.carbs * multiplier;
-    fat += mof.food.fat * multiplier;
+    calories += mof.food.calories * ratio;
+    protein += mof.food.protein * ratio;
+    carbs += mof.food.carbs * ratio;
+    fat += mof.food.fat * ratio;
   }
   
   return {
@@ -172,18 +189,23 @@ serve(async (req) => {
     // Preparar contexto para a IA
     const mealDetails = mealContexts.map(ctx => ({
       mealName: ctx.mealName,
-      foods: ctx.foods.map(f => ({
-        id: f.id,
-        name: f.food.name,
-        grams: f.quantity_grams,
-        per100g: {
-          calories: f.food.calories,
-          protein: f.food.protein,
-          carbs: f.food.carbs,
-          fat: f.food.fat,
-        },
-        category: f.food.category,
-      })),
+      foods: ctx.foods.map(f => {
+        const servingGrams = parseServingGrams(f.food.serving_size);
+        return {
+          id: f.id,
+          name: f.food.name,
+          grams: f.quantity_grams,
+          // Normalizar para por 100g para que a IA faça cálculos consistentes
+          per100g: {
+            calories: Math.round((f.food.calories / servingGrams) * 100),
+            protein: Math.round(((f.food.protein / servingGrams) * 100) * 10) / 10,
+            carbs: Math.round(((f.food.carbs / servingGrams) * 100) * 10) / 10,
+            fat: Math.round(((f.food.fat / servingGrams) * 100) * 10) / 10,
+          },
+          category: f.food.category,
+          servingSize: f.food.serving_size,
+        };
+      }),
     }));
 
     const systemPrompt = `Você é um nutricionista expert em ajuste de planos alimentares. Sua tarefa é analisar um plano alimentar e propor ajustes de porções para atingir metas específicas de macronutrientes.
