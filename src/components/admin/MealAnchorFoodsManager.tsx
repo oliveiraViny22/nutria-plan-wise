@@ -63,6 +63,7 @@ export function MealAnchorFoodsManager() {
   const [editingAnchor, setEditingAnchor] = useState<AnchorFood | null>(null);
   const [formData, setFormData] = useState({
     meal_type: "lunch",
+    option_number: 0, // 0 = todas as opções
     food_ids: [] as string[],
     role_name: "carboidrato_base",
     default_quantity_grams: 100,
@@ -140,6 +141,7 @@ export function MealAnchorFoodsManager() {
         // Create records for all selected foods
         const records = foodIds.map((food_id) => ({
           meal_type: data.meal_type,
+          option_number: (data as any).option_number || 0,
           food_id,
           role_name: data.role_name,
           default_quantity_grams: data.default_quantity_grams,
@@ -152,6 +154,7 @@ export function MealAnchorFoodsManager() {
         if (pairedMealType) {
           const pairedRecords = foodIds.map((food_id) => ({
             meal_type: pairedMealType,
+            option_number: (data as any).option_number || 0,
             food_id,
             role_name: data.role_name,
             default_quantity_grams: data.default_quantity_grams,
@@ -210,6 +213,7 @@ export function MealAnchorFoodsManager() {
   const resetForm = () => {
     setFormData({
       meal_type: "lunch",
+      option_number: 0,
       food_ids: [],
       role_name: "carboidrato_base",
       default_quantity_grams: 100,
@@ -221,6 +225,7 @@ export function MealAnchorFoodsManager() {
     setEditingAnchor(anchor);
     setFormData({
       meal_type: anchor.meal_type,
+      option_number: anchor.option_number,
       food_ids: [anchor.food_id],
       role_name: anchor.role_name,
       default_quantity_grams: anchor.default_quantity_grams,
@@ -351,6 +356,29 @@ export function MealAnchorFoodsManager() {
                 </div>
 
                 <div className="space-y-2">
+                  <Label>Opção de Refeição</Label>
+                  <Select
+                    value={String(formData.option_number)}
+                    onValueChange={(v) => setFormData((p) => ({ ...p, option_number: parseInt(v) }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="0">Todas as opções</SelectItem>
+                      <SelectItem value="1">Opção 1</SelectItem>
+                      <SelectItem value="2">Opção 2</SelectItem>
+                      <SelectItem value="3">Opção 3</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    {formData.option_number === 0 
+                      ? "Aparece em todas as opções" 
+                      : `Aparece apenas na opção ${formData.option_number}`}
+                  </p>
+                </div>
+
+                <div className="space-y-2">
                   <Label>{editingAnchor ? "Alimento" : "Alimentos"}</Label>
                   {editingAnchor ? (
                     <MultiFoodSelect
@@ -467,6 +495,7 @@ export function MealAnchorFoodsManager() {
                         <TableRow>
                           <TableHead>Alimento</TableHead>
                           <TableHead>Papel</TableHead>
+                          <TableHead>Opção</TableHead>
                           <TableHead>Qtd</TableHead>
                           <TableHead>Ativo</TableHead>
                           <TableHead className="w-[100px]">Ações</TableHead>
@@ -485,6 +514,11 @@ export function MealAnchorFoodsManager() {
                               </TableCell>
                               <TableCell>
                                 <Badge variant="outline">{getRoleLabel(anchor.role_name)}</Badge>
+                              </TableCell>
+                              <TableCell>
+                                <Badge variant={anchor.option_number === 0 ? "default" : "secondary"}>
+                                  {anchor.option_number === 0 ? "Todas" : `Opção ${anchor.option_number}`}
+                                </Badge>
                               </TableCell>
                               <TableCell>{anchor.default_quantity_grams}g</TableCell>
                               <TableCell>
