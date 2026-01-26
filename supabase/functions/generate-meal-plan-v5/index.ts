@@ -589,11 +589,30 @@ function buildMealWithAnchors(
   }
 
   // PASSO 3: Processar papéis opcionais se houver espaço
+  // IMPORTANTE: Não preenche necessariamente até o máximo!
+  // Escolhe um número aleatório de itens dentro do range [min, max]
   const itemLimits = ITEM_COUNTS[mealType] || { min: 2, max: 4 };
-  const remainingSlots = itemLimits.max - foods.length;
+  
+  // Determinar quantos itens totais a refeição deve ter (aleatório no range)
+  const targetItems = Math.floor(
+    Math.random() * (itemLimits.max - itemLimits.min + 1)
+  ) + itemLimits.min;
+  
+  // Quantos slots opcionais ainda podemos preencher
+  const remainingSlots = Math.max(0, targetItems - foods.length);
 
-  for (let i = 0; i < Math.min(optionalRoles.length, remainingSlots); i++) {
-    const role = optionalRoles[i];
+  log(`Opção ${optionNumber} de ${mealType}`, {
+    currentItems: foods.length,
+    targetItems,
+    remainingSlots,
+    optionalRolesAvailable: optionalRoles.length,
+  });
+
+  // Embaralhar papéis opcionais para variedade entre opções
+  const shuffledOptionalRoles = [...optionalRoles].sort(() => Math.random() - 0.5);
+
+  for (let i = 0; i < Math.min(shuffledOptionalRoles.length, remainingSlots); i++) {
+    const role = shuffledOptionalRoles[i];
     const food = selectFoodForRole(
       role, 
       eligibleFoods, 
