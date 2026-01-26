@@ -14,7 +14,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Loader2, Plus, Trash2, Edit2, Anchor, UtensilsCrossed, Save, Coffee, Apple, Sun, Moon } from "lucide-react";
-import { SingleFoodSelect } from "@/components/SingleFoodSelect";
+import { MultiFoodSelect } from "@/components/MultiFoodSelect";
 
 
 interface AnchorFood {
@@ -63,7 +63,7 @@ export function MealAnchorFoodsManager() {
   const [editingAnchor, setEditingAnchor] = useState<AnchorFood | null>(null);
   const [formData, setFormData] = useState({
     meal_type: "lunch",
-    food_id: "",
+    food_ids: [] as string[],
     role_name: "carboidrato_base",
     default_quantity_grams: 100,
     sort_order: 1,
@@ -97,11 +97,11 @@ export function MealAnchorFoodsManager() {
 
   // Create/Update mutation
   const saveMutation = useMutation({
-    mutationFn: async (data: typeof formData & { id?: string }) => {
+    mutationFn: async (data: typeof formData & { id?: string; food_id?: string }) => {
       const pairedMealType = getPairedMealType(data.meal_type);
       
-      if (data.id) {
-        // Update main anchor
+      if (data.id && data.food_id) {
+        // Update single anchor (editing mode)
         const { error } = await supabase
           .from("meal_anchor_foods")
           .update({
@@ -117,63 +117,62 @@ export function MealAnchorFoodsManager() {
 
         // If lunch/dinner, also update paired anchor
         if (pairedMealType) {
-          // Check if paired anchor exists
           const { data: existing } = await supabase
             .from("meal_anchor_foods")
             .select("id")
             .eq("meal_type", pairedMealType)
             .eq("role_name", data.role_name)
+            .eq("food_id", data.food_id)
             .single();
 
           if (existing) {
             await supabase
               .from("meal_anchor_foods")
               .update({
-                food_id: data.food_id,
                 default_quantity_grams: data.default_quantity_grams,
                 sort_order: data.sort_order,
               })
               .eq("id", existing.id);
-          } else {
-            await supabase.from("meal_anchor_foods").insert({
-              meal_type: pairedMealType,
-              food_id: data.food_id,
-              role_name: data.role_name,
-              default_quantity_grams: data.default_quantity_grams,
-              sort_order: data.sort_order,
-            });
           }
         }
       } else {
-        // Insert main anchor
-        const { error } = await supabase.from("meal_anchor_foods").insert({
+        // Insert multiple anchors (creation mode)
+        const foodIds = data.food_ids;
+        if (foodIds.length === 0) throw new Error("Selecione pelo menos um alimento");
+
+        // Create records for all selected foods
+        const records = foodIds.map((food_id, index) => ({
           meal_type: data.meal_type,
-          food_id: data.food_id,
+          food_id,
           role_name: data.role_name,
           default_quantity_grams: data.default_quantity_grams,
-          sort_order: data.sort_order,
-        });
+          sort_order: data.sort_order + index,
+        }));
 
+        const { error } = await supabase.from("meal_anchor_foods").insert(records);
         if (error) throw error;
 
-        // If lunch/dinner, also insert paired anchor
+        // If lunch/dinner, also insert paired anchors
         if (pairedMealType) {
-          await supabase.from("meal_anchor_foods").insert({
+          const pairedRecords = foodIds.map((food_id, index) => ({
             meal_type: pairedMealType,
-            food_id: data.food_id,
+            food_id,
             role_name: data.role_name,
             default_quantity_grams: data.default_quantity_grams,
-            sort_order: data.sort_order,
-          });
+            sort_order: data.sort_order + index,
+          }));
+
+          await supabase.from("meal_anchor_foods").insert(pairedRecords);
         }
       }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["meal-anchor-foods"] });
       const pairedMealType = getPairedMealType(formData.meal_type);
+      const count = editingAnchor ? 1 : formData.food_ids.length;
       const message = pairedMealType 
-        ? `Âncora ${editingAnchor ? "atualizada" : "criada"} para almoço e jantar!`
-        : `Âncora ${editingAnchor ? "atualizada" : "criada"}!`;
+        ? `${count} âncora(s) ${editingAnchor ? "atualizada(s)" : "criada(s)"} para almoço e jantar!`
+        : `${count} âncora(s) ${editingAnchor ? "atualizada(s)" : "criada(s)"}!`;
       toast.success(message);
       setDialogOpen(false);
       resetForm();
@@ -216,7 +215,7 @@ export function MealAnchorFoodsManager() {
   const resetForm = () => {
     setFormData({
       meal_type: "lunch",
-      food_id: "",
+      food_ids: [],
       role_name: "carboidrato_base",
       default_quantity_grams: 100,
       sort_order: 1,
@@ -228,7 +227,7 @@ export function MealAnchorFoodsManager() {
     setEditingAnchor(anchor);
     setFormData({
       meal_type: anchor.meal_type,
-      food_id: anchor.food_id,
+      food_ids: [anchor.food_id],
       role_name: anchor.role_name,
       default_quantity_grams: anchor.default_quantity_grams,
       sort_order: anchor.sort_order,
@@ -237,15 +236,25 @@ export function MealAnchorFoodsManager() {
   };
 
   const handleSubmit = () => {
-    if (!formData.food_id) {
-      toast.error("Selecione um alimento");
-      return;
+    if (editingAnchor) {
+      // Edit mode - use single food_id
+      if (formData.food_ids.length === 0) {
+        toast.error("Selecione um alimento");
+        return;
+      }
+      saveMutation.mutate({
+        ...formData,
+        id: editingAnchor.id,
+        food_id: formData.food_ids[0],
+      });
+    } else {
+      // Create mode - use multiple food_ids
+      if (formData.food_ids.length === 0) {
+        toast.error("Selecione pelo menos um alimento");
+        return;
+      }
+      saveMutation.mutate(formData);
     }
-
-    saveMutation.mutate({
-      ...formData,
-      id: editingAnchor?.id,
-    });
   };
 
   const getMealLabel = (type: string) => MEAL_TYPES.find((m) => m.value === type)?.label || type;
@@ -349,12 +358,27 @@ export function MealAnchorFoodsManager() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Alimento</Label>
-                  <SingleFoodSelect
-                    value={formData.food_id}
-                    onChange={(foodId) => setFormData((p) => ({ ...p, food_id: foodId }))}
-                    placeholder="Buscar alimento..."
-                  />
+                  <Label>{editingAnchor ? "Alimento" : "Alimentos"}</Label>
+                  {editingAnchor ? (
+                    <MultiFoodSelect
+                      selectedFoodIds={formData.food_ids}
+                      onSelect={(ids) => setFormData((p) => ({ ...p, food_ids: ids.slice(0, 1) }))}
+                      placeholder="Buscar alimento..."
+                      maxSelections={1}
+                    />
+                  ) : (
+                    <MultiFoodSelect
+                      selectedFoodIds={formData.food_ids}
+                      onSelect={(ids) => setFormData((p) => ({ ...p, food_ids: ids }))}
+                      placeholder="Buscar e adicionar alimentos..."
+                      maxSelections={10}
+                    />
+                  )}
+                  {!editingAnchor && formData.food_ids.length > 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      {formData.food_ids.length} alimento(s) serão adicionados
+                    </p>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
