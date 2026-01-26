@@ -24,6 +24,13 @@ import {
   EXCLUDED_FROM_AUTO_PLAN,
   type FoodCategory,
 } from "../_shared/food-categories.ts";
+import {
+  KCAL_PER_GRAM,
+  GENERATOR_CONTRACT,
+  REBALANCER_CONTRACT,
+  validateGeneratedPlan,
+  type MacroTargets,
+} from "../_shared/nutrition-contracts.ts";
 
 // =====================================================
 // LOGGING
@@ -719,15 +726,17 @@ function validateStructure(meals: MealResult[]): StructuralValidation {
       errors.push(`[E1] ${meal.meal_name}: poucos itens (${meal.foods.length} < ${limits.min})`);
     }
 
-    // Validar presença de proteína em refeições principais
+    // Validar presença de proteína em refeições principais usando constantes dos contratos
     if (MAIN_MEALS.includes(meal.meal_type)) {
-      const hasProtein = meal.foods.some((f) => {
-        const cat = (f.food.category || "").toLowerCase();
-        return cat === "proteinas" || cat === "laticinios";
-      });
-
-      if (!hasProtein) {
-        errors.push(`[E2] ${meal.meal_name}: sem proteína`);
+      const mealProtein = meal.totals.protein;
+      if (mealProtein < GENERATOR_CONTRACT.MIN_PROTEIN_MAIN_MEAL_GRAMS) {
+        errors.push(`[G1] ${meal.meal_name}: proteína insuficiente (${mealProtein.toFixed(1)}g < ${GENERATOR_CONTRACT.MIN_PROTEIN_MAIN_MEAL_GRAMS}g)`);
+      }
+    } else {
+      // Lanches/Ceia
+      const mealProtein = meal.totals.protein;
+      if (mealProtein < GENERATOR_CONTRACT.MIN_PROTEIN_SNACK_GRAMS) {
+        errors.push(`[G2] ${meal.meal_name}: proteína de lanche insuficiente (${mealProtein.toFixed(1)}g < ${GENERATOR_CONTRACT.MIN_PROTEIN_SNACK_GRAMS}g)`);
       }
     }
 
@@ -761,6 +770,85 @@ function validateStructure(meals: MealResult[]): StructuralValidation {
   return {
     valid: errors.length === 0,
     errors,
+  };
+}
+
+// =====================================================
+// VALIDAÇÃO NUTRICIONAL (USA CONTRATOS)
+// =====================================================
+
+interface NutritionalValidation {
+  valid: boolean;
+  errors: string[];
+  warnings: string[];
+  metrics: {
+    totalCalories: number;
+    totalProtein: number;
+    totalCarbs: number;
+    totalFat: number;
+    caloriePercent: number;
+    proteinPercent: number;
+    carbsPercent: number;
+    fatPercentOfCals: number;
+  };
+}
+
+function validateNutritionalContracts(
+  meals: MealResult[],
+  targets: MacroTargets
+): NutritionalValidation {
+  // Calcular totais
+  let totalCals = 0, totalProt = 0, totalCarbs = 0, totalFat = 0;
+  const mealProteinValues: number[] = [];
+  const mainMealIndices: number[] = [];
+
+  for (let i = 0; i < meals.length; i++) {
+    const meal = meals[i];
+    totalCals += meal.totals.calories;
+    totalProt += meal.totals.protein;
+    totalCarbs += meal.totals.carbs;
+    totalFat += meal.totals.fat;
+    mealProteinValues.push(meal.totals.protein);
+
+    if (MAIN_MEALS.includes(meal.meal_type)) {
+      mainMealIndices.push(i);
+    }
+  }
+
+  const totals: MacroTargets = {
+    calories: totalCals,
+    protein: totalProt,
+    carbs: totalCarbs,
+    fat: totalFat,
+  };
+
+  // Usar validação dos contratos
+  const contractValidation = validateGeneratedPlan(
+    totals,
+    targets,
+    mealProteinValues,
+    mainMealIndices
+  );
+
+  // Separar erros críticos de warnings
+  const errors: string[] = [];
+  const warnings: string[] = [];
+
+  for (const error of contractValidation.errors) {
+    // Erros de proteína por refeição são warnings (gerador não fecha macros)
+    if (error.includes('[G1]') && error.includes('Refeição')) {
+      warnings.push(error);
+    } else {
+      // Outros erros são informativos para o gerador (rebalanceador corrige)
+      warnings.push(error);
+    }
+  }
+
+  return {
+    valid: true, // Gerador sempre passa - rebalanceador corrige
+    errors,
+    warnings,
+    metrics: contractValidation.metrics,
   };
 }
 
@@ -1082,6 +1170,23 @@ serve(async (req) => {
 
     log("Validação estrutural OK");
 
+    // Validar contratos nutricionais (informativo - não bloqueia)
+    const targets: MacroTargets = {
+      calories: profile.daily_calories || 2000,
+      protein: profile.protein_target || 100,
+      carbs: profile.carbs_target || 250,
+      fat: profile.fat_target || 65,
+    };
+    
+    const nutritionalValidation = validateNutritionalContracts(meals, targets);
+    
+    if (nutritionalValidation.warnings.length > 0) {
+      log("Avisos nutricionais (rebalanceador corrigirá)", { 
+        warnings: nutritionalValidation.warnings,
+        metrics: nutritionalValidation.metrics 
+      });
+    }
+
     // Salvar plano com todas as opções (NÃO ajustado - será feito pelo rebalanceador)
     const planId = await savePlanWithOptions(supabase, user.id, mealsWithOptions);
 
@@ -1114,6 +1219,9 @@ serve(async (req) => {
           carbs: profile.carbs_target,
           fat: profile.fat_target,
         },
+        // Métricas de validação dos contratos nutricionais
+        contract_metrics: nutritionalValidation.metrics,
+        contract_warnings: nutritionalValidation.warnings,
         meals: mealsWithOptions.map((m) => ({
           type: m.mealType,
           name: m.options[0]?.meal_name || MEAL_NAMES[m.mealType],

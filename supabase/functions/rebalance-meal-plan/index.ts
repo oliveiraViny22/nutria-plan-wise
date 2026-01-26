@@ -1,6 +1,14 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders, createErrorResponse, createSuccessResponse, validate, CLIENT_ERRORS } from "../_shared/security.ts";
+import {
+  KCAL_PER_GRAM,
+  REBALANCER_CONTRACT,
+  GENERATOR_CONTRACT,
+  fatPercentOfCalories,
+  validateGeneratedPlan,
+  type MacroTargets,
+} from "../_shared/nutrition-contracts.ts";
 
 type UserProfile = 'free' | 'premium' | 'usuario_pessoal_pago' | 'profissional_vinculado';
 
@@ -166,14 +174,27 @@ interface RebalanceResult {
 }
 
 // =====================================================
-// CONSTANTES DE EQUIVALÊNCIA
+// CONSTANTES DE EQUIVALÊNCIA (DERIVADAS DOS CONTRATOS)
+// =====================================================
+// O rebalanceador usa tolerâncias de EQUIVALÊNCIA para substituições,
+// não as tolerâncias de geração. Os contratos definem:
+// - REBALANCER_CONTRACT: tolerância ZERO (meta exata)
+// - GENERATOR_CONTRACT: tolerâncias de geração inicial
+// Para substituições equivalentes, usamos tolerâncias intermediárias.
 // =====================================================
 
 const EQUIVALENCE_TOLERANCES = {
-  protein: 5,      // ±5g
-  carbs: 10,       // ±10g
-  fat: 3,          // ±3g
-  calories_percent: 10  // ±10%
+  // Tolerâncias para substituições "equivalentes" (não são as de geração nem de meta exata)
+  protein: 5,      // ±5g (substituto deve ter proteína similar)
+  carbs: 10,       // ±10g (carboidrato similar)
+  fat: 3,          // ±3g (gordura similar)
+  calories_percent: GENERATOR_CONTRACT.CALORIE_TOLERANCE_PERCENT // ±10% (usa contrato)
+};
+
+// Limites de quantidade do rebalanceador (do contrato)
+const QUANTITY_LIMITS = {
+  min: REBALANCER_CONTRACT.MIN_QUANTITY_GRAMS,
+  max: REBALANCER_CONTRACT.MAX_QUANTITY_GRAMS,
 };
 
 // =====================================================
@@ -801,8 +822,10 @@ function generateRuleBasedAdjustments(
       if (permissions.canAdjustMacros && deficits.protein > 5 && food.protein > 15) {
         const proteinPerGram = food.protein / 100;
         const additionalGrams = Math.min(50, Math.round(deficits.protein / proteinPerGram));
+        const newQuantity = mealFood.quantity_grams + additionalGrams;
         
-        if (additionalGrams > 10) {
+        // Usar limites do contrato
+        if (additionalGrams > 10 && newQuantity <= QUANTITY_LIMITS.max) {
           adjustments.push({
             type: 'quantity_change',
             meal_id: meal.id,
@@ -811,7 +834,7 @@ function generateRuleBasedAdjustments(
             food_id: food.id,
             food_name: food.name,
             original_quantity: mealFood.quantity_grams,
-            new_quantity: mealFood.quantity_grams + additionalGrams,
+            new_quantity: Math.min(QUANTITY_LIMITS.max, newQuantity),
             reason: `Aumentar proteína em ${(additionalGrams * proteinPerGram).toFixed(1)}g`
           });
           
@@ -823,8 +846,10 @@ function generateRuleBasedAdjustments(
       if (permissions.canAdjustMacros && deficits.fat < -3 && food.fat > 10) {
         const fatPerGram = food.fat / 100;
         const reduceGrams = Math.min(30, Math.round(Math.abs(deficits.fat) / fatPerGram));
+        const newQuantity = mealFood.quantity_grams - reduceGrams;
         
-        if (reduceGrams > 5 && mealFood.quantity_grams - reduceGrams >= 20) {
+        // Usar limites do contrato
+        if (reduceGrams > 5 && newQuantity >= QUANTITY_LIMITS.min) {
           adjustments.push({
             type: 'quantity_change',
             meal_id: meal.id,
@@ -833,7 +858,7 @@ function generateRuleBasedAdjustments(
             food_id: food.id,
             food_name: food.name,
             original_quantity: mealFood.quantity_grams,
-            new_quantity: mealFood.quantity_grams - reduceGrams,
+            new_quantity: Math.max(QUANTITY_LIMITS.min, newQuantity),
             reason: `Reduzir gordura em ${(reduceGrams * fatPerGram).toFixed(1)}g`
           });
           
