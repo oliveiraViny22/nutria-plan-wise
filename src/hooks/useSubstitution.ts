@@ -37,7 +37,7 @@ export interface UseSubstitutionReturn {
   error: SubstituteError | null;
   
   // Ações
-  findCandidates: (sourceFood: Food, sourceGrams: number, availableFoods: Food[]) => void;
+  findCandidates: (sourceFood: Food, sourceGrams: number, availableFoods: Food[], excludeFoodIds?: string[]) => void;
   selectCandidate: (candidateId: string) => void;
   confirmSubstitution: (mealOptionFoodId: string, optionId: string) => Promise<boolean>;
   reset: () => void;
@@ -72,11 +72,13 @@ export function useSubstitution(options?: UseSubstitutionOptions): UseSubstituti
 
   /**
    * Busca candidatos para substituição
+   * @param excludeFoodIds - IDs de alimentos já presentes na opção (para evitar duplicatas)
    */
   const findCandidates = useCallback((
     sourceFood: Food,
     sourceGrams: number,
-    availableFoods: Food[]
+    availableFoods: Food[],
+    excludeFoodIds?: string[]
   ) => {
     setIsLoading(true);
     setError(null);
@@ -93,8 +95,9 @@ export function useSubstitution(options?: UseSubstitutionOptions): UseSubstituti
         sourceFood,
         sourceGrams,
         availableFoods,
-        undefined,
-        governanceContext
+        undefined, // targetFoodId - será selecionado pelo usuário
+        governanceContext,
+        excludeFoodIds ? { excludeFoodIds } : undefined
       );
       
       if (!result.success) {

@@ -236,12 +236,16 @@ export default function MealDetail() {
       return;
     }
     
+    // Obter IDs de todos os alimentos já presentes na opção de refeição (para evitar duplicatas)
+    const currentOption = mealOptions.find(opt => opt.id === optionId);
+    const existingFoodIds = currentOption?.foods?.map(f => (f.food as Food)?.id).filter(Boolean) as string[] || [];
+    
     setSelectedMealOptionFood(optionFood);
     setCurrentOptionId(optionId);
     resetSubstitution();
-    findCandidates(food, optionFood.quantity_grams, allFoods);
+    findCandidates(food, optionFood.quantity_grams, allFoods, existingFoodIds);
     setShowSubstituteModal(true);
-  }, [allFoods, findCandidates, resetSubstitution, can_substitute, substitutionLimitReached, fetchAllFoods]);
+  }, [allFoods, findCandidates, resetSubstitution, can_substitute, substitutionLimitReached, fetchAllFoods, mealOptions]);
 
   const handleSelectCandidate = useCallback((candidateId: string) => {
     selectCandidate(candidateId);
@@ -253,11 +257,14 @@ export default function MealDetail() {
   }, [selectedMealOptionFood, currentOptionId, proposal, confirmSub]);
 
   const handleBackToCandidates = useCallback(() => {
-    if (selectedMealOptionFood?.food) {
+    if (selectedMealOptionFood?.food && currentOptionId) {
       const food = selectedMealOptionFood.food as Food;
-      findCandidates(food, selectedMealOptionFood.quantity_grams, allFoods);
+      // Obter IDs existentes para evitar duplicatas
+      const currentOption = mealOptions.find(opt => opt.id === currentOptionId);
+      const existingFoodIds = currentOption?.foods?.map(f => (f.food as Food)?.id).filter(Boolean) as string[] || [];
+      findCandidates(food, selectedMealOptionFood.quantity_grams, allFoods, existingFoodIds);
     }
-  }, [selectedMealOptionFood, allFoods, findCandidates]);
+  }, [selectedMealOptionFood, allFoods, findCandidates, currentOptionId, mealOptions]);
 
   const handleCloseModal = useCallback(() => {
     setShowSubstituteModal(false);
@@ -288,8 +295,11 @@ export default function MealDetail() {
     }
     
     // Usar o serviço de substituição diretamente para encontrar o melhor candidato
+    // Excluir alimentos já presentes na opção para evitar duplicatas
     const { findSubstituteCandidates } = await import('@/lib/substitution-service');
-    const candidatesList = findSubstituteCandidates(food, optionFood.quantity_grams, allFoods);
+    const currentOption = mealOptions.find(opt => opt.id === optionId);
+    const existingFoodIds = currentOption?.foods?.map(f => (f.food as Food)?.id).filter(Boolean) as string[] || [];
+    const candidatesList = findSubstituteCandidates(food, optionFood.quantity_grams, allFoods, { excludeFoodIds: existingFoodIds });
     
     if (candidatesList.length === 0) {
       toast.info('Alimento adicionado aos evitados. Não há substitutos equivalentes disponíveis.');
@@ -347,7 +357,7 @@ export default function MealDetail() {
       console.error('Error auto-substituting:', err);
       toast.info('Alimento adicionado aos evitados. Erro ao substituir automaticamente.');
     }
-  }, [addToAvoided, can_substitute, substitutionLimitReached, checkCanSubstitute, allFoods, fetchMealData]);
+  }, [addToAvoided, can_substitute, substitutionLimitReached, checkCanSubstitute, allFoods, fetchMealData, mealOptions]);
 
   const recalculateOptionTotals = async (optionId: string) => {
     const { data: foods } = await supabase
