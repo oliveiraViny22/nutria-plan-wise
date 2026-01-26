@@ -23,6 +23,8 @@ export interface SubstituteOptions {
   allowCrossCategory?: boolean;
   /** Force rebalance after substitution */
   forceRebalance?: boolean;
+  /** IDs of foods already in the meal option (to exclude from candidates) */
+  excludeFoodIds?: string[];
 }
 
 export interface SubstituteCandidate {
@@ -452,6 +454,11 @@ export function findSubstituteCandidates(
     // Não pode ser o mesmo alimento
     if (food.id === sourceFood.id) {
       rejectionStats.sameId++;
+      return false;
+    }
+    
+    // Não pode ser alimento já presente na mesma opção de refeição
+    if (options?.excludeFoodIds?.includes(food.id)) {
       return false;
     }
     
