@@ -66,7 +66,6 @@ export function MealAnchorFoodsManager() {
     food_ids: [] as string[],
     role_name: "carboidrato_base",
     default_quantity_grams: 100,
-    sort_order: 1,
   });
 
   // Fetch anchor foods
@@ -109,7 +108,6 @@ export function MealAnchorFoodsManager() {
             food_id: data.food_id,
             role_name: data.role_name,
             default_quantity_grams: data.default_quantity_grams,
-            sort_order: data.sort_order,
           })
           .eq("id", data.id);
 
@@ -130,7 +128,6 @@ export function MealAnchorFoodsManager() {
               .from("meal_anchor_foods")
               .update({
                 default_quantity_grams: data.default_quantity_grams,
-                sort_order: data.sort_order,
               })
               .eq("id", existing.id);
           }
@@ -141,12 +138,11 @@ export function MealAnchorFoodsManager() {
         if (foodIds.length === 0) throw new Error("Selecione pelo menos um alimento");
 
         // Create records for all selected foods
-        const records = foodIds.map((food_id, index) => ({
+        const records = foodIds.map((food_id) => ({
           meal_type: data.meal_type,
           food_id,
           role_name: data.role_name,
           default_quantity_grams: data.default_quantity_grams,
-          sort_order: data.sort_order + index,
         }));
 
         const { error } = await supabase.from("meal_anchor_foods").insert(records);
@@ -154,12 +150,11 @@ export function MealAnchorFoodsManager() {
 
         // If lunch/dinner, also insert paired anchors
         if (pairedMealType) {
-          const pairedRecords = foodIds.map((food_id, index) => ({
+          const pairedRecords = foodIds.map((food_id) => ({
             meal_type: pairedMealType,
             food_id,
             role_name: data.role_name,
             default_quantity_grams: data.default_quantity_grams,
-            sort_order: data.sort_order + index,
           }));
 
           await supabase.from("meal_anchor_foods").insert(pairedRecords);
@@ -218,7 +213,6 @@ export function MealAnchorFoodsManager() {
       food_ids: [],
       role_name: "carboidrato_base",
       default_quantity_grams: 100,
-      sort_order: 1,
     });
     setEditingAnchor(null);
   };
@@ -230,7 +224,6 @@ export function MealAnchorFoodsManager() {
       food_ids: [anchor.food_id],
       role_name: anchor.role_name,
       default_quantity_grams: anchor.default_quantity_grams,
-      sort_order: anchor.sort_order,
     });
     setDialogOpen(true);
   };
@@ -414,16 +407,6 @@ export function MealAnchorFoodsManager() {
                   </div>
                 </div>
 
-                <div className="space-y-2">
-                  <Label>Ordem de Exibição</Label>
-                  <Input
-                    type="number"
-                    min={1}
-                    max={10}
-                    value={formData.sort_order}
-                    onChange={(e) => setFormData((p) => ({ ...p, sort_order: parseInt(e.target.value) || 1 }))}
-                  />
-                </div>
               </div>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setDialogOpen(false)}>
