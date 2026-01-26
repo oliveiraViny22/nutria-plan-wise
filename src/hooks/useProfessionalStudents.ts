@@ -12,6 +12,7 @@ export interface StudentWithProfile {
   student_id: string;
   professional_id: string;
   status: 'active' | 'inactive' | 'pending';
+  student_confirmed: boolean;
   notes: string | null;
   created_at: string;
   updated_at: string;
@@ -61,6 +62,7 @@ export function useProfessionalStudents() {
           student_id: relation.student_id,
           professional_id: relation.professional_id,
           status: relation.status as 'active' | 'inactive' | 'pending',
+          student_confirmed: relation.student_confirmed ?? false,
           notes: relation.notes,
           created_at: relation.created_at,
           updated_at: relation.updated_at,

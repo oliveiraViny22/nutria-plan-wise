@@ -811,6 +811,7 @@ export type Database = {
           notes: string | null
           professional_id: string
           status: string
+          student_confirmed: boolean | null
           student_id: string
           updated_at: string
         }
@@ -820,6 +821,7 @@ export type Database = {
           notes?: string | null
           professional_id: string
           status?: string
+          student_confirmed?: boolean | null
           student_id: string
           updated_at?: string
         }
@@ -829,6 +831,7 @@ export type Database = {
           notes?: string | null
           professional_id?: string
           status?: string
+          student_confirmed?: boolean | null
           student_id?: string
           updated_at?: string
         }
