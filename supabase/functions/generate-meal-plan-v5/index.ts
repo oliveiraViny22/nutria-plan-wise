@@ -318,25 +318,37 @@ async function loadTemplatesWithRoles(
 // =====================================================
 
 const CATEGORY_QUANTITY_LIMITS: Record<string, { min: number; max: number }> = {
-  proteinas: { min: 50, max: 200 },
-  carboidratos: { min: 80, max: 250 },
+  proteinas: { min: 80, max: 250 },  // Proteínas precisam de mais espaço
+  carboidratos: { min: 80, max: 300 },
   leguminosas: { min: 60, max: 150 },
   vegetais: { min: 50, max: 200 },
   frutas: { min: 80, max: 200 },
   laticinios: { min: 50, max: 200 },
-  gorduras: { min: 10, max: 30 }, // Gorduras são complementos, não itens principais
+  gorduras: { min: 5, max: 20 }, // Gorduras: REDUZIDO - máximo 20g para controlar calorias
+  oleaginosas: { min: 10, max: 30 }, // Oleaginosas também precisam de controle
 };
 
 // Gorduras puras que NÃO devem entrar automaticamente em planos
 // (são temperos/complementos, não itens principais)
 const EXCLUDED_PURE_FATS = [
   "óleo", "azeite", "manteiga", "creme de leite", "tahine",
-  "banha", "margarina", "gordura"
+  "banha", "margarina", "gordura", "bacon", "toucinho"
+];
+
+// Alimentos com alta densidade calórica que devem ter porções controladas
+const HIGH_FAT_FOODS = [
+  "castanha", "nozes", "amêndoa", "amendoim", "pistache", 
+  "gergelim", "linhaça", "chia", "abacate", "coco"
 ];
 
 function isPureFat(foodName: string): boolean {
   const nameLower = foodName.toLowerCase();
   return EXCLUDED_PURE_FATS.some(term => nameLower.includes(term));
+}
+
+function isHighFatFood(foodName: string): boolean {
+  const nameLower = foodName.toLowerCase();
+  return HIGH_FAT_FOODS.some(term => nameLower.includes(term));
 }
 
 function filterEligibleFoods(
@@ -436,9 +448,17 @@ function calculateApproximateQuantity(role: TemplateRole, food?: Food): number {
     if (catLimits) {
       min = Math.max(min, catLimits.min);
       max = Math.min(max, catLimits.max);
-      // Recalcular média com limites ajustados
-      mid = (min + max) / 2;
     }
+    
+    // CRÍTICO: Alimentos com alta gordura precisam de porções MUITO menores
+    if (isHighFatFood(food.name)) {
+      max = Math.min(max, 30); // Máximo 30g para oleaginosas/abacate
+      min = Math.min(min, 10);
+      log("Limitando porção de alimento gorduroso", { name: food.name, max });
+    }
+    
+    // Recalcular média com limites ajustados
+    mid = (min + max) / 2;
   }
 
   const variance = (max - min) * 0.2;
@@ -727,15 +747,16 @@ interface ScaleResult {
   converged: boolean;
 }
 
-// Limites por categoria de alimento
+// Limites por categoria de alimento para escalonamento
 const CATEGORY_SCALE_LIMITS: Record<string, { min: number; max: number }> = {
-  proteinas: { min: 30, max: 300 },
+  proteinas: { min: 50, max: 350 },    // Proteínas precisam de mais espaço para atingir metas
   carboidratos: { min: 50, max: 400 },
   leguminosas: { min: 40, max: 250 },
   vegetais: { min: 30, max: 300 },
   frutas: { min: 50, max: 300 },
   laticinios: { min: 30, max: 250 },
-  gorduras: { min: 5, max: 50 }, // Gorduras têm limite menor
+  gorduras: { min: 5, max: 30 },       // Gorduras: REDUZIDO para controlar excesso
+  oleaginosas: { min: 5, max: 40 },    // Oleaginosas também controladas
 };
 
 const DEFAULT_SCALE_LIMITS = { min: 20, max: 500 };
