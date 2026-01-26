@@ -1,10 +1,35 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import {
+  KCAL_PER_GRAM,
+  REBALANCER_CONTRACT,
+  type MacroTargets as ContractMacroTargets,
+} from "../_shared/nutrition-contracts.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
+
+// =====================================================
+// CONSTANTES DE PRECISÃO (DERIVADAS DOS CONTRATOS)
+// =====================================================
+// O rebalanceador deve entregar precisão de 98-102% em UMA chamada.
+// Sem tolerâncias largas - meta EXATA é o objetivo.
+// =====================================================
+
+const PRECISION_TARGETS = {
+  /** Faixa IDEAL: 98-102% (objetivo principal) */
+  IDEAL_MIN: 98,
+  IDEAL_MAX: 102,
+  /** Faixa ACEITÁVEL (fallback): 96-104% */
+  ACCEPTABLE_MIN: 96,
+  ACCEPTABLE_MAX: 104,
+  /** Máximo de iterações para convergência */
+  MAX_ITERATIONS: 50,
+  /** Tolerância mínima de mudança para continuar iterando (gramas) */
+  MIN_CHANGE_THRESHOLD: 0.5,
+} as const;
 
 interface MealOptionFood {
   id: string;
@@ -300,13 +325,20 @@ function refineAdjustmentsToTarget(
   foods: FoodWithMeta[],
   currentQuantities: Map<string, number>,
   targets: MacroTargets,
-  maxIterations: number = 30
+  maxIterations: number = PRECISION_TARGETS.MAX_ITERATIONS
 ): Map<string, number> {
   const quantities = new Map(currentQuantities);
-  const TARGET_MIN = 95; // Mínimo aceitável
-  const TARGET_MAX = 105; // Máximo aceitável
-  const IDEAL_MIN = 98;
-  const IDEAL_MAX = 102;
+  
+  // Usar constantes centralizadas
+  const IDEAL_MIN = PRECISION_TARGETS.IDEAL_MIN;
+  const IDEAL_MAX = PRECISION_TARGETS.IDEAL_MAX;
+  const MIN_CHANGE = PRECISION_TARGETS.MIN_CHANGE_THRESHOLD;
+  
+  // Pré-calcular contribuições por 100g de cada alimento
+  const foodContributions = new Map<string, MacroTargets>();
+  for (const food of foods) {
+    foodContributions.set(food.id, getFoodContribution(food.food));
+  }
   
   for (let iteration = 0; iteration < maxIterations; iteration++) {
     // Calcular macros atuais
@@ -320,7 +352,7 @@ function refineAdjustmentsToTarget(
                             accuracy.fat >= IDEAL_MIN && accuracy.fat <= IDEAL_MAX;
     
     if (allInIdealRange) {
-      console.log(`Refinamento concluído na iteração ${iteration + 1}: todos macros em 98-102%`);
+      console.log(`Refinamento concluído na iteração ${iteration + 1}: todos macros em ${IDEAL_MIN}-${IDEAL_MAX}%`);
       break;
     }
     
@@ -350,7 +382,7 @@ function refineAdjustmentsToTarget(
     const mainDeficit = outOfRange[0];
     
     // Se a diferença é muito pequena, pular
-    if (Math.abs(mainDeficit.diff) < 0.5) continue;
+    if (Math.abs(mainDeficit.diff) < MIN_CHANGE) continue;
     
     // Encontrar o melhor alimento para ajustar este macro
     let bestFood: FoodWithMeta | null = null;
@@ -358,7 +390,7 @@ function refineAdjustmentsToTarget(
     let bestScore = -Infinity;
     
     for (const food of foods) {
-      const contribution = getFoodContribution(food.food);
+      const contribution = foodContributions.get(food.id)!;
       const macroValue = contribution[mainDeficit.macro];
       
       if (macroValue <= 0) continue;
@@ -408,17 +440,39 @@ function refineAdjustmentsToTarget(
     } else {
       // Fallback: ajuste proporcional em alimentos que contribuem para o macro
       const needIncrease = mainDeficit.diff > 0;
-      for (const food of foods) {
-        const contribution = getFoodContribution(food.food);
-        if (contribution[mainDeficit.macro] > 0) {
+      const contributingFoods = foods.filter(f => {
+        const contribution = foodContributions.get(f.id)!;
+        return contribution[mainDeficit.macro] > 0;
+      });
+      
+      if (contributingFoods.length > 0) {
+        // Distribuir o ajuste proporcionalmente à contribuição de cada alimento
+        const totalContribution = contributingFoods.reduce((sum, f) => {
+          const contribution = foodContributions.get(f.id)!;
+          return sum + contribution[mainDeficit.macro];
+        }, 0);
+        
+        for (const food of contributingFoods) {
+          const contribution = foodContributions.get(food.id)!;
+          const share = contribution[mainDeficit.macro] / totalContribution;
+          const gramsToAdd = (mainDeficit.diff * 100 / contribution[mainDeficit.macro]) * share;
+          
           const currentGrams = quantities.get(food.id) || food.quantity_grams;
           const limits = getQuantityLimits(food.food.category);
-          const factor = needIncrease ? 1.03 : 0.97;
-          const newGrams = Math.round(Math.max(limits.min, Math.min(limits.max, currentGrams * factor)));
+          const newGrams = Math.round(Math.max(limits.min, Math.min(limits.max, currentGrams + gramsToAdd)));
           quantities.set(food.id, newGrams);
         }
       }
     }
+  }
+  
+  // Verificação final - log se não atingiu a meta ideal
+  const finalMacros = calculateMacrosFromMap(foods, quantities);
+  const finalAccuracy = calculateAccuracy(finalMacros, targets);
+  
+  if (finalAccuracy.calories < IDEAL_MIN || finalAccuracy.calories > IDEAL_MAX ||
+      finalAccuracy.protein < IDEAL_MIN || finalAccuracy.protein > IDEAL_MAX) {
+    console.warn(`Refinamento não atingiu ${IDEAL_MIN}-${IDEAL_MAX}%: Cal ${finalAccuracy.calories.toFixed(1)}%, Prot ${finalAccuracy.protein.toFixed(1)}%`);
   }
   
   return quantities;
@@ -822,24 +876,29 @@ RETORNE JSON:
     
     console.log(`IA propôs: Cal ${aiAccuracy.calories.toFixed(1)}%, Prot ${aiAccuracy.protein.toFixed(1)}%, Carb ${aiAccuracy.carbs.toFixed(1)}%, Fat ${aiAccuracy.fat.toFixed(1)}%`);
     
-    // REFINAMENTO MATEMÁTICO V2: Sempre aplicar para garantir precisão
-    // Aceita faixas mais realistas: 95-105% aceitável, 98-102% ideal
-    const ACCEPTABLE_MIN = 95;
-    const ACCEPTABLE_MAX = 105;
+    // REFINAMENTO MATEMÁTICO V3: SEMPRE aplicar para garantir precisão de 98-102%
+    // Usa constantes centralizadas em PRECISION_TARGETS
     let finalQuantities = aiQuantities;
-    let refinementApplied = false;
     
-    // Verificar se algum macro está fora do aceitável
-    const proteinOk = aiAccuracy.protein >= tolerances.protein.minimum;
-    const caloriesOk = aiAccuracy.calories >= ACCEPTABLE_MIN && aiAccuracy.calories <= ACCEPTABLE_MAX;
-    const carbsOk = aiAccuracy.carbs >= tolerances.carbs.acceptable[0] && aiAccuracy.carbs <= tolerances.carbs.acceptable[1];
-    const fatOk = aiAccuracy.fat >= tolerances.fat.acceptable[0] && aiAccuracy.fat <= tolerances.fat.acceptable[1];
+    // Verificar se a IA já atingiu a faixa ideal
+    const aiInIdealRange = 
+      aiAccuracy.calories >= PRECISION_TARGETS.IDEAL_MIN && aiAccuracy.calories <= PRECISION_TARGETS.IDEAL_MAX &&
+      aiAccuracy.protein >= PRECISION_TARGETS.IDEAL_MIN && aiAccuracy.protein <= PRECISION_TARGETS.IDEAL_MAX &&
+      aiAccuracy.carbs >= PRECISION_TARGETS.IDEAL_MIN && aiAccuracy.carbs <= PRECISION_TARGETS.IDEAL_MAX &&
+      aiAccuracy.fat >= PRECISION_TARGETS.IDEAL_MIN && aiAccuracy.fat <= PRECISION_TARGETS.IDEAL_MAX;
     
-    // SEMPRE refinar se proteína ou calorias estão fora do aceitável
-    if (!proteinOk || !caloriesOk || !carbsOk || !fatOk) {
-      console.log(`Aplicando refinamento matemático (protein: ${aiAccuracy.protein.toFixed(1)}%, cal: ${aiAccuracy.calories.toFixed(1)}%)`);
-      finalQuantities = refineAdjustmentsToTarget(allFoodsWithMeta, aiQuantities, targets, 35);
-      refinementApplied = true;
+    // SEMPRE refinar se não estiver na faixa ideal (98-102%)
+    if (!aiInIdealRange) {
+      console.log(`Aplicando refinamento matemático para atingir ${PRECISION_TARGETS.IDEAL_MIN}-${PRECISION_TARGETS.IDEAL_MAX}%`);
+      console.log(`IA inicial: Cal ${aiAccuracy.calories.toFixed(1)}%, Prot ${aiAccuracy.protein.toFixed(1)}%, Carb ${aiAccuracy.carbs.toFixed(1)}%, Fat ${aiAccuracy.fat.toFixed(1)}%`);
+      
+      // Usar mais iterações para garantir convergência
+      finalQuantities = refineAdjustmentsToTarget(
+        allFoodsWithMeta, 
+        aiQuantities, 
+        targets, 
+        PRECISION_TARGETS.MAX_ITERATIONS
+      );
     }
 
     // Mapear ajustes finais
@@ -960,9 +1019,17 @@ RETORNE JSON:
     
     const explanation = buildFriendlyExplanation();
 
-    // Warnings
+    // Warnings - usar constantes centralizadas
     const warnings: string[] = aiResult.warnings || [];
-    if (finalAccuracy.minAccuracy < 99) {
+    
+    // Verificar se atingiu a faixa ideal
+    const isInIdealRange = 
+      finalAccuracy.calories >= PRECISION_TARGETS.IDEAL_MIN && finalAccuracy.calories <= PRECISION_TARGETS.IDEAL_MAX &&
+      finalAccuracy.protein >= PRECISION_TARGETS.IDEAL_MIN && finalAccuracy.protein <= PRECISION_TARGETS.IDEAL_MAX &&
+      finalAccuracy.carbs >= PRECISION_TARGETS.IDEAL_MIN && finalAccuracy.carbs <= PRECISION_TARGETS.IDEAL_MAX &&
+      finalAccuracy.fat >= PRECISION_TARGETS.IDEAL_MIN && finalAccuracy.fat <= PRECISION_TARGETS.IDEAL_MAX;
+    
+    if (!isInIdealRange && finalAccuracy.minAccuracy < PRECISION_TARGETS.IDEAL_MIN) {
       warnings.push(`Atenção: Precisão de ${finalAccuracy.minAccuracy.toFixed(1)}% em um dos macros. Considere ajustar manualmente.`);
     }
 
