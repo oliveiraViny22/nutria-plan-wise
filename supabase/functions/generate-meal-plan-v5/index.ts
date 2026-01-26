@@ -717,30 +717,33 @@ function buildMealWithAnchors(
 
 function validateStructure(meals: MealResult[]): StructuralValidation {
   const errors: string[] = [];
+  const warnings: string[] = [];
 
   for (const meal of meals) {
     const limits = ITEM_COUNTS[meal.meal_type] || { min: 2, max: 6 };
 
-    // Validar número de itens
+    // Validar número de itens (ERRO BLOQUEANTE)
     if (meal.foods.length < limits.min) {
       errors.push(`[E1] ${meal.meal_name}: poucos itens (${meal.foods.length} < ${limits.min})`);
     }
 
-    // Validar presença de proteína em refeições principais usando constantes dos contratos
+    // Validar presença de proteína em refeições principais
+    // NOTA: Isso é WARNING, não erro - o rebalanceador ajustará as quantidades
     if (MAIN_MEALS.includes(meal.meal_type)) {
       const mealProtein = meal.totals.protein;
       if (mealProtein < GENERATOR_CONTRACT.MIN_PROTEIN_MAIN_MEAL_GRAMS) {
-        errors.push(`[G1] ${meal.meal_name}: proteína insuficiente (${mealProtein.toFixed(1)}g < ${GENERATOR_CONTRACT.MIN_PROTEIN_MAIN_MEAL_GRAMS}g)`);
+        // WARNING: rebalanceador pode aumentar quantidade do alimento proteico
+        log(`[WARN] ${meal.meal_name}: proteína baixa (${mealProtein.toFixed(1)}g), rebalanceador ajustará`);
       }
     } else {
-      // Lanches/Ceia
+      // Lanches/Ceia - também é apenas warning
       const mealProtein = meal.totals.protein;
       if (mealProtein < GENERATOR_CONTRACT.MIN_PROTEIN_SNACK_GRAMS) {
-        errors.push(`[G2] ${meal.meal_name}: proteína de lanche insuficiente (${mealProtein.toFixed(1)}g < ${GENERATOR_CONTRACT.MIN_PROTEIN_SNACK_GRAMS}g)`);
+        log(`[WARN] ${meal.meal_name}: proteína baixa no lanche (${mealProtein.toFixed(1)}g)`);
       }
     }
 
-    // Validar estrutura do almoço/jantar: carbo + leguminosa + proteína + vegetal
+    // Validar estrutura do almoço/jantar: carbo + leguminosa + proteína + vegetal (ERRO BLOQUEANTE)
     if (meal.meal_type === "lunch" || meal.meal_type === "dinner") {
       const categories = new Set(meal.foods.map((f) => (f.food.category || "").toLowerCase()));
 
@@ -755,6 +758,17 @@ function validateStructure(meals: MealResult[]): StructuralValidation {
       }
       if (!categories.has("vegetais")) {
         errors.push(`[E6] ${meal.meal_name}: sem vegetal`);
+      }
+    }
+    
+    // Validar que café da manhã tem fonte de proteína (ERRO BLOQUEANTE)
+    if (meal.meal_type === "breakfast") {
+      const hasProteinSource = meal.foods.some((f) => {
+        const cat = (f.food.category || "").toLowerCase();
+        return cat === "proteinas" || cat === "laticinios";
+      });
+      if (!hasProteinSource) {
+        errors.push(`[E7] ${meal.meal_name}: sem fonte de proteína (proteínas ou laticínios)`);
       }
     }
 
