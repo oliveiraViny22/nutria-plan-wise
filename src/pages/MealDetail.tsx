@@ -236,9 +236,12 @@ export default function MealDetail() {
       return;
     }
     
-    // Obter IDs de todos os alimentos já presentes na opção de refeição (para evitar duplicatas)
+    // Obter IDs de alimentos já presentes na opção (exceto o que será substituído)
+    // Isso permite que alimentos de outras opções sejam candidatos válidos
     const currentOption = mealOptions.find(opt => opt.id === optionId);
-    const existingFoodIds = currentOption?.foods?.map(f => (f.food as Food)?.id).filter(Boolean) as string[] || [];
+    const existingFoodIds = currentOption?.foods
+      ?.map(f => (f.food as Food)?.id)
+      .filter((id): id is string => Boolean(id) && id !== food.id) || [];
     
     setSelectedMealOptionFood(optionFood);
     setCurrentOptionId(optionId);
@@ -259,9 +262,11 @@ export default function MealDetail() {
   const handleBackToCandidates = useCallback(() => {
     if (selectedMealOptionFood?.food && currentOptionId) {
       const food = selectedMealOptionFood.food as Food;
-      // Obter IDs existentes para evitar duplicatas
+      // Obter IDs existentes (exceto o que será substituído)
       const currentOption = mealOptions.find(opt => opt.id === currentOptionId);
-      const existingFoodIds = currentOption?.foods?.map(f => (f.food as Food)?.id).filter(Boolean) as string[] || [];
+      const existingFoodIds = currentOption?.foods
+        ?.map(f => (f.food as Food)?.id)
+        .filter((id): id is string => Boolean(id) && id !== food.id) || [];
       findCandidates(food, selectedMealOptionFood.quantity_grams, allFoods, existingFoodIds);
     }
   }, [selectedMealOptionFood, allFoods, findCandidates, currentOptionId, mealOptions]);
@@ -298,7 +303,9 @@ export default function MealDetail() {
     // Excluir alimentos já presentes na opção para evitar duplicatas
     const { findSubstituteCandidates } = await import('@/lib/substitution-service');
     const currentOption = mealOptions.find(opt => opt.id === optionId);
-    const existingFoodIds = currentOption?.foods?.map(f => (f.food as Food)?.id).filter(Boolean) as string[] || [];
+    const existingFoodIds = currentOption?.foods
+      ?.map(f => (f.food as Food)?.id)
+      .filter((id): id is string => Boolean(id) && id !== food.id) || [];
     const candidatesList = findSubstituteCandidates(food, optionFood.quantity_grams, allFoods, { excludeFoodIds: existingFoodIds });
     
     if (candidatesList.length === 0) {
