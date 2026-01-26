@@ -598,18 +598,20 @@ serve(async (req) => {
     const currentCarbsPercent = (currentMacros.carbs / targets.carbs) * 100;
     const currentFatPercent = (currentMacros.fat / targets.fat) * 100;
     
-    // Verificar se todos os macros estão dentro da faixa aceitável
-    const caloriesInRange = currentCaloriesPercent >= tolerances.calories.acceptable[0] && 
-                           currentCaloriesPercent <= tolerances.calories.acceptable[1];
-    const proteinInRange = currentProteinPercent >= tolerances.protein.minimum;
+    // Verificar se todos os macros estão dentro da faixa IDEAL (98-102% para calorias/proteína)
+    // Usar faixa ideal para "já otimizado" - não queremos considerar 88% como otimizado
+    const caloriesInRange = currentCaloriesPercent >= tolerances.calories.ideal[0] && 
+                           currentCaloriesPercent <= tolerances.calories.ideal[1];
+    const proteinInRange = currentProteinPercent >= tolerances.protein.ideal[0] &&
+                          currentProteinPercent <= tolerances.protein.ideal[1];
     const carbsInRange = currentCarbsPercent >= tolerances.carbs.acceptable[0] && 
                         currentCarbsPercent <= tolerances.carbs.acceptable[1];
     const fatInRange = currentFatPercent >= tolerances.fat.acceptable[0] && 
                       currentFatPercent <= tolerances.fat.acceptable[1];
     
-    const allInAcceptableRange = caloriesInRange && proteinInRange && carbsInRange && fatInRange;
+    const allInIdealRange = caloriesInRange && proteinInRange && carbsInRange && fatInRange;
     
-    if (allInAcceptableRange) {
+    if (allInIdealRange) {
       console.log(`Plano já otimizado: Cal ${currentCaloriesPercent.toFixed(1)}%, Prot ${currentProteinPercent.toFixed(1)}%, Carb ${currentCarbsPercent.toFixed(1)}%, Fat ${currentFatPercent.toFixed(1)}%`);
       
       // Construir mensagem amigável com os percentuais
