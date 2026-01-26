@@ -454,6 +454,33 @@ function selectAnchorForOption(
 }
 
 // =====================================================
+// MAPEAMENTO DE NOMES DE PAPÉIS SIMILARES
+// =====================================================
+
+const ROLE_ALIASES: Record<string, string[]> = {
+  proteina: ["proteina_principal", "proteina_leve"],
+  proteina_principal: ["proteina", "proteina_leve"],
+  proteina_leve: ["proteina", "proteina_principal"],
+  carboidrato_base: ["carboidrato"],
+  carboidrato: ["carboidrato_base"],
+  laticinio: ["laticinios"],
+  laticinios: ["laticinio"],
+};
+
+function normalizeRoleName(roleName: string): string {
+  // Retorna o nome canônico para comparação
+  if (roleName.startsWith("proteina")) return "proteina";
+  if (roleName.startsWith("carboidrato")) return "carboidrato";
+  if (roleName.startsWith("laticinio")) return "laticinio";
+  return roleName;
+}
+
+function rolesMatch(anchor_role: string, template_role: string): boolean {
+  if (anchor_role === template_role) return true;
+  return normalizeRoleName(anchor_role) === normalizeRoleName(template_role);
+}
+
+// =====================================================
 // MONTAR REFEIÇÃO COM ÂNCORAS DISTRIBUÍDAS
 // =====================================================
 
@@ -471,13 +498,26 @@ function buildMealWithAnchors(
   const foods: FoodSelection[] = [];
   const usedInMeal = new Set<string>();
   const filledRoles = new Set<string>();
+  const filledNormalizedRoles = new Set<string>(); // Para evitar duplicatas de proteína/carbo
 
   // Criar set combinado de IDs usados (global + opções anteriores desta refeição)
   const combinedUsedIds = new Set([...usedGlobalIds, ...previousOptionsUsedIds]);
 
   // PASSO 1: Tentar usar âncoras para preencher papéis
-  // Cada opção pega uma âncora diferente do mesmo papel
+  // CRÍTICO: Apenas UMA âncora por categoria normalizada de papel
   for (const { role_name, anchors } of anchorsByRole) {
+    const normalizedRole = normalizeRoleName(role_name);
+    
+    // Pular se já temos um alimento para este papel normalizado
+    if (filledNormalizedRoles.has(normalizedRole)) {
+      log(`Âncora ignorada - papel já preenchido`, { 
+        mealType, 
+        role: role_name,
+        normalizedRole 
+      });
+      continue;
+    }
+    
     const anchor = selectAnchorForOption(anchors, optionNumber, combinedUsedIds);
     
     if (anchor && anchor.food) {
@@ -492,17 +532,35 @@ function buildMealWithAnchors(
 
       usedInMeal.add(anchor.food.id);
       filledRoles.add(role_name);
+      filledNormalizedRoles.add(normalizedRole);
+      
+      // Marcar papéis similares como preenchidos também
+      const aliases = ROLE_ALIASES[role_name] || [];
+      for (const alias of aliases) {
+        filledRoles.add(alias);
+      }
+      
       log(`Âncora aplicada (opção ${optionNumber})`, { 
         mealType, 
         food: anchor.food.name, 
-        role: role_name 
+        role: role_name,
+        normalizedRole
       });
     }
   }
 
   // PASSO 2: Processar papéis obrigatórios NÃO preenchidos por âncoras
-  const requiredRoles = roles.filter((r) => r.is_required && !filledRoles.has(r.role_name));
-  const optionalRoles = roles.filter((r) => !r.is_required && !filledRoles.has(r.role_name));
+  // Verificar tanto pelo nome exato quanto pelo normalizado
+  const requiredRoles = roles.filter((r) => 
+    r.is_required && 
+    !filledRoles.has(r.role_name) && 
+    !filledNormalizedRoles.has(normalizeRoleName(r.role_name))
+  );
+  const optionalRoles = roles.filter((r) => 
+    !r.is_required && 
+    !filledRoles.has(r.role_name) &&
+    !filledNormalizedRoles.has(normalizeRoleName(r.role_name))
+  );
 
   for (const role of requiredRoles) {
     const food = selectFoodForRole(
