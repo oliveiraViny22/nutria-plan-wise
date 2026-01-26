@@ -706,71 +706,93 @@ RETORNE JSON:
       throw new Error("LOVABLE_API_KEY is not configured");
     }
 
-    const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
-        ],
-        tools: [
-          {
-            type: "function",
-            function: {
-              name: "propose_adjustments",
-              description: "Propõe ajustes de porções para o plano alimentar",
-              parameters: {
-                type: "object",
-                properties: {
-                  adjustments: {
-                    type: "array",
-                    items: {
-                      type: "object",
-                      properties: {
-                        foodItemId: { type: "string" },
-                        newGrams: { type: "number" },
-                        reason: { type: "string" },
+    let aiResponse: Response;
+    let aiError: string | null = null;
+    
+    // Tentar modelo primário, com fallback para modelo mais estável
+    const modelsToTry = ["google/gemini-2.5-flash", "google/gemini-2.5-flash-lite"];
+    
+    for (const model of modelsToTry) {
+      try {
+        console.log(`Tentando modelo: ${model}`);
+        aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${LOVABLE_API_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model,
+            messages: [
+              { role: "system", content: systemPrompt },
+              { role: "user", content: userPrompt },
+            ],
+            tools: [
+              {
+                type: "function",
+                function: {
+                  name: "propose_adjustments",
+                  description: "Propõe ajustes de porções para o plano alimentar",
+                  parameters: {
+                    type: "object",
+                    properties: {
+                      adjustments: {
+                        type: "array",
+                        items: {
+                          type: "object",
+                          properties: {
+                            foodItemId: { type: "string" },
+                            newGrams: { type: "number" },
+                            reason: { type: "string" },
+                          },
+                          required: ["foodItemId", "newGrams", "reason"],
+                        },
                       },
-                      required: ["foodItemId", "newGrams", "reason"],
+                      explanation: { type: "string" },
+                      warnings: {
+                        type: "array",
+                        items: { type: "string" },
+                      },
                     },
-                  },
-                  explanation: { type: "string" },
-                  warnings: {
-                    type: "array",
-                    items: { type: "string" },
+                    required: ["adjustments", "explanation"],
                   },
                 },
-                required: ["adjustments", "explanation"],
               },
-            },
-          },
-        ],
-        tool_choice: { type: "function", function: { name: "propose_adjustments" } },
-      }),
-    });
+            ],
+            tool_choice: { type: "function", function: { name: "propose_adjustments" } },
+          }),
+        });
 
-    if (!aiResponse.ok) {
-      const errorText = await aiResponse.text();
-      console.error("AI Gateway error:", aiResponse.status, errorText);
-      
-      if (aiResponse.status === 429) {
-        return new Response(
-          JSON.stringify({ error: "Limite de requisições atingido. Tente novamente em alguns minutos." }),
-          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        if (aiResponse.ok) {
+          console.log(`Modelo ${model} respondeu com sucesso`);
+          break;
+        }
+        
+        const errorText = await aiResponse.text();
+        console.error(`Modelo ${model} falhou:`, aiResponse.status, errorText);
+        aiError = errorText;
+        
+        if (aiResponse.status === 429) {
+          return new Response(
+            JSON.stringify({ error: "Limite de requisições atingido. Tente novamente em alguns minutos." }),
+            { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+        if (aiResponse.status === 402) {
+          return new Response(
+            JSON.stringify({ error: "Créditos insuficientes para IA." }),
+            { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+      } catch (fetchError) {
+        console.error(`Erro ao chamar modelo ${model}:`, fetchError);
+        aiError = String(fetchError);
       }
-      if (aiResponse.status === 402) {
-        return new Response(
-          JSON.stringify({ error: "Créditos insuficientes para IA." }),
-          { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-      throw new Error("AI gateway error");
+    }
+
+    if (!aiResponse! || !aiResponse!.ok) {
+      console.error("Todos os modelos falharam:", aiError);
+      throw new Error(`AI gateway error: ${aiError}`);
     }
 
     const aiData = await aiResponse.json();
