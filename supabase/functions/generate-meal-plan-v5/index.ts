@@ -712,11 +712,10 @@ function buildMealWithAnchors(
 }
 
 // =====================================================
-// AJUSTE PROPORCIONAL PARA FECHAR METAS
+// AJUSTE PROPORCIONAL ITERATIVO PARA FECHAR METAS
 // =====================================================
-// O gerador delega o "fechamento fino" ao rebalanceador, MAS precisa
-// entregar um plano dentro de ±10% da meta calórica.
-// Esta função escala todas as porções proporcionalmente.
+// O gerador precisa entregar um plano dentro de ±10% da meta calórica.
+// Esta função usa iteração para convergir com precisão.
 // =====================================================
 
 interface ScaleResult {
@@ -724,11 +723,83 @@ interface ScaleResult {
   scaleFactor: number;
   beforeTotals: { calories: number; protein: number; carbs: number; fat: number };
   afterTotals: { calories: number; protein: number; carbs: number; fat: number };
+  iterations: number;
+  converged: boolean;
+}
+
+// Limites por categoria de alimento
+const CATEGORY_SCALE_LIMITS: Record<string, { min: number; max: number }> = {
+  proteinas: { min: 30, max: 300 },
+  carboidratos: { min: 50, max: 400 },
+  leguminosas: { min: 40, max: 250 },
+  vegetais: { min: 30, max: 300 },
+  frutas: { min: 50, max: 300 },
+  laticinios: { min: 30, max: 250 },
+  gorduras: { min: 5, max: 50 }, // Gorduras têm limite menor
+};
+
+const DEFAULT_SCALE_LIMITS = { min: 20, max: 500 };
+
+function getScaleLimitsForFood(food: Food): { min: number; max: number } {
+  const category = (food.category || "").toLowerCase();
+  return CATEGORY_SCALE_LIMITS[category] || DEFAULT_SCALE_LIMITS;
+}
+
+/**
+ * Calcula totais de uma lista de refeições.
+ */
+function calculatePlanTotals(mealsWithOptions: Array<{ mealType: string; options: MealResult[] }>): {
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+} {
+  let totalCals = 0, totalProt = 0, totalCarbs = 0, totalFat = 0;
+  for (const mealData of mealsWithOptions) {
+    if (mealData.options[0]) {
+      totalCals += mealData.options[0].totals.calories;
+      totalProt += mealData.options[0].totals.protein;
+      totalCarbs += mealData.options[0].totals.carbs;
+      totalFat += mealData.options[0].totals.fat;
+    }
+  }
+  return {
+    calories: Math.round(totalCals),
+    protein: Math.round(totalProt * 10) / 10,
+    carbs: Math.round(totalCarbs * 10) / 10,
+    fat: Math.round(totalFat * 10) / 10,
+  };
+}
+
+/**
+ * Recalcula totais de uma opção de refeição.
+ */
+function recalculateOptionTotals(option: MealResult): void {
+  let totalCals = 0, totalProt = 0, totalCarbs = 0, totalFat = 0;
+  for (const sel of option.foods) {
+    const mult = sel.quantity_grams / 100;
+    totalCals += sel.food.calories * mult;
+    totalProt += sel.food.protein * mult;
+    totalCarbs += sel.food.carbs * mult;
+    totalFat += sel.food.fat * mult;
+  }
+  option.totals = {
+    calories: Math.round(totalCals),
+    protein: Math.round(totalProt * 10) / 10,
+    carbs: Math.round(totalCarbs * 10) / 10,
+    fat: Math.round(totalFat * 10) / 10,
+  };
 }
 
 /**
  * Ajusta proporcionalmente todas as porções para atingir a meta calórica.
- * Prioriza proteína e carboidrato, limitando gordura a 30% das calorias.
+ * Usa iteração para convergir com precisão.
+ * 
+ * Melhorias implementadas:
+ * 1. Iteração até convergência (máx 5 iterações)
+ * 2. Usa tolerância do contrato (10%)
+ * 3. Limites por categoria de alimento
+ * 4. Prioriza alimentos de maior densidade calórica para ajustes finos
  */
 function scaleToCalorieTarget(
   mealsWithOptions: Array<{ mealType: string; options: MealResult[] }>,
@@ -737,119 +808,211 @@ function scaleToCalorieTarget(
   targetCarbs: number,
   targetFat: number
 ): ScaleResult {
-  // Calcular totais atuais (somando primeira opção de cada refeição)
-  let currentCals = 0, currentProt = 0, currentCarbs = 0, currentFat = 0;
+  const MAX_ITERATIONS = 5;
+  const TOLERANCE_PERCENT = GENERATOR_CONTRACT.CALORIE_TOLERANCE_PERCENT; // 10%
   
-  for (const mealData of mealsWithOptions) {
-    if (mealData.options[0]) {
-      currentCals += mealData.options[0].totals.calories;
-      currentProt += mealData.options[0].totals.protein;
-      currentCarbs += mealData.options[0].totals.carbs;
-      currentFat += mealData.options[0].totals.fat;
-    }
-  }
+  const beforeTotals = calculatePlanTotals(mealsWithOptions);
   
-  const beforeTotals = {
-    calories: Math.round(currentCals),
-    protein: Math.round(currentProt * 10) / 10,
-    carbs: Math.round(currentCarbs * 10) / 10,
-    fat: Math.round(currentFat * 10) / 10,
-  };
-  
-  // Se já está dentro da tolerância de 5%, não ajustar
-  const diffPercent = Math.abs((currentCals - targetCalories) / targetCalories * 100);
-  if (diffPercent <= 5) {
-    log("Plano já está dentro da tolerância (±5%)", { currentCals, targetCalories, diffPercent });
+  // Se já está dentro da tolerância, não ajustar
+  const initialDiff = Math.abs((beforeTotals.calories - targetCalories) / targetCalories * 100);
+  if (initialDiff <= TOLERANCE_PERCENT) {
+    log("Plano já está dentro da tolerância", { 
+      currentCals: beforeTotals.calories, 
+      targetCalories, 
+      diffPercent: initialDiff.toFixed(1) 
+    });
     return {
       scaledMeals: mealsWithOptions.map(m => m.options[0]),
       scaleFactor: 1,
       beforeTotals,
       afterTotals: beforeTotals,
+      iterations: 0,
+      converged: true,
     };
   }
   
-  // Calcular fator de escala baseado em calorias
-  const scaleFactor = targetCalories / currentCals;
+  let iteration = 0;
+  let converged = false;
+  let lastScaleFactor = 1;
   
-  log("Aplicando ajuste proporcional", { 
-    currentCals, 
-    targetCalories, 
-    scaleFactor: scaleFactor.toFixed(3),
-    diffPercent: diffPercent.toFixed(1),
-  });
-  
-  // Aplicar fator a todas as opções de todas as refeições
-  for (const mealData of mealsWithOptions) {
-    for (const option of mealData.options) {
-      for (const foodSel of option.foods) {
-        // Aplicar fator de escala à quantidade
-        const originalGrams = foodSel.quantity_grams;
-        let newGrams = originalGrams * scaleFactor;
-        
-        // Limitar a faixa razoável (mínimo 10g, máximo 500g)
-        newGrams = Math.max(10, Math.min(500, newGrams));
-        
-        // Arredondar para número inteiro
-        newGrams = Math.round(newGrams);
-        
-        // Re-aplicar conversão de unidade
-        const conversion = applyUnitConversion(foodSel.food, newGrams);
-        
-        foodSel.quantity_grams = conversion.calculated_grams;
-        foodSel.display_quantity = conversion.display_quantity;
-        foodSel.display_unit = conversion.display_unit;
-      }
-      
-      // Recalcular totais da opção
-      let totalCals = 0, totalProt = 0, totalCarbs = 0, totalFat = 0;
-      for (const sel of option.foods) {
-        const mult = sel.quantity_grams / 100;
-        totalCals += sel.food.calories * mult;
-        totalProt += sel.food.protein * mult;
-        totalCarbs += sel.food.carbs * mult;
-        totalFat += sel.food.fat * mult;
-      }
-      
-      option.totals = {
-        calories: Math.round(totalCals),
-        protein: Math.round(totalProt * 10) / 10,
-        carbs: Math.round(totalCarbs * 10) / 10,
-        fat: Math.round(totalFat * 10) / 10,
-      };
+  // Iterar até convergência ou máximo de iterações
+  while (iteration < MAX_ITERATIONS && !converged) {
+    const currentTotals = calculatePlanTotals(mealsWithOptions);
+    const diffPercent = Math.abs((currentTotals.calories - targetCalories) / targetCalories * 100);
+    
+    if (diffPercent <= TOLERANCE_PERCENT) {
+      converged = true;
+      break;
     }
+    
+    // Calcular fator de escala
+    const scaleFactor = targetCalories / currentTotals.calories;
+    lastScaleFactor = scaleFactor;
+    
+    log(`Iteração ${iteration + 1}`, { 
+      currentCals: currentTotals.calories, 
+      targetCalories, 
+      scaleFactor: scaleFactor.toFixed(3),
+      diffPercent: diffPercent.toFixed(1),
+    });
+    
+    // Aplicar fator a todas as opções de todas as refeições
+    for (const mealData of mealsWithOptions) {
+      for (const option of mealData.options) {
+        for (const foodSel of option.foods) {
+          const limits = getScaleLimitsForFood(foodSel.food);
+          const originalGrams = foodSel.quantity_grams;
+          let newGrams = originalGrams * scaleFactor;
+          
+          // Aplicar limites específicos da categoria
+          newGrams = Math.max(limits.min, Math.min(limits.max, newGrams));
+          
+          // Arredondar para múltiplo de 5g para valores realistas
+          newGrams = Math.round(newGrams / 5) * 5;
+          if (newGrams < limits.min) newGrams = limits.min;
+          
+          // Re-aplicar conversão de unidade
+          const conversion = applyUnitConversion(foodSel.food, newGrams);
+          
+          foodSel.quantity_grams = conversion.calculated_grams;
+          foodSel.display_quantity = conversion.display_quantity;
+          foodSel.display_unit = conversion.display_unit;
+        }
+        
+        // Recalcular totais da opção
+        recalculateOptionTotals(option);
+      }
+    }
+    
+    iteration++;
   }
   
-  // Calcular novos totais após ajuste
-  let afterCals = 0, afterProt = 0, afterCarbs = 0, afterFat = 0;
-  for (const mealData of mealsWithOptions) {
-    if (mealData.options[0]) {
-      afterCals += mealData.options[0].totals.calories;
-      afterProt += mealData.options[0].totals.protein;
-      afterCarbs += mealData.options[0].totals.carbs;
-      afterFat += mealData.options[0].totals.fat;
-    }
-  }
+  const afterTotals = calculatePlanTotals(mealsWithOptions);
+  const finalDiff = Math.abs((afterTotals.calories - targetCalories) / targetCalories * 100);
+  converged = finalDiff <= TOLERANCE_PERCENT;
   
-  const afterTotals = {
-    calories: Math.round(afterCals),
-    protein: Math.round(afterProt * 10) / 10,
-    carbs: Math.round(afterCarbs * 10) / 10,
-    fat: Math.round(afterFat * 10) / 10,
-  };
-  
-  log("Ajuste concluído", { 
+  log("Ajuste iterativo concluído", { 
     before: beforeTotals.calories, 
     after: afterTotals.calories,
     target: targetCalories,
-    finalDiffPercent: Math.abs((afterTotals.calories - targetCalories) / targetCalories * 100).toFixed(1),
+    iterations: iteration,
+    converged,
+    finalDiffPercent: finalDiff.toFixed(1),
   });
+  
+  // AJUSTE FINO: Se não convergiu após iterações, tentar ajuste direcionado
+  if (!converged && iteration >= MAX_ITERATIONS) {
+    log("Iniciando ajuste fino direcionado");
+    const fineAdjusted = applyFineAdjustment(mealsWithOptions, targetCalories, afterTotals.calories);
+    if (fineAdjusted) {
+      const newTotals = calculatePlanTotals(mealsWithOptions);
+      const newDiff = Math.abs((newTotals.calories - targetCalories) / targetCalories * 100);
+      if (newDiff < finalDiff) {
+        log("Ajuste fino aplicado", { 
+          before: afterTotals.calories, 
+          after: newTotals.calories,
+          improvement: (finalDiff - newDiff).toFixed(1) + "%"
+        });
+        return {
+          scaledMeals: mealsWithOptions.map(m => m.options[0]),
+          scaleFactor: lastScaleFactor,
+          beforeTotals,
+          afterTotals: newTotals,
+          iterations: iteration + 1,
+          converged: newDiff <= TOLERANCE_PERCENT,
+        };
+      }
+    }
+  }
   
   return {
     scaledMeals: mealsWithOptions.map(m => m.options[0]),
-    scaleFactor,
+    scaleFactor: lastScaleFactor,
     beforeTotals,
     afterTotals,
+    iterations: iteration,
+    converged,
   };
+}
+
+/**
+ * Ajuste fino: incrementa/decrementa porções de alimentos
+ * de alta densidade calórica para atingir a meta.
+ */
+function applyFineAdjustment(
+  mealsWithOptions: Array<{ mealType: string; options: MealResult[] }>,
+  targetCalories: number,
+  currentCalories: number
+): boolean {
+  const deficit = targetCalories - currentCalories;
+  if (Math.abs(deficit) < 20) return false; // Diferença muito pequena
+  
+  const needMore = deficit > 0;
+  const INCREMENT = 10; // gramas
+  
+  // Coletar todos os alimentos ordenados por densidade calórica
+  const foodsWithMeta: Array<{
+    food: FoodSelection;
+    option: MealResult;
+    caloriesPerGram: number;
+  }> = [];
+  
+  for (const mealData of mealsWithOptions) {
+    for (const option of mealData.options) {
+      for (const foodSel of option.foods) {
+        foodsWithMeta.push({
+          food: foodSel,
+          option,
+          caloriesPerGram: foodSel.food.calories / 100,
+        });
+      }
+    }
+  }
+  
+  // Ordenar: se precisa mais calorias, maior densidade primeiro; se menos, menor primeiro
+  foodsWithMeta.sort((a, b) => 
+    needMore 
+      ? b.caloriesPerGram - a.caloriesPerGram 
+      : a.caloriesPerGram - b.caloriesPerGram
+  );
+  
+  let remaining = Math.abs(deficit);
+  let adjusted = false;
+  
+  for (const { food, option, caloriesPerGram } of foodsWithMeta) {
+    if (remaining <= 0) break;
+    
+    const limits = getScaleLimitsForFood(food.food);
+    const currentGrams = food.quantity_grams;
+    
+    // Calcular ajuste necessário
+    const gramsNeeded = remaining / caloriesPerGram;
+    const maxAdjust = Math.min(gramsNeeded, INCREMENT * 3); // Máximo 30g por ajuste
+    
+    let newGrams = needMore
+      ? Math.min(limits.max, currentGrams + maxAdjust)
+      : Math.max(limits.min, currentGrams - maxAdjust);
+    
+    // Arredondar para múltiplo de 5g
+    newGrams = Math.round(newGrams / 5) * 5;
+    
+    if (Math.abs(newGrams - currentGrams) >= 5) {
+      const calorieChange = Math.abs(newGrams - currentGrams) * caloriesPerGram;
+      remaining -= calorieChange;
+      
+      const conversion = applyUnitConversion(food.food, newGrams);
+      food.quantity_grams = conversion.calculated_grams;
+      food.display_quantity = conversion.display_quantity;
+      food.display_unit = conversion.display_unit;
+      
+      adjusted = true;
+      
+      // Recalcular totais da opção
+      recalculateOptionTotals(option);
+    }
+  }
+  
+  return adjusted;
 }
 
 // =====================================================
@@ -1388,6 +1551,8 @@ serve(async (req) => {
         options_per_meal: mealOptionsLimit,
         scale_applied: scaleResult.scaleFactor !== 1,
         scale_factor: scaleResult.scaleFactor,
+        scale_iterations: scaleResult.iterations,
+        scale_converged: scaleResult.converged,
         totals: {
           calories: totalCals,
           protein: totalProt,
