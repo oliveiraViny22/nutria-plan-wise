@@ -232,9 +232,18 @@ async function loadAnchorFoods(
     result.set(mealType, rolesList);
   }
 
+  // Log detalhado para debug de option_number
+  const anchorSummary = (anchors || []).map((a: AnchorFood) => ({
+    food: a.food?.name,
+    meal_type: a.meal_type,
+    role_name: a.role_name,
+    option_number: a.option_number
+  }));
+  
   log("Âncoras carregadas", { 
     count: anchors?.length || 0,
     meals: Array.from(result.keys()),
+    detail: anchorSummary
   });
   return result;
 }
@@ -452,17 +461,41 @@ function selectAnchorForOption(
     (a.option_number === 0 || a.option_number === optionNumber)
   );
   
-  if (available.length === 0) return null;
+  log(`[ANCHOR-SELECT] Opção ${optionNumber}`, {
+    total_anchors: anchors.length,
+    available_count: available.length,
+    used_ids_count: usedIds.size,
+    anchors_detail: anchors.map(a => ({ 
+      food: a.food?.name, 
+      option_number: a.option_number,
+      is_used: usedIds.has(a.food?.id || ''),
+      matches: a.option_number === 0 || a.option_number === optionNumber
+    }))
+  });
+  
+  if (available.length === 0) {
+    log(`[ANCHOR-SELECT] Nenhuma âncora disponível para opção ${optionNumber}`);
+    return null;
+  }
   
   // Priorizar âncoras específicas para esta opção sobre as genéricas
   const specific = available.filter(a => a.option_number === optionNumber);
   if (specific.length > 0) {
+    log(`[ANCHOR-SELECT] Usando âncora ESPECÍFICA`, { 
+      food: specific[0].food?.name, 
+      option_number: specific[0].option_number 
+    });
     return specific[0];
   }
   
   // Se só temos âncoras genéricas, distribuir ciclicamente entre opções
   const index = (optionNumber - 1) % available.length;
-  return available[index];
+  const selected = available[index];
+  log(`[ANCHOR-SELECT] Usando âncora GENÉRICA (índice ${index})`, { 
+    food: selected.food?.name, 
+    option_number: selected.option_number 
+  });
+  return selected;
 }
 
 // =====================================================
