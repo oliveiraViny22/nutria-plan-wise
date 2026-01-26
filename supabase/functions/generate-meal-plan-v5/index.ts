@@ -712,6 +712,147 @@ function buildMealWithAnchors(
 }
 
 // =====================================================
+// AJUSTE PROPORCIONAL PARA FECHAR METAS
+// =====================================================
+// O gerador delega o "fechamento fino" ao rebalanceador, MAS precisa
+// entregar um plano dentro de ±10% da meta calórica.
+// Esta função escala todas as porções proporcionalmente.
+// =====================================================
+
+interface ScaleResult {
+  scaledMeals: MealResult[];
+  scaleFactor: number;
+  beforeTotals: { calories: number; protein: number; carbs: number; fat: number };
+  afterTotals: { calories: number; protein: number; carbs: number; fat: number };
+}
+
+/**
+ * Ajusta proporcionalmente todas as porções para atingir a meta calórica.
+ * Prioriza proteína e carboidrato, limitando gordura a 30% das calorias.
+ */
+function scaleToCalorieTarget(
+  mealsWithOptions: Array<{ mealType: string; options: MealResult[] }>,
+  targetCalories: number,
+  targetProtein: number,
+  targetCarbs: number,
+  targetFat: number
+): ScaleResult {
+  // Calcular totais atuais (somando primeira opção de cada refeição)
+  let currentCals = 0, currentProt = 0, currentCarbs = 0, currentFat = 0;
+  
+  for (const mealData of mealsWithOptions) {
+    if (mealData.options[0]) {
+      currentCals += mealData.options[0].totals.calories;
+      currentProt += mealData.options[0].totals.protein;
+      currentCarbs += mealData.options[0].totals.carbs;
+      currentFat += mealData.options[0].totals.fat;
+    }
+  }
+  
+  const beforeTotals = {
+    calories: Math.round(currentCals),
+    protein: Math.round(currentProt * 10) / 10,
+    carbs: Math.round(currentCarbs * 10) / 10,
+    fat: Math.round(currentFat * 10) / 10,
+  };
+  
+  // Se já está dentro da tolerância de 5%, não ajustar
+  const diffPercent = Math.abs((currentCals - targetCalories) / targetCalories * 100);
+  if (diffPercent <= 5) {
+    log("Plano já está dentro da tolerância (±5%)", { currentCals, targetCalories, diffPercent });
+    return {
+      scaledMeals: mealsWithOptions.map(m => m.options[0]),
+      scaleFactor: 1,
+      beforeTotals,
+      afterTotals: beforeTotals,
+    };
+  }
+  
+  // Calcular fator de escala baseado em calorias
+  const scaleFactor = targetCalories / currentCals;
+  
+  log("Aplicando ajuste proporcional", { 
+    currentCals, 
+    targetCalories, 
+    scaleFactor: scaleFactor.toFixed(3),
+    diffPercent: diffPercent.toFixed(1),
+  });
+  
+  // Aplicar fator a todas as opções de todas as refeições
+  for (const mealData of mealsWithOptions) {
+    for (const option of mealData.options) {
+      for (const foodSel of option.foods) {
+        // Aplicar fator de escala à quantidade
+        const originalGrams = foodSel.quantity_grams;
+        let newGrams = originalGrams * scaleFactor;
+        
+        // Limitar a faixa razoável (mínimo 10g, máximo 500g)
+        newGrams = Math.max(10, Math.min(500, newGrams));
+        
+        // Arredondar para número inteiro
+        newGrams = Math.round(newGrams);
+        
+        // Re-aplicar conversão de unidade
+        const conversion = applyUnitConversion(foodSel.food, newGrams);
+        
+        foodSel.quantity_grams = conversion.calculated_grams;
+        foodSel.display_quantity = conversion.display_quantity;
+        foodSel.display_unit = conversion.display_unit;
+      }
+      
+      // Recalcular totais da opção
+      let totalCals = 0, totalProt = 0, totalCarbs = 0, totalFat = 0;
+      for (const sel of option.foods) {
+        const mult = sel.quantity_grams / 100;
+        totalCals += sel.food.calories * mult;
+        totalProt += sel.food.protein * mult;
+        totalCarbs += sel.food.carbs * mult;
+        totalFat += sel.food.fat * mult;
+      }
+      
+      option.totals = {
+        calories: Math.round(totalCals),
+        protein: Math.round(totalProt * 10) / 10,
+        carbs: Math.round(totalCarbs * 10) / 10,
+        fat: Math.round(totalFat * 10) / 10,
+      };
+    }
+  }
+  
+  // Calcular novos totais após ajuste
+  let afterCals = 0, afterProt = 0, afterCarbs = 0, afterFat = 0;
+  for (const mealData of mealsWithOptions) {
+    if (mealData.options[0]) {
+      afterCals += mealData.options[0].totals.calories;
+      afterProt += mealData.options[0].totals.protein;
+      afterCarbs += mealData.options[0].totals.carbs;
+      afterFat += mealData.options[0].totals.fat;
+    }
+  }
+  
+  const afterTotals = {
+    calories: Math.round(afterCals),
+    protein: Math.round(afterProt * 10) / 10,
+    carbs: Math.round(afterCarbs * 10) / 10,
+    fat: Math.round(afterFat * 10) / 10,
+  };
+  
+  log("Ajuste concluído", { 
+    before: beforeTotals.calories, 
+    after: afterTotals.calories,
+    target: targetCalories,
+    finalDiffPercent: Math.abs((afterTotals.calories - targetCalories) / targetCalories * 100).toFixed(1),
+  });
+  
+  return {
+    scaledMeals: mealsWithOptions.map(m => m.options[0]),
+    scaleFactor,
+    beforeTotals,
+    afterTotals,
+  };
+}
+
+// =====================================================
 // VALIDAÇÃO ESTRUTURAL (NÃO CALÓRICA)
 // =====================================================
 
@@ -1167,9 +1308,9 @@ serve(async (req) => {
     }
 
     // Para compatibilidade, extrair primeira opção de cada refeição
-    const meals: MealResult[] = mealsWithOptions.map(m => m.options[0]);
+    let meals: MealResult[] = mealsWithOptions.map(m => m.options[0]);
 
-    // Validar estrutura
+    // Validar estrutura ANTES do ajuste proporcional
     const validation = validateStructure(meals);
 
     if (!validation.valid) {
@@ -1184,7 +1325,9 @@ serve(async (req) => {
 
     log("Validação estrutural OK");
 
-    // Validar contratos nutricionais (informativo - não bloqueia)
+    // =====================================================
+    // AJUSTE PROPORCIONAL PARA FECHAR METAS CALÓRICAS
+    // =====================================================
     const targets: MacroTargets = {
       calories: profile.daily_calories || 2000,
       protein: profile.protein_target || 100,
@@ -1192,35 +1335,59 @@ serve(async (req) => {
       fat: profile.fat_target || 65,
     };
     
+    const scaleResult = scaleToCalorieTarget(
+      mealsWithOptions,
+      targets.calories,
+      targets.protein,
+      targets.carbs,
+      targets.fat
+    );
+    
+    log("Ajuste proporcional aplicado", {
+      scaleFactor: scaleResult.scaleFactor.toFixed(3),
+      before: scaleResult.beforeTotals,
+      after: scaleResult.afterTotals,
+      target: targets.calories,
+    });
+    
+    // Atualizar referência após ajuste
+    meals = mealsWithOptions.map(m => m.options[0]);
+
+    // Validar contratos nutricionais APÓS ajuste
     const nutritionalValidation = validateNutritionalContracts(meals, targets);
     
     if (nutritionalValidation.warnings.length > 0) {
-      log("Avisos nutricionais (rebalanceador corrigirá)", { 
+      log("Avisos nutricionais pós-ajuste", { 
         warnings: nutritionalValidation.warnings,
         metrics: nutritionalValidation.metrics 
       });
     }
 
-    // Salvar plano com todas as opções (NÃO ajustado - será feito pelo rebalanceador)
+    // Salvar plano com todas as opções (AGORA AJUSTADO)
     const planId = await savePlanWithOptions(supabase, user.id, mealsWithOptions);
 
     log("Plano salvo", { planId, optionsPerMeal: mealOptionsLimit });
 
-    // Calcular totais finais
-    let totalCals = 0, totalProt = 0, totalCarbs = 0, totalFat = 0;
-    for (const meal of meals) {
-      totalCals += meal.totals.calories;
-      totalProt += meal.totals.protein;
-      totalCarbs += meal.totals.carbs;
-      totalFat += meal.totals.fat;
-    }
+    // Usar totais do resultado do ajuste
+    const totalCals = scaleResult.afterTotals.calories;
+    const totalProt = scaleResult.afterTotals.protein;
+    const totalCarbs = scaleResult.afterTotals.carbs;
+    const totalFat = scaleResult.afterTotals.fat;
+
+    // Calcular diferença percentual final
+    const finalDiffPercent = Math.abs((totalCals - targets.calories) / targets.calories * 100);
+    const isWithinTolerance = finalDiffPercent <= GENERATOR_CONTRACT.CALORIE_TOLERANCE_PERCENT;
 
     return createSuccessResponse(
       {
         plan_id: planId,
-        message: `Plano estrutural gerado com ${mealOptionsLimit} opção(ões) por refeição. Execute o rebalanceador para ajustar macros.`,
-        requires_rebalancing: true,
+        message: isWithinTolerance 
+          ? `Plano gerado com ${mealOptionsLimit} opção(ões) por refeição. Calorias dentro da meta (${finalDiffPercent.toFixed(1)}% de diferença).`
+          : `Plano gerado com ${mealOptionsLimit} opção(ões) por refeição. Rebalanceamento pode refinar os valores.`,
+        requires_rebalancing: !isWithinTolerance,
         options_per_meal: mealOptionsLimit,
+        scale_applied: scaleResult.scaleFactor !== 1,
+        scale_factor: scaleResult.scaleFactor,
         totals: {
           calories: totalCals,
           protein: totalProt,
@@ -1232,6 +1399,12 @@ serve(async (req) => {
           protein: profile.protein_target,
           carbs: profile.carbs_target,
           fat: profile.fat_target,
+        },
+        difference_percent: {
+          calories: finalDiffPercent.toFixed(1),
+          protein: targets.protein > 0 ? ((totalProt - targets.protein) / targets.protein * 100).toFixed(1) : "0",
+          carbs: targets.carbs > 0 ? ((totalCarbs - targets.carbs) / targets.carbs * 100).toFixed(1) : "0",
+          fat: targets.fat > 0 ? ((totalFat - targets.fat) / targets.fat * 100).toFixed(1) : "0",
         },
         // Métricas de validação dos contratos nutricionais
         contract_metrics: nutritionalValidation.metrics,
