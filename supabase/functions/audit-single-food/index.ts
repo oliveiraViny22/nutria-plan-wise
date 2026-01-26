@@ -1,6 +1,13 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { 
+  CANONICAL_CATEGORIES, 
+  PROCESSING_LEVELS,
+  AI_CATEGORY_PROMPT,
+  type FoodCategory,
+  type ProcessingLevel 
+} from "../_shared/food-categories.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -26,8 +33,8 @@ interface CorrectedFood {
   carbs: number;
   fat: number;
   serving_size: string;
-  category: string;
-  processing_level: string;
+  category: FoodCategory;
+  processing_level: ProcessingLevel;
 }
 
 interface AuditResult {
@@ -37,26 +44,6 @@ interface AuditResult {
   changes_summary: string[];
   technical_justification: string;
 }
-
-const VALID_CATEGORIES = [
-  'frutas',
-  'hortaliças_folhosas',
-  'legumes',
-  'cereais_tubérculos',
-  'leguminosas',
-  'proteínas_animais',
-  'laticínios',
-  'óleos_oleaginosas',
-  'suplementos'
-];
-
-const VALID_PROCESSING_LEVELS = [
-  'in_natura',
-  'minimamente_processado',
-  'processado',
-  'ultraprocessado',
-  'suplemento'
-];
 
 const SYSTEM_PROMPT = `Você é um auditor técnico de banco de dados nutricional do NutriaPlan.
 
@@ -101,17 +88,7 @@ Se divergir, ajuste mantendo coerência clínica.
 ❌ Nunca invente valores extremos
 ❌ Nunca zere macros sem justificativa
 
-4️⃣ CATEGORIA
-DEVE ser UMA das seguintes (exatamente como escrito):
-- frutas
-- hortaliças_folhosas
-- legumes
-- cereais_tubérculos
-- leguminosas
-- proteínas_animais
-- laticínios
-- óleos_oleaginosas
-- suplementos
+${AI_CATEGORY_PROMPT}
 
 5️⃣ NÍVEL DE PROCESSAMENTO
 DEVE ser UM dos seguintes:
@@ -150,7 +127,6 @@ FORMATO DE RESPOSTA (JSON puro, sem markdown):
   "changes_summary": ["mudança 1", "mudança 2"],
   "technical_justification": "justificativa técnica"
 }`;
-
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -307,19 +283,22 @@ serve(async (req) => {
     // Ensure original_id is set
     auditResult.original_id = foodToAudit.id;
 
-    // Validate category and processing_level in the response
-    if (!VALID_CATEGORIES.includes(auditResult.corrected_food.category)) {
+    // Validate category and processing_level in the response using canonical lists
+    const categoryList = CANONICAL_CATEGORIES as readonly string[];
+    const processingList = PROCESSING_LEVELS as readonly string[];
+    
+    if (!categoryList.includes(auditResult.corrected_food.category)) {
       console.warn(`Invalid category returned: ${auditResult.corrected_food.category}, defaulting to original or first valid`);
-      auditResult.corrected_food.category = foodToAudit.category && VALID_CATEGORIES.includes(foodToAudit.category) 
+      auditResult.corrected_food.category = (foodToAudit.category && categoryList.includes(foodToAudit.category) 
         ? foodToAudit.category 
-        : 'proteínas_animais';
+        : 'proteinas') as FoodCategory;
     }
 
-    if (!VALID_PROCESSING_LEVELS.includes(auditResult.corrected_food.processing_level)) {
+    if (!processingList.includes(auditResult.corrected_food.processing_level)) {
       console.warn(`Invalid processing_level returned: ${auditResult.corrected_food.processing_level}, defaulting to original or first valid`);
-      auditResult.corrected_food.processing_level = foodToAudit.processing_level && VALID_PROCESSING_LEVELS.includes(foodToAudit.processing_level)
+      auditResult.corrected_food.processing_level = (foodToAudit.processing_level && processingList.includes(foodToAudit.processing_level)
         ? foodToAudit.processing_level
-        : 'minimamente_processado';
+        : 'minimamente_processado') as ProcessingLevel;
     }
 
     console.log(`Audit result for ${foodToAudit.name}: ${auditResult.status}`);
