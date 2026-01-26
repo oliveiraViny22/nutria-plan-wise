@@ -444,11 +444,23 @@ function selectAnchorForOption(
   optionNumber: number,
   usedIds: Set<string>
 ): AnchorFood | null {
-  // Filtrar âncoras não usadas
-  const available = anchors.filter(a => !usedIds.has(a.food.id));
+  // Filtrar âncoras não usadas E que se aplicam a esta opção
+  // option_number = 0 significa "todas as opções"
+  // option_number = N significa "apenas opção N"
+  const available = anchors.filter(a => 
+    !usedIds.has(a.food.id) && 
+    (a.option_number === 0 || a.option_number === optionNumber)
+  );
+  
   if (available.length === 0) return null;
   
-  // Para opção 1, pegar o primeiro; para outras opções, distribuir ciclicamente
+  // Priorizar âncoras específicas para esta opção sobre as genéricas
+  const specific = available.filter(a => a.option_number === optionNumber);
+  if (specific.length > 0) {
+    return specific[0];
+  }
+  
+  // Se só temos âncoras genéricas, distribuir ciclicamente entre opções
   const index = (optionNumber - 1) % available.length;
   return available[index];
 }
