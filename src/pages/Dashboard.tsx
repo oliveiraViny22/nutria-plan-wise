@@ -81,7 +81,18 @@ export default function Dashboard() {
     isSubscribed,
   } = useSubscription();
   const { usage, isLimitReached, refresh: refreshUsage } = useUsageLimits();
-  const { isOptimizing, isUndoing, result: optimizationResult, optimize: bruteForceOptimize, undo: undoOptimization } = useBruteForceOptimizer();
+  const { 
+    isOptimizing, 
+    isApplying,
+    isUndoing, 
+    result: optimizationResult, 
+    preview: optimizationPreview,
+    generatePreview,
+    applyPreview,
+    cancelPreview,
+    undo: undoOptimization 
+  } = useBruteForceOptimizer();
+  const [showOptimizationPreview, setShowOptimizationPreview] = useState(false);
   const [showOptimizationResult, setShowOptimizationResult] = useState(false);
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -251,20 +262,32 @@ export default function Dashboard() {
   const handleBruteForceOptimize = async () => {
     if (!currentDietPlan) return;
     
-    const result = await bruteForceOptimize(currentDietPlan.id, {
+    const preview = await generatePreview(currentDietPlan.id, {
       calories: profile?.daily_calories || 2000,
       protein: profile?.protein_target || 150,
       carbs: profile?.carbs_target || 250,
       fat: profile?.fat_target || 65,
     });
     
-    // Show result dialog if optimization was successful
-    if (result?.success) {
-      setShowOptimizationResult(true);
+    // Show preview dialog if generated successfully
+    if (preview) {
+      setShowOptimizationPreview(true);
     }
+  };
+
+  const handleConfirmOptimization = async () => {
+    const result = await applyPreview();
     
-    // Refresh data after optimization
-    await fetchCurrentPlan();
+    if (result?.success) {
+      setShowOptimizationPreview(false);
+      setShowOptimizationResult(true);
+      await fetchCurrentPlan();
+    }
+  };
+
+  const handleCancelOptimization = () => {
+    cancelPreview();
+    setShowOptimizationPreview(false);
   };
 
   const handleSignOut = async () => {
@@ -771,6 +794,172 @@ export default function Dashboard() {
         currentPlan={subscriptionPlan?.name}
         limit={upgradeLimit}
       />
+
+      {/* Optimization Preview Dialog */}
+      <Dialog open={showOptimizationPreview} onOpenChange={(open) => {
+        if (!open) handleCancelOptimization();
+      }}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Eye className="h-5 w-5 text-blue-500" />
+              Prévia da Otimização
+            </DialogTitle>
+            <DialogDescription>
+              Revise as alterações antes de aplicar
+            </DialogDescription>
+          </DialogHeader>
+
+          {optimizationPreview && (
+            <div className="space-y-4">
+              {/* Macro Comparison */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="p-4 border rounded-lg bg-muted/30">
+                  <h4 className="font-medium text-sm mb-3 text-muted-foreground">Atual</h4>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span>Calorias:</span>
+                      <span className="font-mono">{optimizationPreview.before.calories} kcal</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Proteína:</span>
+                      <span className="font-mono">{optimizationPreview.before.protein}g</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Carboidratos:</span>
+                      <span className="font-mono">{optimizationPreview.before.carbs}g</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Gordura:</span>
+                      <span className="font-mono">{optimizationPreview.before.fat}g</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-4 border rounded-lg bg-green-500/10 border-green-500/30">
+                  <h4 className="font-medium text-sm mb-3 text-green-600 dark:text-green-400">Após Otimização</h4>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span>Calorias:</span>
+                      <span className="font-mono">
+                        {optimizationPreview.after.calories} kcal
+                        <DeltaBadge value={optimizationPreview.after.calories - optimizationPreview.before.calories} />
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Proteína:</span>
+                      <span className="font-mono">
+                        {optimizationPreview.after.protein}g
+                        <DeltaBadge value={optimizationPreview.after.protein - optimizationPreview.before.protein} />
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Carboidratos:</span>
+                      <span className="font-mono">
+                        {optimizationPreview.after.carbs}g
+                        <DeltaBadge value={optimizationPreview.after.carbs - optimizationPreview.before.carbs} />
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Gordura:</span>
+                      <span className="font-mono">
+                        {optimizationPreview.after.fat}g
+                        <DeltaBadge value={optimizationPreview.after.fat - optimizationPreview.before.fat} />
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Target Comparison */}
+              <div className="p-4 border rounded-lg bg-blue-500/10 border-blue-500/30">
+                <h4 className="font-medium text-sm mb-3 text-blue-600 dark:text-blue-400">Metas</h4>
+                <div className="grid grid-cols-4 gap-2 text-sm text-center">
+                  <div>
+                    <div className="font-mono font-medium">{optimizationPreview.targets.calories}</div>
+                    <div className="text-xs text-muted-foreground">kcal</div>
+                  </div>
+                  <div>
+                    <div className="font-mono font-medium">{optimizationPreview.targets.protein}g</div>
+                    <div className="text-xs text-muted-foreground">prot</div>
+                  </div>
+                  <div>
+                    <div className="font-mono font-medium">{optimizationPreview.targets.carbs}g</div>
+                    <div className="text-xs text-muted-foreground">carb</div>
+                  </div>
+                  <div>
+                    <div className="font-mono font-medium">{optimizationPreview.targets.fat}g</div>
+                    <div className="text-xs text-muted-foreground">gord</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Changes Table */}
+              {optimizationPreview.changes.length > 0 ? (
+                <div className="space-y-2">
+                  <h4 className="font-medium text-sm">Alterações Propostas ({optimizationPreview.changes.length})</h4>
+                  <div className="border rounded-lg overflow-hidden">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Alimento</TableHead>
+                          <TableHead className="text-right">Atual</TableHead>
+                          <TableHead className="text-right">Proposto</TableHead>
+                          <TableHead className="text-right">Delta</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {optimizationPreview.changes.map((change, idx) => (
+                          <TableRow key={idx}>
+                            <TableCell className="font-medium text-sm">{change.food_name}</TableCell>
+                            <TableCell className="text-right font-mono text-sm">{change.old_quantity}g</TableCell>
+                            <TableCell className="text-right font-mono text-sm">{change.new_quantity}g</TableCell>
+                            <TableCell className="text-right">
+                              <DeltaBadge value={change.new_quantity - change.old_quantity} suffix="g" />
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-4 text-muted-foreground text-sm">
+                  Nenhuma alteração necessária - o plano já está otimizado!
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div className="flex justify-end gap-2 pt-4 border-t">
+                <Button
+                  variant="outline"
+                  onClick={handleCancelOptimization}
+                  disabled={isApplying}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  onClick={handleConfirmOptimization}
+                  disabled={isApplying || optimizationPreview.changes.length === 0}
+                  className="bg-green-600 hover:bg-green-700"
+                >
+                  {isApplying ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Aplicando...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="h-4 w-4 mr-2" />
+                      Aplicar Otimização
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Optimization Result Dialog */}
       <Dialog open={showOptimizationResult} onOpenChange={setShowOptimizationResult}>

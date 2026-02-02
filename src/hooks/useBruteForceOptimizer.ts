@@ -29,6 +29,19 @@ interface FoodItem {
   category: string;
 }
 
+export interface OptimizationPreview {
+  planId: string;
+  changes: Array<{
+    meal_option_food_id: string;
+    food_name: string;
+    old_quantity: number;
+    new_quantity: number;
+  }>;
+  before: MacroTargets;
+  after: MacroTargets;
+  targets: MacroTargets;
+}
+
 interface OptimizationResult {
   success: boolean;
   planId: string;
@@ -217,8 +230,10 @@ function optimizeQuantities(
 
 export function useBruteForceOptimizer() {
   const [isOptimizing, setIsOptimizing] = useState(false);
+  const [isApplying, setIsApplying] = useState(false);
   const [isUndoing, setIsUndoing] = useState(false);
   const [result, setResult] = useState<OptimizationResult | null>(null);
+  const [preview, setPreview] = useState<OptimizationPreview | null>(null);
   const [settings, setSettings] = useState<OptimizerSettings>(DEFAULT_SETTINGS);
 
   // Load settings from database on mount
@@ -242,9 +257,10 @@ export function useBruteForceOptimizer() {
     loadSettings();
   }, []);
 
-  const optimize = useCallback(async (planId: string, targets: MacroTargets) => {
+  // Preview optimization without applying changes to database
+  const generatePreview = useCallback(async (planId: string, targets: MacroTargets) => {
     setIsOptimizing(true);
-    setResult(null);
+    setPreview(null);
     
     try {
       // 1. Fetch all meal options and foods for this plan
@@ -266,7 +282,7 @@ export function useBruteForceOptimizer() {
         .from('meal_options')
         .select('id, option_number')
         .in('meal_id', mealIds)
-        .eq('option_number', 1); // Only option 1 for simplicity
+        .eq('option_number', 1);
       
       if (optionsError) throw optionsError;
       if (!options || options.length === 0) {
@@ -293,38 +309,23 @@ export function useBruteForceOptimizer() {
       }
       
       // 4. Parse serving_size to get base grams and convert to per-100g
-      // IMPORTANT: serving_size can be "100g", "1 unidade média", etc.
-      // We need to extract the gram weight properly
       const foods: FoodItem[] = optionFoods.map(of => {
         const food = of.food as any;
         const servingSize = (food.serving_size || '100g').toLowerCase();
         
-        // Try to extract grams from serving_size
-        let baseGrams = 100; // default
-        
-        // Pattern 1: "100g" or "100 g" or "100ml"
+        let baseGrams = 100;
         const gramsMatch = servingSize.match(/(\d+)\s*(g|ml)/);
         if (gramsMatch) {
           baseGrams = parseInt(gramsMatch[1], 10);
-        } 
-        // Pattern 2: "(100g)" anywhere in string
-        else {
+        } else {
           const parenMatch = servingSize.match(/\((\d+)\s*(g|ml)\)/);
           if (parenMatch) {
             baseGrams = parseInt(parenMatch[1], 10);
-          }
-          // Pattern 3: "1 unidade" or "1 fatia" - treat as if macros are already per unit
-          // In this case, we assume the database stores macros for that single unit
-          // So we treat the "serving" as the quantity itself and use 1:1 ratio
-          else if (servingSize.match(/^\d+\s+(unidade|fatia|colher|xícara|copo)/)) {
-            // For unit-based foods, assume macros in DB are per serving
-            // Use 100 as baseGrams since we'll multiply by quantity_grams/100
-            // This means quantity_grams represents "number of units * 100"
+          } else if (servingSize.match(/^\d+\s+(unidade|fatia|colher|xícara|copo)/)) {
             baseGrams = 100;
           }
         }
         
-        // Ensure baseGrams is valid
         if (baseGrams <= 0 || isNaN(baseGrams)) {
           baseGrams = 100;
         }
@@ -350,16 +351,10 @@ export function useBruteForceOptimizer() {
       const beforeMacros = calcTotalMacros(foods, beforeQuantities);
       
       // 6. Run optimization with loaded settings
-      console.log('[BruteForce] Starting optimization...');
+      console.log('[BruteForce] Generating preview...');
       console.log('[BruteForce] Settings:', settings);
       console.log('[BruteForce] Targets:', targets);
       console.log('[BruteForce] Before:', beforeMacros);
-      console.log('[BruteForce] Foods:', foods.map(f => ({
-        name: f.name,
-        qty: f.quantity_grams,
-        cal100: f.calories_per_100g,
-        prot100: f.protein_per_100g,
-      })));
       
       const optimizedQuantities = optimizeQuantities(foods, targets, settings);
       const afterMacros = calcTotalMacros(foods, optimizedQuantities);
@@ -373,7 +368,7 @@ export function useBruteForceOptimizer() {
       });
       
       // 7. Calculate changes
-      const changes: OptimizationResult['changes'] = [];
+      const changes: OptimizationPreview['changes'] = [];
       for (const food of foods) {
         const oldQty = food.quantity_grams;
         const newQty = optimizedQuantities.get(food.meal_option_food_id) || oldQty;
@@ -388,8 +383,49 @@ export function useBruteForceOptimizer() {
         }
       }
       
-      // 8. Apply changes to database
-      for (const change of changes) {
+      const previewResult: OptimizationPreview = {
+        planId,
+        changes,
+        before: {
+          calories: Math.round(beforeMacros.calories),
+          protein: Math.round(beforeMacros.protein),
+          carbs: Math.round(beforeMacros.carbs),
+          fat: Math.round(beforeMacros.fat),
+        },
+        after: {
+          calories: Math.round(afterMacros.calories),
+          protein: Math.round(afterMacros.protein),
+          carbs: Math.round(afterMacros.carbs),
+          fat: Math.round(afterMacros.fat),
+        },
+        targets,
+      };
+      
+      setPreview(previewResult);
+      return previewResult;
+    } catch (error: any) {
+      console.error('[BruteForce] Preview error:', error);
+      toast.error('Erro ao gerar prévia: ' + (error.message || 'Erro desconhecido'));
+      return null;
+    } finally {
+      setIsOptimizing(false);
+    }
+  }, [settings]);
+
+  // Apply the previewed optimization to the database
+  const applyPreview = useCallback(async () => {
+    if (!preview || preview.changes.length === 0) {
+      toast.info('Nenhuma alteração para aplicar');
+      return null;
+    }
+
+    setIsApplying(true);
+    
+    try {
+      console.log('[BruteForce] Applying preview changes...');
+      
+      // 1. Apply changes to database
+      for (const change of preview.changes) {
         const { error: updateError } = await supabase
           .from('meal_option_foods')
           .update({ quantity_grams: change.new_quantity })
@@ -400,7 +436,28 @@ export function useBruteForceOptimizer() {
         }
       }
       
-      // 9. Recalculate option totals
+      // 2. Get meal IDs for this plan
+      const { data: meals } = await supabase
+        .from('meals')
+        .select('id')
+        .eq('diet_plan_id', preview.planId);
+      
+      if (!meals) throw new Error('Não foi possível buscar refeições');
+      
+      const mealIds = meals.map(m => m.id);
+      
+      // 3. Get option IDs
+      const { data: options } = await supabase
+        .from('meal_options')
+        .select('id')
+        .in('meal_id', mealIds)
+        .eq('option_number', 1);
+      
+      if (!options) throw new Error('Não foi possível buscar opções');
+      
+      const optionIds = options.map(o => o.id);
+      
+      // 4. Recalculate option totals
       for (const optionId of optionIds) {
         const { data: optFoods } = await supabase
           .from('meal_option_foods')
@@ -413,7 +470,6 @@ export function useBruteForceOptimizer() {
             const food = of_.food as any;
             const servingSize = (food.serving_size || '100g').toLowerCase();
             
-            // Parse base grams properly
             let baseGrams = 100;
             const gramsMatch = servingSize.match(/(\d+)\s*(g|ml)/);
             if (gramsMatch) {
@@ -445,7 +501,7 @@ export function useBruteForceOptimizer() {
         }
       }
       
-      // 10. Update diet_plan totals
+      // 5. Update diet_plan totals
       const { data: allOptions } = await supabase
         .from('meal_options')
         .select('total_calories, total_protein, total_carbs, total_fat, option_number')
@@ -471,44 +527,40 @@ export function useBruteForceOptimizer() {
             total_carbs: planTotals.carbs,
             total_fat: planTotals.fat,
           })
-          .eq('id', planId);
+          .eq('id', preview.planId);
       }
       
       const optimizationResult: OptimizationResult = {
         success: true,
-        planId,
-        changes,
-        before: {
-          calories: Math.round(beforeMacros.calories),
-          protein: Math.round(beforeMacros.protein),
-          carbs: Math.round(beforeMacros.carbs),
-          fat: Math.round(beforeMacros.fat),
-        },
-        after: {
-          calories: Math.round(afterMacros.calories),
-          protein: Math.round(afterMacros.protein),
-          carbs: Math.round(afterMacros.carbs),
-          fat: Math.round(afterMacros.fat),
-        },
-        targets,
+        planId: preview.planId,
+        changes: preview.changes,
+        before: preview.before,
+        after: preview.after,
+        targets: preview.targets,
       };
       
       setResult(optimizationResult);
+      setPreview(null);
       
       toast.success(
-        `Otimização concluída! ${changes.length} alimentos ajustados.`,
+        `Otimização aplicada! ${preview.changes.length} alimentos ajustados.`,
         { duration: 5000 }
       );
       
       return optimizationResult;
     } catch (error: any) {
-      console.error('[BruteForce] Error:', error);
-      toast.error('Erro na otimização: ' + (error.message || 'Erro desconhecido'));
+      console.error('[BruteForce] Apply error:', error);
+      toast.error('Erro ao aplicar: ' + (error.message || 'Erro desconhecido'));
       return null;
     } finally {
-      setIsOptimizing(false);
+      setIsApplying(false);
     }
-  }, [settings]);
+  }, [preview]);
+
+  // Cancel/clear preview
+  const cancelPreview = useCallback(() => {
+    setPreview(null);
+  }, []);
 
   // Undo optimization - restore original quantities
   const undo = useCallback(async () => {
@@ -639,9 +691,13 @@ export function useBruteForceOptimizer() {
 
   return {
     isOptimizing,
+    isApplying,
     isUndoing,
     result,
-    optimize,
+    preview,
+    generatePreview,
+    applyPreview,
+    cancelPreview,
     undo,
   };
 }
