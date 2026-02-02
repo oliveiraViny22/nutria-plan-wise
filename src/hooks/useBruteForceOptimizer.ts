@@ -85,15 +85,29 @@ function calcTotalMacros(foods: FoodItem[], quantities: Map<string, number>): Ma
 
 /**
  * Calculate error/distance from targets
+ * IMPORTANT: Protein has a hard floor of 95% - going below adds massive penalty
  */
 function calcError(current: MacroTargets, targets: MacroTargets): number {
   const calError = Math.abs(current.calories - targets.calories) / targets.calories;
-  const protError = Math.abs(current.protein - targets.protein) / targets.protein;
   const carbError = Math.abs(current.carbs - targets.carbs) / targets.carbs;
   const fatError = Math.abs(current.fat - targets.fat) / targets.fat;
   
-  // Weighted error: prioritize calories and protein
-  return calError * 2 + protError * 1.5 + carbError * 1 + fatError * 1;
+  // Protein error with HARD FLOOR at 95%
+  const proteinRatio = current.protein / targets.protein;
+  const PROTEIN_FLOOR = 0.95;
+  
+  let protError: number;
+  if (proteinRatio < PROTEIN_FLOOR) {
+    // Massive penalty for going below floor - makes it essentially impossible
+    protError = (PROTEIN_FLOOR - proteinRatio) * 100 + Math.abs(1 - proteinRatio);
+  } else {
+    // Normal error calculation above floor
+    protError = Math.abs(current.protein - targets.protein) / targets.protein;
+  }
+  
+  // Weighted error: protein gets highest weight to prevent reduction
+  // Calories: 1.5, Protein: 3.0, Carbs: 1.0, Fat: 1.0
+  return calError * 1.5 + protError * 3.0 + carbError * 1.0 + fatError * 1.0;
 }
 
 /**
