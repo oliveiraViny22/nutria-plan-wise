@@ -47,6 +47,7 @@ import {
 import { CalorieRing } from '@/components/CalorieRing';
 import { MacroChart } from '@/components/MacroChart';
 import { AIRebalancer } from '@/components/AIRebalancer';
+import { TripleOptimizer } from '@/components/TripleOptimizer';
 import {
   Dialog,
   DialogContent,
@@ -882,24 +883,44 @@ export default function Dashboard() {
 
               {/* Otimizar Plano Alimentar - apenas se pode editar */}
               {currentDietPlan && permissions.can_adjust ? (
-                <AIRebalancer
-                  planId={currentDietPlan.id}
-                  targets={{
-                    protein: profile?.protein_target || 150,
-                    carbs: profile?.carbs_target || 250,
-                    fat: profile?.fat_target || 65,
-                    calories: profile?.daily_calories || 2000,
-                  }}
-                  currentMacros={{
-                    protein: currentProtein,
-                    carbs: currentCarbs,
-                    fat: currentFat,
-                    calories: currentCalories,
-                  }}
-                  userGoal={profile?.goal as 'gain_muscle' | 'lose_weight' | 'maintain' | undefined}
-                  onComplete={fetchCurrentPlan}
-                  compact
-                />
+                <div className="flex gap-2">
+                  <AIRebalancer
+                    planId={currentDietPlan.id}
+                    targets={{
+                      protein: profile?.protein_target || 150,
+                      carbs: profile?.carbs_target || 250,
+                      fat: profile?.fat_target || 65,
+                      calories: profile?.daily_calories || 2000,
+                    }}
+                    currentMacros={{
+                      protein: currentProtein,
+                      carbs: currentCarbs,
+                      fat: currentFat,
+                      calories: currentCalories,
+                    }}
+                    userGoal={profile?.goal as 'gain_muscle' | 'lose_weight' | 'maintain' | undefined}
+                    onComplete={fetchCurrentPlan}
+                    compact
+                  />
+                  <TripleOptimizer
+                    planId={currentDietPlan.id}
+                    targets={{
+                      protein: profile?.protein_target || 150,
+                      carbs: profile?.carbs_target || 250,
+                      fat: profile?.fat_target || 65,
+                      calories: profile?.daily_calories || 2000,
+                    }}
+                    currentMacros={{
+                      protein: currentProtein,
+                      carbs: currentCarbs,
+                      fat: currentFat,
+                      calories: currentCalories,
+                    }}
+                    userGoal={profile?.goal as 'gain_muscle' | 'lose_weight' | 'maintain' | undefined}
+                    onComplete={fetchCurrentPlan}
+                    compact
+                  />
+                </div>
               ) : (
                 <div /> // Placeholder para manter grid quando otimizar não disponível
               )}
