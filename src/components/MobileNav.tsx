@@ -144,7 +144,15 @@ export function MobileNav() {
       <SheetContent side="left" className="w-[280px] p-0">
         <SheetHeader className="border-b p-4">
           <SheetTitle className="flex items-center justify-between">
-            <Logo size="sm" />
+            <div className="flex items-center gap-2">
+              <Logo size="sm" />
+              {isAdmin && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-primary/10 text-primary text-xs font-medium rounded-full border border-primary/20">
+                  <Shield className="w-3 h-3" />
+                  Admin
+                </span>
+              )}
+            </div>
             <SheetClose asChild>
               <Button variant="ghost" size="icon" className="h-8 w-8">
                 <X className="h-4 w-4" />
