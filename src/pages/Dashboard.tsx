@@ -456,47 +456,6 @@ export default function Dashboard() {
           </motion.div>
         )}
 
-        {/* Limit Reached Alerts - Show when any limit is hit */}
-        {usage && !isLinkedStudent && (
-          <div className="space-y-3">
-            {isLimitReached('diet') && !dismissedAlerts.has('diet') && (
-              <LimitReachedAlert
-                feature="diet"
-                current={usage.diets.used}
-                limit={usage.diets.limit}
-                planName={subscriptionPlan?.name}
-                onDismiss={() => handleDismissAlert('diet')}
-              />
-            )}
-            {isLimitReached('substitution') && !dismissedAlerts.has('substitution') && (
-              <LimitReachedAlert
-                feature="substitution"
-                current={usage.substitutions.used}
-                limit={usage.substitutions.limit}
-                planName={subscriptionPlan?.name}
-                onDismiss={() => handleDismissAlert('substitution')}
-              />
-            )}
-            {isLimitReached('adjustment') && !dismissedAlerts.has('adjustment') && (
-              <LimitReachedAlert
-                feature="adjustment"
-                current={usage.adjustments.used}
-                limit={usage.adjustments.limit}
-                planName={subscriptionPlan?.name}
-                onDismiss={() => handleDismissAlert('adjustment')}
-              />
-            )}
-            {isLimitReached('chat') && !dismissedAlerts.has('chat') && (
-              <LimitReachedAlert
-                feature="chat"
-                current={usage.chat.used}
-                limit={usage.chat.limit}
-                planName={subscriptionPlan?.name}
-                onDismiss={() => handleDismissAlert('chat')}
-              />
-            )}
-          </div>
-        )}
 
         {/* Welcome Section */}
         <motion.section
