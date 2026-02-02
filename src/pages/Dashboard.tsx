@@ -26,6 +26,7 @@ import {
   Zap,
 } from 'lucide-react';
 import { useBruteForceOptimizer } from '@/hooks/useBruteForceOptimizer';
+import { useHybridOptimizer } from '@/hooks/useHybridOptimizer';
 import { useSuccessSound } from '@/hooks/useSuccessSound';
 import { Button } from '@/components/ui/button';
 import { Logo } from '@/components/Logo';
@@ -96,7 +97,23 @@ export default function Dashboard() {
     undo: undoOptimization 
   } = useBruteForceOptimizer();
   const { playSuccessSound } = useSuccessSound();
+  
+  // Hybrid optimizer
+  const {
+    phase: hybridPhase,
+    isOptimizing: isHybridOptimizing,
+    isApplying: isHybridApplying,
+    preview: hybridPreview,
+    result: hybridResult,
+    generatePreview: generateHybridPreview,
+    applyPreview: applyHybridPreview,
+    cancelPreview: cancelHybridPreview,
+    reset: resetHybrid,
+  } = useHybridOptimizer();
+  
   const [showOptimizationDialog, setShowOptimizationDialog] = useState(false);
+  const [showHybridDialog, setShowHybridDialog] = useState(false);
+  const [hybridDialogPhase, setHybridDialogPhase] = useState<'loading' | 'preview' | 'result'>('loading');
   const [optimizationPhase, setOptimizationPhase] = useState<'loading' | 'preview' | 'result'>('loading');
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -303,6 +320,62 @@ export default function Dashboard() {
     setTimeout(() => setOptimizationPhase('loading'), 300);
   };
 
+  // ========== HYBRID OPTIMIZER HANDLERS ==========
+  const handleHybridOptimize = async () => {
+    if (!currentDietPlan || !profile) return;
+    
+    // Map goal to objective
+    const objectiveMap: Record<string, string> = {
+      lose_weight: 'cut',
+      maintain: 'maintain',
+      gain_muscle: 'bulk',
+    };
+    const objective = objectiveMap[profile.goal || 'maintain'] || 'maintain';
+    
+    setHybridDialogPhase('loading');
+    setShowHybridDialog(true);
+    
+    const preview = await generateHybridPreview(
+      currentDietPlan.id,
+      {
+        calories: profile?.daily_calories || 2000,
+        protein: profile?.protein_target || 150,
+        carbs: profile?.carbs_target || 250,
+        fat: profile?.fat_target || 65,
+      },
+      objective
+    );
+    
+    if (preview) {
+      setHybridDialogPhase('preview');
+    } else {
+      setShowHybridDialog(false);
+    }
+  };
+
+  const handleConfirmHybridOptimization = async () => {
+    const result = await applyHybridPreview();
+    
+    if (result?.success) {
+      setHybridDialogPhase('result');
+      playSuccessSound();
+      await fetchCurrentPlan();
+    }
+  };
+
+  const handleCancelHybridOptimization = () => {
+    cancelHybridPreview();
+    setShowHybridDialog(false);
+  };
+
+  const handleCloseHybridDialog = () => {
+    setShowHybridDialog(false);
+    setTimeout(() => {
+      setHybridDialogPhase('loading');
+      resetHybrid();
+    }, 300);
+  };
+
   const handleSignOut = async () => {
     await signOut();
     navigate('/login');
@@ -489,14 +562,14 @@ export default function Dashboard() {
           transition={{ delay: 0.1 }}
           className="space-y-3 sm:space-y-4"
         >
-          {/* Test Optimization Button */}
+          {/* Optimization Buttons */}
           {currentDietPlan && (
-            <div className="flex justify-end">
+            <div className="flex justify-end gap-2">
               <Button
                 variant="outline"
                 size="sm"
                 onClick={handleBruteForceOptimize}
-                disabled={isOptimizing}
+                disabled={isOptimizing || isHybridOptimizing}
                 className="text-xs border-amber-500 text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950"
               >
                 {isOptimizing ? (
@@ -507,7 +580,26 @@ export default function Dashboard() {
                 ) : (
                   <>
                     <Zap className="w-3 h-3 mr-1" />
-                    Otimizar Plano (Teste)
+                    Rápido (Teste)
+                  </>
+                )}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleHybridOptimize}
+                disabled={isOptimizing || isHybridOptimizing}
+                className="text-xs border-purple-500 text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-950"
+              >
+                {isHybridOptimizing ? (
+                  <>
+                    <Loader2 className="w-3 h-3 animate-spin mr-1" />
+                    {hybridPhase.message || 'Otimizando...'}
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-3 h-3 mr-1" />
+                    Híbrido (IA + Precisão)
                   </>
                 )}
               </Button>
@@ -1348,6 +1440,356 @@ export default function Dashboard() {
                   </Button>
                 </motion.div>
               )}
+            </motion.div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Hybrid Optimization Dialog */}
+      <Dialog open={showHybridDialog} onOpenChange={(open) => {
+        if (!open) handleCancelHybridOptimization();
+      }}>
+        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {hybridDialogPhase === 'result' ? (
+                <>
+                  <Sparkles className="h-5 w-5 text-purple-500" />
+                  Resultado da Otimização Híbrida
+                </>
+              ) : (
+                <>
+                  <Sparkles className="h-5 w-5 text-purple-500" />
+                  Otimização Híbrida (IA + Precisão)
+                </>
+              )}
+            </DialogTitle>
+            <DialogDescription>
+              {hybridDialogPhase === 'result' 
+                ? 'Comparativo das duas fases de otimização'
+                : 'Combinando decisões nutricionais da IA com precisão matemática'
+              }
+            </DialogDescription>
+          </DialogHeader>
+
+          {/* Loading Phase */}
+          {hybridDialogPhase === 'loading' && (
+            <motion.div
+              key="hybrid-loading"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="space-y-6 py-4"
+            >
+              <div className="flex flex-col items-center justify-center py-6">
+                <motion.div
+                  animate={{ 
+                    scale: [1, 1.2, 1],
+                    rotate: [0, 180, 360],
+                  }}
+                  transition={{ 
+                    duration: 2, 
+                    repeat: Infinity, 
+                    ease: "easeInOut" 
+                  }}
+                  className="relative"
+                >
+                  <Sparkles className="h-12 w-12 text-purple-500" />
+                </motion.div>
+                <div className="mt-4 text-center">
+                  <p className="text-sm font-medium text-foreground">
+                    {hybridPhase.message || 'Iniciando otimização...'}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Fase: {hybridPhase.name === 'ai' ? 'IA' : hybridPhase.name === 'bruteforce' ? 'Ajuste Fino' : hybridPhase.name}
+                  </p>
+                </div>
+                {/* Progress Bar */}
+                <div className="w-full max-w-xs mt-4">
+                  <div className="h-2 bg-muted rounded-full overflow-hidden">
+                    <motion.div
+                      className="h-full bg-gradient-to-r from-purple-500 to-pink-500"
+                      initial={{ width: 0 }}
+                      animate={{ width: `${hybridPhase.progress}%` }}
+                      transition={{ duration: 0.3 }}
+                    />
+                  </div>
+                  <p className="text-xs text-center text-muted-foreground mt-1">
+                    {hybridPhase.progress}%
+                  </p>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {/* Preview Phase */}
+          {hybridDialogPhase === 'preview' && hybridPreview && (
+            <motion.div
+              key="hybrid-preview"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="space-y-4"
+            >
+              {/* Three-column comparison */}
+              <div className="grid grid-cols-3 gap-3">
+                {/* Before */}
+                <div className="p-3 border rounded-lg bg-muted/30">
+                  <h4 className="font-medium text-xs mb-2 text-muted-foreground">Antes</h4>
+                  <div className="space-y-1 text-xs">
+                    <div className="flex justify-between">
+                      <span>Cal:</span>
+                      <span className="font-mono">{hybridPreview.before.calories}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Prot:</span>
+                      <span className="font-mono">{hybridPreview.before.protein}g</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Carb:</span>
+                      <span className="font-mono">{hybridPreview.before.carbs}g</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Gord:</span>
+                      <span className="font-mono">{hybridPreview.before.fat}g</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* After AI */}
+                <div className="p-3 border rounded-lg bg-blue-500/10 border-blue-500/30">
+                  <h4 className="font-medium text-xs mb-2 text-blue-600 dark:text-blue-400">Após IA</h4>
+                  <div className="space-y-1 text-xs">
+                    <div className="flex justify-between">
+                      <span>Cal:</span>
+                      <span className="font-mono">{hybridPreview.afterAI.calories}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Prot:</span>
+                      <span className="font-mono">{hybridPreview.afterAI.protein}g</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Carb:</span>
+                      <span className="font-mono">{hybridPreview.afterAI.carbs}g</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Gord:</span>
+                      <span className="font-mono">{hybridPreview.afterAI.fat}g</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* After Brute Force */}
+                <div className="p-3 border rounded-lg bg-green-500/10 border-green-500/30">
+                  <h4 className="font-medium text-xs mb-2 text-green-600 dark:text-green-400">Final (Ajuste Fino)</h4>
+                  <div className="space-y-1 text-xs">
+                    <div className="flex justify-between">
+                      <span>Cal:</span>
+                      <span className="font-mono">{hybridPreview.afterBruteForce.calories}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Prot:</span>
+                      <span className="font-mono">{hybridPreview.afterBruteForce.protein}g</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Carb:</span>
+                      <span className="font-mono">{hybridPreview.afterBruteForce.carbs}g</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Gord:</span>
+                      <span className="font-mono">{hybridPreview.afterBruteForce.fat}g</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Targets */}
+              <div className="p-3 border rounded-lg bg-purple-500/10 border-purple-500/30">
+                <h4 className="font-medium text-xs mb-2 text-purple-600 dark:text-purple-400">Metas</h4>
+                <div className="grid grid-cols-4 gap-2 text-xs text-center">
+                  <div>
+                    <div className="font-mono font-medium">{hybridPreview.targets.calories}</div>
+                    <div className="text-muted-foreground">kcal</div>
+                  </div>
+                  <div>
+                    <div className="font-mono font-medium">{hybridPreview.targets.protein}g</div>
+                    <div className="text-muted-foreground">prot</div>
+                  </div>
+                  <div>
+                    <div className="font-mono font-medium">{hybridPreview.targets.carbs}g</div>
+                    <div className="text-muted-foreground">carb</div>
+                  </div>
+                  <div>
+                    <div className="font-mono font-medium">{hybridPreview.targets.fat}g</div>
+                    <div className="text-muted-foreground">gord</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Changes Summary */}
+              <div className="grid grid-cols-2 gap-3">
+                {/* AI Changes */}
+                <div className="border rounded-lg p-3">
+                  <h4 className="font-medium text-xs mb-2 flex items-center gap-1">
+                    <Zap className="w-3 h-3 text-blue-500" />
+                    Ajustes da IA ({hybridPreview.aiChanges.length})
+                  </h4>
+                  {hybridPreview.aiChanges.length > 0 ? (
+                    <div className="max-h-32 overflow-y-auto space-y-1">
+                      {hybridPreview.aiChanges.slice(0, 5).map((change, i) => (
+                        <div key={i} className="text-xs flex justify-between">
+                          <span className="truncate flex-1">{change.food_name}</span>
+                          <span className="font-mono ml-2">
+                            {change.old_quantity}→{change.new_quantity}g
+                          </span>
+                        </div>
+                      ))}
+                      {hybridPreview.aiChanges.length > 5 && (
+                        <p className="text-xs text-muted-foreground">
+                          +{hybridPreview.aiChanges.length - 5} mais...
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">Nenhum ajuste</p>
+                  )}
+                </div>
+
+                {/* Brute Force Changes */}
+                <div className="border rounded-lg p-3">
+                  <h4 className="font-medium text-xs mb-2 flex items-center gap-1">
+                    <Target className="w-3 h-3 text-green-500" />
+                    Ajuste Fino ({hybridPreview.bruteForceChanges.length})
+                  </h4>
+                  {hybridPreview.bruteForceChanges.length > 0 ? (
+                    <div className="max-h-32 overflow-y-auto space-y-1">
+                      {hybridPreview.bruteForceChanges.slice(0, 5).map((change, i) => (
+                        <div key={i} className="text-xs flex justify-between">
+                          <span className="truncate flex-1">{change.food_name}</span>
+                          <span className="font-mono ml-2">
+                            {change.old_quantity}→{change.new_quantity}g
+                          </span>
+                        </div>
+                      ))}
+                      {hybridPreview.bruteForceChanges.length > 5 && (
+                        <p className="text-xs text-muted-foreground">
+                          +{hybridPreview.bruteForceChanges.length - 5} mais...
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">Nenhum ajuste adicional</p>
+                  )}
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="flex justify-end gap-2 pt-4 border-t">
+                <Button variant="outline" onClick={handleCancelHybridOptimization}>
+                  Cancelar
+                </Button>
+                <Button
+                  onClick={handleConfirmHybridOptimization}
+                  disabled={isHybridApplying}
+                  className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600"
+                >
+                  {isHybridApplying ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Aplicando...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="h-4 w-4 mr-2" />
+                      Aplicar Ajuste Fino
+                    </>
+                  )}
+                </Button>
+              </div>
+            </motion.div>
+          )}
+
+          {/* Result Phase */}
+          {hybridDialogPhase === 'result' && hybridResult && (
+            <motion.div
+              key="hybrid-result"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="space-y-4"
+            >
+              <SuccessAnimation show={true} message="Otimização Concluída!" />
+              
+              <div className="text-center py-2">
+                <p className="text-lg font-semibold text-foreground">
+                  Otimização Híbrida Concluída!
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  {hybridResult.aiChanges.length + hybridResult.bruteForceChanges.length} ajustes aplicados
+                </p>
+              </div>
+
+              {/* Final comparison */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="p-3 border rounded-lg bg-muted/30">
+                  <h4 className="font-medium text-xs mb-2 text-muted-foreground">Antes</h4>
+                  <div className="space-y-1 text-xs">
+                    <div className="flex justify-between">
+                      <span>Calorias:</span>
+                      <span className="font-mono">{hybridResult.before.calories} kcal</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Proteína:</span>
+                      <span className="font-mono">{hybridResult.before.protein}g</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Carboidratos:</span>
+                      <span className="font-mono">{hybridResult.before.carbs}g</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Gordura:</span>
+                      <span className="font-mono">{hybridResult.before.fat}g</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-3 border rounded-lg bg-green-500/10 border-green-500/30">
+                  <h4 className="font-medium text-xs mb-2 text-green-600 dark:text-green-400">Final</h4>
+                  <div className="space-y-1 text-xs">
+                    <div className="flex justify-between">
+                      <span>Calorias:</span>
+                      <span className="font-mono">
+                        {hybridResult.afterBruteForce.calories} kcal
+                        <DeltaBadge value={hybridResult.afterBruteForce.calories - hybridResult.before.calories} />
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Proteína:</span>
+                      <span className="font-mono">
+                        {hybridResult.afterBruteForce.protein}g
+                        <DeltaBadge value={hybridResult.afterBruteForce.protein - hybridResult.before.protein} />
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Carboidratos:</span>
+                      <span className="font-mono">
+                        {hybridResult.afterBruteForce.carbs}g
+                        <DeltaBadge value={hybridResult.afterBruteForce.carbs - hybridResult.before.carbs} />
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Gordura:</span>
+                      <span className="font-mono">
+                        {hybridResult.afterBruteForce.fat}g
+                        <DeltaBadge value={hybridResult.afterBruteForce.fat - hybridResult.before.fat} />
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex justify-end pt-4 border-t">
+                <Button onClick={handleCloseHybridDialog}>
+                  Fechar
+                </Button>
+              </div>
             </motion.div>
           )}
         </DialogContent>
