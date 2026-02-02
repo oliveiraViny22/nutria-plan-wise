@@ -818,20 +818,36 @@ export default function Dashboard() {
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              className="space-y-4 py-4"
+              className="space-y-6 py-4"
             >
-              <div className="flex flex-col items-center justify-center py-8">
+              <div className="flex flex-col items-center justify-center py-6">
+                {/* Animated Icon with Pulse/Bounce */}
                 <motion.div
-                  animate={{ rotate: 360 }}
-                  transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}
+                  animate={{ 
+                    scale: [1, 1.2, 1],
+                    opacity: [1, 0.8, 1],
+                  }}
+                  transition={{ 
+                    duration: 1.2, 
+                    repeat: Infinity, 
+                    ease: "easeInOut" 
+                  }}
+                  className="relative"
                 >
+                  <motion.div
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+                    className="absolute inset-0 rounded-full border-2 border-amber-500/30 border-t-amber-500"
+                    style={{ width: 64, height: 64, margin: -8 }}
+                  />
                   <Zap className="h-12 w-12 text-amber-500" />
                 </motion.div>
+                
                 <motion.p
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.2 }}
-                  className="mt-4 text-lg font-medium text-foreground"
+                  className="mt-6 text-lg font-medium text-foreground"
                 >
                   Calculando otimização...
                 </motion.p>
@@ -845,8 +861,46 @@ export default function Dashboard() {
                 </motion.p>
               </div>
 
+              {/* Estimated Progress Bar */}
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3 }}
+                className="px-4"
+              >
+                <div className="flex items-center justify-between text-xs text-muted-foreground mb-2">
+                  <span>Progresso estimado</span>
+                  <motion.span
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 0.5 }}
+                  >
+                    ~3-5 segundos
+                  </motion.span>
+                </div>
+                <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
+                  <motion.div
+                    className="h-full bg-gradient-to-r from-amber-400 to-amber-600 rounded-full"
+                    initial={{ width: "0%" }}
+                    animate={{ width: "95%" }}
+                    transition={{ 
+                      duration: 4, 
+                      ease: [0.4, 0.0, 0.2, 1]
+                    }}
+                  />
+                </div>
+                <div className="flex justify-between text-xs text-muted-foreground mt-1.5">
+                  <motion.span
+                    animate={{ opacity: [0.5, 1, 0.5] }}
+                    transition={{ duration: 1.5, repeat: Infinity }}
+                  >
+                    Otimizando alimentos...
+                  </motion.span>
+                </div>
+              </motion.div>
+
               {/* Skeleton Preview */}
-              <div className="space-y-4 opacity-50">
+              <div className="space-y-4 opacity-40">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="p-4 border rounded-lg bg-muted/30 space-y-3">
                     <div className="h-4 w-16 bg-muted rounded animate-pulse" />
