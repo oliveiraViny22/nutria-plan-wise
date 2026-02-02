@@ -249,6 +249,133 @@ function validatePlan(
 // PIPELINE DE CORREÇÃO (4 ETAPAS)
 // ============================================
 
+// ============================================
+// REFINAMENTO FINAL (±1g precision)
+// ============================================
+
+function runFinalRefinement(
+  foods: FoodWithMeta[],
+  quantities: Map<string, number>,
+  targets: MacroTargets,
+  contributions: Map<string, MacroTargets>,
+  maxIterations: number = 50
+): { quantities: Map<string, number>; iterations: number; converged: boolean } {
+  const PRECISION = {
+    calories: 10,  // ±10 kcal
+    protein: 1,    // ±1g
+    carbs: 2,      // ±2g
+    fat: 1,        // ±1g
+  };
+
+  let iterations = 0;
+
+  for (let i = 0; i < maxIterations; i++) {
+    iterations = i + 1;
+    const totals = calculateTotals(foods, quantities);
+
+    const calDiff = totals.calories - targets.calories;
+    const protDiff = totals.protein - targets.protein;
+    const carbsDiff = totals.carbs - targets.carbs;
+    const fatDiff = totals.fat - targets.fat;
+
+    // Check if we've converged
+    if (
+      Math.abs(calDiff) <= PRECISION.calories &&
+      Math.abs(protDiff) <= PRECISION.protein &&
+      Math.abs(carbsDiff) <= PRECISION.carbs &&
+      Math.abs(fatDiff) <= PRECISION.fat
+    ) {
+      console.log(`Refinamento convergiu em ${iterations} iterações`);
+      return { quantities, iterations, converged: true };
+    }
+
+    // Find the biggest deviation to prioritize
+    const deviations = [
+      { nutrient: 'calories', diff: calDiff, precision: PRECISION.calories },
+      { nutrient: 'protein', diff: protDiff, precision: PRECISION.protein },
+      { nutrient: 'carbs', diff: carbsDiff, precision: PRECISION.carbs },
+      { nutrient: 'fat', diff: fatDiff, precision: PRECISION.fat },
+    ].filter(d => Math.abs(d.diff) > d.precision);
+
+    if (deviations.length === 0) break;
+
+    // Sort by relative deviation (normalized)
+    deviations.sort((a, b) => 
+      Math.abs(b.diff) / (b.precision || 1) - Math.abs(a.diff) / (a.precision || 1)
+    );
+
+    const target = deviations[0];
+    const needDecrease = target.diff > 0;
+
+    // Find best food to adjust
+    let bestFood: FoodWithMeta | null = null;
+    let bestScore = 0;
+
+    for (const food of foods) {
+      const contrib = contributions.get(food.id);
+      if (!contrib) continue;
+
+      const currentGrams = quantities.get(food.id) || food.quantity_grams;
+      const limits = getCategoryLimits(food.food.category);
+
+      // Skip if at limits
+      if (needDecrease && currentGrams <= limits.min) continue;
+      if (!needDecrease && currentGrams >= limits.max) continue;
+
+      // Calculate nutrient contribution per gram
+      const nutrientKey = target.nutrient as keyof MacroTargets;
+      const contribPerGram = contrib[nutrientKey] / 100;
+
+      if (contribPerGram <= 0) continue;
+
+      // Score: high contribution + room to adjust
+      const roomToAdjust = needDecrease 
+        ? currentGrams - limits.min 
+        : limits.max - currentGrams;
+
+      const score = contribPerGram * Math.min(roomToAdjust, 20);
+      
+      // Penalize if this would worsen other macros significantly
+      if (nutrientKey !== 'calories') {
+        const calContrib = contrib.calories / 100;
+        if (needDecrease && calDiff < -PRECISION.calories && calContrib > 1) {
+          continue; // Don't reduce if already low on calories
+        }
+      }
+
+      if (score > bestScore) {
+        bestScore = score;
+        bestFood = food;
+      }
+    }
+
+    if (!bestFood) break;
+
+    const contrib = contributions.get(bestFood.id)!;
+    const currentGrams = quantities.get(bestFood.id) || bestFood.quantity_grams;
+    const limits = getCategoryLimits(bestFood.food.category);
+
+    const nutrientKey = target.nutrient as keyof MacroTargets;
+    const contribPerGram = contrib[nutrientKey] / 100;
+
+    // Calculate exact grams needed (but limit step size)
+    let gramsToChange = Math.abs(target.diff) / contribPerGram;
+    gramsToChange = Math.min(gramsToChange, 10); // Max 10g per step for precision
+    gramsToChange = Math.max(gramsToChange, 1);  // Min 1g step for precision
+
+    const newGrams = needDecrease
+      ? Math.max(limits.min, currentGrams - gramsToChange)
+      : Math.min(limits.max, currentGrams + gramsToChange);
+
+    if (Math.abs(newGrams - currentGrams) >= 1) {
+      quantities.set(bestFood.id, Math.round(newGrams));
+    }
+  }
+
+  console.log(`Refinamento: ${iterations} iterações, não convergiu completamente`);
+  return { quantities, iterations, converged: false };
+}
+
 function runCorrectionPipeline(
   foods: FoodWithMeta[],
   quantities: Map<string, number>,
@@ -578,118 +705,208 @@ serve(async (req) => {
 
     const typedMeals = meals as unknown as Meal[];
 
-    // Coletar todos os alimentos
-    const allFoods: FoodWithMeta[] = [];
-    const initialQuantities = new Map<string, number>();
-
-    for (const meal of typedMeals) {
-      const firstOption = meal.meal_options.find((o) => o.option_number === 1);
-      if (firstOption) {
-        for (const food of firstOption.meal_option_foods) {
-          allFoods.push({
-            ...food,
-            mealName: meal.name,
-            mealId: meal.id,
-            optionId: firstOption.id,
-          });
-          initialQuantities.set(food.id, food.quantity_grams);
-        }
-      }
+    // ============================================
+    // PROCESSAR TODAS AS OPÇÕES (1, 2, 3)
+    // ============================================
+    
+    interface OptionResult {
+      optionNumber: number;
+      foods: FoodWithMeta[];
+      initialQuantities: Map<string, number>;
+      finalQuantities: Map<string, number>;
+      finalTotals: MacroTargets;
+      adjustments: Adjustment[];
+      iterations: number;
+      converged: boolean;
+      foodChanges: Array<{
+        food_id: string;
+        food_name: string;
+        original_grams: number;
+        new_grams: number;
+        mealOptionFoodId: string;
+        mealId: string;
+        mealOptionId: string;
+        mealName: string;
+      }>;
     }
 
-    // Calcular totais atuais
-    const currentTotals = calculateTotals(allFoods, initialQuantities);
-    console.log(`Totais atuais: ${JSON.stringify(currentTotals)}`);
-    console.log(`Metas: ${JSON.stringify(targets)}`);
+    const optionResults: OptionResult[] = [];
+    
+    // Processar opções 1, 2 e 3
+    for (const optionNumber of [1, 2, 3]) {
+      const optionFoods: FoodWithMeta[] = [];
+      const optionInitialQuantities = new Map<string, number>();
 
-    // Validar plano atual
-    const initialValidation = validatePlan(currentTotals, targets, objective);
+      for (const meal of typedMeals) {
+        const option = meal.meal_options.find((o) => o.option_number === optionNumber);
+        if (option) {
+          for (const food of option.meal_option_foods) {
+            optionFoods.push({
+              ...food,
+              mealName: meal.name,
+              mealId: meal.id,
+              optionId: option.id,
+            });
+            optionInitialQuantities.set(food.id, food.quantity_grams);
+          }
+        }
+      }
 
-    if (initialValidation.valid) {
-      // Plano já válido
-      const result: RebalanceResult = {
-        status: "valid",
-        objective,
-        iterations: 0,
-        final_totals: currentTotals,
-        adjustments: [],
-      };
+      // Pular se não há alimentos nesta opção
+      if (optionFoods.length === 0) {
+        console.log(`Opção ${optionNumber}: sem alimentos, pulando`);
+        continue;
+      }
 
-      console.log("Plano já está válido, nenhum ajuste necessário");
+      console.log(`\n=== Processando Opção ${optionNumber} (${optionFoods.length} alimentos) ===`);
 
-      return new Response(JSON.stringify({
-        success: true,
-        alreadyOptimized: true,
-        result,
-        currentMacros: currentTotals,
-        targetMacros: targets,
-        message: `Seu plano já está dentro dos limites para ${objective === "cut" ? "emagrecimento" : objective === "bulk" ? "ganho de massa" : "manutenção"}.`,
-      }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      // Calcular totais atuais desta opção
+      const optionCurrentTotals = calculateTotals(optionFoods, optionInitialQuantities);
+      console.log(`Opção ${optionNumber} - Totais atuais: ${JSON.stringify(optionCurrentTotals)}`);
+
+      // Validar plano atual
+      const optionValidation = validatePlan(optionCurrentTotals, targets, objective);
+
+      if (optionValidation.valid) {
+        console.log(`Opção ${optionNumber} já está válida`);
+        optionResults.push({
+          optionNumber,
+          foods: optionFoods,
+          initialQuantities: optionInitialQuantities,
+          finalQuantities: optionInitialQuantities,
+          finalTotals: optionCurrentTotals,
+          adjustments: [],
+          iterations: 0,
+          converged: true,
+          foodChanges: [],
+        });
+        continue;
+      }
+
+      // Criar cópia do mapa inicial
+      const workingQuantities = new Map(optionInitialQuantities);
+
+      // FASE 1: Pipeline de correção macro (4 etapas)
+      const pipelineResult = runCorrectionPipeline(
+        optionFoods, 
+        workingQuantities, 
+        targets, 
+        objective, 
+        3
+      );
+
+      // FASE 2: Refinamento final para precisão ±1g
+      // Pré-calcular contribuições
+      const contributions = new Map<string, MacroTargets>();
+      for (const food of optionFoods) {
+        contributions.set(food.id, getFoodContributionPer100g(food.food));
+      }
+
+      const refinementResult = runFinalRefinement(
+        optionFoods,
+        pipelineResult.quantities,
+        targets,
+        contributions,
+        50
+      );
+
+      // Calcular totais finais
+      const optionFinalTotals = calculateTotals(optionFoods, refinementResult.quantities);
+      const totalIterations = pipelineResult.iterations + refinementResult.iterations;
+      
+      console.log(`Opção ${optionNumber} - Totais finais: ${JSON.stringify(optionFinalTotals)}`);
+      console.log(`Opção ${optionNumber} - Iterações: ${totalIterations} (pipeline: ${pipelineResult.iterations}, refinamento: ${refinementResult.iterations})`);
+
+      // Montar mudanças de alimentos
+      const optionFoodChanges: OptionResult['foodChanges'] = [];
+
+      for (const food of optionFoods) {
+        const original = optionInitialQuantities.get(food.id) || food.quantity_grams;
+        const final = refinementResult.quantities.get(food.id) || food.quantity_grams;
+        const diff = Math.abs(final - original);
+
+        if (diff >= 1) {
+          console.log(`  ${food.food.name}: ${original}g → ${final}g (diff: ${diff})`);
+        }
+
+        if (diff >= 1) { // Mudança: reportar todas as diferenças >= 1g
+          optionFoodChanges.push({
+            food_id: food.food_id,
+            food_name: food.food.name,
+            original_grams: original,
+            new_grams: Math.round(final),
+            mealOptionFoodId: food.id,
+            mealId: food.mealId,
+            mealOptionId: food.optionId,
+            mealName: food.mealName,
+          });
+        }
+      }
+
+      optionResults.push({
+        optionNumber,
+        foods: optionFoods,
+        initialQuantities: optionInitialQuantities,
+        finalQuantities: refinementResult.quantities,
+        finalTotals: optionFinalTotals,
+        adjustments: pipelineResult.adjustments,
+        iterations: totalIterations,
+        converged: refinementResult.converged,
+        foodChanges: optionFoodChanges,
       });
     }
 
-    // Criar cópia do mapa inicial (o pipeline modifica in-place)
-    const workingQuantities = new Map(initialQuantities);
+    // Se nenhuma opção foi processada
+    if (optionResults.length === 0) {
+      throw new Error("Nenhuma opção de refeição encontrada no plano");
+    }
+
+    // Usar opção 1 como referência principal para compatibilidade
+    const primaryResult = optionResults.find(r => r.optionNumber === 1) || optionResults[0];
     
-    // Executar pipeline de correção
-    const { quantities: finalQuantities, adjustments, iterations, converged } =
-      runCorrectionPipeline(allFoods, workingQuantities, targets, objective, 3);
+    // Verificar convergência de todas as opções
+    const allConverged = optionResults.every(r => r.converged);
+    const anyConverged = optionResults.some(r => r.converged);
 
-    // Calcular totais finais
-    const finalTotals = calculateTotals(allFoods, finalQuantities);
-    const finalValidation = validatePlan(finalTotals, targets, objective);
-
-    console.log(`Totais finais: ${JSON.stringify(finalTotals)}`);
-    console.log(`Converged: ${converged}, Iterações: ${iterations}`);
-
-    // Determinar status
+    // Determinar status baseado em todas as opções
+    const primaryValidation = validatePlan(primaryResult.finalTotals, targets, objective);
     let status: "valid" | "valid_with_alert" | "error";
-    if (finalValidation.valid) {
+    if (primaryValidation.valid && allConverged) {
       status = "valid";
-    } else if (converged) {
+    } else if (anyConverged) {
       status = "valid_with_alert";
     } else {
       status = "error";
     }
 
-    // Montar mudanças de alimentos
-    const foodChanges: Array<{
-      food_id: string;
-      food_name: string;
-      original_grams: number;
-      new_grams: number;
-    }> = [];
+    // Calcular totais iniciais para compatibilidade
+    const currentTotals = calculateTotals(primaryResult.foods, primaryResult.initialQuantities);
 
-    console.log(`Comparando quantidades (${allFoods.length} alimentos):`);
-    for (const food of allFoods) {
-      const original = initialQuantities.get(food.id) || food.quantity_grams;
-      const final = finalQuantities.get(food.id) || food.quantity_grams;
-      const diff = Math.abs(final - original);
-
-      if (diff >= 1) {
-        console.log(`  ${food.food.name}: ${original}g → ${final}g (diff: ${diff})`);
-      }
-
-      if (diff >= 3) {
-        foodChanges.push({
-          food_id: food.food_id,
-          food_name: food.food.name,
-          original_grams: original,
-          new_grams: Math.round(final),
-        });
-      }
-    }
-    console.log(`Total food_changes: ${foodChanges.length}`);
+    // Combinar todas as mudanças de todas as opções
+    const allFoodChanges = optionResults.flatMap(r => r.foodChanges);
+    const totalIterations = Math.max(...optionResults.map(r => r.iterations));
 
     const result: RebalanceResult = {
       status,
       objective,
-      iterations,
-      final_totals: finalTotals,
-      adjustments,
-      food_changes: foodChanges,
+      iterations: totalIterations,
+      final_totals: primaryResult.finalTotals,
+      adjustments: primaryResult.adjustments,
+      food_changes: allFoodChanges.map(fc => ({
+        food_id: fc.food_id,
+        food_name: fc.food_name,
+        original_grams: fc.original_grams,
+        new_grams: fc.new_grams,
+      })),
     };
+
+    // Log de resumo
+    console.log(`\n=== RESUMO ===`);
+    for (const opt of optionResults) {
+      const calDiff = Math.abs(opt.finalTotals.calories - targets.calories);
+      const protDiff = Math.abs(opt.finalTotals.protein - targets.protein);
+      console.log(`Opção ${opt.optionNumber}: Cal ±${calDiff.toFixed(0)}kcal, Prot ±${protDiff.toFixed(1)}g, Convergiu: ${opt.converged}`);
+    }
 
     // Retornar no formato esperado pelo frontend
     return new Response(JSON.stringify({
@@ -697,12 +914,20 @@ serve(async (req) => {
       result,
       currentMacros: currentTotals,
       targetMacros: targets,
-      proposedMacros: finalTotals,
-      adjustments: foodChanges.map((fc) => ({
-        mealOptionFoodId: allFoods.find((f) => f.food_id === fc.food_id)?.id,
-        mealId: allFoods.find((f) => f.food_id === fc.food_id)?.mealId,
-        mealOptionId: allFoods.find((f) => f.food_id === fc.food_id)?.optionId,
-        mealName: allFoods.find((f) => f.food_id === fc.food_id)?.mealName,
+      proposedMacros: primaryResult.finalTotals,
+      // Incluir resultados de todas as opções
+      optionResults: optionResults.map(opt => ({
+        optionNumber: opt.optionNumber,
+        converged: opt.converged,
+        iterations: opt.iterations,
+        finalTotals: opt.finalTotals,
+        foodChanges: opt.foodChanges.length,
+      })),
+      adjustments: allFoodChanges.map((fc) => ({
+        mealOptionFoodId: fc.mealOptionFoodId,
+        mealId: fc.mealId,
+        mealOptionId: fc.mealOptionId,
+        mealName: fc.mealName,
         foodName: fc.food_name,
         foodId: fc.food_id,
         originalGrams: fc.original_grams,
@@ -710,12 +935,12 @@ serve(async (req) => {
         reason: `Ajuste para ${objective === "cut" ? "emagrecimento" : objective === "bulk" ? "ganho de massa" : "manutenção"}`,
       })),
       explanation: status === "error"
-        ? `Não foi possível atingir as metas em ${iterations} ciclos. Verifique se as metas são realistas para os alimentos disponíveis.`
-        : `Plano ajustado em ${iterations} ciclo(s) para ${objective === "cut" ? "emagrecimento" : objective === "bulk" ? "ganho de massa" : "manutenção"}.`,
+        ? `Não foi possível atingir as metas. Verifique se as metas são realistas para os alimentos disponíveis.`
+        : `Plano ajustado em ${totalIterations} iteração(ões) para ${objective === "cut" ? "emagrecimento" : objective === "bulk" ? "ganho de massa" : "manutenção"}. ${optionResults.length} opção(ões) processada(s).`,
       warnings: status === "error"
-        ? finalValidation.errors
+        ? primaryValidation.errors
         : status === "valid_with_alert"
-        ? ["Plano próximo das metas, mas com pequenos desvios"]
+        ? optionResults.filter(r => !r.converged).map(r => `Opção ${r.optionNumber} não convergiu completamente`)
         : [],
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
