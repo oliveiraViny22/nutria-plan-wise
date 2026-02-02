@@ -62,6 +62,7 @@ import { ThemeToggle } from '@/components/ThemeToggle';
 import { ObjectiveChangePoliciesManager } from '@/components/admin/ObjectiveChangePoliciesManager';
 import { MealAnchorFoodsManager } from '@/components/admin/MealAnchorFoodsManager';
 import { MealTemplatesManager } from '@/components/admin/MealTemplatesManager';
+import { OptimizerSettingsManager } from '@/components/admin/OptimizerSettingsManager';
 
 
 const CHART_COLORS = [
@@ -1954,6 +1955,9 @@ export default function Admin() {
                   </div>
                 </CardContent>
               </Card>
+
+              {/* Optimizer Settings */}
+              <OptimizerSettingsManager />
             </div>
           </TabsContent>
         </Tabs>
