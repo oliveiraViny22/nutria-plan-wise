@@ -373,11 +373,13 @@ function runCorrectionPipeline(
     // ETAPA 2: PROTEÍNA
     // ==========================================
     if (afterCaloriesPercents.protein < rules.protein.min) {
-      const proteinNeeded = (targets.protein * rules.protein.min / 100) - afterCalories.protein;
+      const proteinTarget = (targets.protein * rules.protein.min / 100);
+      let remainingProtein = proteinTarget - afterCalories.protein;
+      const initialProteinNeeded = remainingProtein;
 
-      if (proteinNeeded > 1) {
+      if (remainingProtein > 1) {
         for (const food of proteinFoods) {
-          if (proteinNeeded <= 0) break;
+          if (remainingProtein <= 1) break;
 
           const contrib = contributions.get(food.id)!;
           if (contrib.protein <= 0) continue;
@@ -385,7 +387,7 @@ function runCorrectionPipeline(
           const currentGrams = quantities.get(food.id) || food.quantity_grams;
           const limits = getCategoryLimits(food.food.category);
 
-          const gramsNeeded = (proteinNeeded * 100) / contrib.protein;
+          const gramsNeeded = (remainingProtein * 100) / contrib.protein;
           const gramsToAdd = Math.min(gramsNeeded, limits.max - currentGrams);
 
           if (gramsToAdd < 5) continue;
@@ -397,16 +399,18 @@ function runCorrectionPipeline(
           }
 
           const newGrams = Math.min(limits.max, currentGrams + gramsToAdd);
+          const actualGramsAdded = newGrams - currentGrams;
           quantities.set(food.id, Math.round(newGrams));
 
-          const proteinAdded = ((newGrams - currentGrams) / 100) * contrib.protein;
-          console.log(`Etapa 2: +${Math.round(newGrams - currentGrams)}g ${food.food.name} (+${proteinAdded.toFixed(1)}g prot)`);
+          const proteinAdded = (actualGramsAdded / 100) * contrib.protein;
+          remainingProtein -= proteinAdded;
+          console.log(`Etapa 2: +${Math.round(actualGramsAdded)}g ${food.food.name} (+${proteinAdded.toFixed(1)}g prot)`);
         }
 
         adjustments.push({
           nutrient: "protein",
           action: "increase",
-          delta: `+${Math.round(proteinNeeded)}g`,
+          delta: `+${Math.round(initialProteinNeeded)}g`,
         });
       }
     }
@@ -456,11 +460,13 @@ function runCorrectionPipeline(
     // ETAPA 4: GORDURA (reduzir se acima do máx)
     // ==========================================
     if (rules.fat && afterCarbsPercents.fat > rules.fat.max) {
-      const fatExcess = afterCarbs.fat - (targets.fat * rules.fat.max / 100);
+      const fatTarget = (targets.fat * rules.fat.max / 100);
+      let remainingFatExcess = afterCarbs.fat - fatTarget;
+      const initialFatExcess = remainingFatExcess;
 
-      if (fatExcess > 1) {
+      if (remainingFatExcess > 1) {
         for (const food of fatFoods) {
-          if (fatExcess <= 0) break;
+          if (remainingFatExcess <= 1) break;
 
           const contrib = contributions.get(food.id)!;
           if (contrib.fat <= 0) continue;
@@ -468,20 +474,25 @@ function runCorrectionPipeline(
           const currentGrams = quantities.get(food.id) || food.quantity_grams;
           const limits = getCategoryLimits(food.food.category);
 
-          const gramsNeeded = (fatExcess * 100) / contrib.fat;
+          const gramsNeeded = (remainingFatExcess * 100) / contrib.fat;
           const gramsToRemove = Math.min(gramsNeeded, currentGrams - limits.min);
 
           if (gramsToRemove < 2) continue;
 
           // Nunca zerar gordura
           const newGrams = Math.max(limits.min, currentGrams - gramsToRemove);
+          const actualGramsRemoved = currentGrams - newGrams;
           quantities.set(food.id, Math.round(newGrams));
+
+          const fatRemoved = (actualGramsRemoved / 100) * contrib.fat;
+          remainingFatExcess -= fatRemoved;
+          console.log(`Etapa 4: -${Math.round(actualGramsRemoved)}g ${food.food.name} (-${fatRemoved.toFixed(1)}g fat)`);
         }
 
         adjustments.push({
           nutrient: "fat",
           action: "decrease",
-          delta: `-${Math.round(fatExcess)}g`,
+          delta: `-${Math.round(initialFatExcess)}g`,
         });
       }
     }
@@ -616,9 +627,12 @@ serve(async (req) => {
       });
     }
 
+    // Criar cópia do mapa inicial (o pipeline modifica in-place)
+    const workingQuantities = new Map(initialQuantities);
+    
     // Executar pipeline de correção
     const { quantities: finalQuantities, adjustments, iterations, converged } =
-      runCorrectionPipeline(allFoods, initialQuantities, targets, objective, 3);
+      runCorrectionPipeline(allFoods, workingQuantities, targets, objective, 3);
 
     // Calcular totais finais
     const finalTotals = calculateTotals(allFoods, finalQuantities);
@@ -645,11 +659,17 @@ serve(async (req) => {
       new_grams: number;
     }> = [];
 
+    console.log(`Comparando quantidades (${allFoods.length} alimentos):`);
     for (const food of allFoods) {
       const original = initialQuantities.get(food.id) || food.quantity_grams;
       const final = finalQuantities.get(food.id) || food.quantity_grams;
+      const diff = Math.abs(final - original);
 
-      if (Math.abs(final - original) >= 3) {
+      if (diff >= 1) {
+        console.log(`  ${food.food.name}: ${original}g → ${final}g (diff: ${diff})`);
+      }
+
+      if (diff >= 3) {
         foodChanges.push({
           food_id: food.food_id,
           food_name: food.food.name,
@@ -658,6 +678,7 @@ serve(async (req) => {
         });
       }
     }
+    console.log(`Total food_changes: ${foodChanges.length}`);
 
     const result: RebalanceResult = {
       status,
