@@ -262,6 +262,12 @@ export default function Dashboard() {
           <div className="flex items-center gap-2">
             <MobileNav />
             <Logo />
+            {isAdmin && (
+              <span className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 bg-primary/10 text-primary text-xs font-medium rounded-full border border-primary/20">
+                <Shield className="w-3 h-3" />
+                Admin
+              </span>
+            )}
           </div>
           {/* Desktop navigation - hidden on mobile */}
           <TooltipProvider delayDuration={300}>
