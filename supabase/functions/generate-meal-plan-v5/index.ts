@@ -38,6 +38,7 @@ import { buildMealWithAnchors } from "./meal-builder.ts";
 import { scaleToCalorieTarget, calculatePlanTotals } from "./scaling.ts";
 import { validateStructure, validateNutritionalContracts } from "./validation.ts";
 import { savePlanWithOptions } from "./database.ts";
+import { optimizeMacroDistribution } from "./macro-optimization.ts";
 
 // =====================================================
 // HANDLER PRINCIPAL
@@ -212,12 +213,22 @@ serve(async (req) => {
     
     const scaleResult = scaleToCalorieTarget(mealsWithOptions, targets);
     
-    logInfo("Ajuste proporcional aplicado", {
+    logInfo("Ajuste calórico aplicado", {
       scaleFactor: scaleResult.scaleFactor.toFixed(3),
       before: scaleResult.beforeTotals,
       after: scaleResult.afterTotals,
       target: targets.calories,
       proteinAdjusted: scaleResult.proteinAdjusted,
+    });
+    
+    // NOVA OTIMIZAÇÃO: Ajustar distribuição de macros
+    const macroOptResult = optimizeMacroDistribution(mealsWithOptions, targets);
+    
+    logInfo("Otimização de macros aplicada", {
+      multiObjectiveApplied: macroOptResult.multiObjectiveApplied,
+      fineAdjustmentApplied: macroOptResult.fineAdjustmentApplied,
+      beforeProtein: macroOptResult.beforeTotals.protein,
+      afterProtein: macroOptResult.afterTotals.protein,
     });
     
     // Atualizar referência após ajuste
@@ -238,11 +249,12 @@ serve(async (req) => {
 
     logInfo("Plano salvo", { planId, optionsPerMeal: mealOptionsLimit });
 
-    // Usar totais do resultado do ajuste
-    const totalCals = scaleResult.afterTotals.calories;
-    const totalProt = scaleResult.afterTotals.protein;
-    const totalCarbs = scaleResult.afterTotals.carbs;
-    const totalFat = scaleResult.afterTotals.fat;
+    // Usar totais do resultado da otimização (após ambos os ajustes)
+    const finalTotals = calculatePlanTotals(mealsWithOptions);
+    const totalCals = finalTotals.calories;
+    const totalProt = finalTotals.protein;
+    const totalCarbs = finalTotals.carbs;
+    const totalFat = finalTotals.fat;
 
     // Calcular diferença percentual final
     const finalDiffPercent = Math.abs((totalCals - targets.calories) / targets.calories * 100);
