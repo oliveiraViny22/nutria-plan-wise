@@ -53,6 +53,7 @@ import { UpgradeDialog } from '@/components/UpgradeDialog';
 import { FoodPreferencesManager } from '@/components/FoodPreferencesManager';
 import { useLinkedStudent } from '@/hooks/useLinkedStudent';
 import { useSubscription } from '@/hooks/useSubscription';
+import { useMetabolicCalculations } from '@/hooks/useMetabolicCalculations';
 
 const ADMIN_EMAIL = "admin@nutriaplan.com";
 
@@ -85,6 +86,9 @@ export default function Profile() {
   const { isLinkedStudent, professionalId } = useLinkedStudent();
   const { subscriptionInfo } = useSubscription();
   const isPaidUser = subscriptionInfo?.plan?.type !== 'gratuito';
+  
+  // Metabolic calculations
+  const metabolicData = useMetabolicCalculations(profile);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -311,6 +315,45 @@ export default function Profile() {
                         <p className="text-xs text-muted-foreground">Gordura</p>
                       </div>
                     </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* TMB & TDEE Card */}
+              {metabolicData && (
+                <Card className="border-amber-500/30 bg-gradient-to-br from-amber-500/5 to-orange-500/10">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <Flame className="h-5 w-5 text-amber-500" />
+                      Metabolismo Base
+                    </CardTitle>
+                    <CardDescription>
+                      Calculado pela fórmula de Mifflin-St Jeor
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="bg-background/60 rounded-xl p-4 text-center">
+                        <div className="w-8 h-8 mx-auto mb-2 rounded-full bg-amber-500/20 flex items-center justify-center">
+                          <Flame className="h-4 w-4 text-amber-500" />
+                        </div>
+                        <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">{metabolicData.bmr}</p>
+                        <p className="text-xs text-muted-foreground">TMB (kcal/dia)</p>
+                        <p className="text-[10px] text-muted-foreground mt-1">Taxa Metabólica Basal</p>
+                      </div>
+                      <div className="bg-background/60 rounded-xl p-4 text-center">
+                        <div className="w-8 h-8 mx-auto mb-2 rounded-full bg-orange-500/20 flex items-center justify-center">
+                          <TrendingUp className="h-4 w-4 text-orange-500" />
+                        </div>
+                        <p className="text-2xl font-bold text-orange-600 dark:text-orange-400">{metabolicData.tdee}</p>
+                        <p className="text-xs text-muted-foreground">TDEE (kcal/dia)</p>
+                        <p className="text-[10px] text-muted-foreground mt-1">Gasto Total Diário</p>
+                      </div>
+                    </div>
+                    <p className="text-xs text-muted-foreground text-center mt-4">
+                      Seu corpo queima aproximadamente <span className="font-semibold text-foreground">{metabolicData.bmr} kcal</span> em repouso 
+                      e <span className="font-semibold text-foreground">{metabolicData.tdee} kcal</span> considerando sua atividade física.
+                    </p>
                   </CardContent>
                 </Card>
               )}
