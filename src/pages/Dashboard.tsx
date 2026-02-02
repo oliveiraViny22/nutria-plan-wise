@@ -49,6 +49,7 @@ import {
 } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Progress } from '@/components/ui/progress';
 
 import { UpgradeDialog } from '@/components/UpgradeDialog';
 import { AdherenceWidget } from '@/components/AdherenceWidget';
@@ -86,6 +87,7 @@ export default function Dashboard() {
     isOptimizing, 
     isApplying,
     isUndoing, 
+    applyProgress,
     result: optimizationResult, 
     preview: optimizationPreview,
     generatePreview,
@@ -1082,31 +1084,54 @@ export default function Dashboard() {
               )}
 
               {/* Action Buttons */}
-              <div className="flex justify-end gap-2 pt-4 border-t">
-                <Button
-                  variant="outline"
-                  onClick={handleCancelOptimization}
-                  disabled={isApplying}
-                >
-                  Cancelar
-                </Button>
-                <Button
-                  onClick={handleConfirmOptimization}
-                  disabled={isApplying || optimizationPreview.changes.length === 0}
-                  className="bg-green-600 hover:bg-green-700"
-                >
-                  {isApplying ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Aplicando...
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="h-4 w-4 mr-2" />
-                      Aplicar Otimização
-                    </>
-                  )}
-                </Button>
+              <div className="flex flex-col gap-3 pt-4 border-t">
+                {/* Progress Bar */}
+                {applyProgress && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="space-y-2"
+                  >
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">{applyProgress.label}</span>
+                      <span className="font-medium text-primary">
+                        {applyProgress.current}/{applyProgress.total}
+                      </span>
+                    </div>
+                    <Progress 
+                      value={applyProgress.total > 0 ? (applyProgress.current / applyProgress.total) * 100 : 0} 
+                      className="h-2"
+                    />
+                  </motion.div>
+                )}
+                
+                <div className="flex justify-end gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={handleCancelOptimization}
+                    disabled={isApplying}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button
+                    onClick={handleConfirmOptimization}
+                    disabled={isApplying || optimizationPreview.changes.length === 0}
+                    className="bg-green-600 hover:bg-green-700"
+                  >
+                    {isApplying ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Aplicando...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="h-4 w-4 mr-2" />
+                        Aplicar Otimização
+                      </>
+                    )}
+                  </Button>
+                </div>
               </div>
             </motion.div>
           )}

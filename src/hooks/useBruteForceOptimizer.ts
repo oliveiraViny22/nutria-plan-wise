@@ -58,10 +58,18 @@ interface OptimizationResult {
   targets: MacroTargets;
 }
 
+export interface ApplyProgress {
+  phase: 'updating' | 'recalculating' | 'syncing' | 'done';
+  current: number;
+  total: number;
+  label: string;
+}
+
 export function useBruteForceOptimizer() {
   const [isOptimizing, setIsOptimizing] = useState(false);
   const [isApplying, setIsApplying] = useState(false);
   const [isUndoing, setIsUndoing] = useState(false);
+  const [applyProgress, setApplyProgress] = useState<ApplyProgress | null>(null);
   const [result, setResult] = useState<OptimizationResult | null>(null);
   const [preview, setPreview] = useState<OptimizationPreview | null>(null);
   const [settings, setSettings] = useState<OptimizerSettings>(DEFAULT_SETTINGS);
@@ -274,6 +282,7 @@ export function useBruteForceOptimizer() {
     }
 
     setIsApplying(true);
+    setApplyProgress({ phase: 'updating', current: 0, total: preview.changes.length, label: 'Atualizando quantidades...' });
     
     try {
       console.log('[BruteForce] Applying', preview.changes.length, 'changes via batch update...');
@@ -287,14 +296,17 @@ export function useBruteForceOptimizer() {
         batches.push(preview.changes.slice(i, i + BATCH_SIZE));
       }
       
+      let completedChanges = 0;
       await Promise.all(batches.map(async (batch) => {
         // Use individual updates in parallel within each batch
-        await Promise.all(batch.map(change => 
-          supabase
+        await Promise.all(batch.map(async (change) => {
+          await supabase
             .from('meal_option_foods')
             .update({ quantity_grams: change.new_quantity })
-            .eq('id', change.meal_option_food_id)
-        ));
+            .eq('id', change.meal_option_food_id);
+          completedChanges++;
+          setApplyProgress(prev => prev ? { ...prev, current: completedChanges } : null);
+        }));
       }));
       
       const updateTime = Math.round(performance.now() - startTime);
@@ -304,8 +316,10 @@ export function useBruteForceOptimizer() {
       const affectedOptionIds = [...new Set(preview.changes.map(c => c.meal_option_id))];
       
       // 3. Recalculate totals for all affected options in PARALLEL
+      setApplyProgress({ phase: 'recalculating', current: 0, total: affectedOptionIds.length, label: 'Recalculando totais...' });
       const recalcStart = performance.now();
       
+      let completedRecalc = 0;
       await Promise.all(affectedOptionIds.map(async (optionId) => {
         const { data: optFoods } = await supabase
           .from('meal_option_foods')
@@ -334,12 +348,15 @@ export function useBruteForceOptimizer() {
             })
             .eq('id', optionId);
         }
+        completedRecalc++;
+        setApplyProgress(prev => prev ? { ...prev, current: completedRecalc } : null);
       }));
       
       const recalcTime = Math.round(performance.now() - recalcStart);
       console.log(`[BruteForce] Totals recalculation completed in ${recalcTime}ms`);
       
       // 4. Update diet_plan totals (using option 1 values)
+      setApplyProgress({ phase: 'syncing', current: 0, total: 1, label: 'Sincronizando plano...' });
       const { data: meals } = await supabase
         .from('meals')
         .select('id')
@@ -380,6 +397,8 @@ export function useBruteForceOptimizer() {
       const totalTime = Math.round(performance.now() - startTime);
       console.log(`[BruteForce] Total apply time: ${totalTime}ms`);
       
+      setApplyProgress({ phase: 'done', current: 1, total: 1, label: 'Concluído!' });
+      
       const optimizationResult: OptimizationResult = {
         success: true,
         planId: preview.planId,
@@ -406,6 +425,7 @@ export function useBruteForceOptimizer() {
       return null;
     } finally {
       setIsApplying(false);
+      setTimeout(() => setApplyProgress(null), 500);
     }
   }, [preview]);
 
@@ -532,6 +552,7 @@ export function useBruteForceOptimizer() {
     isOptimizing,
     isApplying,
     isUndoing,
+    applyProgress,
     result,
     preview,
     generatePreview,
