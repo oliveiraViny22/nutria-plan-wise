@@ -49,7 +49,6 @@ import {
 } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Progress } from '@/components/ui/progress';
 
 import { UpgradeDialog } from '@/components/UpgradeDialog';
 import { AdherenceWidget } from '@/components/AdherenceWidget';
@@ -87,7 +86,6 @@ export default function Dashboard() {
     isOptimizing, 
     isApplying,
     isUndoing, 
-    applyProgress,
     result: optimizationResult, 
     preview: optimizationPreview,
     generatePreview,
@@ -458,6 +456,47 @@ export default function Dashboard() {
           </motion.div>
         )}
 
+        {/* Limit Reached Alerts - Show when any limit is hit */}
+        {usage && !isLinkedStudent && (
+          <div className="space-y-3">
+            {isLimitReached('diet') && !dismissedAlerts.has('diet') && (
+              <LimitReachedAlert
+                feature="diet"
+                current={usage.diets.used}
+                limit={usage.diets.limit}
+                planName={subscriptionPlan?.name}
+                onDismiss={() => handleDismissAlert('diet')}
+              />
+            )}
+            {isLimitReached('substitution') && !dismissedAlerts.has('substitution') && (
+              <LimitReachedAlert
+                feature="substitution"
+                current={usage.substitutions.used}
+                limit={usage.substitutions.limit}
+                planName={subscriptionPlan?.name}
+                onDismiss={() => handleDismissAlert('substitution')}
+              />
+            )}
+            {isLimitReached('adjustment') && !dismissedAlerts.has('adjustment') && (
+              <LimitReachedAlert
+                feature="adjustment"
+                current={usage.adjustments.used}
+                limit={usage.adjustments.limit}
+                planName={subscriptionPlan?.name}
+                onDismiss={() => handleDismissAlert('adjustment')}
+              />
+            )}
+            {isLimitReached('chat') && !dismissedAlerts.has('chat') && (
+              <LimitReachedAlert
+                feature="chat"
+                current={usage.chat.used}
+                limit={usage.chat.limit}
+                planName={subscriptionPlan?.name}
+                onDismiss={() => handleDismissAlert('chat')}
+              />
+            )}
+          </div>
+        )}
 
         {/* Welcome Section */}
         <motion.section
@@ -1008,32 +1047,20 @@ export default function Dashboard() {
                 </div>
               </motion.div>
 
-              {/* Changes Table - Grouped by Option */}
+              {/* Changes Table */}
               {optimizationPreview.changes.length > 0 ? (
                 <motion.div 
                   initial={{ opacity: 0, y: 15 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.3, duration: 0.35 }}
-                  className="space-y-3"
+                  className="space-y-2"
                 >
-                  <div className="flex items-center justify-between">
-                    <h4 className="font-medium text-sm">Alterações Propostas ({optimizationPreview.changes.length})</h4>
-                    {optimizationPreview.options && optimizationPreview.options.length > 1 && (
-                      <div className="flex gap-1">
-                        {optimizationPreview.options.filter(o => o.changes.length > 0).map(opt => (
-                          <Badge key={opt.option_number} variant="outline" className="text-xs">
-                            Opção {opt.option_number}: {opt.changes.length}
-                          </Badge>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                  <div className="border rounded-lg overflow-hidden max-h-[300px] overflow-y-auto">
+                  <h4 className="font-medium text-sm">Alterações Propostas ({optimizationPreview.changes.length})</h4>
+                  <div className="border rounded-lg overflow-hidden">
                     <Table>
-                      <TableHeader className="sticky top-0 bg-background">
+                      <TableHeader>
                         <TableRow>
                           <TableHead>Alimento</TableHead>
-                          <TableHead className="text-center w-16">Opção</TableHead>
                           <TableHead className="text-right">Atual</TableHead>
                           <TableHead className="text-right">Proposto</TableHead>
                           <TableHead className="text-right">Delta</TableHead>
@@ -1042,25 +1069,17 @@ export default function Dashboard() {
                       <TableBody>
                         {optimizationPreview.changes.map((change, idx) => (
                           <motion.tr
-                            key={`${change.meal_option_food_id}-${idx}`}
+                            key={idx}
                             initial={{ opacity: 0, x: -20 }}
                             animate={{ opacity: 1, x: 0 }}
                             transition={{ 
-                              delay: 0.35 + (idx * 0.03),
-                              duration: 0.2,
+                              delay: 0.35 + (idx * 0.05),
+                              duration: 0.25,
                               ease: 'easeOut'
                             }}
-                            className="border-b transition-colors hover:bg-muted/50"
+                            className="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted"
                           >
                             <TableCell className="font-medium text-sm">{change.food_name}</TableCell>
-                            <TableCell className="text-center">
-                              <Badge 
-                                variant={change.option_number === 1 ? 'default' : 'secondary'} 
-                                className="text-xs px-1.5"
-                              >
-                                {change.option_number}
-                              </Badge>
-                            </TableCell>
                             <TableCell className="text-right font-mono text-sm">{change.old_quantity}g</TableCell>
                             <TableCell className="text-right font-mono text-sm">{change.new_quantity}g</TableCell>
                             <TableCell className="text-right">
@@ -1084,54 +1103,31 @@ export default function Dashboard() {
               )}
 
               {/* Action Buttons */}
-              <div className="flex flex-col gap-3 pt-4 border-t">
-                {/* Progress Bar */}
-                {applyProgress && (
-                  <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: 'auto' }}
-                    exit={{ opacity: 0, height: 0 }}
-                    className="space-y-2"
-                  >
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">{applyProgress.label}</span>
-                      <span className="font-medium text-primary">
-                        {applyProgress.current}/{applyProgress.total}
-                      </span>
-                    </div>
-                    <Progress 
-                      value={applyProgress.total > 0 ? (applyProgress.current / applyProgress.total) * 100 : 0} 
-                      className="h-2"
-                    />
-                  </motion.div>
-                )}
-                
-                <div className="flex justify-end gap-2">
-                  <Button
-                    variant="outline"
-                    onClick={handleCancelOptimization}
-                    disabled={isApplying}
-                  >
-                    Cancelar
-                  </Button>
-                  <Button
-                    onClick={handleConfirmOptimization}
-                    disabled={isApplying || optimizationPreview.changes.length === 0}
-                    className="bg-green-600 hover:bg-green-700"
-                  >
-                    {isApplying ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Aplicando...
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles className="h-4 w-4 mr-2" />
-                        Aplicar Otimização
-                      </>
-                    )}
-                  </Button>
-                </div>
+              <div className="flex justify-end gap-2 pt-4 border-t">
+                <Button
+                  variant="outline"
+                  onClick={handleCancelOptimization}
+                  disabled={isApplying}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  onClick={handleConfirmOptimization}
+                  disabled={isApplying || optimizationPreview.changes.length === 0}
+                  className="bg-green-600 hover:bg-green-700"
+                >
+                  {isApplying ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Aplicando...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="h-4 w-4 mr-2" />
+                      Aplicar Otimização
+                    </>
+                  )}
+                </Button>
               </div>
             </motion.div>
           )}
@@ -1265,32 +1261,20 @@ export default function Dashboard() {
                 </div>
               </motion.div>
 
-              {/* Changes Table - with Option badges */}
+              {/* Changes Table */}
               {optimizationResult.changes.length > 0 ? (
                 <motion.div 
                   initial={{ opacity: 0, y: 15 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.3, duration: 0.35 }}
-                  className="space-y-3"
+                  className="space-y-2"
                 >
-                  <div className="flex items-center justify-between">
-                    <h4 className="font-medium text-sm">Alimentos Ajustados ({optimizationResult.changes.length})</h4>
-                    {optimizationResult.options && optimizationResult.options.length > 1 && (
-                      <div className="flex gap-1">
-                        {optimizationResult.options.filter(o => o.changes.length > 0).map(opt => (
-                          <Badge key={opt.option_number} variant="outline" className="text-xs">
-                            Opção {opt.option_number}: {opt.changes.length}
-                          </Badge>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                  <div className="border rounded-lg overflow-hidden max-h-[300px] overflow-y-auto">
+                  <h4 className="font-medium text-sm">Alimentos Ajustados ({optimizationResult.changes.length})</h4>
+                  <div className="border rounded-lg overflow-hidden">
                     <Table>
-                      <TableHeader className="sticky top-0 bg-background">
+                      <TableHeader>
                         <TableRow>
                           <TableHead>Alimento</TableHead>
-                          <TableHead className="text-center w-16">Opção</TableHead>
                           <TableHead className="text-right">Antes</TableHead>
                           <TableHead className="text-right">Depois</TableHead>
                           <TableHead className="text-right">Delta</TableHead>
@@ -1299,25 +1283,17 @@ export default function Dashboard() {
                       <TableBody>
                         {optimizationResult.changes.map((change, idx) => (
                           <motion.tr
-                            key={`${change.meal_option_food_id}-${idx}`}
+                            key={idx}
                             initial={{ opacity: 0, x: -20 }}
                             animate={{ opacity: 1, x: 0 }}
                             transition={{ 
-                              delay: 0.8 + (idx * 0.04),
-                              duration: 0.2,
+                              delay: 0.8 + (idx * 0.06),
+                              duration: 0.25,
                               ease: 'easeOut'
                             }}
-                            className="border-b transition-colors hover:bg-muted/50"
+                            className="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted"
                           >
                             <TableCell className="font-medium text-sm">{change.food_name}</TableCell>
-                            <TableCell className="text-center">
-                              <Badge 
-                                variant={change.option_number === 1 ? 'default' : 'secondary'} 
-                                className="text-xs px-1.5"
-                              >
-                                {change.option_number}
-                              </Badge>
-                            </TableCell>
                             <TableCell className="text-right font-mono text-sm">{change.old_quantity}g</TableCell>
                             <TableCell className="text-right font-mono text-sm">{change.new_quantity}g</TableCell>
                             <TableCell className="text-right">

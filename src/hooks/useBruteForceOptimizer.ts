@@ -1,48 +1,42 @@
 // =====================================================
-// OTIMIZADOR BRUTO V2 - Suporta Múltiplas Opções
+// OTIMIZADOR BRUTO - TESTE SEM RESTRIÇÕES
 // =====================================================
 // Ajusta quantidades de alimentos para atingir metas exatas
-// de calorias e macros em TODAS as opções (1, 2, 3).
-// Usa cálculos incrementais para melhor performance.
+// de calorias e macros. IGNORA todas as regras/limites.
 // =====================================================
 
 import { useState, useCallback, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import {
-  MacroTargets,
-  FoodItem,
-  OptimizerSettings,
-  DEFAULT_SETTINGS,
-  calcTotalMacros,
-  optimizeQuantities,
-  parseServingSize,
-  groupFoodsByOption,
-} from '@/lib/optimizer-engine';
 
-export type { MacroTargets, OptimizerSettings };
-
-export interface OptimizationChange {
-  meal_option_food_id: string;
-  meal_option_id: string;
-  option_number: number;
-  food_name: string;
-  old_quantity: number;
-  new_quantity: number;
+interface MacroTargets {
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
 }
 
-export interface OptionResult {
-  option_number: number;
-  changes: OptimizationChange[];
-  before: MacroTargets;
-  after: MacroTargets;
+interface FoodItem {
+  id: string;
+  meal_option_food_id: string;
+  name: string;
+  quantity_grams: number;
+  // Macros per 100g
+  calories_per_100g: number;
+  protein_per_100g: number;
+  carbs_per_100g: number;
+  fat_per_100g: number;
+  category: string;
 }
 
 export interface OptimizationPreview {
   planId: string;
-  options: OptionResult[];
-  // Aggregated for backwards compatibility
-  changes: OptimizationChange[];
+  changes: Array<{
+    meal_option_food_id: string;
+    food_name: string;
+    old_quantity: number;
+    new_quantity: number;
+  }>;
   before: MacroTargets;
   after: MacroTargets;
   targets: MacroTargets;
@@ -51,25 +45,193 @@ export interface OptimizationPreview {
 interface OptimizationResult {
   success: boolean;
   planId: string;
-  options: OptionResult[];
-  changes: OptimizationChange[];
+  changes: Array<{
+    meal_option_food_id: string;
+    food_name: string;
+    old_quantity: number;
+    new_quantity: number;
+  }>;
   before: MacroTargets;
   after: MacroTargets;
   targets: MacroTargets;
 }
 
-export interface ApplyProgress {
-  phase: 'updating' | 'recalculating' | 'syncing' | 'done';
-  current: number;
-  total: number;
-  label: string;
+export interface OptimizerSettings {
+  protein_floor: number;
+  protein_ceiling: number;
+  carbs_floor: number;
+  carbs_ceiling: number;
+  fat_floor: number;
+  fat_ceiling: number;
+  calories_tolerance: number;
+  protein_weight: number;
+  carbs_weight: number;
+  fat_weight: number;
+  calories_weight: number;
+}
+
+const DEFAULT_SETTINGS: OptimizerSettings = {
+  protein_floor: 95,
+  protein_ceiling: 120,
+  carbs_floor: 80,
+  carbs_ceiling: 120,
+  fat_floor: 80,
+  fat_ceiling: 120,
+  calories_tolerance: 5,
+  protein_weight: 3.0,
+  carbs_weight: 1.0,
+  fat_weight: 1.0,
+  calories_weight: 1.5,
+};
+
+// Min/max constraints for quantities
+const MIN_GRAMS = 10;
+const MAX_GRAMS = 600;
+
+/**
+ * Calculate macros for a given quantity
+ */
+function calcMacros(food: FoodItem, grams: number): MacroTargets {
+  const multiplier = grams / 100;
+  return {
+    calories: food.calories_per_100g * multiplier,
+    protein: food.protein_per_100g * multiplier,
+    carbs: food.carbs_per_100g * multiplier,
+    fat: food.fat_per_100g * multiplier,
+  };
+}
+
+/**
+ * Calculate total macros for all foods
+ */
+function calcTotalMacros(foods: FoodItem[], quantities: Map<string, number>): MacroTargets {
+  let total: MacroTargets = { calories: 0, protein: 0, carbs: 0, fat: 0 };
+  
+  for (const food of foods) {
+    const qty = quantities.get(food.meal_option_food_id) || food.quantity_grams;
+    const macros = calcMacros(food, qty);
+    total.calories += macros.calories;
+    total.protein += macros.protein;
+    total.carbs += macros.carbs;
+    total.fat += macros.fat;
+  }
+  
+  return total;
+}
+
+/**
+ * Calculate error/distance from targets
+ * IMPORTANT: Uses configurable floors - going below adds massive penalty
+ */
+function calcError(
+  current: MacroTargets, 
+  targets: MacroTargets,
+  settings: OptimizerSettings
+): number {
+  const calError = Math.abs(current.calories - targets.calories) / targets.calories;
+  const carbError = Math.abs(current.carbs - targets.carbs) / targets.carbs;
+  const fatError = Math.abs(current.fat - targets.fat) / targets.fat;
+  
+  // Helper function to calculate error with floor penalty
+  const calcMacroError = (current: number, target: number, floor: number): number => {
+    const ratio = current / target;
+    const floorRatio = floor / 100;
+    
+    if (ratio < floorRatio) {
+      // Massive penalty for going below floor - makes it essentially impossible
+      return (floorRatio - ratio) * 100 + Math.abs(1 - ratio);
+    }
+    // Normal error calculation above floor
+    return Math.abs(current - target) / target;
+  };
+  
+  const protError = calcMacroError(current.protein, targets.protein, settings.protein_floor);
+  const carbFloorError = calcMacroError(current.carbs, targets.carbs, settings.carbs_floor);
+  const fatFloorError = calcMacroError(current.fat, targets.fat, settings.fat_floor);
+  
+  // Use floor-aware errors for carbs and fat too
+  const finalCarbError = Math.max(carbError, carbFloorError);
+  const finalFatError = Math.max(fatError, fatFloorError);
+  
+  // Weighted error using configurable weights
+  return (
+    calError * settings.calories_weight + 
+    protError * settings.protein_weight + 
+    finalCarbError * settings.carbs_weight + 
+    finalFatError * settings.fat_weight
+  );
+}
+
+/**
+ * Brute-force optimizer using gradient descent-like approach
+ * Uses configurable settings for floors/ceilings and weights
+ */
+function optimizeQuantities(
+  foods: FoodItem[],
+  targets: MacroTargets,
+  settings: OptimizerSettings,
+  maxIterations: number = 1000
+): Map<string, number> {
+  // Start with current quantities
+  const quantities = new Map<string, number>();
+  for (const food of foods) {
+    quantities.set(food.meal_option_food_id, food.quantity_grams);
+  }
+  
+  let currentError = calcError(calcTotalMacros(foods, quantities), targets, settings);
+  const stepSizes = [50, 20, 10, 5, 2, 1];
+  
+  for (const stepSize of stepSizes) {
+    let improved = true;
+    let iterations = 0;
+    
+    while (improved && iterations < maxIterations / stepSizes.length) {
+      improved = false;
+      iterations++;
+      
+      for (const food of foods) {
+        const currentQty = quantities.get(food.meal_option_food_id) || food.quantity_grams;
+        
+        // Try increasing
+        const increasedQty = Math.min(currentQty + stepSize, MAX_GRAMS);
+        quantities.set(food.meal_option_food_id, increasedQty);
+        const increasedError = calcError(calcTotalMacros(foods, quantities), targets, settings);
+        
+        if (increasedError < currentError) {
+          currentError = increasedError;
+          improved = true;
+          continue;
+        }
+        
+        // Try decreasing
+        const decreasedQty = Math.max(currentQty - stepSize, MIN_GRAMS);
+        quantities.set(food.meal_option_food_id, decreasedQty);
+        const decreasedError = calcError(calcTotalMacros(foods, quantities), targets, settings);
+        
+        if (decreasedError < currentError) {
+          currentError = decreasedError;
+          improved = true;
+          continue;
+        }
+        
+        // Revert to original
+        quantities.set(food.meal_option_food_id, currentQty);
+      }
+    }
+  }
+  
+  // Round to nearest integer
+  for (const [id, qty] of quantities.entries()) {
+    quantities.set(id, Math.round(qty));
+  }
+  
+  return quantities;
 }
 
 export function useBruteForceOptimizer() {
   const [isOptimizing, setIsOptimizing] = useState(false);
   const [isApplying, setIsApplying] = useState(false);
   const [isUndoing, setIsUndoing] = useState(false);
-  const [applyProgress, setApplyProgress] = useState<ApplyProgress | null>(null);
   const [result, setResult] = useState<OptimizationResult | null>(null);
   const [preview, setPreview] = useState<OptimizationPreview | null>(null);
   const [settings, setSettings] = useState<OptimizerSettings>(DEFAULT_SETTINGS);
@@ -100,13 +262,11 @@ export function useBruteForceOptimizer() {
     setIsOptimizing(true);
     setPreview(null);
     
-    const startTime = performance.now();
-    
     try {
-      // 1. Fetch all meals for this plan
+      // 1. Fetch all meal options and foods for this plan
       const { data: meals, error: mealsError } = await supabase
         .from('meals')
-        .select('id, name')
+        .select('id')
         .eq('diet_plan_id', planId);
       
       if (mealsError) throw mealsError;
@@ -117,12 +277,12 @@ export function useBruteForceOptimizer() {
       
       const mealIds = meals.map(m => m.id);
       
-      // 2. Fetch ALL meal options (1, 2, and 3)
+      // 2. Fetch all meal options
       const { data: options, error: optionsError } = await supabase
         .from('meal_options')
-        .select('id, option_number, meal_id')
+        .select('id, option_number')
         .in('meal_id', mealIds)
-        .order('option_number');
+        .eq('option_number', 1);
       
       if (optionsError) throw optionsError;
       if (!options || options.length === 0) {
@@ -132,12 +292,11 @@ export function useBruteForceOptimizer() {
       
       const optionIds = options.map(o => o.id);
       
-      // 3. Fetch all foods in ALL options
+      // 3. Fetch all foods in these options
       const { data: optionFoods, error: foodsError } = await supabase
         .from('meal_option_foods')
         .select(`
           id,
-          meal_option_id,
           quantity_grams,
           food:foods(id, name, calories, protein, carbs, fat, serving_size, category)
         `)
@@ -149,20 +308,31 @@ export function useBruteForceOptimizer() {
         return null;
       }
       
-      // 4. Create option lookup map
-      const optionLookup = new Map(options.map(o => [o.id, o.option_number]));
-      
-      // 5. Parse all foods with per-100g macros
+      // 4. Parse serving_size to get base grams and convert to per-100g
       const foods: FoodItem[] = optionFoods.map(of => {
         const food = of.food as any;
-        const baseGrams = parseServingSize(food.serving_size);
-        const optionNumber = optionLookup.get(of.meal_option_id) || 1;
+        const servingSize = (food.serving_size || '100g').toLowerCase();
+        
+        let baseGrams = 100;
+        const gramsMatch = servingSize.match(/(\d+)\s*(g|ml)/);
+        if (gramsMatch) {
+          baseGrams = parseInt(gramsMatch[1], 10);
+        } else {
+          const parenMatch = servingSize.match(/\((\d+)\s*(g|ml)\)/);
+          if (parenMatch) {
+            baseGrams = parseInt(parenMatch[1], 10);
+          } else if (servingSize.match(/^\d+\s+(unidade|fatia|colher|xícara|copo)/)) {
+            baseGrams = 100;
+          }
+        }
+        
+        if (baseGrams <= 0 || isNaN(baseGrams)) {
+          baseGrams = 100;
+        }
         
         return {
           id: food.id,
           meal_option_food_id: of.id,
-          meal_option_id: of.meal_option_id,
-          option_number: optionNumber,
           name: food.name,
           quantity_grams: of.quantity_grams,
           calories_per_100g: (food.calories / baseGrams) * 100,
@@ -173,93 +343,61 @@ export function useBruteForceOptimizer() {
         };
       });
       
-      // 6. Group by option and optimize each independently
-      const groupedFoods = groupFoodsByOption(foods);
-      const optionResults: OptionResult[] = [];
-      const allChanges: OptimizationChange[] = [];
+      // 5. Calculate before macros
+      const beforeQuantities = new Map<string, number>();
+      for (const f of foods) {
+        beforeQuantities.set(f.meal_option_food_id, f.quantity_grams);
+      }
+      const beforeMacros = calcTotalMacros(foods, beforeQuantities);
       
-      // Aggregate before/after for backwards compatibility (using option 1 as reference)
-      let aggregatedBefore: MacroTargets = { calories: 0, protein: 0, carbs: 0, fat: 0 };
-      let aggregatedAfter: MacroTargets = { calories: 0, protein: 0, carbs: 0, fat: 0 };
+      // 6. Run optimization with loaded settings
+      console.log('[BruteForce] Generating preview...');
+      console.log('[BruteForce] Settings:', settings);
+      console.log('[BruteForce] Targets:', targets);
+      console.log('[BruteForce] Before:', beforeMacros);
       
-      console.log('[BruteForce] Optimizing', groupedFoods.size, 'option groups...');
+      const optimizedQuantities = optimizeQuantities(foods, targets, settings);
+      const afterMacros = calcTotalMacros(foods, optimizedQuantities);
       
-      for (const [optionNum, optionFoods] of groupedFoods.entries()) {
-        // Calculate before macros
-        const beforeQuantities = new Map<string, number>();
-        for (const f of optionFoods) {
-          beforeQuantities.set(f.meal_option_food_id, f.quantity_grams);
-        }
-        const beforeMacros = calcTotalMacros(optionFoods, beforeQuantities);
+      console.log('[BruteForce] After:', afterMacros);
+      console.log('[BruteForce] Deltas:', {
+        calories: afterMacros.calories - targets.calories,
+        protein: afterMacros.protein - targets.protein,
+        carbs: afterMacros.carbs - targets.carbs,
+        fat: afterMacros.fat - targets.fat,
+      });
+      
+      // 7. Calculate changes
+      const changes: OptimizationPreview['changes'] = [];
+      for (const food of foods) {
+        const oldQty = food.quantity_grams;
+        const newQty = optimizedQuantities.get(food.meal_option_food_id) || oldQty;
         
-        // Run optimization
-        const optimizedQuantities = optimizeQuantities(optionFoods, targets, settings);
-        const afterMacros = calcTotalMacros(optionFoods, optimizedQuantities);
-        
-        // Calculate changes for this option
-        const changes: OptimizationChange[] = [];
-        for (const food of optionFoods) {
-          const oldQty = food.quantity_grams;
-          const newQty = optimizedQuantities.get(food.meal_option_food_id) || oldQty;
-          
-          if (Math.abs(newQty - oldQty) >= 1) {
-            changes.push({
-              meal_option_food_id: food.meal_option_food_id,
-              meal_option_id: food.meal_option_id,
-              option_number: optionNum,
-              food_name: food.name,
-              old_quantity: oldQty,
-              new_quantity: newQty,
-            });
-          }
-        }
-        
-        optionResults.push({
-          option_number: optionNum,
-          changes,
-          before: {
-            calories: Math.round(beforeMacros.calories),
-            protein: Math.round(beforeMacros.protein),
-            carbs: Math.round(beforeMacros.carbs),
-            fat: Math.round(beforeMacros.fat),
-          },
-          after: {
-            calories: Math.round(afterMacros.calories),
-            protein: Math.round(afterMacros.protein),
-            carbs: Math.round(afterMacros.carbs),
-            fat: Math.round(afterMacros.fat),
-          },
-        });
-        
-        allChanges.push(...changes);
-        
-        // Use option 1 for aggregated values
-        if (optionNum === 1) {
-          aggregatedBefore = {
-            calories: Math.round(beforeMacros.calories),
-            protein: Math.round(beforeMacros.protein),
-            carbs: Math.round(beforeMacros.carbs),
-            fat: Math.round(beforeMacros.fat),
-          };
-          aggregatedAfter = {
-            calories: Math.round(afterMacros.calories),
-            protein: Math.round(afterMacros.protein),
-            carbs: Math.round(afterMacros.carbs),
-            fat: Math.round(afterMacros.fat),
-          };
+        if (Math.abs(newQty - oldQty) >= 1) {
+          changes.push({
+            meal_option_food_id: food.meal_option_food_id,
+            food_name: food.name,
+            old_quantity: oldQty,
+            new_quantity: newQty,
+          });
         }
       }
       
-      const duration = Math.round(performance.now() - startTime);
-      console.log(`[BruteForce] Optimization completed in ${duration}ms`);
-      console.log('[BruteForce] Total changes:', allChanges.length);
-      
       const previewResult: OptimizationPreview = {
         planId,
-        options: optionResults.sort((a, b) => a.option_number - b.option_number),
-        changes: allChanges,
-        before: aggregatedBefore,
-        after: aggregatedAfter,
+        changes,
+        before: {
+          calories: Math.round(beforeMacros.calories),
+          protein: Math.round(beforeMacros.protein),
+          carbs: Math.round(beforeMacros.carbs),
+          fat: Math.round(beforeMacros.fat),
+        },
+        after: {
+          calories: Math.round(afterMacros.calories),
+          protein: Math.round(afterMacros.protein),
+          carbs: Math.round(afterMacros.carbs),
+          fat: Math.round(afterMacros.fat),
+        },
         targets,
       };
       
@@ -282,45 +420,45 @@ export function useBruteForceOptimizer() {
     }
 
     setIsApplying(true);
-    setApplyProgress({ phase: 'updating', current: 0, total: preview.changes.length, label: 'Atualizando quantidades...' });
     
     try {
-      console.log('[BruteForce] Applying', preview.changes.length, 'changes via batch update...');
-      const startTime = performance.now();
+      console.log('[BruteForce] Applying preview changes...');
       
-      // 1. BATCH UPDATE: Update all foods in a single query using Promise.all
-      // Group changes by small batches for optimal performance
-      const BATCH_SIZE = 50;
-      const batches: OptimizationChange[][] = [];
-      for (let i = 0; i < preview.changes.length; i += BATCH_SIZE) {
-        batches.push(preview.changes.slice(i, i + BATCH_SIZE));
+      // 1. Apply changes to database
+      for (const change of preview.changes) {
+        const { error: updateError } = await supabase
+          .from('meal_option_foods')
+          .update({ quantity_grams: change.new_quantity })
+          .eq('id', change.meal_option_food_id);
+        
+        if (updateError) {
+          console.error('[BruteForce] Update error:', updateError);
+        }
       }
       
-      let completedChanges = 0;
-      await Promise.all(batches.map(async (batch) => {
-        // Use individual updates in parallel within each batch
-        await Promise.all(batch.map(async (change) => {
-          await supabase
-            .from('meal_option_foods')
-            .update({ quantity_grams: change.new_quantity })
-            .eq('id', change.meal_option_food_id);
-          completedChanges++;
-          setApplyProgress(prev => prev ? { ...prev, current: completedChanges } : null);
-        }));
-      }));
+      // 2. Get meal IDs for this plan
+      const { data: meals } = await supabase
+        .from('meals')
+        .select('id')
+        .eq('diet_plan_id', preview.planId);
       
-      const updateTime = Math.round(performance.now() - startTime);
-      console.log(`[BruteForce] Batch update completed in ${updateTime}ms`);
+      if (!meals) throw new Error('Não foi possível buscar refeições');
       
-      // 2. Get all affected option IDs
-      const affectedOptionIds = [...new Set(preview.changes.map(c => c.meal_option_id))];
+      const mealIds = meals.map(m => m.id);
       
-      // 3. Recalculate totals for all affected options in PARALLEL
-      setApplyProgress({ phase: 'recalculating', current: 0, total: affectedOptionIds.length, label: 'Recalculando totais...' });
-      const recalcStart = performance.now();
+      // 3. Get option IDs
+      const { data: options } = await supabase
+        .from('meal_options')
+        .select('id')
+        .in('meal_id', mealIds)
+        .eq('option_number', 1);
       
-      let completedRecalc = 0;
-      await Promise.all(affectedOptionIds.map(async (optionId) => {
+      if (!options) throw new Error('Não foi possível buscar opções');
+      
+      const optionIds = options.map(o => o.id);
+      
+      // 4. Recalculate option totals
+      for (const optionId of optionIds) {
         const { data: optFoods } = await supabase
           .from('meal_option_foods')
           .select('quantity_grams, food:foods(calories, protein, carbs, fat, serving_size)')
@@ -330,7 +468,20 @@ export function useBruteForceOptimizer() {
           let totals = { calories: 0, protein: 0, carbs: 0, fat: 0 };
           for (const of_ of optFoods) {
             const food = of_.food as any;
-            const baseGrams = parseServingSize(food.serving_size);
+            const servingSize = (food.serving_size || '100g').toLowerCase();
+            
+            let baseGrams = 100;
+            const gramsMatch = servingSize.match(/(\d+)\s*(g|ml)/);
+            if (gramsMatch) {
+              baseGrams = parseInt(gramsMatch[1], 10);
+            } else {
+              const parenMatch = servingSize.match(/\((\d+)\s*(g|ml)\)/);
+              if (parenMatch) {
+                baseGrams = parseInt(parenMatch[1], 10);
+              }
+            }
+            if (baseGrams <= 0 || isNaN(baseGrams)) baseGrams = 100;
+            
             const multiplier = of_.quantity_grams / baseGrams;
             totals.calories += Math.round(food.calories * multiplier);
             totals.protein += Math.round(food.protein * multiplier);
@@ -348,61 +499,40 @@ export function useBruteForceOptimizer() {
             })
             .eq('id', optionId);
         }
-        completedRecalc++;
-        setApplyProgress(prev => prev ? { ...prev, current: completedRecalc } : null);
-      }));
-      
-      const recalcTime = Math.round(performance.now() - recalcStart);
-      console.log(`[BruteForce] Totals recalculation completed in ${recalcTime}ms`);
-      
-      // 4. Update diet_plan totals (using option 1 values)
-      setApplyProgress({ phase: 'syncing', current: 0, total: 1, label: 'Sincronizando plano...' });
-      const { data: meals } = await supabase
-        .from('meals')
-        .select('id')
-        .eq('diet_plan_id', preview.planId);
-      
-      if (meals) {
-        const mealIds = meals.map(m => m.id);
-        
-        const { data: allOptions } = await supabase
-          .from('meal_options')
-          .select('total_calories, total_protein, total_carbs, total_fat')
-          .in('meal_id', mealIds)
-          .eq('option_number', 1);
-        
-        if (allOptions) {
-          const planTotals = allOptions.reduce(
-            (acc, opt) => ({
-              calories: acc.calories + (opt.total_calories || 0),
-              protein: acc.protein + (opt.total_protein || 0),
-              carbs: acc.carbs + (opt.total_carbs || 0),
-              fat: acc.fat + (opt.total_fat || 0),
-            }),
-            { calories: 0, protein: 0, carbs: 0, fat: 0 }
-          );
-          
-          await supabase
-            .from('diet_plans')
-            .update({
-              total_calories: planTotals.calories,
-              total_protein: planTotals.protein,
-              total_carbs: planTotals.carbs,
-              total_fat: planTotals.fat,
-            })
-            .eq('id', preview.planId);
-        }
       }
       
-      const totalTime = Math.round(performance.now() - startTime);
-      console.log(`[BruteForce] Total apply time: ${totalTime}ms`);
+      // 5. Update diet_plan totals
+      const { data: allOptions } = await supabase
+        .from('meal_options')
+        .select('total_calories, total_protein, total_carbs, total_fat, option_number')
+        .in('meal_id', mealIds)
+        .eq('option_number', 1);
       
-      setApplyProgress({ phase: 'done', current: 1, total: 1, label: 'Concluído!' });
+      if (allOptions) {
+        const planTotals = allOptions.reduce(
+          (acc, opt) => ({
+            calories: acc.calories + (opt.total_calories || 0),
+            protein: acc.protein + (opt.total_protein || 0),
+            carbs: acc.carbs + (opt.total_carbs || 0),
+            fat: acc.fat + (opt.total_fat || 0),
+          }),
+          { calories: 0, protein: 0, carbs: 0, fat: 0 }
+        );
+        
+        await supabase
+          .from('diet_plans')
+          .update({
+            total_calories: planTotals.calories,
+            total_protein: planTotals.protein,
+            total_carbs: planTotals.carbs,
+            total_fat: planTotals.fat,
+          })
+          .eq('id', preview.planId);
+      }
       
       const optimizationResult: OptimizationResult = {
         success: true,
         planId: preview.planId,
-        options: preview.options,
         changes: preview.changes,
         before: preview.before,
         after: preview.after,
@@ -412,9 +542,8 @@ export function useBruteForceOptimizer() {
       setResult(optimizationResult);
       setPreview(null);
       
-      const optionCount = preview.options.filter(o => o.changes.length > 0).length;
       toast.success(
-        `Otimização aplicada em ${totalTime}ms! ${preview.changes.length} ajustes em ${optionCount} opção(ões).`,
+        `Otimização aplicada! ${preview.changes.length} alimentos ajustados.`,
         { duration: 5000 }
       );
       
@@ -425,7 +554,6 @@ export function useBruteForceOptimizer() {
       return null;
     } finally {
       setIsApplying(false);
-      setTimeout(() => setApplyProgress(null), 500);
     }
   }, [preview]);
 
@@ -443,59 +571,21 @@ export function useBruteForceOptimizer() {
 
     setIsUndoing(true);
     try {
-      console.log('[BruteForce] Undoing', result.changes.length, 'changes via batch...');
-      const startTime = performance.now();
+      console.log('[BruteForce] Undoing optimization...');
       
-      // 1. BATCH RESTORE: Restore original quantities in parallel
-      const BATCH_SIZE = 50;
-      const batches: OptimizationChange[][] = [];
-      for (let i = 0; i < result.changes.length; i += BATCH_SIZE) {
-        batches.push(result.changes.slice(i, i + BATCH_SIZE));
-      }
-      
-      await Promise.all(batches.map(async (batch) => {
-        await Promise.all(batch.map(change =>
-          supabase
-            .from('meal_option_foods')
-            .update({ quantity_grams: change.old_quantity })
-            .eq('id', change.meal_option_food_id)
-        ));
-      }));
-
-      // 2. Recalculate affected options in PARALLEL
-      const affectedOptionIds = [...new Set(result.changes.map(c => c.meal_option_id))];
-      
-      await Promise.all(affectedOptionIds.map(async (optionId) => {
-        const { data: optFoods } = await supabase
+      // 1. Restore original quantities for each changed food
+      for (const change of result.changes) {
+        const { error } = await supabase
           .from('meal_option_foods')
-          .select('quantity_grams, food:foods(calories, protein, carbs, fat, serving_size)')
-          .eq('meal_option_id', optionId);
+          .update({ quantity_grams: change.old_quantity })
+          .eq('id', change.meal_option_food_id);
         
-        if (optFoods) {
-          let totals = { calories: 0, protein: 0, carbs: 0, fat: 0 };
-          for (const of_ of optFoods) {
-            const food = of_.food as any;
-            const baseGrams = parseServingSize(food.serving_size);
-            const multiplier = of_.quantity_grams / baseGrams;
-            totals.calories += Math.round(food.calories * multiplier);
-            totals.protein += Math.round(food.protein * multiplier);
-            totals.carbs += Math.round(food.carbs * multiplier);
-            totals.fat += Math.round(food.fat * multiplier);
-          }
-          
-          await supabase
-            .from('meal_options')
-            .update({
-              total_calories: totals.calories,
-              total_protein: totals.protein,
-              total_carbs: totals.carbs,
-              total_fat: totals.fat,
-            })
-            .eq('id', optionId);
+        if (error) {
+          console.error('[BruteForce] Undo error:', error);
         }
-      }));
+      }
 
-      // 3. Update diet_plan totals
+      // 2. Get meal IDs for this plan to recalculate totals
       const { data: meals } = await supabase
         .from('meals')
         .select('id')
@@ -504,39 +594,90 @@ export function useBruteForceOptimizer() {
       if (meals) {
         const mealIds = meals.map(m => m.id);
         
-        const { data: allOptions } = await supabase
+        // 3. Get all meal options
+        const { data: options } = await supabase
           .from('meal_options')
-          .select('total_calories, total_protein, total_carbs, total_fat')
+          .select('id')
           .in('meal_id', mealIds)
           .eq('option_number', 1);
         
-        if (allOptions) {
-          const planTotals = allOptions.reduce(
-            (acc, opt) => ({
-              calories: acc.calories + (opt.total_calories || 0),
-              protein: acc.protein + (opt.total_protein || 0),
-              carbs: acc.carbs + (opt.total_carbs || 0),
-              fat: acc.fat + (opt.total_fat || 0),
-            }),
-            { calories: 0, protein: 0, carbs: 0, fat: 0 }
-          );
+        if (options) {
+          // 4. Recalculate each option's totals
+          for (const option of options) {
+            const { data: optFoods } = await supabase
+              .from('meal_option_foods')
+              .select('quantity_grams, food:foods(calories, protein, carbs, fat, serving_size)')
+              .eq('meal_option_id', option.id);
+            
+            if (optFoods) {
+              let totals = { calories: 0, protein: 0, carbs: 0, fat: 0 };
+              for (const of_ of optFoods) {
+                const food = of_.food as any;
+                const servingSize = (food.serving_size || '100g').toLowerCase();
+                
+                let baseGrams = 100;
+                const gramsMatch = servingSize.match(/(\d+)\s*(g|ml)/);
+                if (gramsMatch) {
+                  baseGrams = parseInt(gramsMatch[1], 10);
+                } else {
+                  const parenMatch = servingSize.match(/\((\d+)\s*(g|ml)\)/);
+                  if (parenMatch) {
+                    baseGrams = parseInt(parenMatch[1], 10);
+                  }
+                }
+                if (baseGrams <= 0 || isNaN(baseGrams)) baseGrams = 100;
+                
+                const multiplier = of_.quantity_grams / baseGrams;
+                totals.calories += Math.round(food.calories * multiplier);
+                totals.protein += Math.round(food.protein * multiplier);
+                totals.carbs += Math.round(food.carbs * multiplier);
+                totals.fat += Math.round(food.fat * multiplier);
+              }
+              
+              await supabase
+                .from('meal_options')
+                .update({
+                  total_calories: totals.calories,
+                  total_protein: totals.protein,
+                  total_carbs: totals.carbs,
+                  total_fat: totals.fat,
+                })
+                .eq('id', option.id);
+            }
+          }
           
-          await supabase
-            .from('diet_plans')
-            .update({
-              total_calories: planTotals.calories,
-              total_protein: planTotals.protein,
-              total_carbs: planTotals.carbs,
-              total_fat: planTotals.fat,
-            })
-            .eq('id', result.planId);
+          // 5. Update diet_plan totals
+          const { data: allOptions } = await supabase
+            .from('meal_options')
+            .select('total_calories, total_protein, total_carbs, total_fat')
+            .in('meal_id', mealIds)
+            .eq('option_number', 1);
+          
+          if (allOptions) {
+            const planTotals = allOptions.reduce(
+              (acc, opt) => ({
+                calories: acc.calories + (opt.total_calories || 0),
+                protein: acc.protein + (opt.total_protein || 0),
+                carbs: acc.carbs + (opt.total_carbs || 0),
+                fat: acc.fat + (opt.total_fat || 0),
+              }),
+              { calories: 0, protein: 0, carbs: 0, fat: 0 }
+            );
+            
+            await supabase
+              .from('diet_plans')
+              .update({
+                total_calories: planTotals.calories,
+                total_protein: planTotals.protein,
+                total_carbs: planTotals.carbs,
+                total_fat: planTotals.fat,
+              })
+              .eq('id', result.planId);
+          }
         }
       }
 
-      const totalTime = Math.round(performance.now() - startTime);
-      console.log(`[BruteForce] Undo completed in ${totalTime}ms`);
-
-      toast.success(`Otimização desfeita em ${totalTime}ms!`);
+      toast.success('Otimização desfeita com sucesso!');
       setResult(null);
       return true;
     } catch (error: any) {
@@ -552,7 +693,6 @@ export function useBruteForceOptimizer() {
     isOptimizing,
     isApplying,
     isUndoing,
-    applyProgress,
     result,
     preview,
     generatePreview,
