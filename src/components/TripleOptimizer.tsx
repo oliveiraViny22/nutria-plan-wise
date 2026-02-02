@@ -354,22 +354,80 @@ export function TripleOptimizer({
                 </div>
               </div>
 
-              {/* Violations comparison */}
-              {preview.violationsBefore.length > 0 && (
-                <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/30">
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-destructive">{preview.violationsBefore.length}</div>
-                    <div className="text-xs text-muted-foreground">Antes</div>
-                  </div>
-                  <ArrowRight className="w-4 h-4 text-muted-foreground" />
-                  <div className="text-center">
-                    <div className={`text-2xl font-bold ${preview.violationsAfter.length === 0 ? 'text-primary' : 'text-amber-500'}`}>
-                      {preview.violationsAfter.length}
+              {/* Violations comparison - DETAILED */}
+              {(preview.violationsBefore.length > 0 || preview.violationsAfter.length > 0) && (
+                <div className="space-y-3 p-4 rounded-xl bg-muted/30 border border-border">
+                  <h4 className="font-semibold text-sm flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4" />
+                    Violações de Contrato
+                  </h4>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    {/* Before */}
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                        <span className="w-2 h-2 rounded-full bg-destructive" />
+                        Antes ({preview.violationsBefore.length})
+                      </div>
+                      {preview.violationsBefore.length > 0 ? (
+                        <div className="space-y-1">
+                          {preview.violationsBefore.map((v, i) => (
+                            <Badge 
+                              key={i}
+                              variant={v.severity === 'error' ? 'destructive' : 'secondary'}
+                              className="text-[10px] mr-1 mb-1"
+                            >
+                              {v.code}: {v.message.split(':')[0]}
+                            </Badge>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-xs text-muted-foreground">Nenhuma violação</p>
+                      )}
                     </div>
-                    <div className="text-xs text-muted-foreground">Depois</div>
+                    
+                    {/* After */}
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                        <span className={`w-2 h-2 rounded-full ${preview.violationsAfter.length === 0 ? 'bg-primary' : 'bg-amber-500'}`} />
+                        Depois ({preview.violationsAfter.length})
+                      </div>
+                      {preview.violationsAfter.length > 0 ? (
+                        <div className="space-y-1">
+                          {preview.violationsAfter.map((v, i) => (
+                            <Badge 
+                              key={i}
+                              variant={v.severity === 'error' ? 'destructive' : 'secondary'}
+                              className="text-[10px] mr-1 mb-1"
+                            >
+                              {v.code}: {v.message.split(':')[0]}
+                            </Badge>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-1 text-xs text-primary">
+                          <Check className="w-3 h-3" />
+                          <span>Todos os contratos atendidos</span>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex-1 text-right text-xs text-muted-foreground">
-                    violações de contrato
+                  
+                  {/* Summary */}
+                  <div className="pt-2 border-t border-border/50">
+                    {preview.violationsAfter.length < preview.violationsBefore.length ? (
+                      <p className="text-xs text-primary">
+                        ✓ Resolvidas: {preview.violationsBefore.length - preview.violationsAfter.length} violação(ões)
+                      </p>
+                    ) : preview.violationsAfter.length === preview.violationsBefore.length && preview.violationsBefore.length > 0 ? (
+                      <p className="text-xs text-amber-500">
+                        ⚠️ Mesma quantidade de violações - revise os ajustes
+                      </p>
+                    ) : preview.violationsAfter.length > preview.violationsBefore.length ? (
+                      <p className="text-xs text-destructive">
+                        ⚠️ Novas violações detectadas - {preview.violationsAfter.length - preview.violationsBefore.length} a mais
+                      </p>
+                    ) : null}
                   </div>
                 </div>
               )}

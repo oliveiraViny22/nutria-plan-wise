@@ -16,13 +16,19 @@ import {
   Ruler,
   Weight,
   UserCircle,
-  Apple
+  Apple,
+  Info,
+  TrendingDown,
+  ArrowUpRight,
+  ArrowDownRight,
+  Minus
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Badge } from '@/components/ui/badge';
 import {
   AlertDialog,
@@ -319,43 +325,167 @@ export default function Profile() {
                 </Card>
               )}
 
-              {/* TMB & TDEE Card */}
+              {/* TMB & TDEE Card with Tooltips and Goal Comparison */}
               {metabolicData && (
-                <Card className="border-amber-500/30 bg-gradient-to-br from-amber-500/5 to-orange-500/10">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-base flex items-center gap-2">
-                      <Flame className="h-5 w-5 text-amber-500" />
-                      Metabolismo Base
-                    </CardTitle>
-                    <CardDescription>
-                      Calculado pela fórmula de Mifflin-St Jeor
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="bg-background/60 rounded-xl p-4 text-center">
-                        <div className="w-8 h-8 mx-auto mb-2 rounded-full bg-amber-500/20 flex items-center justify-center">
-                          <Flame className="h-4 w-4 text-amber-500" />
-                        </div>
-                        <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">{metabolicData.bmr}</p>
-                        <p className="text-xs text-muted-foreground">TMB (kcal/dia)</p>
-                        <p className="text-[10px] text-muted-foreground mt-1">Taxa Metabólica Basal</p>
+                <TooltipProvider delayDuration={200}>
+                  <Card className="border-amber-500/30 bg-gradient-to-br from-amber-500/5 to-orange-500/10">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <Flame className="h-5 w-5 text-amber-500" />
+                        Metabolismo Base
+                      </CardTitle>
+                      <CardDescription>
+                        Calculado pela fórmula de Mifflin-St Jeor
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-2 gap-4 mb-4">
+                        {/* TMB with Tooltip */}
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div className="bg-background/60 rounded-xl p-4 text-center cursor-help hover:bg-background/80 transition-colors">
+                              <div className="w-8 h-8 mx-auto mb-2 rounded-full bg-amber-500/20 flex items-center justify-center relative">
+                                <Flame className="h-4 w-4 text-amber-500" />
+                                <Info className="h-3 w-3 text-muted-foreground absolute -top-1 -right-1" />
+                              </div>
+                              <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">{metabolicData.bmr}</p>
+                              <p className="text-xs text-muted-foreground">TMB (kcal/dia)</p>
+                              <p className="text-[10px] text-muted-foreground mt-1">Taxa Metabólica Basal</p>
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent side="bottom" className="max-w-xs p-3">
+                            <p className="font-semibold mb-1">O que é TMB?</p>
+                            <p className="text-sm">
+                              A Taxa Metabólica Basal é a quantidade de calorias que seu corpo queima 
+                              <strong> apenas para manter as funções vitais</strong> (respiração, batimentos 
+                              cardíacos, temperatura corporal) enquanto você está em repouso absoluto.
+                            </p>
+                          </TooltipContent>
+                        </Tooltip>
+                        
+                        {/* TDEE with Tooltip */}
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div className="bg-background/60 rounded-xl p-4 text-center cursor-help hover:bg-background/80 transition-colors">
+                              <div className="w-8 h-8 mx-auto mb-2 rounded-full bg-orange-500/20 flex items-center justify-center relative">
+                                <TrendingUp className="h-4 w-4 text-orange-500" />
+                                <Info className="h-3 w-3 text-muted-foreground absolute -top-1 -right-1" />
+                              </div>
+                              <p className="text-2xl font-bold text-orange-600 dark:text-orange-400">{metabolicData.tdee}</p>
+                              <p className="text-xs text-muted-foreground">TDEE (kcal/dia)</p>
+                              <p className="text-[10px] text-muted-foreground mt-1">Gasto Total Diário</p>
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent side="bottom" className="max-w-xs p-3">
+                            <p className="font-semibold mb-1">O que é TDEE?</p>
+                            <p className="text-sm">
+                              O Gasto Energético Total Diário inclui a TMB mais todas as calorias 
+                              que você queima com <strong>atividades físicas e digestão</strong>. 
+                              É o total que você gasta em um dia normal.
+                            </p>
+                          </TooltipContent>
+                        </Tooltip>
                       </div>
-                      <div className="bg-background/60 rounded-xl p-4 text-center">
-                        <div className="w-8 h-8 mx-auto mb-2 rounded-full bg-orange-500/20 flex items-center justify-center">
-                          <TrendingUp className="h-4 w-4 text-orange-500" />
+                      
+                      {/* TDEE vs Goal Comparison */}
+                      {profile?.daily_calories && (
+                        <div className="bg-background/80 rounded-xl p-4 border border-border/50">
+                          <div className="flex items-center justify-between mb-3">
+                            <span className="text-sm font-medium">Comparação com sua Meta</span>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Info className="h-4 w-4 text-muted-foreground cursor-help" />
+                              </TooltipTrigger>
+                              <TooltipContent side="left" className="max-w-xs p-3">
+                                <p className="text-sm">
+                                  Comparamos seu TDEE (gasto real) com a meta calórica do seu plano 
+                                  para verificar se está alinhado ao seu objetivo.
+                                </p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </div>
+                          
+                          {(() => {
+                            const diff = profile.daily_calories - metabolicData.tdee;
+                            const diffPercent = Math.round((diff / metabolicData.tdee) * 100);
+                            const normalizedGoal = formData.goal || 'maintain';
+                            
+                            const getExpectedRange = () => {
+                              switch (normalizedGoal) {
+                                case 'lose_weight':
+                                  return { min: -25, max: -10, label: 'déficit de 10-25%', expected: 'abaixo' };
+                                case 'gain_muscle':
+                                  return { min: 10, max: 20, label: 'superávit de 10-20%', expected: 'acima' };
+                                default:
+                                  return { min: -5, max: 5, label: 'variação de ±5%', expected: 'igual' };
+                              }
+                            };
+                            
+                            const range = getExpectedRange();
+                            const isAligned = diffPercent >= range.min && diffPercent <= range.max;
+                            const goalLabel = GOALS[normalizedGoal as keyof typeof GOALS]?.label || 'Manutenção';
+                            
+                            return (
+                              <div className="space-y-3">
+                                <div className="flex items-center justify-between text-sm">
+                                  <span className="text-muted-foreground">TDEE (você gasta)</span>
+                                  <span className="font-semibold">{metabolicData.tdee} kcal</span>
+                                </div>
+                                <div className="flex items-center justify-between text-sm">
+                                  <span className="text-muted-foreground">Meta (você consome)</span>
+                                  <span className="font-semibold">{profile.daily_calories} kcal</span>
+                                </div>
+                                <div className="h-px bg-border" />
+                                <div className="flex items-center justify-between">
+                                  <span className="text-sm text-muted-foreground">Diferença</span>
+                                  <div className="flex items-center gap-2">
+                                    {diff > 0 ? (
+                                      <ArrowUpRight className="h-4 w-4 text-primary" />
+                                    ) : diff < 0 ? (
+                                      <ArrowDownRight className="h-4 w-4 text-destructive" />
+                                    ) : (
+                                      <Minus className="h-4 w-4 text-muted-foreground" />
+                                    )}
+                                    <span className={`font-bold ${
+                                      diff > 0 ? 'text-primary' : diff < 0 ? 'text-destructive' : 'text-muted-foreground'
+                                    }`}>
+                                      {diff > 0 ? '+' : ''}{diff} kcal ({diffPercent > 0 ? '+' : ''}{diffPercent}%)
+                                    </span>
+                                  </div>
+                                </div>
+                                
+                                {/* Alignment feedback */}
+                                <div className={`p-3 rounded-lg text-sm ${
+                                  isAligned 
+                                    ? 'bg-primary/10 border border-primary/30' 
+                                    : 'bg-amber-500/10 border border-amber-500/30'
+                                }`}>
+                                  {isAligned ? (
+                                    <p className="text-primary">
+                                      ✓ <strong>Meta alinhada!</strong> Para <em>{goalLabel}</em>, 
+                                      esperamos um {range.label}. Sua meta está dentro do ideal.
+                                    </p>
+                                  ) : (
+                                    <p className="text-amber-600 dark:text-amber-400">
+                                      ⚠️ Para <em>{goalLabel}</em>, esperamos um {range.label}, 
+                                      mas sua meta está {diffPercent > 0 ? '+' : ''}{diffPercent}% do TDEE. 
+                                      Considere revisar com um profissional.
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })()}
                         </div>
-                        <p className="text-2xl font-bold text-orange-600 dark:text-orange-400">{metabolicData.tdee}</p>
-                        <p className="text-xs text-muted-foreground">TDEE (kcal/dia)</p>
-                        <p className="text-[10px] text-muted-foreground mt-1">Gasto Total Diário</p>
-                      </div>
-                    </div>
-                    <p className="text-xs text-muted-foreground text-center mt-4">
-                      Seu corpo queima aproximadamente <span className="font-semibold text-foreground">{metabolicData.bmr} kcal</span> em repouso 
-                      e <span className="font-semibold text-foreground">{metabolicData.tdee} kcal</span> considerando sua atividade física.
-                    </p>
-                  </CardContent>
-                </Card>
+                      )}
+                      
+                      <p className="text-xs text-muted-foreground text-center mt-4">
+                        Seu corpo queima aproximadamente <span className="font-semibold text-foreground">{metabolicData.bmr} kcal</span> em repouso 
+                        e <span className="font-semibold text-foreground">{metabolicData.tdee} kcal</span> considerando sua atividade física.
+                      </p>
+                    </CardContent>
+                  </Card>
+                </TooltipProvider>
               )}
 
               {/* Objective Display - Read-only */}
