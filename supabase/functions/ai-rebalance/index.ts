@@ -337,6 +337,12 @@ function runFinalRefinement(
     fat: 1,        // ±1g
   };
 
+  // ============================================
+  // REGRA CRÍTICA: PROTEÇÃO DE PROTEÍNA
+  // ============================================
+  // A proteína é o macro mais importante. Nunca sacrificar proteína
+  // para atingir metas de outros macros.
+  
   let iterations = 0;
 
   for (let i = 0; i < maxIterations; i++) {
@@ -347,6 +353,10 @@ function runFinalRefinement(
     const protDiff = totals.protein - targets.protein;
     const carbsDiff = totals.carbs - targets.carbs;
     const fatDiff = totals.fat - targets.fat;
+    
+    // Proteína está no nível ok ou abaixo? Então está PROTEGIDA.
+    const proteinIsProtected = protDiff <= 2; // Se não temos excesso de proteína, proteger
+    const proteinDeficit = protDiff < -PRECISION.protein;
 
     // Check if we've converged
     if (
@@ -360,19 +370,21 @@ function runFinalRefinement(
     }
 
     // Find the biggest deviation to prioritize
+    // MUDANÇA: Priorizar SEMPRE proteína quando está em déficit
     const deviations = [
-      { nutrient: 'calories', diff: calDiff, precision: PRECISION.calories },
-      { nutrient: 'protein', diff: protDiff, precision: PRECISION.protein },
-      { nutrient: 'carbs', diff: carbsDiff, precision: PRECISION.carbs },
-      { nutrient: 'fat', diff: fatDiff, precision: PRECISION.fat },
+      { nutrient: 'calories', diff: calDiff, precision: PRECISION.calories, priority: 2 },
+      { nutrient: 'protein', diff: protDiff, precision: PRECISION.protein, priority: proteinDeficit ? 5 : 3 },
+      { nutrient: 'carbs', diff: carbsDiff, precision: PRECISION.carbs, priority: 1 },
+      { nutrient: 'fat', diff: fatDiff, precision: PRECISION.fat, priority: 1 },
     ].filter(d => Math.abs(d.diff) > d.precision);
 
     if (deviations.length === 0) break;
 
-    // Sort by relative deviation (normalized)
-    deviations.sort((a, b) => 
-      Math.abs(b.diff) / (b.precision || 1) - Math.abs(a.diff) / (a.precision || 1)
-    );
+    // Sort by priority first, then by relative deviation
+    deviations.sort((a, b) => {
+      if (a.priority !== b.priority) return b.priority - a.priority;
+      return Math.abs(b.diff) / (b.precision || 1) - Math.abs(a.diff) / (a.precision || 1);
+    });
 
     const target = deviations[0];
     const needDecrease = target.diff > 0;
@@ -397,6 +409,23 @@ function runFinalRefinement(
       const contribPerGram = contrib[nutrientKey] / 100;
 
       if (contribPerGram <= 0) continue;
+      
+      // ============================================
+      // PROTEÇÃO DE PROTEÍNA - REGRA CRÍTICA
+      // ============================================
+      // Se proteína está protegida e este é um alimento proteico,
+      // NÃO PERMITIR REDUÇÃO
+      const isProteinFood = contrib.protein >= 15; // >15g prot/100g = alimento proteico
+      if (proteinIsProtected && isProteinFood && needDecrease && target.nutrient !== 'protein') {
+        console.log(`[PROTEÇÃO] Bloqueando redução de ${food.food.name} (proteína protegida)`);
+        continue;
+      }
+      
+      // Se há déficit de proteína, não reduzir alimentos proteicos NUNCA
+      if (proteinDeficit && isProteinFood && needDecrease) {
+        console.log(`[PROTEÇÃO] Bloqueando redução de ${food.food.name} (déficit de proteína)`);
+        continue;
+      }
 
       // Score: high contribution + room to adjust
       const roomToAdjust = needDecrease 
@@ -412,6 +441,11 @@ function runFinalRefinement(
           continue; // Don't reduce if already low on calories
         }
       }
+      
+      // EXTRA: Penalizar alimentos que prejudicariam proteína
+      if (needDecrease && isProteinFood && proteinIsProtected) {
+        continue; // Skip entirely
+      }
 
       if (score > bestScore) {
         bestScore = score;
@@ -419,7 +453,10 @@ function runFinalRefinement(
       }
     }
 
-    if (!bestFood) break;
+    if (!bestFood) {
+      console.log(`[REFINAMENTO] Nenhum alimento válido para ajustar ${target.nutrient}`);
+      break;
+    }
 
     const contrib = contributions.get(bestFood.id)!;
     const currentGrams = quantities.get(bestFood.id) || bestFood.quantity_grams;
@@ -439,6 +476,7 @@ function runFinalRefinement(
 
     if (Math.abs(newGrams - currentGrams) >= 1) {
       quantities.set(bestFood.id, Math.round(newGrams));
+      console.log(`[REFINAMENTO] ${needDecrease ? '-' : '+'}${Math.round(Math.abs(newGrams - currentGrams))}g ${bestFood.food.name}`);
     }
   }
 
@@ -524,9 +562,13 @@ function runCorrectionPipeline(
       const caloriesToAdjust = before.calories - targetCalories;
 
       if (Math.abs(caloriesToAdjust) > 10) {
-        // Prioridade: 1. Gordura, 2. Carboidrato, 3. Proteína (só se excedente)
+        // ============================================
+        // REGRA CRÍTICA: NUNCA REDUZIR PROTEÍNA PARA CORTAR CALORIAS
+        // ============================================
+        // Prioridade para REDUZIR: 1. Gordura, 2. Carboidrato (NUNCA proteína)
+        // Prioridade para AUMENTAR: 1. Carboidrato, 2. Proteína
         const foodsToAdjust = needDecrease
-          ? [...fatFoods, ...carbFoods]
+          ? [...fatFoods, ...carbFoods] // NUNCA inclui proteinFoods na redução
           : [...carbFoods, ...proteinFoods];
 
         let remainingCals = Math.abs(caloriesToAdjust);
@@ -539,6 +581,14 @@ function runCorrectionPipeline(
 
           const currentGrams = quantities.get(food.id) || food.quantity_grams;
           const limits = getCategoryLimits(food.food.category);
+          
+          // ============================================
+          // PROTEÇÃO DE PROTEÍNA - SE PRECISAR DIMINUIR CALORIAS
+          // ============================================
+          if (needDecrease && contrib.protein >= 15) {
+            console.log(`[CALORIAS] Pulando ${food.food.name} (alimento proteico protegido)`);
+            continue; // NUNCA reduzir alimento proteico para cortar calorias
+          }
 
           // Calcular gramas necessários
           const gramsForCals = (remainingCals * 100) / contrib.calories;
@@ -555,6 +605,7 @@ function runCorrectionPipeline(
 
           quantities.set(food.id, Math.round(newGrams));
           remainingCals -= calsChanged;
+          console.log(`[CALORIAS] ${needDecrease ? '-' : '+'}${Math.round(actualChange)}g ${food.food.name} (${needDecrease ? '-' : '+'}${Math.round(calsChanged)}kcal)`);
         }
 
         adjustments.push({
