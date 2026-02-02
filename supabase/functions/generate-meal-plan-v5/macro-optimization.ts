@@ -347,53 +347,136 @@ export interface MacroOptimizationResult {
   afterTotals: MacroTotals;
   multiObjectiveApplied: boolean;
   fineAdjustmentApplied: boolean;
+  metrics: OptimizationMetrics;
+}
+
+export interface OptimizationMetrics {
+  executionTimeMs: number;
+  proteinImprovement: number;
+  carbsImprovement: number;
+  fatImprovement: number;
+  totalAdjustments: number;
+  timestamp: string;
 }
 
 /**
  * Aplica todas as otimizações de macro em sequência.
  * Deve ser chamada APÓS o escalonamento calórico básico.
+ * Inclui métricas detalhadas para monitoramento em produção.
  */
 export function optimizeMacroDistribution(
   mealsWithOptions: MealWithOptions[],
   targets: MacroTargets
 ): MacroOptimizationResult {
+  const startTime = performance.now();
+  const timestamp = new Date().toISOString();
+  
   const beforeTotals = calculatePlanTotals(mealsWithOptions);
   
-  logInfo("Iniciando otimização de macros", {
+  // Log estruturado de início
+  logInfo("🔧 [MACRO-OPT] Iniciando otimização", {
+    timestamp,
+    stage: "START",
     before: {
+      calories: beforeTotals.calories,
       protein: beforeTotals.protein,
       carbs: beforeTotals.carbs,
       fat: beforeTotals.fat,
-      calories: beforeTotals.calories,
     },
     targets: {
+      calories: targets.calories,
       protein: targets.protein,
       carbs: targets.carbs,
       fat: targets.fat,
-      calories: targets.calories,
     },
+    deficits: {
+      protein: `${(beforeTotals.protein / targets.protein * 100).toFixed(1)}%`,
+      carbs: `${(beforeTotals.carbs / targets.carbs * 100).toFixed(1)}%`,
+      fat: `${(beforeTotals.fat / targets.fat * 100).toFixed(1)}%`,
+    },
+    mealsCount: mealsWithOptions.length,
+    foodsCount: mealsWithOptions.reduce((sum, m) => 
+      sum + (m.options[0]?.foods.length || 0), 0
+    ),
   });
   
   // Passo 1: Escalonamento multi-objetivo
+  const step1Start = performance.now();
   const multiObjectiveApplied = applyMultiObjectiveScaling(mealsWithOptions, targets);
+  const step1Time = performance.now() - step1Start;
+  
+  const afterStep1 = calculatePlanTotals(mealsWithOptions);
+  logInfo("🔧 [MACRO-OPT] Multi-objetivo concluído", {
+    timestamp,
+    stage: "MULTI_OBJECTIVE",
+    applied: multiObjectiveApplied,
+    executionMs: step1Time.toFixed(2),
+    totals: {
+      protein: afterStep1.protein,
+      carbs: afterStep1.carbs,
+      fat: afterStep1.fat,
+    },
+  });
   
   // Passo 2: Ajuste fino por macro
+  const step2Start = performance.now();
   const fineAdjustmentApplied = applyMacroFineAdjustment(mealsWithOptions, targets);
+  const step2Time = performance.now() - step2Start;
   
   const afterTotals = calculatePlanTotals(mealsWithOptions);
   
-  logInfo("Otimização de macros concluída", {
+  const totalTime = performance.now() - startTime;
+  
+  // Calcular melhorias percentuais
+  const proteinBefore = beforeTotals.protein / targets.protein * 100;
+  const proteinAfter = afterTotals.protein / targets.protein * 100;
+  const carbsBefore = beforeTotals.carbs / targets.carbs * 100;
+  const carbsAfter = afterTotals.carbs / targets.carbs * 100;
+  const fatBefore = beforeTotals.fat / targets.fat * 100;
+  const fatAfter = afterTotals.fat / targets.fat * 100;
+  
+  const metrics: OptimizationMetrics = {
+    executionTimeMs: Math.round(totalTime * 100) / 100,
+    proteinImprovement: Math.round((proteinAfter - proteinBefore) * 10) / 10,
+    carbsImprovement: Math.round((carbsAfter - carbsBefore) * 10) / 10,
+    fatImprovement: Math.round((fatAfter - fatBefore) * 10) / 10,
+    totalAdjustments: (multiObjectiveApplied ? 1 : 0) + (fineAdjustmentApplied ? 1 : 0),
+    timestamp,
+  };
+  
+  // Log estruturado final com todas as métricas
+  logInfo("✅ [MACRO-OPT] Otimização concluída", {
+    timestamp,
+    stage: "COMPLETE",
+    executionTimeMs: metrics.executionTimeMs,
+    steps: {
+      multiObjective: {
+        applied: multiObjectiveApplied,
+        timeMs: step1Time.toFixed(2),
+      },
+      fineAdjustment: {
+        applied: fineAdjustmentApplied,
+        timeMs: step2Time.toFixed(2),
+      },
+    },
+    before: {
+      calories: beforeTotals.calories,
+      protein: `${beforeTotals.protein}g (${proteinBefore.toFixed(1)}%)`,
+      carbs: `${beforeTotals.carbs}g (${carbsBefore.toFixed(1)}%)`,
+      fat: `${beforeTotals.fat}g (${fatBefore.toFixed(1)}%)`,
+    },
     after: {
-      protein: afterTotals.protein,
-      carbs: afterTotals.carbs,
-      fat: afterTotals.fat,
       calories: afterTotals.calories,
+      protein: `${afterTotals.protein}g (${proteinAfter.toFixed(1)}%)`,
+      carbs: `${afterTotals.carbs}g (${carbsAfter.toFixed(1)}%)`,
+      fat: `${afterTotals.fat}g (${fatAfter.toFixed(1)}%)`,
     },
     improvements: {
-      protein: `${((afterTotals.protein / targets.protein) * 100).toFixed(1)}%`,
-      carbs: `${((afterTotals.carbs / targets.carbs) * 100).toFixed(1)}%`,
-      fat: `${((afterTotals.fat / targets.fat) * 100).toFixed(1)}%`,
+      protein: `${metrics.proteinImprovement >= 0 ? '+' : ''}${metrics.proteinImprovement}pp`,
+      carbs: `${metrics.carbsImprovement >= 0 ? '+' : ''}${metrics.carbsImprovement}pp`,
+      fat: `${metrics.fatImprovement >= 0 ? '+' : ''}${metrics.fatImprovement}pp`,
     },
+    success: proteinAfter >= 95 && carbsAfter >= 90,
   });
   
   return {
@@ -401,5 +484,6 @@ export function optimizeMacroDistribution(
     afterTotals,
     multiObjectiveApplied,
     fineAdjustmentApplied,
+    metrics,
   };
 }
