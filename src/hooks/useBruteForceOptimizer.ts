@@ -216,10 +216,41 @@ export function useBruteForceOptimizer() {
       }
       
       // 4. Parse serving_size to get base grams and convert to per-100g
+      // IMPORTANT: serving_size can be "100g", "1 unidade média", etc.
+      // We need to extract the gram weight properly
       const foods: FoodItem[] = optionFoods.map(of => {
         const food = of.food as any;
-        const servingSize = food.serving_size || '100g';
-        const baseGrams = parseInt(servingSize.match(/(\d+)/)?.[1] || '100', 10);
+        const servingSize = (food.serving_size || '100g').toLowerCase();
+        
+        // Try to extract grams from serving_size
+        let baseGrams = 100; // default
+        
+        // Pattern 1: "100g" or "100 g" or "100ml"
+        const gramsMatch = servingSize.match(/(\d+)\s*(g|ml)/);
+        if (gramsMatch) {
+          baseGrams = parseInt(gramsMatch[1], 10);
+        } 
+        // Pattern 2: "(100g)" anywhere in string
+        else {
+          const parenMatch = servingSize.match(/\((\d+)\s*(g|ml)\)/);
+          if (parenMatch) {
+            baseGrams = parseInt(parenMatch[1], 10);
+          }
+          // Pattern 3: "1 unidade" or "1 fatia" - treat as if macros are already per unit
+          // In this case, we assume the database stores macros for that single unit
+          // So we treat the "serving" as the quantity itself and use 1:1 ratio
+          else if (servingSize.match(/^\d+\s+(unidade|fatia|colher|xícara|copo)/)) {
+            // For unit-based foods, assume macros in DB are per serving
+            // Use 100 as baseGrams since we'll multiply by quantity_grams/100
+            // This means quantity_grams represents "number of units * 100"
+            baseGrams = 100;
+          }
+        }
+        
+        // Ensure baseGrams is valid
+        if (baseGrams <= 0 || isNaN(baseGrams)) {
+          baseGrams = 100;
+        }
         
         return {
           id: food.id,
@@ -245,11 +276,23 @@ export function useBruteForceOptimizer() {
       console.log('[BruteForce] Starting optimization...');
       console.log('[BruteForce] Targets:', targets);
       console.log('[BruteForce] Before:', beforeMacros);
+      console.log('[BruteForce] Foods:', foods.map(f => ({
+        name: f.name,
+        qty: f.quantity_grams,
+        cal100: f.calories_per_100g,
+        prot100: f.protein_per_100g,
+      })));
       
       const optimizedQuantities = optimizeQuantities(foods, targets);
       const afterMacros = calcTotalMacros(foods, optimizedQuantities);
       
       console.log('[BruteForce] After:', afterMacros);
+      console.log('[BruteForce] Deltas:', {
+        calories: afterMacros.calories - targets.calories,
+        protein: afterMacros.protein - targets.protein,
+        carbs: afterMacros.carbs - targets.carbs,
+        fat: afterMacros.fat - targets.fat,
+      });
       
       // 7. Calculate changes
       const changes: OptimizationResult['changes'] = [];
@@ -290,7 +333,21 @@ export function useBruteForceOptimizer() {
           let totals = { calories: 0, protein: 0, carbs: 0, fat: 0 };
           for (const of_ of optFoods) {
             const food = of_.food as any;
-            const baseGrams = parseInt((food.serving_size || '100g').match(/(\d+)/)?.[1] || '100', 10);
+            const servingSize = (food.serving_size || '100g').toLowerCase();
+            
+            // Parse base grams properly
+            let baseGrams = 100;
+            const gramsMatch = servingSize.match(/(\d+)\s*(g|ml)/);
+            if (gramsMatch) {
+              baseGrams = parseInt(gramsMatch[1], 10);
+            } else {
+              const parenMatch = servingSize.match(/\((\d+)\s*(g|ml)\)/);
+              if (parenMatch) {
+                baseGrams = parseInt(parenMatch[1], 10);
+              }
+            }
+            if (baseGrams <= 0 || isNaN(baseGrams)) baseGrams = 100;
+            
             const multiplier = of_.quantity_grams / baseGrams;
             totals.calories += Math.round(food.calories * multiplier);
             totals.protein += Math.round(food.protein * multiplier);
