@@ -480,7 +480,7 @@ export default function Dashboard() {
           className="space-y-3 sm:space-y-4"
         >
           {/* Test Optimization Button */}
-          {currentDietPlan && isAdmin && (
+          {currentDietPlan && (
             <div className="flex justify-end">
               <Button
                 variant="outline"
