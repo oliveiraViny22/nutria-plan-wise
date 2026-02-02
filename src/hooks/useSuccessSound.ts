@@ -5,10 +5,28 @@ const FREQUENCIES = [523.25, 659.25, 783.99]; // C5, E5, G5 (major chord arpeggi
 const DURATION = 0.12;
 const GAIN = 0.15; // Subtle volume
 
+// Haptic pattern for success feedback (vibration in ms)
+const HAPTIC_PATTERN = [50, 30, 80]; // Short pulse, pause, longer pulse
+
 export function useSuccessSound() {
   const audioContextRef = useRef<AudioContext | null>(null);
 
+  const triggerHapticFeedback = useCallback(() => {
+    try {
+      // Check for Vibration API support
+      if ('vibrate' in navigator) {
+        navigator.vibrate(HAPTIC_PATTERN);
+      }
+    } catch (error) {
+      // Silently fail - haptic is optional enhancement
+      console.debug('Haptic feedback failed:', error);
+    }
+  }, []);
+
   const playSuccessSound = useCallback(() => {
+    // Trigger haptic feedback on mobile devices
+    triggerHapticFeedback();
+
     try {
       // Create or reuse AudioContext
       if (!audioContextRef.current) {
@@ -48,7 +66,7 @@ export function useSuccessSound() {
       // Silently fail - audio is optional enhancement
       console.debug('Audio playback failed:', error);
     }
-  }, []);
+  }, [triggerHapticFeedback]);
 
-  return { playSuccessSound };
+  return { playSuccessSound, triggerHapticFeedback };
 }
