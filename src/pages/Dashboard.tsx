@@ -40,6 +40,15 @@ import {
 import { CalorieRing } from '@/components/CalorieRing';
 import { MacroChart } from '@/components/MacroChart';
 import { AIRebalancer } from '@/components/AIRebalancer';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Badge } from '@/components/ui/badge';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
 import { UpgradeDialog } from '@/components/UpgradeDialog';
 import { AdherenceWidget } from '@/components/AdherenceWidget';
@@ -72,7 +81,8 @@ export default function Dashboard() {
     isSubscribed,
   } = useSubscription();
   const { usage, isLimitReached, refresh: refreshUsage } = useUsageLimits();
-  const { isOptimizing, optimize: bruteForceOptimize } = useBruteForceOptimizer();
+  const { isOptimizing, result: optimizationResult, optimize: bruteForceOptimize } = useBruteForceOptimizer();
+  const [showOptimizationResult, setShowOptimizationResult] = useState(false);
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [currentDietPlan, setCurrentDietPlan] = useState<DietPlan | null>(null);
@@ -241,12 +251,17 @@ export default function Dashboard() {
   const handleBruteForceOptimize = async () => {
     if (!currentDietPlan) return;
     
-    await bruteForceOptimize(currentDietPlan.id, {
+    const result = await bruteForceOptimize(currentDietPlan.id, {
       calories: profile?.daily_calories || 2000,
       protein: profile?.protein_target || 150,
       carbs: profile?.carbs_target || 250,
       fat: profile?.fat_target || 65,
     });
+    
+    // Show result dialog if optimization was successful
+    if (result?.success) {
+      setShowOptimizationResult(true);
+    }
     
     // Refresh data after optimization
     await fetchCurrentPlan();
@@ -756,7 +771,164 @@ export default function Dashboard() {
         currentPlan={subscriptionPlan?.name}
         limit={upgradeLimit}
       />
+
+      {/* Optimization Result Dialog */}
+      <Dialog open={showOptimizationResult} onOpenChange={setShowOptimizationResult}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Zap className="h-5 w-5 text-yellow-500" />
+              Resultado da Otimização
+            </DialogTitle>
+            <DialogDescription>
+              Comparativo antes e depois do ajuste de quantidades
+            </DialogDescription>
+          </DialogHeader>
+
+          {optimizationResult && (
+            <div className="space-y-6 py-4">
+              {/* Macro Comparison */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="p-4 border rounded-lg bg-muted/30">
+                  <h4 className="font-medium text-sm mb-3 text-muted-foreground">Antes</h4>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span>Calorias:</span>
+                      <span className="font-mono">{optimizationResult.before.calories} kcal</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Proteína:</span>
+                      <span className="font-mono">{optimizationResult.before.protein}g</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Carboidratos:</span>
+                      <span className="font-mono">{optimizationResult.before.carbs}g</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Gordura:</span>
+                      <span className="font-mono">{optimizationResult.before.fat}g</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-4 border rounded-lg bg-green-500/10 border-green-500/30">
+                  <h4 className="font-medium text-sm mb-3 text-green-600 dark:text-green-400">Depois</h4>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span>Calorias:</span>
+                      <span className="font-mono">
+                        {optimizationResult.after.calories} kcal
+                        <DeltaBadge value={optimizationResult.after.calories - optimizationResult.before.calories} />
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Proteína:</span>
+                      <span className="font-mono">
+                        {optimizationResult.after.protein}g
+                        <DeltaBadge value={optimizationResult.after.protein - optimizationResult.before.protein} />
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Carboidratos:</span>
+                      <span className="font-mono">
+                        {optimizationResult.after.carbs}g
+                        <DeltaBadge value={optimizationResult.after.carbs - optimizationResult.before.carbs} />
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Gordura:</span>
+                      <span className="font-mono">
+                        {optimizationResult.after.fat}g
+                        <DeltaBadge value={optimizationResult.after.fat - optimizationResult.before.fat} />
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Target Comparison */}
+              <div className="p-4 border rounded-lg bg-blue-500/10 border-blue-500/30">
+                <h4 className="font-medium text-sm mb-3 text-blue-600 dark:text-blue-400">Metas</h4>
+                <div className="grid grid-cols-4 gap-2 text-sm text-center">
+                  <div>
+                    <div className="font-mono font-medium">{optimizationResult.targets.calories}</div>
+                    <div className="text-xs text-muted-foreground">kcal</div>
+                  </div>
+                  <div>
+                    <div className="font-mono font-medium">{optimizationResult.targets.protein}g</div>
+                    <div className="text-xs text-muted-foreground">prot</div>
+                  </div>
+                  <div>
+                    <div className="font-mono font-medium">{optimizationResult.targets.carbs}g</div>
+                    <div className="text-xs text-muted-foreground">carb</div>
+                  </div>
+                  <div>
+                    <div className="font-mono font-medium">{optimizationResult.targets.fat}g</div>
+                    <div className="text-xs text-muted-foreground">gord</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Changes Table */}
+              {optimizationResult.changes.length > 0 ? (
+                <div className="space-y-2">
+                  <h4 className="font-medium text-sm">Alimentos Ajustados ({optimizationResult.changes.length})</h4>
+                  <div className="border rounded-lg overflow-hidden">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Alimento</TableHead>
+                          <TableHead className="text-right">Antes</TableHead>
+                          <TableHead className="text-right">Depois</TableHead>
+                          <TableHead className="text-right">Delta</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {optimizationResult.changes.map((change, idx) => (
+                          <TableRow key={idx}>
+                            <TableCell className="font-medium text-sm">{change.food_name}</TableCell>
+                            <TableCell className="text-right font-mono text-sm">{change.old_quantity}g</TableCell>
+                            <TableCell className="text-right font-mono text-sm">{change.new_quantity}g</TableCell>
+                            <TableCell className="text-right">
+                              <DeltaBadge value={change.new_quantity - change.old_quantity} suffix="g" />
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-4 text-muted-foreground text-sm">
+                  Nenhum alimento precisou ser ajustado - o plano já está otimizado!
+                </div>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
       </div>
     </>
+  );
+}
+
+// Helper component for displaying deltas
+function DeltaBadge({ value, suffix = '' }: { value: number; suffix?: string }) {
+  if (Math.abs(value) < 1) return null;
+  
+  const isPositive = value > 0;
+  const displayValue = Math.round(value);
+  
+  return (
+    <Badge 
+      variant="outline" 
+      className={`ml-1 text-xs ${
+        isPositive 
+          ? 'border-green-500 text-green-600 dark:text-green-400' 
+          : 'border-red-500 text-red-600 dark:text-red-400'
+      }`}
+    >
+      {isPositive ? '+' : ''}{displayValue}{suffix}
+    </Badge>
   );
 }
