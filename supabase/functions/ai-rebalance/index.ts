@@ -314,12 +314,16 @@ function getQuantityLimits(category: string | null): { min: number; max: number 
 }
 
 // Prioridade de macros: PROTEÍNA > CALORIAS > CARBOIDRATOS > GORDURA
+// Proteína tem peso MUITO maior para garantir ≥95% mesmo ao reduzir gordura
 const MACRO_PRIORITY: Record<string, number> = {
-  protein: 4,  // Máxima prioridade
-  calories: 3,
+  protein: 10, // MÁXIMA prioridade - garantir ≥95% sempre
+  calories: 4,
   carbs: 2,
-  fat: 1,      // Menor prioridade
+  fat: 1,      // Menor prioridade - pode sacrificar para manter proteína
 };
+
+// Threshold mínimo de proteína (95%) - abaixo disso, força compensação
+const PROTEIN_FLOOR_PERCENT = 95;
 
 function refineAdjustmentsToTarget(
   foods: FoodWithMeta[],
@@ -336,6 +340,18 @@ function refineAdjustmentsToTarget(
   
   // Pré-calcular contribuições por 100g de cada alimento
   const foodContributions = new Map<string, MacroTargets>();
+  // Identificar alimentos ricos em proteína para compensação
+  const highProteinFoods: FoodWithMeta[] = [];
+  
+  for (const food of foods) {
+    const contribution = getFoodContribution(food.food);
+    foodContributions.set(food.id, contribution);
+    
+    // Alimentos com >15g proteína por 100g são "ricos em proteína"
+    if (contribution.protein >= 15) {
+      highProteinFoods.push(food);
+    }
+  }
   for (const food of foods) {
     foodContributions.set(food.id, getFoodContribution(food.food));
   }
@@ -466,6 +482,59 @@ function refineAdjustmentsToTarget(
     }
   }
   
+  // ========================================
+  // PROTEÇÃO DE PROTEÍNA: Garantir ≥95%
+  // ========================================
+  // Se a proteína caiu abaixo de 95%, compensar aumentando alimentos ricos em proteína
+  const proteinCheckMacros = calculateMacrosFromMap(foods, quantities);
+  const proteinPercent = targets.protein > 0 ? (proteinCheckMacros.protein / targets.protein) * 100 : 100;
+  
+  if (proteinPercent < PROTEIN_FLOOR_PERCENT && highProteinFoods.length > 0) {
+    console.log(`Proteção de proteína ativada: ${proteinPercent.toFixed(1)}% < ${PROTEIN_FLOOR_PERCENT}%`);
+    
+    const proteinDeficit = targets.protein - proteinCheckMacros.protein;
+    const proteinNeededToFloor = targets.protein * (PROTEIN_FLOOR_PERCENT / 100) - proteinCheckMacros.protein;
+    
+    // Distribuir aumento entre alimentos ricos em proteína
+    // Priorizar os que têm melhor ratio proteína/gordura
+    const sortedProteinFoods = highProteinFoods.sort((a, b) => {
+      const contribA = foodContributions.get(a.id)!;
+      const contribB = foodContributions.get(b.id)!;
+      // Ratio proteína/gordura - maior é melhor (evita adicionar muita gordura)
+      const ratioA = contribA.fat > 0 ? contribA.protein / contribA.fat : contribA.protein * 10;
+      const ratioB = contribB.fat > 0 ? contribB.protein / contribB.fat : contribB.protein * 10;
+      return ratioB - ratioA;
+    });
+    
+    let remainingProteinNeeded = proteinNeededToFloor;
+    
+    for (const food of sortedProteinFoods) {
+      if (remainingProteinNeeded <= 0) break;
+      
+      const contribution = foodContributions.get(food.id)!;
+      const currentGrams = quantities.get(food.id) || food.quantity_grams;
+      const limits = getQuantityLimits(food.food.category);
+      
+      // Calcular quantos gramas podemos adicionar
+      const maxAddable = limits.max - currentGrams;
+      if (maxAddable <= 0) continue;
+      
+      // Quantos gramas necessários para cobrir o déficit restante
+      const gramsNeeded = (remainingProteinNeeded * 100) / contribution.protein;
+      const gramsToAdd = Math.min(maxAddable, gramsNeeded);
+      
+      if (gramsToAdd >= 5) { // Mínimo de 5g para valer a pena
+        const newGrams = Math.round(currentGrams + gramsToAdd);
+        quantities.set(food.id, newGrams);
+        
+        const proteinAdded = (gramsToAdd / 100) * contribution.protein;
+        remainingProteinNeeded -= proteinAdded;
+        
+        console.log(`Proteção: +${gramsToAdd.toFixed(0)}g ${food.food.name} (+${proteinAdded.toFixed(1)}g proteína)`);
+      }
+    }
+  }
+  
   // Verificação final - log se não atingiu a meta ideal
   const finalMacros = calculateMacrosFromMap(foods, quantities);
   const finalAccuracy = calculateAccuracy(finalMacros, targets);
@@ -473,6 +542,11 @@ function refineAdjustmentsToTarget(
   if (finalAccuracy.calories < IDEAL_MIN || finalAccuracy.calories > IDEAL_MAX ||
       finalAccuracy.protein < IDEAL_MIN || finalAccuracy.protein > IDEAL_MAX) {
     console.warn(`Refinamento não atingiu ${IDEAL_MIN}-${IDEAL_MAX}%: Cal ${finalAccuracy.calories.toFixed(1)}%, Prot ${finalAccuracy.protein.toFixed(1)}%`);
+  }
+  
+  // Log especial se proteína ainda estiver abaixo do piso mínimo
+  if (finalAccuracy.protein < PROTEIN_FLOOR_PERCENT) {
+    console.error(`⚠️ ALERTA: Proteína em ${finalAccuracy.protein.toFixed(1)}% - abaixo do piso de ${PROTEIN_FLOOR_PERCENT}%`);
   }
   
   return quantities;
