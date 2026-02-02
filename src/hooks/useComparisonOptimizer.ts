@@ -100,12 +100,25 @@ interface OptimizerResult {
   quantities: Map<string, number>;
 }
 
+export interface NutritionalAnalysis {
+  recommendedIndex: number;
+  recommendedName: string;
+  reasoning: string;
+  highlights: string[];
+  tradeoffs: Array<{
+    optimizerName: string;
+    pros: string[];
+    cons: string[];
+  }>;
+}
+
 export interface ComparisonPreview {
   planId: string;
   targets: MacroTargets;
   before: MacroTargets;
   results: OptimizerResult[];
   foods: FoodItem[];
+  analysis: NutritionalAnalysis;
 }
 
 interface OptimizerSettings {
@@ -229,6 +242,197 @@ function calcScore(macros: MacroTargets, targets: MacroTargets, violations: Cont
   }
   
   return Math.max(0, Math.min(100, Math.round(score)));
+}
+
+// =====================================================
+// NUTRITIONAL ANALYSIS FUNCTION
+// =====================================================
+
+function generateNutritionalAnalysis(
+  results: OptimizerResult[],
+  targets: MacroTargets,
+  before: MacroTargets,
+  objective: string
+): NutritionalAnalysis {
+  if (results.length === 0) {
+    return {
+      recommendedIndex: 0,
+      recommendedName: 'Nenhum',
+      reasoning: 'Nenhum resultado disponível para análise.',
+      highlights: [],
+      tradeoffs: [],
+    };
+  }
+
+  // Build tradeoffs for each optimizer
+  const tradeoffs = results.map(result => {
+    const pros: string[] = [];
+    const cons: string[] = [];
+    
+    // Analyze macro precision
+    const protDiff = result.macros.protein - targets.protein;
+    const carbDiff = result.macros.carbs - targets.carbs;
+    const fatDiff = result.macros.fat - targets.fat;
+    const calDiff = result.macros.calories - targets.calories;
+    
+    // Protein analysis
+    if (Math.abs(protDiff) <= 3) {
+      pros.push('Proteína precisa (±3g da meta)');
+    } else if (protDiff > 0 && protDiff <= 10) {
+      pros.push(`+${Math.round(protDiff)}g de proteína extra`);
+    } else if (protDiff < -5) {
+      cons.push(`${Math.round(protDiff)}g abaixo na proteína`);
+    }
+    
+    // Carbs analysis
+    if (Math.abs(carbDiff) <= 5) {
+      pros.push('Carboidratos bem balanceados');
+    } else if (carbDiff > 10) {
+      cons.push(`+${Math.round(carbDiff)}g de carb (excesso energético)`);
+    } else if (carbDiff < -10) {
+      cons.push(`${Math.round(carbDiff)}g de carb (déficit energético)`);
+    }
+    
+    // Fat analysis
+    if (Math.abs(fatDiff) <= 3) {
+      pros.push('Gordura dentro da meta');
+    } else if (fatDiff > 5) {
+      cons.push(`+${Math.round(fatDiff)}g de gordura`);
+    } else if (fatDiff < -5) {
+      pros.push(`${Math.abs(Math.round(fatDiff))}g menos gordura`);
+    }
+    
+    // Calorie analysis
+    const calPct = (result.macros.calories / targets.calories) * 100;
+    if (calPct >= 98 && calPct <= 102) {
+      pros.push('Calorias exatas');
+    } else if (calPct > 105) {
+      cons.push(`${Math.round(calPct - 100)}% acima das calorias`);
+    } else if (calPct < 95) {
+      cons.push(`${Math.round(100 - calPct)}% abaixo das calorias`);
+    }
+    
+    // Violation analysis
+    if (result.violations.length === 0) {
+      pros.push('Nenhuma violação nutricional');
+    } else {
+      const errors = result.violations.filter(v => v.severity === 'error').length;
+      const warnings = result.violations.filter(v => v.severity === 'warning').length;
+      if (errors > 0) cons.push(`${errors} violação(ões) crítica(s)`);
+      if (warnings > 0) cons.push(`${warnings} alerta(s)`);
+    }
+    
+    // Changes analysis
+    if (result.changes.length <= 3) {
+      pros.push('Poucas alterações necessárias');
+    } else if (result.changes.length > 10) {
+      cons.push(`${result.changes.length} alimentos alterados`);
+    }
+    
+    return {
+      optimizerName: result.name,
+      pros,
+      cons,
+    };
+  });
+
+  // Determine recommended optimizer based on objective and constraints
+  let recommendedIndex = 0;
+  let reasoning = '';
+  const highlights: string[] = [];
+
+  const bestResult = results[0]; // Already sorted by score
+  
+  // Analyze based on objective
+  if (objective === 'cut' || objective === 'lose_weight') {
+    // For cutting: prioritize protein retention and calorie control
+    const proteinPreservers = results.filter(r => 
+      r.macros.protein >= targets.protein * 0.95 && 
+      r.macros.calories <= targets.calories * 1.02
+    );
+    
+    if (proteinPreservers.length > 0) {
+      // Find the one with lowest fat
+      const bestForCut = proteinPreservers.reduce((best, curr) => 
+        curr.macros.fat < best.macros.fat ? curr : best
+      );
+      recommendedIndex = results.findIndex(r => r.name === bestForCut.name);
+      reasoning = `Para **cutting**, o "${bestForCut.name}" é recomendado por preservar proteína (${bestForCut.macros.protein}g ≥95% da meta) ` +
+        `mantendo calorias controladas e minimizando gordura (${bestForCut.macros.fat}g).`;
+      highlights.push('✓ Preserva massa muscular');
+      highlights.push('✓ Controle calórico adequado');
+      if (bestForCut.macros.fat <= targets.fat) {
+        highlights.push('✓ Gordura dentro do limite');
+      }
+    } else {
+      reasoning = `Nenhum otimizador atinge as metas ideais para cutting. O "${bestResult.name}" tem o melhor equilíbrio geral.`;
+      highlights.push('⚠ Considere ajustar metas');
+    }
+  } else if (objective === 'bulk' || objective === 'gain_muscle') {
+    // For bulking: prioritize protein and adequate calories
+    const muscleBuilders = results.filter(r => 
+      r.macros.protein >= targets.protein * 0.95 && 
+      r.macros.calories >= targets.calories * 0.98
+    );
+    
+    if (muscleBuilders.length > 0) {
+      // Find the one with best protein/calorie ratio
+      const bestForBulk = muscleBuilders.reduce((best, curr) => {
+        const currRatio = curr.macros.protein / curr.macros.calories;
+        const bestRatio = best.macros.protein / best.macros.calories;
+        return currRatio > bestRatio ? curr : best;
+      });
+      recommendedIndex = results.findIndex(r => r.name === bestForBulk.name);
+      reasoning = `Para **bulk**, o "${bestForBulk.name}" é ideal por garantir proteína suficiente (${bestForBulk.macros.protein}g) ` +
+        `com calorias adequadas (${bestForBulk.macros.calories} kcal) para suportar o anabolismo.`;
+      highlights.push('✓ Proteína otimizada para ganho');
+      highlights.push('✓ Calorias para suportar treino');
+      highlights.push('✓ Energia distribuída');
+    } else {
+      reasoning = `Para bulk, o "${bestResult.name}" oferece o melhor balanço entre proteína e calorias disponíveis.`;
+    }
+  } else {
+    // For maintenance: prioritize balance and minimal violations
+    const balanced = results.filter(r => 
+      r.violations.length === 0 &&
+      Math.abs(r.macros.calories - targets.calories) / targets.calories < 0.03
+    );
+    
+    if (balanced.length > 0) {
+      const bestBalanced = balanced[0];
+      recommendedIndex = results.findIndex(r => r.name === bestBalanced.name);
+      reasoning = `Para **manutenção**, o "${bestBalanced.name}" oferece o equilíbrio ideal: ` +
+        `macros precisos (${bestBalanced.macros.calories} kcal) sem violar contratos nutricionais.`;
+      highlights.push('✓ Macros equilibrados');
+      highlights.push('✓ Sustentável a longo prazo');
+      highlights.push('✓ Sem restrições extremas');
+    } else if (results.some(r => r.violations.length === 0)) {
+      const noViolations = results.filter(r => r.violations.length === 0)[0];
+      recommendedIndex = results.findIndex(r => r.name === noViolations.name);
+      reasoning = `O "${noViolations.name}" é recomendado por respeitar todos os contratos nutricionais, essencial para manutenção.`;
+      highlights.push('✓ Todos os contratos respeitados');
+    } else {
+      reasoning = `O "${bestResult.name}" tem a melhor pontuação geral (${bestResult.score}/100) para manutenção.`;
+    }
+  }
+
+  // Add comparative insight
+  if (results.length >= 2) {
+    const scoreDiff = results[0].score - results[results.length - 1].score;
+    if (scoreDiff <= 5) {
+      highlights.push('📊 Resultados muito próximos - escolha por preferência');
+    } else if (scoreDiff >= 20) {
+      highlights.push(`📊 Diferença significativa: ${results[0].name} claramente superior`);
+    }
+  }
+
+  return {
+    recommendedIndex,
+    recommendedName: results[recommendedIndex]?.name || 'Nenhum',
+    reasoning,
+    highlights,
+    tradeoffs,
+  };
 }
 
 // =====================================================
@@ -625,17 +829,24 @@ export function useComparisonOptimizer() {
       // Sort by score descending
       results.sort((a, b) => b.score - a.score);
       
+      // Generate nutritional analysis
+      const beforeRounded = {
+        calories: Math.round(beforeMacros.calories),
+        protein: Math.round(beforeMacros.protein),
+        carbs: Math.round(beforeMacros.carbs),
+        fat: Math.round(beforeMacros.fat),
+      };
+      const analysis = generateNutritionalAnalysis(results, targets, beforeRounded, objective);
+      
+      console.log('[Comparison] Analysis:', { recommended: analysis.recommendedName, reasoning: analysis.reasoning });
+      
       const previewResult: ComparisonPreview = {
         planId,
         targets,
-        before: {
-          calories: Math.round(beforeMacros.calories),
-          protein: Math.round(beforeMacros.protein),
-          carbs: Math.round(beforeMacros.carbs),
-          fat: Math.round(beforeMacros.fat),
-        },
+        before: beforeRounded,
         results,
         foods,
+        analysis,
       };
       
       console.log('[Comparison] Results:', results.map(r => ({ name: r.name, score: r.score })));

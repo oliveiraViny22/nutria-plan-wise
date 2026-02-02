@@ -24,6 +24,9 @@ import {
   HelpCircle,
   Layers,
   Zap,
+  Lightbulb,
+  ThumbsUp,
+  ThumbsDown,
 } from 'lucide-react';
 import { useBruteForceOptimizer } from '@/hooks/useBruteForceOptimizer';
 import { useHybridOptimizer } from '@/hooks/useHybridOptimizer';
@@ -2477,6 +2480,102 @@ export default function Dashboard() {
                   );
                 })}
               </div>
+
+              {/* Nutritional Analysis Card */}
+              {comparisonPreview.analysis && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.4 }}
+                  className="p-4 border-2 rounded-lg bg-gradient-to-br from-yellow-50 to-amber-50 dark:from-yellow-950/30 dark:to-amber-950/30 border-amber-200 dark:border-amber-800"
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 rounded-full bg-amber-100 dark:bg-amber-900/50">
+                      <Lightbulb className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+                    </div>
+                    <div className="flex-1 space-y-3">
+                      <div>
+                        <h4 className="font-semibold text-sm text-amber-800 dark:text-amber-300 flex items-center gap-2">
+                          Análise Nutricional
+                          <Badge className="bg-amber-500 text-white text-xs">
+                            Recomendado: {comparisonPreview.analysis.recommendedName}
+                          </Badge>
+                        </h4>
+                        <p className="text-sm text-amber-700 dark:text-amber-400 mt-1" 
+                           dangerouslySetInnerHTML={{ 
+                             __html: comparisonPreview.analysis.reasoning.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') 
+                           }} 
+                        />
+                      </div>
+                      
+                      {/* Highlights */}
+                      {comparisonPreview.analysis.highlights.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5">
+                          {comparisonPreview.analysis.highlights.map((h, i) => (
+                            <span key={i} className="text-xs px-2 py-1 rounded-full bg-amber-200/50 dark:bg-amber-800/50 text-amber-800 dark:text-amber-200">
+                              {h}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Tradeoffs for selected */}
+                      {selectedComparisonIndex !== null && comparisonPreview.analysis.tradeoffs[selectedComparisonIndex] && (
+                        <motion.div 
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          className="pt-3 border-t border-amber-200 dark:border-amber-700"
+                        >
+                          <p className="text-xs font-medium text-amber-700 dark:text-amber-400 mb-2">
+                            Análise do "{comparisonPreview.results[selectedComparisonIndex].name}":
+                          </p>
+                          <div className="grid grid-cols-2 gap-3 text-xs">
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-1 text-green-700 dark:text-green-400 font-medium">
+                                <ThumbsUp className="h-3 w-3" />
+                                <span>Vantagens</span>
+                              </div>
+                              {comparisonPreview.analysis.tradeoffs[selectedComparisonIndex].pros.length > 0 ? (
+                                comparisonPreview.analysis.tradeoffs[selectedComparisonIndex].pros.map((pro, i) => (
+                                  <div key={i} className="text-green-600 dark:text-green-500">• {pro}</div>
+                                ))
+                              ) : (
+                                <div className="text-muted-foreground italic">Nenhuma</div>
+                              )}
+                            </div>
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-1 text-red-700 dark:text-red-400 font-medium">
+                                <ThumbsDown className="h-3 w-3" />
+                                <span>Desvantagens</span>
+                              </div>
+                              {comparisonPreview.analysis.tradeoffs[selectedComparisonIndex].cons.length > 0 ? (
+                                comparisonPreview.analysis.tradeoffs[selectedComparisonIndex].cons.map((con, i) => (
+                                  <div key={i} className="text-red-600 dark:text-red-500">• {con}</div>
+                                ))
+                              ) : (
+                                <div className="text-muted-foreground italic">Nenhuma</div>
+                              )}
+                            </div>
+                          </div>
+                        </motion.div>
+                      )}
+
+                      {/* Quick action to select recommended */}
+                      {selectedComparisonIndex !== comparisonPreview.analysis.recommendedIndex && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setSelectedComparisonIndex(comparisonPreview.analysis.recommendedIndex)}
+                          className="mt-2 border-amber-300 text-amber-700 hover:bg-amber-100 dark:border-amber-700 dark:text-amber-400 dark:hover:bg-amber-900/50"
+                        >
+                          <Lightbulb className="h-3 w-3 mr-1" />
+                          Selecionar Recomendado
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </motion.div>
+              )}
 
               {/* Selected Details */}
               {selectedComparisonIndex !== null && comparisonPreview.results[selectedComparisonIndex] && (
