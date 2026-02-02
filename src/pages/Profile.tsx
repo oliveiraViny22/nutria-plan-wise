@@ -130,6 +130,21 @@ export default function Profile() {
     }
   }, [profile]);
 
+  const calculateBMR = () => {
+    const { age, sex, height, weight } = formData;
+    
+    if (!age || !sex || !height || !weight) {
+      return null;
+    }
+
+    // Mifflin-St Jeor formula
+    const bmr = sex === 'male'
+      ? 10 * Number(weight) + 6.25 * Number(height) - 5 * Number(age) + 5
+      : 10 * Number(weight) + 6.25 * Number(height) - 5 * Number(age) - 161;
+
+    return Math.round(bmr);
+  };
+
   const calculateTargets = () => {
     const { age, sex, height, weight, goal, activity_level } = formData;
     
@@ -137,10 +152,7 @@ export default function Profile() {
       return null;
     }
 
-    const bmr = sex === 'male'
-      ? 10 * Number(weight) + 6.25 * Number(height) - 5 * Number(age) + 5
-      : 10 * Number(weight) + 6.25 * Number(height) - 5 * Number(age) - 161;
-
+    const bmr = calculateBMR() || 0;
     const activityMultiplier = ACTIVITY_LEVELS[activity_level as keyof typeof ACTIVITY_LEVELS]?.multiplier || 1.55;
     const tdee = bmr * activityMultiplier;
     
@@ -166,6 +178,8 @@ export default function Profile() {
       protein: Math.round((calories * proteinRatio) / 4),
       carbs: Math.round((calories * carbsRatio) / 4),
       fat: Math.round((calories * fatRatio) / 9),
+      bmr,
+      tdee: Math.round(tdee),
     };
   };
 
@@ -315,7 +329,38 @@ export default function Profile() {
                 </Card>
               )}
 
-              {/* Objective Display - Read-only */}
+              {/* BMR/TDEE Card */}
+              {targets && targets.bmr && targets.tdee && (
+                <Card className="border-orange-500/30 bg-gradient-to-br from-orange-500/5 to-amber-500/10">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <Flame className="h-5 w-5 text-orange-500" />
+                      Taxa Metabólica
+                    </CardTitle>
+                    <CardDescription>
+                      Calculada com base nos seus dados usando a fórmula Mifflin-St Jeor
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="bg-background/60 rounded-xl p-4 text-center">
+                        <p className="text-xs text-muted-foreground mb-1 uppercase tracking-wide">TMB</p>
+                        <p className="text-2xl font-bold text-orange-500">{targets.bmr}</p>
+                        <p className="text-xs text-muted-foreground">kcal/dia em repouso</p>
+                      </div>
+                      <div className="bg-background/60 rounded-xl p-4 text-center">
+                        <p className="text-xs text-muted-foreground mb-1 uppercase tracking-wide">TDEE</p>
+                        <p className="text-2xl font-bold text-amber-500">{targets.tdee}</p>
+                        <p className="text-xs text-muted-foreground">kcal/dia com atividade</p>
+                      </div>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-3 text-center">
+                      TMB = Taxa Metabólica Basal • TDEE = Gasto Energético Total Diário
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
+
               <Card>
                 <CardHeader className="pb-4">
                   <div className="flex items-center justify-between">
