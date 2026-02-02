@@ -702,17 +702,38 @@ function runCorrectionPipeline(
     // ==========================================
     // ETAPA 4: GORDURA (reduzir se acima do máx)
     // ==========================================
+    // REGRA CRÍTICA: Apenas reduzir gorduras PURAS (azeite, castanhas, óleos)
+    // NUNCA reduzir alimentos que são fontes de proteína
     if (rules.fat && afterCarbsPercents.fat > rules.fat.max) {
       const fatTarget = (targets.fat * rules.fat.max / 100);
       let remainingFatExcess = afterCarbs.fat - fatTarget;
       const initialFatExcess = remainingFatExcess;
 
       if (remainingFatExcess > 1) {
-        for (const food of fatFoods) {
+        // Filtrar apenas gorduras puras (não fontes de proteína)
+        const pureFatFoods = fatFoods.filter(f => {
+          const contrib = contributions.get(f.id)!;
+          // Gordura pura = baixa proteína (<10g/100g) e alta gordura (>20g/100g)
+          const isPureFat = contrib.protein < 10 && contrib.fat > 20;
+          const cat = (f.food.category || "").toLowerCase();
+          const isFatCategory = cat.includes("gordura") || cat.includes("oleaginosa") || cat.includes("azeite") || cat.includes("óleo");
+          return isPureFat || isFatCategory;
+        });
+
+        for (const food of pureFatFoods) {
           if (remainingFatExcess <= 1) break;
 
           const contrib = contributions.get(food.id)!;
           if (contrib.fat <= 0) continue;
+          
+          // ============================================
+          // PROTEÇÃO DE PROTEÍNA - REGRA CRÍTICA
+          // ============================================
+          // NUNCA reduzir alimentos com proteína significativa
+          if (contrib.protein >= 10) {
+            console.log(`[GORDURA] Protegendo ${food.food.name} (${contrib.protein.toFixed(1)}g prot/100g)`);
+            continue;
+          }
 
           const currentGrams = quantities.get(food.id) || food.quantity_grams;
           const limits = getCategoryLimits(food.food.category);
@@ -729,14 +750,16 @@ function runCorrectionPipeline(
 
           const fatRemoved = (actualGramsRemoved / 100) * contrib.fat;
           remainingFatExcess -= fatRemoved;
-          console.log(`Etapa 4: -${Math.round(actualGramsRemoved)}g ${food.food.name} (-${fatRemoved.toFixed(1)}g fat)`);
+          console.log(`Etapa 4: -${Math.round(actualGramsRemoved)}g ${food.food.name} (-${fatRemoved.toFixed(1)}g fat) [gordura pura]`);
         }
 
-        adjustments.push({
-          nutrient: "fat",
-          action: "decrease",
-          delta: `-${Math.round(initialFatExcess)}g`,
-        });
+        if (initialFatExcess > 1) {
+          adjustments.push({
+            nutrient: "fat",
+            action: "decrease",
+            delta: `-${Math.round(initialFatExcess - remainingFatExcess)}g`,
+          });
+        }
       }
     }
   }
