@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { useBruteForceOptimizer } from '@/hooks/useBruteForceOptimizer';
 import { useHybridOptimizer } from '@/hooks/useHybridOptimizer';
+import { useContractOptimizer, ContractOptimizationPreview } from '@/hooks/useContractOptimizer';
 import { useSuccessSound } from '@/hooks/useSuccessSound';
 import { Button } from '@/components/ui/button';
 import { Logo } from '@/components/Logo';
@@ -111,9 +112,21 @@ export default function Dashboard() {
     reset: resetHybrid,
   } = useHybridOptimizer();
   
+  // Contract optimizer
+  const {
+    isOptimizing: isContractOptimizing,
+    isApplying: isContractApplying,
+    preview: contractPreview,
+    generatePreview: generateContractPreview,
+    applyPreview: applyContractPreview,
+    cancelPreview: cancelContractPreview,
+  } = useContractOptimizer();
+  
   const [showOptimizationDialog, setShowOptimizationDialog] = useState(false);
   const [showHybridDialog, setShowHybridDialog] = useState(false);
+  const [showContractDialog, setShowContractDialog] = useState(false);
   const [hybridDialogPhase, setHybridDialogPhase] = useState<'loading' | 'preview' | 'result'>('loading');
+  const [contractDialogPhase, setContractDialogPhase] = useState<'loading' | 'preview' | 'result'>('loading');
   const [optimizationPhase, setOptimizationPhase] = useState<'loading' | 'preview' | 'result'>('loading');
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -376,6 +389,49 @@ export default function Dashboard() {
     }, 300);
   };
 
+  // ========== CONTRACT OPTIMIZER HANDLERS ==========
+  const handleContractOptimize = async () => {
+    if (!currentDietPlan || !profile) return;
+    
+    setContractDialogPhase('loading');
+    setShowContractDialog(true);
+    
+    const preview = await generateContractPreview(currentDietPlan.id, {
+      calories: profile?.daily_calories || 2000,
+      protein: profile?.protein_target || 150,
+      carbs: profile?.carbs_target || 250,
+      fat: profile?.fat_target || 65,
+    });
+    
+    if (preview) {
+      setContractDialogPhase('preview');
+    } else {
+      setShowContractDialog(false);
+    }
+  };
+
+  const handleConfirmContractOptimization = async () => {
+    const result = await applyContractPreview();
+    
+    if (result?.success) {
+      setContractDialogPhase('result');
+      playSuccessSound();
+      await fetchCurrentPlan();
+    }
+  };
+
+  const handleCancelContractOptimization = () => {
+    cancelContractPreview();
+    setShowContractDialog(false);
+  };
+
+  const handleCloseContractDialog = () => {
+    setShowContractDialog(false);
+    setTimeout(() => {
+      setContractDialogPhase('loading');
+    }, 300);
+  };
+
   const handleSignOut = async () => {
     await signOut();
     navigate('/login');
@@ -564,12 +620,12 @@ export default function Dashboard() {
         >
           {/* Optimization Buttons */}
           {currentDietPlan && (
-            <div className="flex justify-end gap-2">
+            <div className="flex justify-end gap-2 flex-wrap">
               <Button
                 variant="outline"
                 size="sm"
                 onClick={handleBruteForceOptimize}
-                disabled={isOptimizing || isHybridOptimizing}
+                disabled={isOptimizing || isHybridOptimizing || isContractOptimizing}
                 className="text-xs border-amber-500 text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950"
               >
                 {isOptimizing ? (
@@ -580,7 +636,26 @@ export default function Dashboard() {
                 ) : (
                   <>
                     <Zap className="w-3 h-3 mr-1" />
-                    Rápido (Teste)
+                    Rápido
+                  </>
+                )}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleContractOptimize}
+                disabled={isOptimizing || isHybridOptimizing || isContractOptimizing}
+                className="text-xs border-emerald-500 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950"
+              >
+                {isContractOptimizing ? (
+                  <>
+                    <Loader2 className="w-3 h-3 animate-spin mr-1" />
+                    Analisando...
+                  </>
+                ) : (
+                  <>
+                    <Shield className="w-3 h-3 mr-1" />
+                    Contratos
                   </>
                 )}
               </Button>
@@ -588,7 +663,7 @@ export default function Dashboard() {
                 variant="outline"
                 size="sm"
                 onClick={handleHybridOptimize}
-                disabled={isOptimizing || isHybridOptimizing}
+                disabled={isOptimizing || isHybridOptimizing || isContractOptimizing}
                 className="text-xs border-purple-500 text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-950"
               >
                 {isHybridOptimizing ? (
@@ -599,7 +674,7 @@ export default function Dashboard() {
                 ) : (
                   <>
                     <Sparkles className="w-3 h-3 mr-1" />
-                    Híbrido (IA + Precisão)
+                    Híbrido
                   </>
                 )}
               </Button>
@@ -1787,6 +1862,299 @@ export default function Dashboard() {
 
               <div className="flex justify-end pt-4 border-t">
                 <Button onClick={handleCloseHybridDialog}>
+                  Fechar
+                </Button>
+              </div>
+            </motion.div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Contract Optimizer Dialog */}
+      <Dialog open={showContractDialog} onOpenChange={(open) => {
+        if (!open) handleCancelContractOptimization();
+      }}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {contractDialogPhase === 'result' ? (
+                <>
+                  <Shield className="h-5 w-5 text-emerald-500" />
+                  Resultado - Otimização com Contratos
+                </>
+              ) : (
+                <>
+                  <Shield className="h-5 w-5 text-emerald-500" />
+                  Prévia - Otimização com Contratos
+                </>
+              )}
+            </DialogTitle>
+            <DialogDescription>
+              Otimização matemática respeitando contratos nutricionais por refeição
+            </DialogDescription>
+          </DialogHeader>
+
+          {/* Loading Phase */}
+          {contractDialogPhase === 'loading' && (
+            <motion.div
+              key="contract-loading"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="py-8 space-y-6"
+            >
+              <div className="flex flex-col items-center justify-center">
+                <motion.div
+                  animate={{
+                    scale: [1, 1.1, 1],
+                    opacity: [1, 0.8, 1],
+                  }}
+                  transition={{ duration: 1.2, repeat: Infinity, ease: "easeInOut" }}
+                  className="relative"
+                >
+                  <motion.div
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+                    className="absolute inset-0 rounded-full border-2 border-emerald-500/30 border-t-emerald-500"
+                    style={{ width: 64, height: 64, margin: -8 }}
+                  />
+                  <Shield className="h-12 w-12 text-emerald-500" />
+                </motion.div>
+                
+                <motion.p
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.2 }}
+                  className="mt-6 text-lg font-medium text-foreground"
+                >
+                  Analisando contratos nutricionais...
+                </motion.p>
+                <motion.p
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 0.4 }}
+                  className="mt-2 text-sm text-muted-foreground text-center max-w-xs"
+                >
+                  Verificando proteína por refeição, limites de gordura e distribuição de macros
+                </motion.p>
+              </div>
+            </motion.div>
+          )}
+
+          {/* Preview Phase */}
+          {contractDialogPhase === 'preview' && contractPreview && (
+            <motion.div 
+              key="contract-preview"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              className="space-y-4"
+            >
+              {/* Contract Violations Comparison */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className={`p-3 border rounded-lg ${contractPreview.violationsBefore.length > 0 ? 'bg-red-500/10 border-red-500/30' : 'bg-muted/30'}`}>
+                  <h4 className="font-medium text-xs mb-2 flex items-center gap-1">
+                    Violações Antes
+                    <Badge variant="outline" className={contractPreview.violationsBefore.length > 0 ? 'border-red-500 text-red-600' : 'border-green-500 text-green-600'}>
+                      {contractPreview.violationsBefore.length}
+                    </Badge>
+                  </h4>
+                  {contractPreview.violationsBefore.length > 0 ? (
+                    <div className="space-y-1 max-h-24 overflow-y-auto">
+                      {contractPreview.violationsBefore.map((v, i) => (
+                        <div key={i} className="text-xs text-red-600 dark:text-red-400">
+                          • {v.message}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-green-600">✓ Sem violações</p>
+                  )}
+                </div>
+
+                <div className={`p-3 border rounded-lg ${contractPreview.violationsAfter.length > 0 ? 'bg-amber-500/10 border-amber-500/30' : 'bg-green-500/10 border-green-500/30'}`}>
+                  <h4 className="font-medium text-xs mb-2 flex items-center gap-1">
+                    Violações Depois
+                    <Badge variant="outline" className={contractPreview.violationsAfter.length > 0 ? 'border-amber-500 text-amber-600' : 'border-green-500 text-green-600'}>
+                      {contractPreview.violationsAfter.length}
+                    </Badge>
+                  </h4>
+                  {contractPreview.violationsAfter.length > 0 ? (
+                    <div className="space-y-1 max-h-24 overflow-y-auto">
+                      {contractPreview.violationsAfter.map((v, i) => (
+                        <div key={i} className={`text-xs ${v.severity === 'error' ? 'text-red-600 dark:text-red-400' : 'text-amber-600 dark:text-amber-400'}`}>
+                          • {v.message}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-green-600">✓ Todos os contratos respeitados!</p>
+                  )}
+                </div>
+              </div>
+
+              {/* Meal Protein Comparison */}
+              <div className="border rounded-lg p-3">
+                <h4 className="font-medium text-xs mb-2 flex items-center gap-1">
+                  <Target className="w-3 h-3 text-emerald-500" />
+                  Proteína por Refeição
+                </h4>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+                  {contractPreview.mealTotalsAfter.map((meal, i) => {
+                    const before = contractPreview.mealTotalsBefore.find(m => m.meal_id === meal.meal_id);
+                    const protBefore = before?.protein || 0;
+                    const delta = meal.protein - protBefore;
+                    return (
+                      <div key={meal.meal_id} className="text-xs flex justify-between">
+                        <span className="truncate">{meal.meal_name}</span>
+                        <span className="font-mono">
+                          {Math.round(protBefore)}→{Math.round(meal.protein)}g
+                          {Math.abs(delta) >= 1 && (
+                            <span className={delta > 0 ? 'text-green-600 ml-1' : 'text-red-600 ml-1'}>
+                              ({delta > 0 ? '+' : ''}{Math.round(delta)})
+                            </span>
+                          )}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Macro Comparison */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="p-3 border rounded-lg bg-muted/30">
+                  <h4 className="font-medium text-xs mb-2 text-muted-foreground">Antes</h4>
+                  <div className="space-y-1 text-xs">
+                    <div className="flex justify-between">
+                      <span>Cal:</span>
+                      <span className="font-mono">{contractPreview.before.calories}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Prot:</span>
+                      <span className="font-mono">{contractPreview.before.protein}g</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Carb:</span>
+                      <span className="font-mono">{contractPreview.before.carbs}g</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Gord:</span>
+                      <span className="font-mono">{contractPreview.before.fat}g</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-3 border rounded-lg bg-emerald-500/10 border-emerald-500/30">
+                  <h4 className="font-medium text-xs mb-2 text-emerald-600 dark:text-emerald-400">Depois</h4>
+                  <div className="space-y-1 text-xs">
+                    <div className="flex justify-between">
+                      <span>Cal:</span>
+                      <span className="font-mono">{contractPreview.after.calories}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Prot:</span>
+                      <span className="font-mono">{contractPreview.after.protein}g</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Carb:</span>
+                      <span className="font-mono">{contractPreview.after.carbs}g</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Gord:</span>
+                      <span className="font-mono">{contractPreview.after.fat}g</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Changes Table */}
+              {contractPreview.changes.length > 0 && (
+                <div className="border rounded-lg overflow-hidden">
+                  <div className="bg-muted/50 px-3 py-2 border-b">
+                    <h4 className="font-medium text-xs">Alterações ({contractPreview.changes.length} alimentos)</h4>
+                  </div>
+                  <div className="max-h-40 overflow-y-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="text-xs">
+                          <TableHead className="py-2">Alimento</TableHead>
+                          <TableHead className="py-2 text-right">Antes</TableHead>
+                          <TableHead className="py-2 text-right">Depois</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {contractPreview.changes.slice(0, 10).map((change, i) => (
+                          <TableRow key={i} className="text-xs">
+                            <TableCell className="py-1.5">
+                              <span className="truncate block max-w-[150px]" title={change.food_name}>
+                                {change.food_name}
+                              </span>
+                              <span className="text-[10px] text-muted-foreground">{change.meal_name}</span>
+                            </TableCell>
+                            <TableCell className="py-1.5 text-right font-mono">{change.old_quantity}g</TableCell>
+                            <TableCell className="py-1.5 text-right font-mono">
+                              {change.new_quantity}g
+                              <DeltaBadge value={change.new_quantity - change.old_quantity} />
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                    {contractPreview.changes.length > 10 && (
+                      <p className="text-xs text-muted-foreground text-center py-2">
+                        +{contractPreview.changes.length - 10} mais alterações...
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Actions */}
+              <div className="flex justify-end gap-2 pt-4 border-t">
+                <Button variant="outline" onClick={handleCancelContractOptimization}>
+                  Cancelar
+                </Button>
+                <Button
+                  onClick={handleConfirmContractOptimization}
+                  disabled={isContractApplying}
+                  className="bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600"
+                >
+                  {isContractApplying ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Aplicando...
+                    </>
+                  ) : (
+                    <>
+                      <Shield className="h-4 w-4 mr-2" />
+                      Aplicar Otimização
+                    </>
+                  )}
+                </Button>
+              </div>
+            </motion.div>
+          )}
+
+          {/* Result Phase */}
+          {contractDialogPhase === 'result' && (
+            <motion.div
+              key="contract-result"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="space-y-4"
+            >
+              <SuccessAnimation show={true} message="Contratos Respeitados!" />
+              
+              <div className="text-center py-2">
+                <p className="text-lg font-semibold text-foreground">
+                  Otimização com Contratos Concluída!
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Plano ajustado respeitando mínimos proteicos por refeição
+                </p>
+              </div>
+
+              <div className="flex justify-end pt-4 border-t">
+                <Button onClick={handleCloseContractDialog}>
                   Fechar
                 </Button>
               </div>
