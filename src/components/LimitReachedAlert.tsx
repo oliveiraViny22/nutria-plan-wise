@@ -2,6 +2,10 @@ import { AlertTriangle, Lock, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useUserRole } from '@/hooks/useUserRole';
+
+// Limite especial que indica acesso ilimitado (retornado pelo banco para admins)
+const UNLIMITED_LIMIT = 999999;
 
 interface LimitReachedAlertProps {
   feature: 'diet' | 'substitution' | 'adjustment' | 'chat';
@@ -40,7 +44,14 @@ export function LimitReachedAlert({
   compact = false,
 }: LimitReachedAlertProps) {
   const navigate = useNavigate();
+  const { isAdmin } = useUserRole();
   const { title, description } = FEATURE_LABELS[feature];
+
+  // Don't show alert for admins or users with unlimited access
+  const isUnlimited = isAdmin || limit >= UNLIMITED_LIMIT;
+  if (isUnlimited) {
+    return null;
+  }
 
   if (compact) {
     return (
