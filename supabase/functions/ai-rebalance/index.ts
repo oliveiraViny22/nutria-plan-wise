@@ -762,6 +762,87 @@ function runCorrectionPipeline(
         }
       }
     }
+
+    // ==========================================
+    // ETAPA 5: ADIÇÃO DE GORDURA (CONDICIONAL)
+    // ==========================================
+    // Gordura SÓ pode ser adicionada se TODAS as condições forem atendidas:
+    // - Proteína ≥ 95% da meta
+    // - Carboidratos entre 90% e 110% da meta
+    // - Calorias totais < 95% da meta
+    // - Não há mais ajuste possível em proteína ou carbs
+    const afterFatReduction = calculateTotals(foods, quantities);
+    const afterFatPercents = calculatePercents(afterFatReduction, targets);
+
+    const proteinOk = afterFatPercents.protein >= 95;
+    const carbsOk = afterFatPercents.carbs >= 90 && afterFatPercents.carbs <= 110;
+    const caloriesLow = afterFatPercents.calories < 95;
+
+    if (proteinOk && carbsOk && caloriesLow) {
+      const caloricDeficit = targets.calories - afterFatReduction.calories;
+      const fatNeeded = Math.round(caloricDeficit / 9); // 9 kcal por grama de gordura
+      
+      console.log(`[ETAPA 5] Condições atendidas - déficit calórico: ${caloricDeficit.toFixed(0)}kcal, gordura necessária: ${fatNeeded}g`);
+      
+      // REGRA: Se gordura necessária > 30% das calorias totais, plano inválido
+      const fatCaloriesPercent = (fatNeeded * 9) / targets.calories * 100;
+      if (fatCaloriesPercent > 30) {
+        console.warn(`[ETAPA 5] Gordura necessária (${fatCaloriesPercent.toFixed(1)}%) > 30% - plano deve ser regenerado`);
+        // Não adicionar gordura excessiva - deixar para o refinamento final
+      } else if (fatNeeded > 3) {
+        // Encontrar fonte de gordura pura para adicionar
+        // Prioridade: alimentos já no plano da categoria gorduras/oleaginosas
+        const pureFatFoods = fatFoods.filter(f => {
+          const contrib = contributions.get(f.id)!;
+          // Gordura pura = alta gordura (>30g/100g) e baixa proteína (<5g/100g)
+          return contrib.fat > 30 && contrib.protein < 5;
+        });
+
+        let remainingFatToAdd = fatNeeded;
+
+        for (const food of pureFatFoods) {
+          if (remainingFatToAdd <= 1) break;
+
+          const contrib = contributions.get(food.id)!;
+          if (contrib.fat <= 0) continue;
+
+          const currentGrams = quantities.get(food.id) || food.quantity_grams;
+          const limits = getCategoryLimits(food.food.category);
+          
+          // Limitar adição (máx +15g por alimento para manter porções realistas)
+          const gramsNeeded = (remainingFatToAdd * 100) / contrib.fat;
+          const gramsToAdd = Math.min(gramsNeeded, limits.max - currentGrams, 15);
+
+          if (gramsToAdd < 2) continue;
+
+          const newGrams = Math.min(limits.max, currentGrams + gramsToAdd);
+          const actualGramsAdded = newGrams - currentGrams;
+          quantities.set(food.id, Math.round(newGrams));
+
+          const fatAdded = (actualGramsAdded / 100) * contrib.fat;
+          remainingFatToAdd -= fatAdded;
+          console.log(`[ETAPA 5] +${Math.round(actualGramsAdded)}g ${food.food.name} (+${fatAdded.toFixed(1)}g gordura)`);
+        }
+
+        if (fatNeeded - remainingFatToAdd > 1) {
+          adjustments.push({
+            nutrient: "fat",
+            action: "increase",
+            delta: `+${Math.round(fatNeeded - remainingFatToAdd)}g`,
+          });
+        }
+      }
+    } else {
+      if (!proteinOk) {
+        console.log(`[ETAPA 5] Proteína insuficiente (${afterFatPercents.protein.toFixed(1)}% < 95%) - não adicionar gordura`);
+      }
+      if (!carbsOk) {
+        console.log(`[ETAPA 5] Carboidratos fora do range (${afterFatPercents.carbs.toFixed(1)}%) - não adicionar gordura`);
+      }
+      if (!caloriesLow) {
+        console.log(`[ETAPA 5] Calorias não estão baixas (${afterFatPercents.calories.toFixed(1)}%) - não adicionar gordura`);
+      }
+    }
   }
 
   return { quantities, adjustments, iterations, converged: false };
