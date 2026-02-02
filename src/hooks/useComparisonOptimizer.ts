@@ -12,6 +12,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { getCategoryLimits } from '@/lib/optimizer-limits';
 
 // =====================================================
 // CONTRACTS & CONSTANTS
@@ -31,21 +32,6 @@ const CONTRACT = {
 const MAIN_MEALS = ['lunch', 'dinner', 'almoço', 'jantar', 'almoco'];
 const SNACK_MEALS = ['morning_snack', 'afternoon_snack', 'lanche_manha', 'lanche_tarde', 'lanche'];
 
-const CATEGORY_LIMITS: Record<string, { min: number; max: number }> = {
-  'carboidrato': { min: 40, max: 300 },
-  'carboidratos': { min: 40, max: 300 },
-  'proteína': { min: 60, max: 250 },
-  'proteínas': { min: 60, max: 250 },
-  'carnes': { min: 80, max: 250 },
-  'laticínios': { min: 30, max: 300 },
-  'vegetais': { min: 30, max: 300 },
-  'frutas': { min: 50, max: 300 },
-  'gorduras': { min: 5, max: 50 },
-  'oleaginosas': { min: 10, max: 60 },
-};
-
-const DEFAULT_MIN = 20;
-const DEFAULT_MAX = 400;
 
 // =====================================================
 // INTERFACES
@@ -139,14 +125,7 @@ const DEFAULT_SETTINGS: OptimizerSettings = {
 // HELPER FUNCTIONS
 // =====================================================
 
-function getCategoryLimits(category: string): { min: number; max: number } {
-  const norm = category.toLowerCase().trim();
-  if (CATEGORY_LIMITS[norm]) return CATEGORY_LIMITS[norm];
-  for (const [key, limits] of Object.entries(CATEGORY_LIMITS)) {
-    if (norm.includes(key) || key.includes(norm)) return limits;
-  }
-  return { min: DEFAULT_MIN, max: DEFAULT_MAX };
-}
+// getCategoryLimits is now imported from @/lib/optimizer-limits
 
 function calcMacros(food: FoodItem, grams: number): MacroTargets {
   const m = grams / 100;

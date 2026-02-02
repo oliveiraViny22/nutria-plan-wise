@@ -8,6 +8,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { getCategoryLimits } from '@/lib/optimizer-limits';
 
 interface MacroTargets {
   calories: number;
@@ -84,75 +85,7 @@ const DEFAULT_SETTINGS: OptimizerSettings = {
   calories_weight: 1.5,
 };
 
-// Category-based min/max constraints for realistic portions
-const CATEGORY_LIMITS: Record<string, { min: number; max: number }> = {
-  // Carboidratos - porções realistas
-  'carboidrato': { min: 40, max: 300 },
-  'carboidratos': { min: 40, max: 300 },
-  'grãos': { min: 40, max: 250 },
-  'cereais': { min: 30, max: 200 },
-  'pães': { min: 25, max: 150 },
-  'massas': { min: 60, max: 250 },
-  'tubérculos': { min: 50, max: 300 },
-  
-  // Proteínas - porções realistas
-  'proteína': { min: 60, max: 250 },
-  'proteínas': { min: 60, max: 250 },
-  'carnes': { min: 80, max: 250 },
-  'aves': { min: 80, max: 250 },
-  'peixes': { min: 80, max: 250 },
-  'frutos do mar': { min: 60, max: 200 },
-  'ovos': { min: 50, max: 200 },
-  
-  // Laticínios
-  'laticínios': { min: 30, max: 300 },
-  'queijos': { min: 20, max: 100 },
-  'leite': { min: 100, max: 400 },
-  'iogurtes': { min: 100, max: 300 },
-  
-  // Vegetais e frutas
-  'vegetais': { min: 30, max: 300 },
-  'verduras': { min: 20, max: 200 },
-  'legumes': { min: 40, max: 250 },
-  'frutas': { min: 50, max: 300 },
-  'saladas': { min: 30, max: 200 },
-  
-  // Gorduras - porções pequenas
-  'gorduras': { min: 5, max: 50 },
-  'óleos': { min: 5, max: 30 },
-  'oleaginosas': { min: 10, max: 60 },
-  'castanhas': { min: 10, max: 50 },
-  
-  // Suplementos e outros
-  'suplementos': { min: 10, max: 100 },
-  'bebidas': { min: 100, max: 500 },
-  'condimentos': { min: 5, max: 30 },
-};
-
-// Default limits for unknown categories
-const DEFAULT_MIN_GRAMS = 20;
-const DEFAULT_MAX_GRAMS = 400;
-
-/**
- * Get min/max limits for a food based on its category
- */
-function getCategoryLimits(category: string): { min: number; max: number } {
-  const normalizedCategory = category.toLowerCase().trim();
-  
-  // Try exact match first
-  if (CATEGORY_LIMITS[normalizedCategory]) {
-    return CATEGORY_LIMITS[normalizedCategory];
-  }
-  
-  // Try partial match
-  for (const [key, limits] of Object.entries(CATEGORY_LIMITS)) {
-    if (normalizedCategory.includes(key) || key.includes(normalizedCategory)) {
-      return limits;
-    }
-  }
-  
-  return { min: DEFAULT_MIN_GRAMS, max: DEFAULT_MAX_GRAMS };
-}
+// getCategoryLimits is now imported from @/lib/optimizer-limits
 
 /**
  * Calculate macros for a given quantity
