@@ -31,6 +31,7 @@ interface FoodItem {
 
 interface OptimizationResult {
   success: boolean;
+  planId: string;
   changes: Array<{
     meal_option_food_id: string;
     food_name: string;
@@ -216,6 +217,7 @@ function optimizeQuantities(
 
 export function useBruteForceOptimizer() {
   const [isOptimizing, setIsOptimizing] = useState(false);
+  const [isUndoing, setIsUndoing] = useState(false);
   const [result, setResult] = useState<OptimizationResult | null>(null);
   const [settings, setSettings] = useState<OptimizerSettings>(DEFAULT_SETTINGS);
 
@@ -474,6 +476,7 @@ export function useBruteForceOptimizer() {
       
       const optimizationResult: OptimizationResult = {
         success: true,
+        planId,
         changes,
         before: {
           calories: Math.round(beforeMacros.calories),
@@ -505,11 +508,140 @@ export function useBruteForceOptimizer() {
     } finally {
       setIsOptimizing(false);
     }
-  }, []);
+  }, [settings]);
+
+  // Undo optimization - restore original quantities
+  const undo = useCallback(async () => {
+    if (!result || result.changes.length === 0) {
+      toast.info('Nada para desfazer');
+      return false;
+    }
+
+    setIsUndoing(true);
+    try {
+      console.log('[BruteForce] Undoing optimization...');
+      
+      // 1. Restore original quantities for each changed food
+      for (const change of result.changes) {
+        const { error } = await supabase
+          .from('meal_option_foods')
+          .update({ quantity_grams: change.old_quantity })
+          .eq('id', change.meal_option_food_id);
+        
+        if (error) {
+          console.error('[BruteForce] Undo error:', error);
+        }
+      }
+
+      // 2. Get meal IDs for this plan to recalculate totals
+      const { data: meals } = await supabase
+        .from('meals')
+        .select('id')
+        .eq('diet_plan_id', result.planId);
+      
+      if (meals) {
+        const mealIds = meals.map(m => m.id);
+        
+        // 3. Get all meal options
+        const { data: options } = await supabase
+          .from('meal_options')
+          .select('id')
+          .in('meal_id', mealIds)
+          .eq('option_number', 1);
+        
+        if (options) {
+          // 4. Recalculate each option's totals
+          for (const option of options) {
+            const { data: optFoods } = await supabase
+              .from('meal_option_foods')
+              .select('quantity_grams, food:foods(calories, protein, carbs, fat, serving_size)')
+              .eq('meal_option_id', option.id);
+            
+            if (optFoods) {
+              let totals = { calories: 0, protein: 0, carbs: 0, fat: 0 };
+              for (const of_ of optFoods) {
+                const food = of_.food as any;
+                const servingSize = (food.serving_size || '100g').toLowerCase();
+                
+                let baseGrams = 100;
+                const gramsMatch = servingSize.match(/(\d+)\s*(g|ml)/);
+                if (gramsMatch) {
+                  baseGrams = parseInt(gramsMatch[1], 10);
+                } else {
+                  const parenMatch = servingSize.match(/\((\d+)\s*(g|ml)\)/);
+                  if (parenMatch) {
+                    baseGrams = parseInt(parenMatch[1], 10);
+                  }
+                }
+                if (baseGrams <= 0 || isNaN(baseGrams)) baseGrams = 100;
+                
+                const multiplier = of_.quantity_grams / baseGrams;
+                totals.calories += Math.round(food.calories * multiplier);
+                totals.protein += Math.round(food.protein * multiplier);
+                totals.carbs += Math.round(food.carbs * multiplier);
+                totals.fat += Math.round(food.fat * multiplier);
+              }
+              
+              await supabase
+                .from('meal_options')
+                .update({
+                  total_calories: totals.calories,
+                  total_protein: totals.protein,
+                  total_carbs: totals.carbs,
+                  total_fat: totals.fat,
+                })
+                .eq('id', option.id);
+            }
+          }
+          
+          // 5. Update diet_plan totals
+          const { data: allOptions } = await supabase
+            .from('meal_options')
+            .select('total_calories, total_protein, total_carbs, total_fat')
+            .in('meal_id', mealIds)
+            .eq('option_number', 1);
+          
+          if (allOptions) {
+            const planTotals = allOptions.reduce(
+              (acc, opt) => ({
+                calories: acc.calories + (opt.total_calories || 0),
+                protein: acc.protein + (opt.total_protein || 0),
+                carbs: acc.carbs + (opt.total_carbs || 0),
+                fat: acc.fat + (opt.total_fat || 0),
+              }),
+              { calories: 0, protein: 0, carbs: 0, fat: 0 }
+            );
+            
+            await supabase
+              .from('diet_plans')
+              .update({
+                total_calories: planTotals.calories,
+                total_protein: planTotals.protein,
+                total_carbs: planTotals.carbs,
+                total_fat: planTotals.fat,
+              })
+              .eq('id', result.planId);
+          }
+        }
+      }
+
+      toast.success('Otimização desfeita com sucesso!');
+      setResult(null);
+      return true;
+    } catch (error: any) {
+      console.error('[BruteForce] Undo error:', error);
+      toast.error('Erro ao desfazer: ' + (error.message || 'Erro desconhecido'));
+      return false;
+    } finally {
+      setIsUndoing(false);
+    }
+  }, [result]);
 
   return {
     isOptimizing,
+    isUndoing,
     result,
     optimize,
+    undo,
   };
 }

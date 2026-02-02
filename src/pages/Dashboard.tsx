@@ -81,7 +81,7 @@ export default function Dashboard() {
     isSubscribed,
   } = useSubscription();
   const { usage, isLimitReached, refresh: refreshUsage } = useUsageLimits();
-  const { isOptimizing, result: optimizationResult, optimize: bruteForceOptimize } = useBruteForceOptimizer();
+  const { isOptimizing, isUndoing, result: optimizationResult, optimize: bruteForceOptimize, undo: undoOptimization } = useBruteForceOptimizer();
   const [showOptimizationResult, setShowOptimizationResult] = useState(false);
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -901,6 +901,41 @@ export default function Dashboard() {
               ) : (
                 <div className="text-center py-4 text-muted-foreground text-sm">
                   Nenhum alimento precisou ser ajustado - o plano já está otimizado!
+                </div>
+              )}
+
+              {/* Undo Button */}
+              {optimizationResult.changes.length > 0 && (
+                <div className="flex justify-end gap-2 pt-4 border-t">
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowOptimizationResult(false)}
+                  >
+                    Fechar
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    onClick={async () => {
+                      const success = await undoOptimization();
+                      if (success) {
+                        setShowOptimizationResult(false);
+                        await fetchCurrentPlan();
+                      }
+                    }}
+                    disabled={isUndoing}
+                  >
+                    {isUndoing ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Desfazendo...
+                      </>
+                    ) : (
+                      <>
+                        <RefreshCw className="h-4 w-4 mr-2" />
+                        Desfazer Otimização
+                      </>
+                    )}
+                  </Button>
                 </div>
               )}
             </div>
