@@ -23,7 +23,9 @@ import {
   Shield,
   HelpCircle,
   Layers,
+  Zap,
 } from 'lucide-react';
+import { useBruteForceOptimizer } from '@/hooks/useBruteForceOptimizer';
 import { Button } from '@/components/ui/button';
 import { Logo } from '@/components/Logo';
 import { MobileNav } from '@/components/MobileNav';
@@ -70,6 +72,7 @@ export default function Dashboard() {
     isSubscribed,
   } = useSubscription();
   const { usage, isLimitReached, refresh: refreshUsage } = useUsageLimits();
+  const { isOptimizing, optimize: bruteForceOptimize } = useBruteForceOptimizer();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [currentDietPlan, setCurrentDietPlan] = useState<DietPlan | null>(null);
@@ -233,6 +236,20 @@ export default function Dashboard() {
 
   const handleDismissAlert = (feature: string) => {
     setDismissedAlerts(prev => new Set([...prev, feature]));
+  };
+
+  const handleBruteForceOptimize = async () => {
+    if (!currentDietPlan) return;
+    
+    await bruteForceOptimize(currentDietPlan.id, {
+      calories: profile?.daily_calories || 2000,
+      protein: profile?.protein_target || 150,
+      carbs: profile?.carbs_target || 250,
+      fat: profile?.fat_target || 65,
+    });
+    
+    // Refresh data after optimization
+    await fetchCurrentPlan();
   };
 
   const handleSignOut = async () => {
@@ -462,6 +479,31 @@ export default function Dashboard() {
           transition={{ delay: 0.1 }}
           className="space-y-3 sm:space-y-4"
         >
+          {/* Test Optimization Button */}
+          {currentDietPlan && isAdmin && (
+            <div className="flex justify-end">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleBruteForceOptimize}
+                disabled={isOptimizing}
+                className="text-xs border-amber-500 text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950"
+              >
+                {isOptimizing ? (
+                  <>
+                    <Loader2 className="w-3 h-3 animate-spin mr-1" />
+                    Otimizando...
+                  </>
+                ) : (
+                  <>
+                    <Zap className="w-3 h-3 mr-1" />
+                    Otimizar Plano (Teste)
+                  </>
+                )}
+              </Button>
+            </div>
+          )}
+
           {/* Calorie & Macros Row */}
           <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2">
             {/* Calorie Card */}
