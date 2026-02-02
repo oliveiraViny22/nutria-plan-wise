@@ -276,25 +276,37 @@ export function useBruteForceOptimizer() {
     setIsApplying(true);
     
     try {
-      console.log('[BruteForce] Applying', preview.changes.length, 'changes...');
+      console.log('[BruteForce] Applying', preview.changes.length, 'changes via batch update...');
+      const startTime = performance.now();
       
-      // 1. Batch update all foods
-      for (const change of preview.changes) {
-        const { error: updateError } = await supabase
-          .from('meal_option_foods')
-          .update({ quantity_grams: change.new_quantity })
-          .eq('id', change.meal_option_food_id);
-        
-        if (updateError) {
-          console.error('[BruteForce] Update error:', updateError);
-        }
+      // 1. BATCH UPDATE: Update all foods in a single query using Promise.all
+      // Group changes by small batches for optimal performance
+      const BATCH_SIZE = 50;
+      const batches: OptimizationChange[][] = [];
+      for (let i = 0; i < preview.changes.length; i += BATCH_SIZE) {
+        batches.push(preview.changes.slice(i, i + BATCH_SIZE));
       }
+      
+      await Promise.all(batches.map(async (batch) => {
+        // Use individual updates in parallel within each batch
+        await Promise.all(batch.map(change => 
+          supabase
+            .from('meal_option_foods')
+            .update({ quantity_grams: change.new_quantity })
+            .eq('id', change.meal_option_food_id)
+        ));
+      }));
+      
+      const updateTime = Math.round(performance.now() - startTime);
+      console.log(`[BruteForce] Batch update completed in ${updateTime}ms`);
       
       // 2. Get all affected option IDs
       const affectedOptionIds = [...new Set(preview.changes.map(c => c.meal_option_id))];
       
-      // 3. Recalculate totals for each affected option
-      for (const optionId of affectedOptionIds) {
+      // 3. Recalculate totals for all affected options in PARALLEL
+      const recalcStart = performance.now();
+      
+      await Promise.all(affectedOptionIds.map(async (optionId) => {
         const { data: optFoods } = await supabase
           .from('meal_option_foods')
           .select('quantity_grams, food:foods(calories, protein, carbs, fat, serving_size)')
@@ -322,7 +334,10 @@ export function useBruteForceOptimizer() {
             })
             .eq('id', optionId);
         }
-      }
+      }));
+      
+      const recalcTime = Math.round(performance.now() - recalcStart);
+      console.log(`[BruteForce] Totals recalculation completed in ${recalcTime}ms`);
       
       // 4. Update diet_plan totals (using option 1 values)
       const { data: meals } = await supabase
@@ -362,6 +377,9 @@ export function useBruteForceOptimizer() {
         }
       }
       
+      const totalTime = Math.round(performance.now() - startTime);
+      console.log(`[BruteForce] Total apply time: ${totalTime}ms`);
+      
       const optimizationResult: OptimizationResult = {
         success: true,
         planId: preview.planId,
@@ -377,7 +395,7 @@ export function useBruteForceOptimizer() {
       
       const optionCount = preview.options.filter(o => o.changes.length > 0).length;
       toast.success(
-        `Otimização aplicada! ${preview.changes.length} ajustes em ${optionCount} opção(ões).`,
+        `Otimização aplicada em ${totalTime}ms! ${preview.changes.length} ajustes em ${optionCount} opção(ões).`,
         { duration: 5000 }
       );
       
@@ -405,24 +423,29 @@ export function useBruteForceOptimizer() {
 
     setIsUndoing(true);
     try {
-      console.log('[BruteForce] Undoing', result.changes.length, 'changes...');
+      console.log('[BruteForce] Undoing', result.changes.length, 'changes via batch...');
+      const startTime = performance.now();
       
-      // 1. Restore original quantities
-      for (const change of result.changes) {
-        const { error } = await supabase
-          .from('meal_option_foods')
-          .update({ quantity_grams: change.old_quantity })
-          .eq('id', change.meal_option_food_id);
-        
-        if (error) {
-          console.error('[BruteForce] Undo error:', error);
-        }
+      // 1. BATCH RESTORE: Restore original quantities in parallel
+      const BATCH_SIZE = 50;
+      const batches: OptimizationChange[][] = [];
+      for (let i = 0; i < result.changes.length; i += BATCH_SIZE) {
+        batches.push(result.changes.slice(i, i + BATCH_SIZE));
       }
+      
+      await Promise.all(batches.map(async (batch) => {
+        await Promise.all(batch.map(change =>
+          supabase
+            .from('meal_option_foods')
+            .update({ quantity_grams: change.old_quantity })
+            .eq('id', change.meal_option_food_id)
+        ));
+      }));
 
-      // 2. Recalculate affected options
+      // 2. Recalculate affected options in PARALLEL
       const affectedOptionIds = [...new Set(result.changes.map(c => c.meal_option_id))];
       
-      for (const optionId of affectedOptionIds) {
+      await Promise.all(affectedOptionIds.map(async (optionId) => {
         const { data: optFoods } = await supabase
           .from('meal_option_foods')
           .select('quantity_grams, food:foods(calories, protein, carbs, fat, serving_size)')
@@ -450,7 +473,7 @@ export function useBruteForceOptimizer() {
             })
             .eq('id', optionId);
         }
-      }
+      }));
 
       // 3. Update diet_plan totals
       const { data: meals } = await supabase
@@ -490,7 +513,10 @@ export function useBruteForceOptimizer() {
         }
       }
 
-      toast.success('Otimização desfeita com sucesso!');
+      const totalTime = Math.round(performance.now() - startTime);
+      console.log(`[BruteForce] Undo completed in ${totalTime}ms`);
+
+      toast.success(`Otimização desfeita em ${totalTime}ms!`);
       setResult(null);
       return true;
     } catch (error: any) {
