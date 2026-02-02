@@ -5,7 +5,7 @@
 // de calorias e macros. IGNORA todas as regras/limites.
 // =====================================================
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -42,11 +42,33 @@ interface OptimizationResult {
   targets: MacroTargets;
 }
 
-const KCAL_PER_GRAM = {
-  protein: 4,
-  carbs: 4,
-  fat: 9,
-} as const;
+export interface OptimizerSettings {
+  protein_floor: number;
+  protein_ceiling: number;
+  carbs_floor: number;
+  carbs_ceiling: number;
+  fat_floor: number;
+  fat_ceiling: number;
+  calories_tolerance: number;
+  protein_weight: number;
+  carbs_weight: number;
+  fat_weight: number;
+  calories_weight: number;
+}
+
+const DEFAULT_SETTINGS: OptimizerSettings = {
+  protein_floor: 95,
+  protein_ceiling: 120,
+  carbs_floor: 80,
+  carbs_ceiling: 120,
+  fat_floor: 80,
+  fat_ceiling: 120,
+  calories_tolerance: 5,
+  protein_weight: 3.0,
+  carbs_weight: 1.0,
+  fat_weight: 1.0,
+  calories_weight: 1.5,
+};
 
 // Min/max constraints for quantities
 const MIN_GRAMS = 10;
@@ -85,38 +107,55 @@ function calcTotalMacros(foods: FoodItem[], quantities: Map<string, number>): Ma
 
 /**
  * Calculate error/distance from targets
- * IMPORTANT: Protein has a hard floor of 95% - going below adds massive penalty
+ * IMPORTANT: Uses configurable floors - going below adds massive penalty
  */
-function calcError(current: MacroTargets, targets: MacroTargets): number {
+function calcError(
+  current: MacroTargets, 
+  targets: MacroTargets,
+  settings: OptimizerSettings
+): number {
   const calError = Math.abs(current.calories - targets.calories) / targets.calories;
   const carbError = Math.abs(current.carbs - targets.carbs) / targets.carbs;
   const fatError = Math.abs(current.fat - targets.fat) / targets.fat;
   
-  // Protein error with HARD FLOOR at 95%
-  const proteinRatio = current.protein / targets.protein;
-  const PROTEIN_FLOOR = 0.95;
-  
-  let protError: number;
-  if (proteinRatio < PROTEIN_FLOOR) {
-    // Massive penalty for going below floor - makes it essentially impossible
-    protError = (PROTEIN_FLOOR - proteinRatio) * 100 + Math.abs(1 - proteinRatio);
-  } else {
+  // Helper function to calculate error with floor penalty
+  const calcMacroError = (current: number, target: number, floor: number): number => {
+    const ratio = current / target;
+    const floorRatio = floor / 100;
+    
+    if (ratio < floorRatio) {
+      // Massive penalty for going below floor - makes it essentially impossible
+      return (floorRatio - ratio) * 100 + Math.abs(1 - ratio);
+    }
     // Normal error calculation above floor
-    protError = Math.abs(current.protein - targets.protein) / targets.protein;
-  }
+    return Math.abs(current - target) / target;
+  };
   
-  // Weighted error: protein gets highest weight to prevent reduction
-  // Calories: 1.5, Protein: 3.0, Carbs: 1.0, Fat: 1.0
-  return calError * 1.5 + protError * 3.0 + carbError * 1.0 + fatError * 1.0;
+  const protError = calcMacroError(current.protein, targets.protein, settings.protein_floor);
+  const carbFloorError = calcMacroError(current.carbs, targets.carbs, settings.carbs_floor);
+  const fatFloorError = calcMacroError(current.fat, targets.fat, settings.fat_floor);
+  
+  // Use floor-aware errors for carbs and fat too
+  const finalCarbError = Math.max(carbError, carbFloorError);
+  const finalFatError = Math.max(fatError, fatFloorError);
+  
+  // Weighted error using configurable weights
+  return (
+    calError * settings.calories_weight + 
+    protError * settings.protein_weight + 
+    finalCarbError * settings.carbs_weight + 
+    finalFatError * settings.fat_weight
+  );
 }
 
 /**
  * Brute-force optimizer using gradient descent-like approach
- * Ignores ALL rules except min/max quantity constraints
+ * Uses configurable settings for floors/ceilings and weights
  */
 function optimizeQuantities(
   foods: FoodItem[],
   targets: MacroTargets,
+  settings: OptimizerSettings,
   maxIterations: number = 1000
 ): Map<string, number> {
   // Start with current quantities
@@ -125,7 +164,7 @@ function optimizeQuantities(
     quantities.set(food.meal_option_food_id, food.quantity_grams);
   }
   
-  let currentError = calcError(calcTotalMacros(foods, quantities), targets);
+  let currentError = calcError(calcTotalMacros(foods, quantities), targets, settings);
   const stepSizes = [50, 20, 10, 5, 2, 1];
   
   for (const stepSize of stepSizes) {
@@ -142,7 +181,7 @@ function optimizeQuantities(
         // Try increasing
         const increasedQty = Math.min(currentQty + stepSize, MAX_GRAMS);
         quantities.set(food.meal_option_food_id, increasedQty);
-        const increasedError = calcError(calcTotalMacros(foods, quantities), targets);
+        const increasedError = calcError(calcTotalMacros(foods, quantities), targets, settings);
         
         if (increasedError < currentError) {
           currentError = increasedError;
@@ -153,7 +192,7 @@ function optimizeQuantities(
         // Try decreasing
         const decreasedQty = Math.max(currentQty - stepSize, MIN_GRAMS);
         quantities.set(food.meal_option_food_id, decreasedQty);
-        const decreasedError = calcError(calcTotalMacros(foods, quantities), targets);
+        const decreasedError = calcError(calcTotalMacros(foods, quantities), targets, settings);
         
         if (decreasedError < currentError) {
           currentError = decreasedError;
@@ -178,6 +217,28 @@ function optimizeQuantities(
 export function useBruteForceOptimizer() {
   const [isOptimizing, setIsOptimizing] = useState(false);
   const [result, setResult] = useState<OptimizationResult | null>(null);
+  const [settings, setSettings] = useState<OptimizerSettings>(DEFAULT_SETTINGS);
+
+  // Load settings from database on mount
+  useEffect(() => {
+    const loadSettings = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('system_settings')
+          .select('value')
+          .eq('key', 'optimizer_macro_settings')
+          .maybeSingle();
+
+        if (!error && data?.value) {
+          setSettings({ ...DEFAULT_SETTINGS, ...(data.value as object) });
+          console.log('[BruteForce] Loaded settings from DB:', data.value);
+        }
+      } catch (err) {
+        console.error('[BruteForce] Error loading settings:', err);
+      }
+    };
+    loadSettings();
+  }, []);
 
   const optimize = useCallback(async (planId: string, targets: MacroTargets) => {
     setIsOptimizing(true);
@@ -286,8 +347,9 @@ export function useBruteForceOptimizer() {
       }
       const beforeMacros = calcTotalMacros(foods, beforeQuantities);
       
-      // 6. Run optimization
+      // 6. Run optimization with loaded settings
       console.log('[BruteForce] Starting optimization...');
+      console.log('[BruteForce] Settings:', settings);
       console.log('[BruteForce] Targets:', targets);
       console.log('[BruteForce] Before:', beforeMacros);
       console.log('[BruteForce] Foods:', foods.map(f => ({
@@ -297,7 +359,7 @@ export function useBruteForceOptimizer() {
         prot100: f.protein_per_100g,
       })));
       
-      const optimizedQuantities = optimizeQuantities(foods, targets);
+      const optimizedQuantities = optimizeQuantities(foods, targets, settings);
       const afterMacros = calcTotalMacros(foods, optimizedQuantities);
       
       console.log('[BruteForce] After:', afterMacros);
