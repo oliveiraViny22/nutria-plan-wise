@@ -57,7 +57,6 @@ import { GoalsProjectionCard } from '@/components/GoalsProjectionCard';
 import { HydrationTipCard } from '@/components/HydrationTipCard';
 import { OnboardingTutorial } from '@/components/OnboardingTutorial';
 import { DashboardSkeleton } from '@/components/DashboardSkeleton';
-import { LimitReachedAlert } from '@/components/LimitReachedAlert';
 import { SuccessAnimation } from '@/components/SuccessAnimation';
 import { useTutorial } from '@/hooks/useTutorial';
 import { useAuth } from '@/contexts/AuthContext';
@@ -107,7 +106,6 @@ export default function Dashboard() {
   const [upgradeFeature, setUpgradeFeature] = useState<string>('diet');
   const [upgradeLimit, setUpgradeLimit] = useState<number>(0);
   const [planReleased, setPlanReleased] = useState(false);
-  const [dismissedAlerts, setDismissedAlerts] = useState<Set<string>>(new Set());
 
   // Handle checkout success
   useEffect(() => {
@@ -256,10 +254,6 @@ export default function Dashboard() {
     } finally {
       setGeneratingV5(false);
     }
-  };
-
-  const handleDismissAlert = (feature: string) => {
-    setDismissedAlerts(prev => new Set([...prev, feature]));
   };
 
   const handleBruteForceOptimize = async () => {
@@ -469,47 +463,6 @@ export default function Dashboard() {
           </motion.div>
         )}
 
-        {/* Limit Reached Alerts - Show when any limit is hit */}
-        {usage && !isLinkedStudent && (
-          <div className="space-y-3">
-            {isLimitReached('diet') && !dismissedAlerts.has('diet') && (
-              <LimitReachedAlert
-                feature="diet"
-                current={usage.diets.used}
-                limit={usage.diets.limit}
-                planName={subscriptionPlan?.name}
-                onDismiss={() => handleDismissAlert('diet')}
-              />
-            )}
-            {isLimitReached('substitution') && !dismissedAlerts.has('substitution') && (
-              <LimitReachedAlert
-                feature="substitution"
-                current={usage.substitutions.used}
-                limit={usage.substitutions.limit}
-                planName={subscriptionPlan?.name}
-                onDismiss={() => handleDismissAlert('substitution')}
-              />
-            )}
-            {isLimitReached('adjustment') && !dismissedAlerts.has('adjustment') && (
-              <LimitReachedAlert
-                feature="adjustment"
-                current={usage.adjustments.used}
-                limit={usage.adjustments.limit}
-                planName={subscriptionPlan?.name}
-                onDismiss={() => handleDismissAlert('adjustment')}
-              />
-            )}
-            {isLimitReached('chat') && !dismissedAlerts.has('chat') && (
-              <LimitReachedAlert
-                feature="chat"
-                current={usage.chat.used}
-                limit={usage.chat.limit}
-                planName={subscriptionPlan?.name}
-                onDismiss={() => handleDismissAlert('chat')}
-              />
-            )}
-          </div>
-        )}
 
         {/* Welcome Section */}
         <motion.section
