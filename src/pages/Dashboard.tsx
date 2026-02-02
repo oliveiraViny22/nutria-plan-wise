@@ -262,6 +262,9 @@ export default function Dashboard() {
   const handleBruteForceOptimize = async () => {
     if (!currentDietPlan) return;
     
+    // Open modal immediately to show loading state
+    setShowOptimizationPreview(true);
+    
     const preview = await generatePreview(currentDietPlan.id, {
       calories: profile?.daily_calories || 2000,
       protein: profile?.protein_target || 150,
@@ -269,9 +272,9 @@ export default function Dashboard() {
       fat: profile?.fat_target || 65,
     });
     
-    // Show preview dialog if generated successfully
-    if (preview) {
-      setShowOptimizationPreview(true);
+    // Close modal if preview generation failed
+    if (!preview) {
+      setShowOptimizationPreview(false);
     }
   };
 
@@ -809,6 +812,75 @@ export default function Dashboard() {
               Revise as alterações antes de aplicar
             </DialogDescription>
           </DialogHeader>
+
+          {/* Loading State */}
+          {isOptimizing && !optimizationPreview && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="space-y-4 py-4"
+            >
+              <div className="flex flex-col items-center justify-center py-8">
+                <motion.div
+                  animate={{ rotate: 360 }}
+                  transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}
+                >
+                  <Zap className="h-12 w-12 text-amber-500" />
+                </motion.div>
+                <motion.p
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.2 }}
+                  className="mt-4 text-lg font-medium text-foreground"
+                >
+                  Calculando otimização...
+                </motion.p>
+                <motion.p
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 0.4 }}
+                  className="mt-2 text-sm text-muted-foreground text-center max-w-xs"
+                >
+                  Analisando macros e ajustando quantidades para atingir suas metas
+                </motion.p>
+              </div>
+
+              {/* Skeleton Preview */}
+              <div className="space-y-4 opacity-50">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="p-4 border rounded-lg bg-muted/30 space-y-3">
+                    <div className="h-4 w-16 bg-muted rounded animate-pulse" />
+                    <div className="space-y-2">
+                      <div className="h-3 w-full bg-muted rounded animate-pulse" />
+                      <div className="h-3 w-3/4 bg-muted rounded animate-pulse" />
+                      <div className="h-3 w-5/6 bg-muted rounded animate-pulse" />
+                      <div className="h-3 w-2/3 bg-muted rounded animate-pulse" />
+                    </div>
+                  </div>
+                  <div className="p-4 border rounded-lg bg-green-500/5 space-y-3">
+                    <div className="h-4 w-24 bg-muted rounded animate-pulse" />
+                    <div className="space-y-2">
+                      <div className="h-3 w-full bg-muted rounded animate-pulse" />
+                      <div className="h-3 w-3/4 bg-muted rounded animate-pulse" />
+                      <div className="h-3 w-5/6 bg-muted rounded animate-pulse" />
+                      <div className="h-3 w-2/3 bg-muted rounded animate-pulse" />
+                    </div>
+                  </div>
+                </div>
+                <div className="p-4 border rounded-lg bg-blue-500/5 space-y-3">
+                  <div className="h-4 w-16 bg-muted rounded animate-pulse" />
+                  <div className="grid grid-cols-4 gap-2">
+                    {[1, 2, 3, 4].map(i => (
+                      <div key={i} className="text-center space-y-1">
+                        <div className="h-4 w-12 mx-auto bg-muted rounded animate-pulse" />
+                        <div className="h-3 w-8 mx-auto bg-muted rounded animate-pulse" />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          )}
 
           {optimizationPreview && (
             <motion.div 
