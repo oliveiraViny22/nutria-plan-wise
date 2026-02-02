@@ -1047,20 +1047,32 @@ export default function Dashboard() {
                 </div>
               </motion.div>
 
-              {/* Changes Table */}
+              {/* Changes Table - Grouped by Option */}
               {optimizationPreview.changes.length > 0 ? (
                 <motion.div 
                   initial={{ opacity: 0, y: 15 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.3, duration: 0.35 }}
-                  className="space-y-2"
+                  className="space-y-3"
                 >
-                  <h4 className="font-medium text-sm">Alterações Propostas ({optimizationPreview.changes.length})</h4>
-                  <div className="border rounded-lg overflow-hidden">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-medium text-sm">Alterações Propostas ({optimizationPreview.changes.length})</h4>
+                    {optimizationPreview.options && optimizationPreview.options.length > 1 && (
+                      <div className="flex gap-1">
+                        {optimizationPreview.options.filter(o => o.changes.length > 0).map(opt => (
+                          <Badge key={opt.option_number} variant="outline" className="text-xs">
+                            Opção {opt.option_number}: {opt.changes.length}
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <div className="border rounded-lg overflow-hidden max-h-[300px] overflow-y-auto">
                     <Table>
-                      <TableHeader>
+                      <TableHeader className="sticky top-0 bg-background">
                         <TableRow>
                           <TableHead>Alimento</TableHead>
+                          <TableHead className="text-center w-16">Opção</TableHead>
                           <TableHead className="text-right">Atual</TableHead>
                           <TableHead className="text-right">Proposto</TableHead>
                           <TableHead className="text-right">Delta</TableHead>
@@ -1069,17 +1081,25 @@ export default function Dashboard() {
                       <TableBody>
                         {optimizationPreview.changes.map((change, idx) => (
                           <motion.tr
-                            key={idx}
+                            key={`${change.meal_option_food_id}-${idx}`}
                             initial={{ opacity: 0, x: -20 }}
                             animate={{ opacity: 1, x: 0 }}
                             transition={{ 
-                              delay: 0.35 + (idx * 0.05),
-                              duration: 0.25,
+                              delay: 0.35 + (idx * 0.03),
+                              duration: 0.2,
                               ease: 'easeOut'
                             }}
-                            className="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted"
+                            className="border-b transition-colors hover:bg-muted/50"
                           >
                             <TableCell className="font-medium text-sm">{change.food_name}</TableCell>
+                            <TableCell className="text-center">
+                              <Badge 
+                                variant={change.option_number === 1 ? 'default' : 'secondary'} 
+                                className="text-xs px-1.5"
+                              >
+                                {change.option_number}
+                              </Badge>
+                            </TableCell>
                             <TableCell className="text-right font-mono text-sm">{change.old_quantity}g</TableCell>
                             <TableCell className="text-right font-mono text-sm">{change.new_quantity}g</TableCell>
                             <TableCell className="text-right">
@@ -1261,20 +1281,32 @@ export default function Dashboard() {
                 </div>
               </motion.div>
 
-              {/* Changes Table */}
+              {/* Changes Table - with Option badges */}
               {optimizationResult.changes.length > 0 ? (
                 <motion.div 
                   initial={{ opacity: 0, y: 15 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.3, duration: 0.35 }}
-                  className="space-y-2"
+                  className="space-y-3"
                 >
-                  <h4 className="font-medium text-sm">Alimentos Ajustados ({optimizationResult.changes.length})</h4>
-                  <div className="border rounded-lg overflow-hidden">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-medium text-sm">Alimentos Ajustados ({optimizationResult.changes.length})</h4>
+                    {optimizationResult.options && optimizationResult.options.length > 1 && (
+                      <div className="flex gap-1">
+                        {optimizationResult.options.filter(o => o.changes.length > 0).map(opt => (
+                          <Badge key={opt.option_number} variant="outline" className="text-xs">
+                            Opção {opt.option_number}: {opt.changes.length}
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <div className="border rounded-lg overflow-hidden max-h-[300px] overflow-y-auto">
                     <Table>
-                      <TableHeader>
+                      <TableHeader className="sticky top-0 bg-background">
                         <TableRow>
                           <TableHead>Alimento</TableHead>
+                          <TableHead className="text-center w-16">Opção</TableHead>
                           <TableHead className="text-right">Antes</TableHead>
                           <TableHead className="text-right">Depois</TableHead>
                           <TableHead className="text-right">Delta</TableHead>
@@ -1283,17 +1315,25 @@ export default function Dashboard() {
                       <TableBody>
                         {optimizationResult.changes.map((change, idx) => (
                           <motion.tr
-                            key={idx}
+                            key={`${change.meal_option_food_id}-${idx}`}
                             initial={{ opacity: 0, x: -20 }}
                             animate={{ opacity: 1, x: 0 }}
                             transition={{ 
-                              delay: 0.8 + (idx * 0.06),
-                              duration: 0.25,
+                              delay: 0.8 + (idx * 0.04),
+                              duration: 0.2,
                               ease: 'easeOut'
                             }}
-                            className="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted"
+                            className="border-b transition-colors hover:bg-muted/50"
                           >
                             <TableCell className="font-medium text-sm">{change.food_name}</TableCell>
+                            <TableCell className="text-center">
+                              <Badge 
+                                variant={change.option_number === 1 ? 'default' : 'secondary'} 
+                                className="text-xs px-1.5"
+                              >
+                                {change.option_number}
+                              </Badge>
+                            </TableCell>
                             <TableCell className="text-right font-mono text-sm">{change.old_quantity}g</TableCell>
                             <TableCell className="text-right font-mono text-sm">{change.new_quantity}g</TableCell>
                             <TableCell className="text-right">
