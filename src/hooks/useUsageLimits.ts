@@ -1,12 +1,16 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useUserRole } from '@/hooks/useUserRole';
+
+// Limite especial que indica acesso ilimitado (retornado pelo banco para admins)
+const UNLIMITED_LIMIT = 999999;
 
 export interface UsageLimits {
-  diets: { used: number; limit: number; remaining: number };
-  substitutions: { used: number; limit: number; remaining: number };
-  adjustments: { used: number; limit: number; remaining: number };
-  chat: { used: number; limit: number; remaining: number };
+  diets: { used: number; limit: number; remaining: number; isUnlimited: boolean };
+  substitutions: { used: number; limit: number; remaining: number; isUnlimited: boolean };
+  adjustments: { used: number; limit: number; remaining: number; isUnlimited: boolean };
+  chat: { used: number; limit: number; remaining: number; isUnlimited: boolean };
 }
 
 export interface UsageLimitsResult {
@@ -16,10 +20,12 @@ export interface UsageLimitsResult {
   refresh: () => Promise<void>;
   canUse: (feature: 'diet' | 'substitution' | 'adjustment' | 'chat') => boolean;
   isLimitReached: (feature: 'diet' | 'substitution' | 'adjustment' | 'chat') => boolean;
+  isAdmin: boolean;
 }
 
 export function useUsageLimits(): UsageLimitsResult {
   const { user } = useAuth();
+  const { isAdmin } = useUserRole();
   const [usage, setUsage] = useState<UsageLimits | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -58,26 +64,36 @@ export function useUsageLimits(): UsageLimitsResult {
         const adjustmentsUsed = usageData?.adjustments_used || 0;
         const chatUsed = usageData?.chat_messages_today || 0;
 
+        // Check if limits indicate unlimited access (admin)
+        const isDietUnlimited = dietLimit >= UNLIMITED_LIMIT;
+        const isSubstitutionUnlimited = substitutionLimit >= UNLIMITED_LIMIT;
+        const isAdjustmentUnlimited = adjustmentLimit >= UNLIMITED_LIMIT;
+        const isChatUnlimited = chatLimit >= UNLIMITED_LIMIT;
+
         setUsage({
           diets: {
             used: dietsUsed,
             limit: dietLimit,
-            remaining: Math.max(0, dietLimit - dietsUsed),
+            remaining: isDietUnlimited ? UNLIMITED_LIMIT : Math.max(0, dietLimit - dietsUsed),
+            isUnlimited: isDietUnlimited,
           },
           substitutions: {
             used: substitutionsUsed,
             limit: substitutionLimit,
-            remaining: Math.max(0, substitutionLimit - substitutionsUsed),
+            remaining: isSubstitutionUnlimited ? UNLIMITED_LIMIT : Math.max(0, substitutionLimit - substitutionsUsed),
+            isUnlimited: isSubstitutionUnlimited,
           },
           adjustments: {
             used: adjustmentsUsed,
             limit: adjustmentLimit,
-            remaining: Math.max(0, adjustmentLimit - adjustmentsUsed),
+            remaining: isAdjustmentUnlimited ? UNLIMITED_LIMIT : Math.max(0, adjustmentLimit - adjustmentsUsed),
+            isUnlimited: isAdjustmentUnlimited,
           },
           chat: {
             used: chatUsed,
             limit: chatLimit,
-            remaining: Math.max(0, chatLimit - chatUsed),
+            remaining: isChatUnlimited ? UNLIMITED_LIMIT : Math.max(0, chatLimit - chatUsed),
+            isUnlimited: isChatUnlimited,
           },
         });
         setError(null);
@@ -100,13 +116,13 @@ export function useUsageLimits(): UsageLimitsResult {
       
       switch (feature) {
         case 'diet':
-          return usage.diets.remaining > 0;
+          return usage.diets.isUnlimited || usage.diets.remaining > 0;
         case 'substitution':
-          return usage.substitutions.remaining > 0;
+          return usage.substitutions.isUnlimited || usage.substitutions.remaining > 0;
         case 'adjustment':
-          return usage.adjustments.remaining > 0;
+          return usage.adjustments.isUnlimited || usage.adjustments.remaining > 0;
         case 'chat':
-          return usage.chat.remaining > 0;
+          return usage.chat.isUnlimited || usage.chat.remaining > 0;
         default:
           return false;
       }
@@ -120,13 +136,13 @@ export function useUsageLimits(): UsageLimitsResult {
       
       switch (feature) {
         case 'diet':
-          return usage.diets.remaining <= 0;
+          return !usage.diets.isUnlimited && usage.diets.remaining <= 0;
         case 'substitution':
-          return usage.substitutions.remaining <= 0;
+          return !usage.substitutions.isUnlimited && usage.substitutions.remaining <= 0;
         case 'adjustment':
-          return usage.adjustments.remaining <= 0;
+          return !usage.adjustments.isUnlimited && usage.adjustments.remaining <= 0;
         case 'chat':
-          return usage.chat.remaining <= 0;
+          return !usage.chat.isUnlimited && usage.chat.remaining <= 0;
         default:
           return false;
       }
@@ -141,5 +157,6 @@ export function useUsageLimits(): UsageLimitsResult {
     refresh: fetchUsage,
     canUse,
     isLimitReached,
+    isAdmin,
   };
 }

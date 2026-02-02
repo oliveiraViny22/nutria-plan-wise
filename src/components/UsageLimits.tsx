@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { Check, X, AlertTriangle, Activity, Package } from 'lucide-react';
+import { Check, X, AlertTriangle, Activity, Package, Infinity } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
@@ -8,10 +8,13 @@ import { useSubscription } from '@/hooks/useSubscription';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useNavigate } from 'react-router-dom';
 
+// Limite especial que indica acesso ilimitado (retornado pelo banco para admins)
+const UNLIMITED_LIMIT = 999999;
+
 export function UsageLimits() {
   const navigate = useNavigate();
   const { subscriptionInfo, currentPlan, usage, loading, isLinkedToProfessional } = useSubscription();
-  const { isProfessional } = useUserRole();
+  const { isProfessional, isAdmin } = useUserRole();
 
   if (loading || !currentPlan) {
     return null;
@@ -27,48 +30,58 @@ export function UsageLimits() {
   // Só exibe opções de refeição se o limite for maior que 1 (planos pagos permitem escolher entre opções)
   const showMealOptions = !isFreePlan && effectiveMealOptionsLimit > 1;
 
-  // Usage items (counters)
+  // Usage items (counters) - check if admin has unlimited
+  const dietLimit = currentPlan.diet_limit;
+  const substitutionLimit = currentPlan.substitution_limit;
+  const adjustmentLimit = currentPlan.adjustment_limit;
+  const chatLimit = currentPlan.chat_messages_per_day;
+
   const usageItems = [
     {
       name: 'Dietas',
       used: usage?.diets_used || 0,
-      limit: currentPlan.diet_limit,
+      limit: dietLimit,
       key: 'diet',
+      isUnlimited: isAdmin || dietLimit >= UNLIMITED_LIMIT,
     },
     {
       name: 'Substituições',
       used: usage?.substitutions_used || 0,
-      limit: currentPlan.substitution_limit,
+      limit: substitutionLimit,
       key: 'substitution',
+      isUnlimited: isAdmin || substitutionLimit >= UNLIMITED_LIMIT,
     },
     {
       name: 'Ajustes',
       used: usage?.adjustments_used || 0,
-      limit: currentPlan.adjustment_limit,
+      limit: adjustmentLimit,
       key: 'adjustment',
+      isUnlimited: isAdmin || adjustmentLimit >= UNLIMITED_LIMIT,
     },
   ];
 
-  if (currentPlan.has_chat) {
+  if (currentPlan.has_chat || isAdmin) {
     usageItems.push({
       name: 'Mensagens (hoje)',
       used: usage?.chat_messages_today || 0,
-      limit: currentPlan.chat_messages_per_day,
+      limit: chatLimit,
       key: 'chat',
+      isUnlimited: isAdmin || chatLimit >= UNLIMITED_LIMIT,
     });
   }
 
   // Features/resources included
   const features = [
-    { name: 'Chat com IA', available: currentPlan.has_chat },
+    { name: 'Chat com IA', available: currentPlan.has_chat || isAdmin },
     ...(showMealOptions ? [{ 
       name: `${effectiveMealOptionsLimit} opções por refeição`, 
       available: true 
     }] : []),
+    ...(isAdmin ? [{ name: 'Acesso administrativo', available: true }] : []),
   ];
 
-  const getPercentage = (used: number, limit: number) => {
-    if (limit === 0) return 0;
+  const getPercentage = (used: number, limit: number, isUnlimited: boolean) => {
+    if (isUnlimited || limit === 0) return 0;
     return Math.min((used / limit) * 100, 100);
   };
 
@@ -95,15 +108,15 @@ export function UsageLimits() {
               <CardTitle className="text-lg">Uso do Período</CardTitle>
             </div>
             <Badge variant="outline" className="capitalize">
-              {currentPlan.name}
+              {isAdmin ? 'Administrador' : currentPlan.name}
             </Badge>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
           {usageItems.map((item) => {
-            const percentage = getPercentage(item.used, item.limit);
-            const isAtLimit = percentage >= 100;
-            const isNearLimit = percentage >= 80;
+            const percentage = getPercentage(item.used, item.limit, item.isUnlimited);
+            const isAtLimit = !item.isUnlimited && percentage >= 100;
+            const isNearLimit = !item.isUnlimited && percentage >= 80 && percentage < 100;
 
             return (
               <motion.div
@@ -118,18 +131,27 @@ export function UsageLimits() {
                     {isAtLimit && (
                       <X className="h-3 w-3 text-destructive" />
                     )}
-                    {isNearLimit && !isAtLimit && (
+                    {isNearLimit && (
                       <AlertTriangle className="h-3 w-3 text-yellow-500" />
                     )}
                   </span>
-                  <span className={getStatusColor(percentage)}>
-                    {item.used}/{item.limit}
-                  </span>
+                  {item.isUnlimited ? (
+                    <span className="flex items-center gap-1 text-primary font-medium">
+                      <Infinity className="h-4 w-4" />
+                      Ilimitado
+                    </span>
+                  ) : (
+                    <span className={getStatusColor(percentage)}>
+                      {item.used}/{item.limit}
+                    </span>
+                  )}
                 </div>
-                <Progress 
-                  value={percentage} 
-                  className={`h-2 ${getProgressColor(percentage)}`}
-                />
+                {!item.isUnlimited && (
+                  <Progress 
+                    value={percentage} 
+                    className={`h-2 ${getProgressColor(percentage)}`}
+                  />
+                )}
               </motion.div>
             );
           })}
