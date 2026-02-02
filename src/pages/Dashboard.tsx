@@ -26,6 +26,7 @@ import {
   Zap,
 } from 'lucide-react';
 import { useBruteForceOptimizer } from '@/hooks/useBruteForceOptimizer';
+import { useSuccessSound } from '@/hooks/useSuccessSound';
 import { Button } from '@/components/ui/button';
 import { Logo } from '@/components/Logo';
 import { MobileNav } from '@/components/MobileNav';
@@ -93,8 +94,9 @@ export default function Dashboard() {
     cancelPreview,
     undo: undoOptimization 
   } = useBruteForceOptimizer();
-  const [showOptimizationPreview, setShowOptimizationPreview] = useState(false);
-  const [showOptimizationResult, setShowOptimizationResult] = useState(false);
+  const { playSuccessSound } = useSuccessSound();
+  const [showOptimizationDialog, setShowOptimizationDialog] = useState(false);
+  const [optimizationPhase, setOptimizationPhase] = useState<'loading' | 'preview' | 'result'>('loading');
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [currentDietPlan, setCurrentDietPlan] = useState<DietPlan | null>(null);
@@ -264,7 +266,8 @@ export default function Dashboard() {
     if (!currentDietPlan) return;
     
     // Open modal immediately to show loading state
-    setShowOptimizationPreview(true);
+    setOptimizationPhase('loading');
+    setShowOptimizationDialog(true);
     
     const preview = await generatePreview(currentDietPlan.id, {
       calories: profile?.daily_calories || 2000,
@@ -273,9 +276,11 @@ export default function Dashboard() {
       fat: profile?.fat_target || 65,
     });
     
-    // Close modal if preview generation failed
-    if (!preview) {
-      setShowOptimizationPreview(false);
+    // Transition to preview phase or close if failed
+    if (preview) {
+      setOptimizationPhase('preview');
+    } else {
+      setShowOptimizationDialog(false);
     }
   };
 
@@ -283,15 +288,23 @@ export default function Dashboard() {
     const result = await applyPreview();
     
     if (result?.success) {
-      setShowOptimizationPreview(false);
-      setShowOptimizationResult(true);
+      // Smooth transition to result phase
+      setOptimizationPhase('result');
+      // Play success sound
+      playSuccessSound();
       await fetchCurrentPlan();
     }
   };
 
   const handleCancelOptimization = () => {
     cancelPreview();
-    setShowOptimizationPreview(false);
+    setShowOptimizationDialog(false);
+  };
+
+  const handleCloseOptimizationDialog = () => {
+    setShowOptimizationDialog(false);
+    // Reset phase after dialog close animation
+    setTimeout(() => setOptimizationPhase('loading'), 300);
   };
 
   const handleSignOut = async () => {
@@ -799,26 +812,40 @@ export default function Dashboard() {
         limit={upgradeLimit}
       />
 
-      {/* Optimization Preview Dialog */}
-      <Dialog open={showOptimizationPreview} onOpenChange={(open) => {
+      {/* Unified Optimization Dialog with Phase Transitions */}
+      <Dialog open={showOptimizationDialog} onOpenChange={(open) => {
         if (!open) handleCancelOptimization();
       }}>
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Eye className="h-5 w-5 text-blue-500" />
-              Prévia da Otimização
+              {optimizationPhase === 'result' ? (
+                <>
+                  <Zap className="h-5 w-5 text-yellow-500" />
+                  Resultado da Otimização
+                </>
+              ) : (
+                <>
+                  <Eye className="h-5 w-5 text-blue-500" />
+                  Prévia da Otimização
+                </>
+              )}
             </DialogTitle>
             <DialogDescription>
-              Revise as alterações antes de aplicar
+              {optimizationPhase === 'result' 
+                ? 'Comparativo antes e depois do ajuste de quantidades'
+                : 'Revise as alterações antes de aplicar'
+              }
             </DialogDescription>
           </DialogHeader>
 
-          {/* Loading State */}
-          {isOptimizing && !optimizationPreview && (
+          {/* Loading Phase */}
+          {optimizationPhase === 'loading' && (
             <motion.div
+              key="loading"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
+              exit={{ opacity: 0, x: -20 }}
               className="space-y-6 py-4"
             >
               <div className="flex flex-col items-center justify-center py-6">
@@ -937,11 +964,13 @@ export default function Dashboard() {
             </motion.div>
           )}
 
-          {optimizationPreview && (
+          {/* Preview Phase */}
+          {optimizationPhase === 'preview' && optimizationPreview && (
             <motion.div 
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
+              key="preview"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
               transition={{ duration: 0.3, ease: "easeOut" }}
               className="space-y-4"
             >
@@ -1131,27 +1160,14 @@ export default function Dashboard() {
               </div>
             </motion.div>
           )}
-        </DialogContent>
-      </Dialog>
 
-      {/* Optimization Result Dialog */}
-      <Dialog open={showOptimizationResult} onOpenChange={setShowOptimizationResult}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Zap className="h-5 w-5 text-yellow-500" />
-              Resultado da Otimização
-            </DialogTitle>
-            <DialogDescription>
-              Comparativo antes e depois do ajuste de quantidades
-            </DialogDescription>
-          </DialogHeader>
-
-          {optimizationResult && (
+          {/* Result Phase */}
+          {optimizationPhase === 'result' && optimizationResult && (
             <motion.div 
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.3, ease: "easeOut" }}
+              key="result"
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.4, ease: "easeOut" }}
               className="space-y-6 py-4"
             >
               {/* Success Animation */}
@@ -1326,7 +1342,7 @@ export default function Dashboard() {
                 >
                   <Button
                     variant="outline"
-                    onClick={() => setShowOptimizationResult(false)}
+                    onClick={handleCloseOptimizationDialog}
                   >
                     Fechar
                   </Button>
@@ -1335,7 +1351,7 @@ export default function Dashboard() {
                     onClick={async () => {
                       const success = await undoOptimization();
                       if (success) {
-                        setShowOptimizationResult(false);
+                        handleCloseOptimizationDialog();
                         await fetchCurrentPlan();
                       }
                     }}
