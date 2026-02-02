@@ -328,74 +328,85 @@ function runFinalRefinement(
   quantities: Map<string, number>,
   targets: MacroTargets,
   contributions: Map<string, MacroTargets>,
-  maxIterations: number = 100 // Aumentado para garantir convergência hard
+  maxIterations: number = 200
 ): { quantities: Map<string, number>; iterations: number; converged: boolean } {
   // ============================================
-  // RANGE HARD: PRECISÃO MÁXIMA
+  // RANGE HARD: CONVERGÊNCIA MULTI-OBJETIVO
   // ============================================
-  // Convergir para valores exatos das metas
+  // Ajusta TODOS os macros simultaneamente usando gradiente descendente
   const PRECISION = {
-    calories: 5,   // ±5 kcal (range hard)
-    protein: 1,    // ±1g (range hard)
-    carbs: 1,      // ±1g (range hard)
-    fat: 1,        // ±1g (range hard)
+    calories: 5,   // ±5 kcal
+    protein: 1,    // ±1g
+    carbs: 1,      // ±1g
+    fat: 1,        // ±1g
   };
 
-  // ============================================
-  // REGRA CRÍTICA: PROTEÇÃO DE PROTEÍNA
-  // ============================================
-  // A proteína é o macro mais importante. Nunca sacrificar proteína
-  // para atingir metas de outros macros.
-  
+  // Pesos para priorização (proteína é mais importante)
+  const WEIGHTS = {
+    calories: 1.0,
+    protein: 3.0,  // Proteína tem peso 3x
+    carbs: 1.0,
+    fat: 1.0,
+  };
+
   let iterations = 0;
+  let lastError = Infinity;
+  let stuckCounter = 0;
 
   for (let i = 0; i < maxIterations; i++) {
     iterations = i + 1;
     const totals = calculateTotals(foods, quantities);
 
-    const calDiff = totals.calories - targets.calories;
-    const protDiff = totals.protein - targets.protein;
-    const carbsDiff = totals.carbs - targets.carbs;
-    const fatDiff = totals.fat - targets.fat;
-    
-    // Proteína está no nível ok ou abaixo? Então está PROTEGIDA.
-    const proteinIsProtected = protDiff <= 2; // Se não temos excesso de proteína, proteger
-    const proteinDeficit = protDiff < -PRECISION.protein;
+    const errors = {
+      calories: totals.calories - targets.calories,
+      protein: totals.protein - targets.protein,
+      carbs: totals.carbs - targets.carbs,
+      fat: totals.fat - targets.fat,
+    };
 
-    // Check if we've converged
-    if (
-      Math.abs(calDiff) <= PRECISION.calories &&
-      Math.abs(protDiff) <= PRECISION.protein &&
-      Math.abs(carbsDiff) <= PRECISION.carbs &&
-      Math.abs(fatDiff) <= PRECISION.fat
-    ) {
-      console.log(`Refinamento convergiu em ${iterations} iterações`);
+    // Verificar convergência HARD
+    const converged = 
+      Math.abs(errors.calories) <= PRECISION.calories &&
+      Math.abs(errors.protein) <= PRECISION.protein &&
+      Math.abs(errors.carbs) <= PRECISION.carbs &&
+      Math.abs(errors.fat) <= PRECISION.fat;
+
+    if (converged) {
+      console.log(`[HARD] Convergência completa em ${iterations} iterações`);
+      console.log(`[HARD] Finais: cal=${totals.calories}, prot=${totals.protein}g, carb=${totals.carbs}g, fat=${totals.fat}g`);
       return { quantities, iterations, converged: true };
     }
 
-    // Find the biggest deviation to prioritize
-    // MUDANÇA: Priorizar SEMPRE proteína quando está em déficit
-    const deviations = [
-      { nutrient: 'calories', diff: calDiff, precision: PRECISION.calories, priority: 2 },
-      { nutrient: 'protein', diff: protDiff, precision: PRECISION.protein, priority: proteinDeficit ? 5 : 3 },
-      { nutrient: 'carbs', diff: carbsDiff, precision: PRECISION.carbs, priority: 1 },
-      { nutrient: 'fat', diff: fatDiff, precision: PRECISION.fat, priority: 1 },
-    ].filter(d => Math.abs(d.diff) > d.precision);
+    // Calcular erro total ponderado
+    const totalError = 
+      Math.abs(errors.calories) / targets.calories * WEIGHTS.calories +
+      Math.abs(errors.protein) / targets.protein * WEIGHTS.protein +
+      Math.abs(errors.carbs) / targets.carbs * WEIGHTS.carbs +
+      Math.abs(errors.fat) / targets.fat * WEIGHTS.fat;
 
-    if (deviations.length === 0) break;
+    // Detectar se estamos presos
+    if (Math.abs(totalError - lastError) < 0.0001) {
+      stuckCounter++;
+      if (stuckCounter > 10) {
+        console.log(`[HARD] Algoritmo preso após ${iterations} iterações`);
+        break;
+      }
+    } else {
+      stuckCounter = 0;
+    }
+    lastError = totalError;
 
-    // Sort by priority first, then by relative deviation
-    deviations.sort((a, b) => {
-      if (a.priority !== b.priority) return b.priority - a.priority;
-      return Math.abs(b.diff) / (b.precision || 1) - Math.abs(a.diff) / (a.precision || 1);
-    });
-
-    const target = deviations[0];
-    const needDecrease = target.diff > 0;
-
-    // Find best food to adjust
+    // ============================================
+    // ENCONTRAR MELHOR ALIMENTO PARA AJUSTAR
+    // ============================================
+    // Usar score multi-objetivo: qual alimento reduz mais o erro total?
+    
     let bestFood: FoodWithMeta | null = null;
-    let bestScore = 0;
+    let bestDelta = 0;
+    let bestScoreImprovement = 0;
+
+    const proteinDeficit = errors.protein < -PRECISION.protein;
+    const proteinIsProtected = errors.protein <= 2;
 
     for (const food of foods) {
       const contrib = contributions.get(food.id);
@@ -403,102 +414,65 @@ function runFinalRefinement(
 
       const currentGrams = quantities.get(food.id) || food.quantity_grams;
       const limits = getCategoryLimits(food.food.category);
+      const isProteinFood = contrib.protein >= 15;
 
-      // Skip if at limits
-      if (needDecrease && currentGrams <= limits.min) continue;
-      if (!needDecrease && currentGrams >= limits.max) continue;
+      // Testar +1g a +5g e -1g a -5g
+      for (const delta of [-5, -3, -1, 1, 3, 5]) {
+        const newGrams = currentGrams + delta;
+        
+        // Verificar limites
+        if (newGrams < limits.min || newGrams > limits.max) continue;
 
-      // Calculate nutrient contribution per gram
-      const nutrientKey = target.nutrient as keyof MacroTargets;
-      const contribPerGram = contrib[nutrientKey] / 100;
+        // PROTEÇÃO: não reduzir alimentos proteicos se proteína está protegida
+        if (delta < 0 && isProteinFood && proteinIsProtected) continue;
+        if (delta < 0 && isProteinFood && proteinDeficit) continue;
 
-      if (contribPerGram <= 0) continue;
-      
-      // ============================================
-      // PROTEÇÃO DE PROTEÍNA - REGRA CRÍTICA
-      // ============================================
-      // Se proteína está protegida e este é um alimento proteico,
-      // NÃO PERMITIR REDUÇÃO
-      const isProteinFood = contrib.protein >= 15; // >15g prot/100g = alimento proteico
-      if (proteinIsProtected && isProteinFood && needDecrease && target.nutrient !== 'protein') {
-        console.log(`[PROTEÇÃO] Bloqueando redução de ${food.food.name} (proteína protegida)`);
-        continue;
-      }
-      
-      // Se há déficit de proteína, não reduzir alimentos proteicos NUNCA
-      if (proteinDeficit && isProteinFood && needDecrease) {
-        console.log(`[PROTEÇÃO] Bloqueando redução de ${food.food.name} (déficit de proteína)`);
-        continue;
-      }
+        // Calcular novos macros com este delta
+        const newErrors = {
+          calories: errors.calories + (delta / 100) * contrib.calories,
+          protein: errors.protein + (delta / 100) * contrib.protein,
+          carbs: errors.carbs + (delta / 100) * contrib.carbs,
+          fat: errors.fat + (delta / 100) * contrib.fat,
+        };
 
-      // Score: high contribution + room to adjust
-      const roomToAdjust = needDecrease 
-        ? currentGrams - limits.min 
-        : limits.max - currentGrams;
+        // Calcular novo erro total
+        const newTotalError = 
+          Math.abs(newErrors.calories) / targets.calories * WEIGHTS.calories +
+          Math.abs(newErrors.protein) / targets.protein * WEIGHTS.protein +
+          Math.abs(newErrors.carbs) / targets.carbs * WEIGHTS.carbs +
+          Math.abs(newErrors.fat) / targets.fat * WEIGHTS.fat;
 
-      const score = contribPerGram * Math.min(roomToAdjust, 20);
-      
-      // Penalize if this would worsen other macros significantly
-      if (nutrientKey !== 'calories') {
-        const calContrib = contrib.calories / 100;
-        if (needDecrease && calDiff < -PRECISION.calories && calContrib > 1) {
-          continue; // Don't reduce if already low on calories
+        const improvement = totalError - newTotalError;
+
+        // Bônus para ajustes que melhoram proteína quando em déficit
+        let adjustedImprovement = improvement;
+        if (proteinDeficit && delta > 0 && contrib.protein > 10) {
+          adjustedImprovement *= 1.5; // 50% bônus
         }
-      }
-      
-      // EXTRA: Penalizar alimentos que prejudicariam proteína
-      if (needDecrease && isProteinFood && proteinIsProtected) {
-        continue; // Skip entirely
-      }
 
-      if (score > bestScore) {
-        bestScore = score;
-        bestFood = food;
+        if (adjustedImprovement > bestScoreImprovement) {
+          bestScoreImprovement = adjustedImprovement;
+          bestFood = food;
+          bestDelta = delta;
+        }
       }
     }
 
-    if (!bestFood) {
-      console.log(`[REFINAMENTO] Nenhum alimento válido para ajustar ${target.nutrient}`);
+    if (!bestFood || bestScoreImprovement <= 0) {
+      console.log(`[HARD] Sem melhoria possível após ${iterations} iterações`);
       break;
     }
 
-    const contrib = contributions.get(bestFood.id)!;
+    // Aplicar melhor ajuste
     const currentGrams = quantities.get(bestFood.id) || bestFood.quantity_grams;
-    const limits = getCategoryLimits(bestFood.food.category);
-
-    const nutrientKey = target.nutrient as keyof MacroTargets;
-    const contribPerGram = contrib[nutrientKey] / 100;
-
-    // ============================================
-    // PASSO ADAPTATIVO PARA RANGE HARD
-    // ============================================
-    // Calcular gramas exatos, com passo menor perto do target
-    let gramsToChange = Math.abs(target.diff) / contribPerGram;
-    
-    // Passo adaptativo: mais fino quando mais perto do target
-    const distanceToTarget = Math.abs(target.diff) / target.precision;
-    if (distanceToTarget < 3) {
-      // Perto do target: passos de 1-3g
-      gramsToChange = Math.min(gramsToChange, 3);
-    } else if (distanceToTarget < 5) {
-      // Médio: passos de até 5g
-      gramsToChange = Math.min(gramsToChange, 5);
-    } else {
-      // Longe: passos de até 10g
-      gramsToChange = Math.min(gramsToChange, 10);
-    }
-    gramsToChange = Math.max(gramsToChange, 1);  // Min 1g step
-
-    const newGrams = needDecrease
-      ? Math.max(limits.min, currentGrams - gramsToChange)
-      : Math.min(limits.max, currentGrams + gramsToChange);
-
-    if (Math.abs(newGrams - currentGrams) >= 1) {
-      quantities.set(bestFood.id, Math.round(newGrams));
-    }
+    quantities.set(bestFood.id, Math.round(currentGrams + bestDelta));
   }
 
-  console.log(`Refinamento: ${iterations} iterações, não convergiu completamente`);
+  // Log final
+  const finalTotals = calculateTotals(foods, quantities);
+  console.log(`[HARD] Finais após ${iterations} iterações: cal=${finalTotals.calories}, prot=${finalTotals.protein}g, carb=${finalTotals.carbs}g, fat=${finalTotals.fat}g`);
+  console.log(`[HARD] Metas: cal=${targets.calories}, prot=${targets.protein}g, carb=${targets.carbs}g, fat=${targets.fat}g`);
+  
   return { quantities, iterations, converged: false };
 }
 
