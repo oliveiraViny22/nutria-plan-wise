@@ -52,16 +52,18 @@ export const CATEGORY_LIMITS: Record<string, { min: number; max: number }> = {
   'verduras': { min: 20, max: 200 },
   'legumes': { min: 40, max: 250 },
   'leguminosas': { min: 40, max: 200 },
-  'frutas': { min: 50, max: 300 },
+  'frutas': { min: 30, max: 150 },  // Reduzido de 300 para 150
+  'figo': { min: 20, max: 80 },      // Figo específico
   'saladas': { min: 30, max: 200 },
   
   // ==========================================
   // GORDURAS - porções controladas
   // ==========================================
-  'gorduras': { min: 5, max: 50 },
-  'óleos': { min: 5, max: 30 },
-  'oleaginosas': { min: 10, max: 60 },
-  'castanhas': { min: 10, max: 50 },
+  'gorduras': { min: 5, max: 30 },   // Reduzido de 50 para 30
+  'óleos': { min: 5, max: 20 },      // Reduzido de 30 para 20
+  'oleaginosas': { min: 10, max: 40 }, // Reduzido de 60 para 40
+  'castanhas': { min: 10, max: 35 },   // Reduzido de 50 para 35
+  'azeite': { min: 5, max: 20 },       // Azeite específico
   
   // ==========================================
   // OUTROS

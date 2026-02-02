@@ -128,10 +128,12 @@ const CATEGORY_LIMITS: Record<string, { min: number; max: number }> = {
   carboidratos: { min: 40, max: 400 },
   leguminosas: { min: 40, max: 200 },
   vegetais: { min: 30, max: 250 },
-  frutas: { min: 50, max: 300 },
+  frutas: { min: 30, max: 150 },    // Reduzido de 300
   laticinios: { min: 30, max: 300 },
-  gorduras: { min: 5, max: 40 },
-  oleaginosas: { min: 10, max: 50 },
+  gorduras: { min: 5, max: 30 },    // Reduzido de 40
+  oleaginosas: { min: 10, max: 40 }, // Reduzido de 50
+  azeite: { min: 5, max: 20 },       // Novo
+  figo: { min: 20, max: 80 },        // Novo
 };
 
 function getCategoryLimits(category: string | null): { min: number; max: number } {

@@ -161,19 +161,29 @@ function calcError(
   );
 }
 
+/**
+ * Otimiza quantidades com ajuste LEVE (±10g máx por alimento).
+ * Projetado para refinar decisões da IA sem alterações drásticas.
+ */
 function optimizeQuantities(
   foods: FoodItem[],
   targets: MacroTargets,
   settings: OptimizerSettings,
-  maxIterations: number = 1000
+  maxIterations: number = 500,
+  maxDeltaPerFood: number = 10 // Limite máximo de variação por alimento
 ): Map<string, number> {
   const quantities = new Map<string, number>();
+  const originalQuantities = new Map<string, number>();
+  
   for (const food of foods) {
     quantities.set(food.meal_option_food_id, food.quantity_grams);
+    originalQuantities.set(food.meal_option_food_id, food.quantity_grams);
   }
   
   let currentError = calcError(calcTotalMacros(foods, quantities), targets, settings);
-  const stepSizes = [50, 20, 10, 5, 2, 1];
+  
+  // Apenas passos pequenos (1-5g) para ajuste leve
+  const stepSizes = [5, 2, 1];
   
   for (const stepSize of stepSizes) {
     let improved = true;
@@ -185,33 +195,46 @@ function optimizeQuantities(
       
       for (const food of foods) {
         const currentQty = quantities.get(food.meal_option_food_id) || food.quantity_grams;
+        const originalQty = originalQuantities.get(food.meal_option_food_id) || food.quantity_grams;
         const limits = getCategoryLimits(food.category);
         
-        const increasedQty = Math.min(currentQty + stepSize, limits.max);
-        quantities.set(food.meal_option_food_id, increasedQty);
-        const increasedError = calcError(calcTotalMacros(foods, quantities), targets, settings);
+        // Limitar variação máxima em relação ao original da IA
+        const minAllowed = Math.max(limits.min, originalQty - maxDeltaPerFood);
+        const maxAllowed = Math.min(limits.max, originalQty + maxDeltaPerFood);
         
-        if (increasedError < currentError) {
-          currentError = increasedError;
-          improved = true;
-          continue;
+        // Tentar aumentar
+        if (currentQty + stepSize <= maxAllowed) {
+          const increasedQty = currentQty + stepSize;
+          quantities.set(food.meal_option_food_id, increasedQty);
+          const increasedError = calcError(calcTotalMacros(foods, quantities), targets, settings);
+          
+          if (increasedError < currentError) {
+            currentError = increasedError;
+            improved = true;
+            continue;
+          }
         }
         
-        const decreasedQty = Math.max(currentQty - stepSize, limits.min);
-        quantities.set(food.meal_option_food_id, decreasedQty);
-        const decreasedError = calcError(calcTotalMacros(foods, quantities), targets, settings);
-        
-        if (decreasedError < currentError) {
-          currentError = decreasedError;
-          improved = true;
-          continue;
+        // Tentar diminuir
+        if (currentQty - stepSize >= minAllowed) {
+          const decreasedQty = currentQty - stepSize;
+          quantities.set(food.meal_option_food_id, decreasedQty);
+          const decreasedError = calcError(calcTotalMacros(foods, quantities), targets, settings);
+          
+          if (decreasedError < currentError) {
+            currentError = decreasedError;
+            improved = true;
+            continue;
+          }
         }
         
+        // Restaurar se nenhuma melhoria
         quantities.set(food.meal_option_food_id, currentQty);
       }
     }
   }
   
+  // Arredondar valores finais
   for (const [id, qty] of quantities.entries()) {
     quantities.set(id, Math.round(qty));
   }
