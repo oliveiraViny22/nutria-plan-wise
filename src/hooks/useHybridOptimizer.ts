@@ -9,6 +9,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { getCategoryLimits } from '@/lib/optimizer-limits';
 
 interface MacroTargets {
   calories: number;
@@ -84,9 +85,6 @@ const DEFAULT_SETTINGS: OptimizerSettings = {
   calories_weight: 1.5,
 };
 
-// Min/max constraints for quantities
-const MIN_GRAMS = 10;
-const MAX_GRAMS = 600;
 
 // =====================================================
 // BRUTE FORCE ENGINE (inline para evitar dependência)
@@ -187,8 +185,9 @@ function optimizeQuantities(
       
       for (const food of foods) {
         const currentQty = quantities.get(food.meal_option_food_id) || food.quantity_grams;
+        const limits = getCategoryLimits(food.category);
         
-        const increasedQty = Math.min(currentQty + stepSize, MAX_GRAMS);
+        const increasedQty = Math.min(currentQty + stepSize, limits.max);
         quantities.set(food.meal_option_food_id, increasedQty);
         const increasedError = calcError(calcTotalMacros(foods, quantities), targets, settings);
         
@@ -198,7 +197,7 @@ function optimizeQuantities(
           continue;
         }
         
-        const decreasedQty = Math.max(currentQty - stepSize, MIN_GRAMS);
+        const decreasedQty = Math.max(currentQty - stepSize, limits.min);
         quantities.set(food.meal_option_food_id, decreasedQty);
         const decreasedError = calcError(calcTotalMacros(foods, quantities), targets, settings);
         
