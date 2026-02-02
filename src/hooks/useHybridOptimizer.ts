@@ -269,7 +269,11 @@ export function useHybridOptimizer() {
       console.log('[Hybrid] Fase 1: Chamando AI-Rebalance...');
       
       const aiResponse = await supabase.functions.invoke('ai-rebalance', {
-        body: { plan_id: planId, objective },
+        body: { 
+          planId: planId, 
+          targets: targets,
+          goal: objective 
+        },
       });
       
       if (aiResponse.error) {
