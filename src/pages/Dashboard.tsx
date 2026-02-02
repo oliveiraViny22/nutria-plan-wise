@@ -57,6 +57,7 @@ import { HydrationTipCard } from '@/components/HydrationTipCard';
 import { OnboardingTutorial } from '@/components/OnboardingTutorial';
 import { DashboardSkeleton } from '@/components/DashboardSkeleton';
 import { LimitReachedAlert } from '@/components/LimitReachedAlert';
+import { SuccessAnimation } from '@/components/SuccessAnimation';
 import { useTutorial } from '@/hooks/useTutorial';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserRole } from '@/hooks/useUserRole';
@@ -1067,14 +1068,24 @@ export default function Dashboard() {
                       </TableHeader>
                       <TableBody>
                         {optimizationPreview.changes.map((change, idx) => (
-                          <TableRow key={idx}>
+                          <motion.tr
+                            key={idx}
+                            initial={{ opacity: 0, x: -20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ 
+                              delay: 0.35 + (idx * 0.05),
+                              duration: 0.25,
+                              ease: 'easeOut'
+                            }}
+                            className="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted"
+                          >
                             <TableCell className="font-medium text-sm">{change.food_name}</TableCell>
                             <TableCell className="text-right font-mono text-sm">{change.old_quantity}g</TableCell>
                             <TableCell className="text-right font-mono text-sm">{change.new_quantity}g</TableCell>
                             <TableCell className="text-right">
                               <DeltaBadge value={change.new_quantity - change.old_quantity} suffix="g" />
                             </TableCell>
-                          </TableRow>
+                          </motion.tr>
                         ))}
                       </TableBody>
                     </Table>
@@ -1143,6 +1154,11 @@ export default function Dashboard() {
               transition={{ duration: 0.3, ease: "easeOut" }}
               className="space-y-6 py-4"
             >
+              {/* Success Animation */}
+              <SuccessAnimation 
+                show={true} 
+                message={`${optimizationResult.changes.length} alimentos otimizados!`} 
+              />
               {/* Macro Comparison */}
               <motion.div 
                 initial={{ opacity: 0, scale: 0.95 }}
@@ -1266,14 +1282,24 @@ export default function Dashboard() {
                       </TableHeader>
                       <TableBody>
                         {optimizationResult.changes.map((change, idx) => (
-                          <TableRow key={idx}>
+                          <motion.tr
+                            key={idx}
+                            initial={{ opacity: 0, x: -20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ 
+                              delay: 0.8 + (idx * 0.06),
+                              duration: 0.25,
+                              ease: 'easeOut'
+                            }}
+                            className="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted"
+                          >
                             <TableCell className="font-medium text-sm">{change.food_name}</TableCell>
                             <TableCell className="text-right font-mono text-sm">{change.old_quantity}g</TableCell>
                             <TableCell className="text-right font-mono text-sm">{change.new_quantity}g</TableCell>
                             <TableCell className="text-right">
                               <DeltaBadge value={change.new_quantity - change.old_quantity} suffix="g" />
                             </TableCell>
-                          </TableRow>
+                          </motion.tr>
                         ))}
                       </TableBody>
                     </Table>
