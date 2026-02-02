@@ -28,6 +28,7 @@ import {
 import { useBruteForceOptimizer } from '@/hooks/useBruteForceOptimizer';
 import { useHybridOptimizer } from '@/hooks/useHybridOptimizer';
 import { useContractOptimizer, ContractOptimizationPreview } from '@/hooks/useContractOptimizer';
+import { useComparisonOptimizer, ComparisonPreview } from '@/hooks/useComparisonOptimizer';
 import { useSuccessSound } from '@/hooks/useSuccessSound';
 import { Button } from '@/components/ui/button';
 import { Logo } from '@/components/Logo';
@@ -122,12 +123,25 @@ export default function Dashboard() {
     cancelPreview: cancelContractPreview,
   } = useContractOptimizer();
   
+  // Comparison optimizer
+  const {
+    isComparing,
+    isApplying: isComparisonApplying,
+    preview: comparisonPreview,
+    generateComparison,
+    applyResult: applyComparisonResult,
+    cancelComparison,
+  } = useComparisonOptimizer();
+  
   const [showOptimizationDialog, setShowOptimizationDialog] = useState(false);
   const [showHybridDialog, setShowHybridDialog] = useState(false);
   const [showContractDialog, setShowContractDialog] = useState(false);
+  const [showComparisonDialog, setShowComparisonDialog] = useState(false);
   const [hybridDialogPhase, setHybridDialogPhase] = useState<'loading' | 'preview' | 'result'>('loading');
   const [contractDialogPhase, setContractDialogPhase] = useState<'loading' | 'preview' | 'result'>('loading');
+  const [comparisonDialogPhase, setComparisonDialogPhase] = useState<'loading' | 'preview' | 'result'>('loading');
   const [optimizationPhase, setOptimizationPhase] = useState<'loading' | 'preview' | 'result'>('loading');
+  const [selectedComparisonIndex, setSelectedComparisonIndex] = useState<number | null>(null);
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [currentDietPlan, setCurrentDietPlan] = useState<DietPlan | null>(null);
@@ -432,6 +446,67 @@ export default function Dashboard() {
     }, 300);
   };
 
+  // ========== COMPARISON OPTIMIZER HANDLERS ==========
+  const handleCompare = async () => {
+    if (!currentDietPlan || !profile) return;
+    
+    const objectiveMap: Record<string, string> = {
+      lose_weight: 'cut',
+      maintain: 'maintain',
+      gain_muscle: 'bulk',
+    };
+    const objective = objectiveMap[profile.goal || 'maintain'] || 'maintain';
+    
+    setComparisonDialogPhase('loading');
+    setShowComparisonDialog(true);
+    setSelectedComparisonIndex(null);
+    
+    const preview = await generateComparison(
+      currentDietPlan.id,
+      {
+        calories: profile?.daily_calories || 2000,
+        protein: profile?.protein_target || 150,
+        carbs: profile?.carbs_target || 250,
+        fat: profile?.fat_target || 65,
+      },
+      objective
+    );
+    
+    if (preview) {
+      setComparisonDialogPhase('preview');
+    } else {
+      setShowComparisonDialog(false);
+    }
+  };
+
+  const handleApplyComparison = async () => {
+    if (selectedComparisonIndex === null) {
+      toast.error('Selecione um otimizador para aplicar');
+      return;
+    }
+    
+    const result = await applyComparisonResult(selectedComparisonIndex);
+    
+    if (result?.success) {
+      setComparisonDialogPhase('result');
+      playSuccessSound();
+      await fetchCurrentPlan();
+    }
+  };
+
+  const handleCancelComparison = () => {
+    cancelComparison();
+    setShowComparisonDialog(false);
+  };
+
+  const handleCloseComparisonDialog = () => {
+    setShowComparisonDialog(false);
+    setTimeout(() => {
+      setComparisonDialogPhase('loading');
+      setSelectedComparisonIndex(null);
+    }, 300);
+  };
+
   const handleSignOut = async () => {
     await signOut();
     navigate('/login');
@@ -663,7 +738,7 @@ export default function Dashboard() {
                 variant="outline"
                 size="sm"
                 onClick={handleHybridOptimize}
-                disabled={isOptimizing || isHybridOptimizing || isContractOptimizing}
+                disabled={isOptimizing || isHybridOptimizing || isContractOptimizing || isComparing}
                 className="text-xs border-purple-500 text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-950"
               >
                 {isHybridOptimizing ? (
@@ -675,6 +750,25 @@ export default function Dashboard() {
                   <>
                     <Sparkles className="w-3 h-3 mr-1" />
                     Híbrido
+                  </>
+                )}
+              </Button>
+              <Button
+                variant="default"
+                size="sm"
+                onClick={handleCompare}
+                disabled={isOptimizing || isHybridOptimizing || isContractOptimizing || isComparing}
+                className="text-xs bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600"
+              >
+                {isComparing ? (
+                  <>
+                    <Loader2 className="w-3 h-3 animate-spin mr-1" />
+                    Comparando...
+                  </>
+                ) : (
+                  <>
+                    <Layers className="w-3 h-3 mr-1" />
+                    Comparar Todos
                   </>
                 )}
               </Button>
@@ -2155,6 +2249,333 @@ export default function Dashboard() {
 
               <div className="flex justify-end pt-4 border-t">
                 <Button onClick={handleCloseContractDialog}>
+                  Fechar
+                </Button>
+              </div>
+            </motion.div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Comparison Dialog */}
+      <Dialog open={showComparisonDialog} onOpenChange={(open) => {
+        if (!open) handleCancelComparison();
+      }}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Layers className="h-5 w-5 text-indigo-500" />
+              Comparação de Otimizadores
+            </DialogTitle>
+            <DialogDescription>
+              Compare os resultados dos 4 otimizadores e escolha qual aplicar
+            </DialogDescription>
+          </DialogHeader>
+
+          {/* Loading Phase */}
+          {comparisonDialogPhase === 'loading' && (
+            <motion.div
+              key="comparison-loading"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="py-12 space-y-6"
+            >
+              <div className="flex flex-col items-center justify-center">
+                <motion.div
+                  animate={{ scale: [1, 1.1, 1], opacity: [1, 0.8, 1] }}
+                  transition={{ duration: 1.2, repeat: Infinity, ease: "easeInOut" }}
+                  className="relative"
+                >
+                  <motion.div
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+                    className="absolute inset-0 rounded-full border-2 border-indigo-500/30 border-t-indigo-500"
+                    style={{ width: 64, height: 64, margin: -8 }}
+                  />
+                  <Layers className="h-12 w-12 text-indigo-500" />
+                </motion.div>
+                
+                <motion.p
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.2 }}
+                  className="mt-6 text-lg font-medium text-foreground"
+                >
+                  Executando 4 otimizadores...
+                </motion.p>
+                <motion.p
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 0.4 }}
+                  className="mt-2 text-sm text-muted-foreground text-center max-w-xs"
+                >
+                  Rápido, Contratos, IA e Híbrido sendo processados em paralelo
+                </motion.p>
+              </div>
+
+              {/* Progress indicators */}
+              <div className="grid grid-cols-4 gap-2 px-4">
+                {['Rápido', 'Contratos', 'IA', 'Híbrido'].map((name, i) => (
+                  <motion.div
+                    key={name}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.3 + i * 0.1 }}
+                    className="text-center p-2 border rounded-lg bg-muted/30"
+                  >
+                    <motion.div
+                      animate={{ opacity: [0.5, 1, 0.5] }}
+                      transition={{ duration: 1, repeat: Infinity, delay: i * 0.2 }}
+                      className="h-2 w-full bg-muted rounded-full overflow-hidden"
+                    >
+                      <motion.div
+                        className="h-full bg-gradient-to-r from-indigo-400 to-purple-500"
+                        initial={{ width: "0%" }}
+                        animate={{ width: "100%" }}
+                        transition={{ duration: 2 + i * 0.5, ease: "easeInOut" }}
+                      />
+                    </motion.div>
+                    <span className="text-xs text-muted-foreground mt-1 block">{name}</span>
+                  </motion.div>
+                ))}
+              </div>
+            </motion.div>
+          )}
+
+          {/* Preview Phase */}
+          {comparisonDialogPhase === 'preview' && comparisonPreview && (
+            <motion.div 
+              key="comparison-preview"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              className="space-y-4"
+            >
+              {/* Current State */}
+              <div className="p-3 border rounded-lg bg-muted/30">
+                <h4 className="font-medium text-xs mb-2 text-muted-foreground">Estado Atual</h4>
+                <div className="grid grid-cols-4 gap-2 text-xs text-center">
+                  <div>
+                    <div className="font-mono font-medium">{comparisonPreview.before.calories}</div>
+                    <div className="text-muted-foreground">kcal</div>
+                  </div>
+                  <div>
+                    <div className="font-mono font-medium">{comparisonPreview.before.protein}g</div>
+                    <div className="text-muted-foreground">prot</div>
+                  </div>
+                  <div>
+                    <div className="font-mono font-medium">{comparisonPreview.before.carbs}g</div>
+                    <div className="text-muted-foreground">carb</div>
+                  </div>
+                  <div>
+                    <div className="font-mono font-medium">{comparisonPreview.before.fat}g</div>
+                    <div className="text-muted-foreground">gord</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Targets */}
+              <div className="p-3 border rounded-lg bg-indigo-500/10 border-indigo-500/30">
+                <h4 className="font-medium text-xs mb-2 text-indigo-600 dark:text-indigo-400">Metas</h4>
+                <div className="grid grid-cols-4 gap-2 text-xs text-center">
+                  <div>
+                    <div className="font-mono font-medium">{comparisonPreview.targets.calories}</div>
+                    <div className="text-muted-foreground">kcal</div>
+                  </div>
+                  <div>
+                    <div className="font-mono font-medium">{comparisonPreview.targets.protein}g</div>
+                    <div className="text-muted-foreground">prot</div>
+                  </div>
+                  <div>
+                    <div className="font-mono font-medium">{comparisonPreview.targets.carbs}g</div>
+                    <div className="text-muted-foreground">carb</div>
+                  </div>
+                  <div>
+                    <div className="font-mono font-medium">{comparisonPreview.targets.fat}g</div>
+                    <div className="text-muted-foreground">gord</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Results Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {comparisonPreview.results.map((result, index) => {
+                  const isSelected = selectedComparisonIndex === index;
+                  const colorClasses: Record<string, { border: string; bg: string; text: string }> = {
+                    amber: { border: 'border-amber-500', bg: 'bg-amber-500/10', text: 'text-amber-600 dark:text-amber-400' },
+                    emerald: { border: 'border-emerald-500', bg: 'bg-emerald-500/10', text: 'text-emerald-600 dark:text-emerald-400' },
+                    blue: { border: 'border-blue-500', bg: 'bg-blue-500/10', text: 'text-blue-600 dark:text-blue-400' },
+                    purple: { border: 'border-purple-500', bg: 'bg-purple-500/10', text: 'text-purple-600 dark:text-purple-400' },
+                  };
+                  const colors = colorClasses[result.color] || colorClasses.amber;
+                  
+                  const IconComponent = result.icon === 'zap' ? Zap :
+                    result.icon === 'shield' ? Shield :
+                    result.icon === 'sparkles' ? Sparkles : Target;
+                  
+                  return (
+                    <motion.div
+                      key={result.name}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: index * 0.1 }}
+                      onClick={() => setSelectedComparisonIndex(index)}
+                      className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${
+                        isSelected 
+                          ? `${colors.border} ${colors.bg} ring-2 ring-offset-2 ring-${result.color}-500` 
+                          : 'border-border hover:border-muted-foreground/50'
+                      }`}
+                    >
+                      {/* Header */}
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                          <IconComponent className={`w-4 h-4 ${colors.text}`} />
+                          <span className={`font-medium text-sm ${colors.text}`}>{result.name}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Badge 
+                            variant={result.score >= 80 ? 'default' : result.score >= 60 ? 'secondary' : 'outline'}
+                            className="text-xs"
+                          >
+                            Score: {result.score}
+                          </Badge>
+                          {isSelected && (
+                            <Badge className="bg-green-500 text-white text-xs">
+                              ✓ Selecionado
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Macros */}
+                      <div className="grid grid-cols-4 gap-1 text-xs mb-3">
+                        <div className="text-center">
+                          <div className="font-mono">{result.macros.calories}</div>
+                          <div className="text-muted-foreground text-[10px]">kcal</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="font-mono">{result.macros.protein}g</div>
+                          <div className="text-muted-foreground text-[10px]">prot</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="font-mono">{result.macros.carbs}g</div>
+                          <div className="text-muted-foreground text-[10px]">carb</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="font-mono">{result.macros.fat}g</div>
+                          <div className="text-muted-foreground text-[10px]">gord</div>
+                        </div>
+                      </div>
+
+                      {/* Stats */}
+                      <div className="flex items-center justify-between text-xs text-muted-foreground">
+                        <span>{result.changes.length} alterações</span>
+                        <span className={result.violations.length === 0 ? 'text-green-600' : 'text-amber-600'}>
+                          {result.violations.length === 0 ? '✓ Sem violações' : `${result.violations.length} violações`}
+                        </span>
+                      </div>
+                    </motion.div>
+                  );
+                })}
+              </div>
+
+              {/* Selected Details */}
+              {selectedComparisonIndex !== null && comparisonPreview.results[selectedComparisonIndex] && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  className="border rounded-lg p-3 bg-muted/20"
+                >
+                  <h4 className="font-medium text-sm mb-2">
+                    Detalhes: {comparisonPreview.results[selectedComparisonIndex].name}
+                  </h4>
+                  
+                  {/* Violations */}
+                  {comparisonPreview.results[selectedComparisonIndex].violations.length > 0 && (
+                    <div className="mb-3">
+                      <p className="text-xs text-muted-foreground mb-1">Violações:</p>
+                      <div className="space-y-1">
+                        {comparisonPreview.results[selectedComparisonIndex].violations.map((v, i) => (
+                          <div 
+                            key={i} 
+                            className={`text-xs ${v.severity === 'error' ? 'text-red-600' : 'text-amber-600'}`}
+                          >
+                            • {v.message}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Changes preview */}
+                  <p className="text-xs text-muted-foreground mb-1">
+                    Primeiras alterações ({comparisonPreview.results[selectedComparisonIndex].changes.length} total):
+                  </p>
+                  <div className="grid grid-cols-2 gap-1 text-xs">
+                    {comparisonPreview.results[selectedComparisonIndex].changes.slice(0, 6).map((c, i) => (
+                      <div key={i} className="flex justify-between">
+                        <span className="truncate flex-1">{c.food_name}</span>
+                        <span className="font-mono ml-1">{c.old_quantity}→{c.new_quantity}g</span>
+                      </div>
+                    ))}
+                  </div>
+                </motion.div>
+              )}
+
+              {/* Actions */}
+              <div className="flex justify-between items-center pt-4 border-t">
+                <p className="text-xs text-muted-foreground">
+                  {selectedComparisonIndex !== null 
+                    ? `Selecionado: ${comparisonPreview.results[selectedComparisonIndex].name}`
+                    : 'Clique em um card para selecionar'
+                  }
+                </p>
+                <div className="flex gap-2">
+                  <Button variant="outline" onClick={handleCancelComparison}>
+                    Cancelar
+                  </Button>
+                  <Button
+                    onClick={handleApplyComparison}
+                    disabled={selectedComparisonIndex === null || isComparisonApplying}
+                    className="bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600"
+                  >
+                    {isComparisonApplying ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Aplicando...
+                      </>
+                    ) : (
+                      <>
+                        <Layers className="h-4 w-4 mr-2" />
+                        Aplicar Selecionado
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {/* Result Phase */}
+          {comparisonDialogPhase === 'result' && (
+            <motion.div
+              key="comparison-result"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="space-y-4"
+            >
+              <SuccessAnimation show={true} message="Otimização Aplicada!" />
+              
+              <div className="text-center py-2">
+                <p className="text-lg font-semibold text-foreground">
+                  Comparação Concluída!
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  O otimizador selecionado foi aplicado com sucesso
+                </p>
+              </div>
+
+              <div className="flex justify-end pt-4 border-t">
+                <Button onClick={handleCloseComparisonDialog}>
                   Fechar
                 </Button>
               </div>
