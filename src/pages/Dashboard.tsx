@@ -811,10 +811,26 @@ export default function Dashboard() {
           </DialogHeader>
 
           {optimizationPreview && (
-            <div className="space-y-4">
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.3, ease: "easeOut" }}
+              className="space-y-4"
+            >
               {/* Macro Comparison */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="p-4 border rounded-lg bg-muted/30">
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: 0.1, duration: 0.25 }}
+                className="grid grid-cols-2 gap-4"
+              >
+                <motion.div 
+                  initial={{ x: -20, opacity: 0 }}
+                  animate={{ x: 0, opacity: 1 }}
+                  transition={{ delay: 0.15, duration: 0.3 }}
+                  className="p-4 border rounded-lg bg-muted/30"
+                >
                   <h4 className="font-medium text-sm mb-3 text-muted-foreground">Atual</h4>
                   <div className="space-y-2 text-sm">
                     <div className="flex justify-between">
@@ -834,9 +850,14 @@ export default function Dashboard() {
                       <span className="font-mono">{optimizationPreview.before.fat}g</span>
                     </div>
                   </div>
-                </div>
+                </motion.div>
 
-                <div className="p-4 border rounded-lg bg-green-500/10 border-green-500/30">
+                <motion.div 
+                  initial={{ x: 20, opacity: 0 }}
+                  animate={{ x: 0, opacity: 1 }}
+                  transition={{ delay: 0.2, duration: 0.3 }}
+                  className="p-4 border rounded-lg bg-green-500/10 border-green-500/30"
+                >
                   <h4 className="font-medium text-sm mb-3 text-green-600 dark:text-green-400">Após Otimização</h4>
                   <div className="space-y-2 text-sm">
                     <div className="flex justify-between">
@@ -868,11 +889,16 @@ export default function Dashboard() {
                       </span>
                     </div>
                   </div>
-                </div>
-              </div>
+                </motion.div>
+              </motion.div>
 
               {/* Target Comparison */}
-              <div className="p-4 border rounded-lg bg-blue-500/10 border-blue-500/30">
+              <motion.div 
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.25, duration: 0.3 }}
+                className="p-4 border rounded-lg bg-blue-500/10 border-blue-500/30"
+              >
                 <h4 className="font-medium text-sm mb-3 text-blue-600 dark:text-blue-400">Metas</h4>
                 <div className="grid grid-cols-4 gap-2 text-sm text-center">
                   <div>
@@ -892,11 +918,16 @@ export default function Dashboard() {
                     <div className="text-xs text-muted-foreground">gord</div>
                   </div>
                 </div>
-              </div>
+              </motion.div>
 
               {/* Changes Table */}
               {optimizationPreview.changes.length > 0 ? (
-                <div className="space-y-2">
+                <motion.div 
+                  initial={{ opacity: 0, y: 15 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.3, duration: 0.35 }}
+                  className="space-y-2"
+                >
                   <h4 className="font-medium text-sm">Alterações Propostas ({optimizationPreview.changes.length})</h4>
                   <div className="border rounded-lg overflow-hidden">
                     <Table>
@@ -922,11 +953,16 @@ export default function Dashboard() {
                       </TableBody>
                     </Table>
                   </div>
-                </div>
+                </motion.div>
               ) : (
-                <div className="text-center py-4 text-muted-foreground text-sm">
+                <motion.div 
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 0.3, duration: 0.3 }}
+                  className="text-center py-4 text-muted-foreground text-sm"
+                >
                   Nenhuma alteração necessária - o plano já está otimizado!
-                </div>
+                </motion.div>
               )}
 
               {/* Action Buttons */}
@@ -956,7 +992,7 @@ export default function Dashboard() {
                   )}
                 </Button>
               </div>
-            </div>
+            </motion.div>
           )}
         </DialogContent>
       </Dialog>
@@ -975,10 +1011,25 @@ export default function Dashboard() {
           </DialogHeader>
 
           {optimizationResult && (
-            <div className="space-y-6 py-4">
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3, ease: "easeOut" }}
+              className="space-y-6 py-4"
+            >
               {/* Macro Comparison */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="p-4 border rounded-lg bg-muted/30">
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: 0.1, duration: 0.25 }}
+                className="grid grid-cols-2 gap-4"
+              >
+                <motion.div 
+                  initial={{ x: -20, opacity: 0 }}
+                  animate={{ x: 0, opacity: 1 }}
+                  transition={{ delay: 0.15, duration: 0.3 }}
+                  className="p-4 border rounded-lg bg-muted/30"
+                >
                   <h4 className="font-medium text-sm mb-3 text-muted-foreground">Antes</h4>
                   <div className="space-y-2 text-sm">
                     <div className="flex justify-between">
@@ -998,9 +1049,14 @@ export default function Dashboard() {
                       <span className="font-mono">{optimizationResult.before.fat}g</span>
                     </div>
                   </div>
-                </div>
+                </motion.div>
 
-                <div className="p-4 border rounded-lg bg-green-500/10 border-green-500/30">
+                <motion.div 
+                  initial={{ x: 20, opacity: 0 }}
+                  animate={{ x: 0, opacity: 1 }}
+                  transition={{ delay: 0.2, duration: 0.3 }}
+                  className="p-4 border rounded-lg bg-green-500/10 border-green-500/30"
+                >
                   <h4 className="font-medium text-sm mb-3 text-green-600 dark:text-green-400">Depois</h4>
                   <div className="space-y-2 text-sm">
                     <div className="flex justify-between">
@@ -1032,11 +1088,16 @@ export default function Dashboard() {
                       </span>
                     </div>
                   </div>
-                </div>
-              </div>
+                </motion.div>
+              </motion.div>
 
               {/* Target Comparison */}
-              <div className="p-4 border rounded-lg bg-blue-500/10 border-blue-500/30">
+              <motion.div 
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.25, duration: 0.3 }}
+                className="p-4 border rounded-lg bg-blue-500/10 border-blue-500/30"
+              >
                 <h4 className="font-medium text-sm mb-3 text-blue-600 dark:text-blue-400">Metas</h4>
                 <div className="grid grid-cols-4 gap-2 text-sm text-center">
                   <div>
@@ -1056,11 +1117,16 @@ export default function Dashboard() {
                     <div className="text-xs text-muted-foreground">gord</div>
                   </div>
                 </div>
-              </div>
+              </motion.div>
 
               {/* Changes Table */}
               {optimizationResult.changes.length > 0 ? (
-                <div className="space-y-2">
+                <motion.div 
+                  initial={{ opacity: 0, y: 15 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.3, duration: 0.35 }}
+                  className="space-y-2"
+                >
                   <h4 className="font-medium text-sm">Alimentos Ajustados ({optimizationResult.changes.length})</h4>
                   <div className="border rounded-lg overflow-hidden">
                     <Table>
@@ -1086,16 +1152,26 @@ export default function Dashboard() {
                       </TableBody>
                     </Table>
                   </div>
-                </div>
+                </motion.div>
               ) : (
-                <div className="text-center py-4 text-muted-foreground text-sm">
+                <motion.div 
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 0.3, duration: 0.3 }}
+                  className="text-center py-4 text-muted-foreground text-sm"
+                >
                   Nenhum alimento precisou ser ajustado - o plano já está otimizado!
-                </div>
+                </motion.div>
               )}
 
               {/* Undo Button */}
               {optimizationResult.changes.length > 0 && (
-                <div className="flex justify-end gap-2 pt-4 border-t">
+                <motion.div 
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.35, duration: 0.3 }}
+                  className="flex justify-end gap-2 pt-4 border-t"
+                >
                   <Button
                     variant="outline"
                     onClick={() => setShowOptimizationResult(false)}
@@ -1125,9 +1201,9 @@ export default function Dashboard() {
                       </>
                     )}
                   </Button>
-                </div>
+                </motion.div>
               )}
-            </div>
+            </motion.div>
           )}
         </DialogContent>
       </Dialog>
