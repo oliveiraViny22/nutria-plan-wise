@@ -59,6 +59,7 @@ import { OnboardingTutorial } from '@/components/OnboardingTutorial';
 import { DashboardSkeleton } from '@/components/DashboardSkeleton';
 import { SuccessAnimation } from '@/components/SuccessAnimation';
 import { useTutorial } from '@/hooks/useTutorial';
+import { useMetabolicCalculations } from '@/hooks/useMetabolicCalculations';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useSubscription } from '@/hooks/useSubscription';
@@ -82,6 +83,7 @@ export default function Dashboard() {
     isSubscribed,
   } = useSubscription();
   const { usage, isLimitReached, refresh: refreshUsage } = useUsageLimits();
+  const metabolicData = useMetabolicCalculations(profile);
   const { 
     isOptimizing, 
     isApplying,
@@ -543,9 +545,31 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Goals Projection + Hydration Tip - Compact Row */}
+          {/* TMB/TDEE + Goals Projection + Hydration Tip */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div className="sm:col-span-2">
+            {/* TMB/TDEE Compact Card */}
+            {metabolicData && (
+              <div className="card-elevated rounded-xl p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <Flame className="w-4 h-4 text-amber-500" />
+                  <h3 className="font-semibold text-foreground text-sm">Metabolismo</h3>
+                </div>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-muted-foreground">TMB</span>
+                    <span className="font-mono font-semibold text-amber-600 dark:text-amber-400">{metabolicData.bmr} kcal</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-muted-foreground">TDEE</span>
+                    <span className="font-mono font-semibold text-orange-600 dark:text-orange-400">{metabolicData.tdee} kcal</span>
+                  </div>
+                </div>
+                <p className="text-[10px] text-muted-foreground mt-2">
+                  Gasto basal e total diário
+                </p>
+              </div>
+            )}
+            <div className={metabolicData ? "sm:col-span-1" : "sm:col-span-2"}>
               <GoalsProjectionCard />
             </div>
             <HydrationTipCard />
