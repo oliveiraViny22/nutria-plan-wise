@@ -91,7 +91,69 @@ interface RebalanceResult {
 }
 
 // ============================================
-// REGRAS POR OBJETIVO (ESPECIFICAÇÃO)
+// CONFIGURAÇÕES DO ADMIN (carregadas do DB)
+// ============================================
+
+interface OptimizerSettings {
+  protein_floor: number;
+  protein_ceiling: number;
+  carbs_floor: number;
+  carbs_ceiling: number;
+  fat_floor: number;
+  fat_ceiling: number;
+  calories_tolerance: number;
+  protein_weight: number;
+  carbs_weight: number;
+  fat_weight: number;
+  calories_weight: number;
+}
+
+const DEFAULT_OPTIMIZER_SETTINGS: OptimizerSettings = {
+  protein_floor: 95,
+  protein_ceiling: 120,
+  carbs_floor: 80,
+  carbs_ceiling: 120,
+  fat_floor: 80,
+  fat_ceiling: 120,
+  calories_tolerance: 5,
+  protein_weight: 3.0,
+  carbs_weight: 1.0,
+  fat_weight: 1.0,
+  calories_weight: 1.5,
+};
+
+// Variável global para configurações carregadas
+let loadedSettings: OptimizerSettings | null = null;
+
+async function loadOptimizerSettings(supabase: any): Promise<OptimizerSettings> {
+  if (loadedSettings) return loadedSettings;
+
+  try {
+    const { data, error } = await supabase
+      .from('system_settings')
+      .select('value')
+      .eq('key', 'optimizer_macro_settings')
+      .maybeSingle();
+
+    if (error) {
+      console.warn('Erro ao carregar configurações do otimizador:', error.message);
+      return DEFAULT_OPTIMIZER_SETTINGS;
+    }
+
+    if (data?.value) {
+      loadedSettings = { ...DEFAULT_OPTIMIZER_SETTINGS, ...(data.value as object) };
+      console.log('Configurações do otimizador carregadas do admin:', JSON.stringify(loadedSettings));
+      return loadedSettings;
+    }
+  } catch (e) {
+    console.warn('Falha ao carregar configurações:', e);
+  }
+
+  return DEFAULT_OPTIMIZER_SETTINGS;
+}
+
+// ============================================
+// REGRAS POR OBJETIVO (DINÂMICAS)
 // ============================================
 
 interface ObjectiveRules {
@@ -101,23 +163,30 @@ interface ObjectiveRules {
   fat?: { max: number };
 }
 
-const OBJECTIVE_RULES: Record<Objective, ObjectiveRules> = {
-  cut: {
-    calories: { min: 90, max: 100 },
-    protein: { min: 95 },
-    fat: { max: 110 },
-  },
-  maintain: {
-    calories: { min: 95, max: 105 },
-    protein: { min: 85 },
-  },
-  bulk: {
-    calories: { min: 95, max: 105 },
-    protein: { min: 90 },
-    carbs: { min: 85 },
-    fat: { max: 130 },
-  },
-};
+function getObjectiveRules(objective: Objective, settings: OptimizerSettings): ObjectiveRules {
+  // Usar configurações do admin para definir regras por objetivo
+  switch (objective) {
+    case "cut":
+      return {
+        calories: { min: 100 - settings.calories_tolerance, max: 100 },
+        protein: { min: settings.protein_floor },
+        fat: { max: settings.fat_ceiling },
+      };
+    case "bulk":
+      return {
+        calories: { min: 100 - settings.calories_tolerance, max: 100 + settings.calories_tolerance },
+        protein: { min: Math.max(settings.protein_floor - 5, 85) }, // Bulk pode ter piso um pouco menor
+        carbs: { min: settings.carbs_floor },
+        fat: { max: settings.fat_ceiling + 10 }, // Bulk permite mais gordura
+      };
+    case "maintain":
+    default:
+      return {
+        calories: { min: 100 - settings.calories_tolerance, max: 100 + settings.calories_tolerance },
+        protein: { min: Math.max(settings.protein_floor - 10, 80) },
+      };
+  }
+}
 
 // ============================================
 // LIMITES DE QUANTIDADE POR CATEGORIA
@@ -128,12 +197,12 @@ const CATEGORY_LIMITS: Record<string, { min: number; max: number }> = {
   carboidratos: { min: 40, max: 400 },
   leguminosas: { min: 40, max: 200 },
   vegetais: { min: 30, max: 250 },
-  frutas: { min: 30, max: 150 },    // Reduzido de 300
+  frutas: { min: 30, max: 150 },
   laticinios: { min: 30, max: 300 },
-  gorduras: { min: 5, max: 30 },    // Reduzido de 40
-  oleaginosas: { min: 10, max: 40 }, // Reduzido de 50
-  azeite: { min: 5, max: 20 },       // Novo
-  figo: { min: 20, max: 80 },        // Novo
+  gorduras: { min: 5, max: 30 },
+  oleaginosas: { min: 10, max: 40 },
+  azeite: { min: 5, max: 20 },
+  figo: { min: 20, max: 80 },
 };
 
 function getCategoryLimits(category: string | null): { min: number; max: number } {
@@ -208,9 +277,10 @@ function calculatePercents(
 function validatePlan(
   totals: MacroTargets,
   targets: MacroTargets,
-  objective: Objective
+  objective: Objective,
+  settings: OptimizerSettings
 ): { valid: boolean; errors: string[] } {
-  const rules = OBJECTIVE_RULES[objective];
+  const rules = getObjectiveRules(objective, settings);
   const percents = calculatePercents(totals, targets);
   const errors: string[] = [];
 
@@ -381,6 +451,7 @@ function runCorrectionPipeline(
   quantities: Map<string, number>,
   targets: MacroTargets,
   objective: Objective,
+  settings: OptimizerSettings,
   maxCycles: number = 3
 ): { quantities: Map<string, number>; adjustments: Adjustment[]; iterations: number; converged: boolean } {
   const adjustments: Adjustment[] = [];
@@ -424,12 +495,12 @@ function runCorrectionPipeline(
     return cB.fat - cA.fat;
   });
 
-  const rules = OBJECTIVE_RULES[objective];
+  const rules = getObjectiveRules(objective, settings);
 
   for (let cycle = 0; cycle < maxCycles; cycle++) {
     iterations = cycle + 1;
     const before = calculateTotals(foods, quantities);
-    const validation = validatePlan(before, targets, objective);
+    const validation = validatePlan(before, targets, objective, settings);
 
     if (validation.valid) {
       console.log(`Plano válido após ${iterations} ciclo(s)`);
@@ -665,9 +736,13 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
+    // Carregar configurações do admin
+    const settings = await loadOptimizerSettings(supabase);
+
     // Mapear objetivo
     const objective = mapGoalToObjective(goal);
     console.log(`Objetivo: ${objective} (goal recebido: ${goal})`);
+    console.log(`Usando settings: prot_floor=${settings.protein_floor}%, cal_tol=${settings.calories_tolerance}%`);
 
     // Buscar refeições
     const { data: meals, error: mealsError } = await supabase
@@ -765,7 +840,7 @@ serve(async (req) => {
       console.log(`Opção ${optionNumber} - Totais atuais: ${JSON.stringify(optionCurrentTotals)}`);
 
       // Validar plano atual
-      const optionValidation = validatePlan(optionCurrentTotals, targets, objective);
+      const optionValidation = validatePlan(optionCurrentTotals, targets, objective, settings);
 
       if (optionValidation.valid) {
         console.log(`Opção ${optionNumber} já está válida`);
@@ -791,7 +866,8 @@ serve(async (req) => {
         optionFoods, 
         workingQuantities, 
         targets, 
-        objective, 
+        objective,
+        settings,
         3
       );
 
@@ -869,7 +945,7 @@ serve(async (req) => {
     const anyConverged = optionResults.some(r => r.converged);
 
     // Determinar status baseado em todas as opções
-    const primaryValidation = validatePlan(primaryResult.finalTotals, targets, objective);
+    const primaryValidation = validatePlan(primaryResult.finalTotals, targets, objective, settings);
     let status: "valid" | "valid_with_alert" | "error";
     if (primaryValidation.valid && allConverged) {
       status = "valid";
