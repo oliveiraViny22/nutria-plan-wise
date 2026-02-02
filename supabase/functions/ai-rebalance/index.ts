@@ -328,13 +328,17 @@ function runFinalRefinement(
   quantities: Map<string, number>,
   targets: MacroTargets,
   contributions: Map<string, MacroTargets>,
-  maxIterations: number = 50
+  maxIterations: number = 100 // Aumentado para garantir convergência hard
 ): { quantities: Map<string, number>; iterations: number; converged: boolean } {
+  // ============================================
+  // RANGE HARD: PRECISÃO MÁXIMA
+  // ============================================
+  // Convergir para valores exatos das metas
   const PRECISION = {
-    calories: 10,  // ±10 kcal
-    protein: 1,    // ±1g
-    carbs: 2,      // ±2g
-    fat: 1,        // ±1g
+    calories: 5,   // ±5 kcal (range hard)
+    protein: 1,    // ±1g (range hard)
+    carbs: 1,      // ±1g (range hard)
+    fat: 1,        // ±1g (range hard)
   };
 
   // ============================================
@@ -465,10 +469,25 @@ function runFinalRefinement(
     const nutrientKey = target.nutrient as keyof MacroTargets;
     const contribPerGram = contrib[nutrientKey] / 100;
 
-    // Calculate exact grams needed (but limit step size)
+    // ============================================
+    // PASSO ADAPTATIVO PARA RANGE HARD
+    // ============================================
+    // Calcular gramas exatos, com passo menor perto do target
     let gramsToChange = Math.abs(target.diff) / contribPerGram;
-    gramsToChange = Math.min(gramsToChange, 10); // Max 10g per step for precision
-    gramsToChange = Math.max(gramsToChange, 1);  // Min 1g step for precision
+    
+    // Passo adaptativo: mais fino quando mais perto do target
+    const distanceToTarget = Math.abs(target.diff) / target.precision;
+    if (distanceToTarget < 3) {
+      // Perto do target: passos de 1-3g
+      gramsToChange = Math.min(gramsToChange, 3);
+    } else if (distanceToTarget < 5) {
+      // Médio: passos de até 5g
+      gramsToChange = Math.min(gramsToChange, 5);
+    } else {
+      // Longe: passos de até 10g
+      gramsToChange = Math.min(gramsToChange, 10);
+    }
+    gramsToChange = Math.max(gramsToChange, 1);  // Min 1g step
 
     const newGrams = needDecrease
       ? Math.max(limits.min, currentGrams - gramsToChange)
@@ -476,7 +495,6 @@ function runFinalRefinement(
 
     if (Math.abs(newGrams - currentGrams) >= 1) {
       quantities.set(bestFood.id, Math.round(newGrams));
-      console.log(`[REFINAMENTO] ${needDecrease ? '-' : '+'}${Math.round(Math.abs(newGrams - currentGrams))}g ${bestFood.food.name}`);
     }
   }
 
@@ -929,12 +947,13 @@ serve(async (req) => {
         contributions.set(food.id, getFoodContributionPer100g(food.food));
       }
 
+      // FASE 2: Refinamento final para precisão hard (±1g, ±5kcal)
       const refinementResult = runFinalRefinement(
         optionFoods,
         pipelineResult.quantities,
         targets,
         contributions,
-        50
+        150 // Mais iterações para garantir range hard
       );
 
       // Calcular totais finais
