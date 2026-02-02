@@ -776,7 +776,7 @@ function runCorrectionPipeline(
 
     const proteinOk = afterFatPercents.protein >= 95;
     const carbsOk = afterFatPercents.carbs >= 90 && afterFatPercents.carbs <= 110;
-    const caloriesLow = afterFatPercents.calories < 95;
+    const caloriesLow = afterFatPercents.calories <= 95;
 
     if (proteinOk && carbsOk && caloriesLow) {
       const caloricDeficit = targets.calories - afterFatReduction.calories;
