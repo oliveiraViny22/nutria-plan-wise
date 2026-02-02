@@ -84,9 +84,75 @@ const DEFAULT_SETTINGS: OptimizerSettings = {
   calories_weight: 1.5,
 };
 
-// Min/max constraints for quantities
-const MIN_GRAMS = 10;
-const MAX_GRAMS = 600;
+// Category-based min/max constraints for realistic portions
+const CATEGORY_LIMITS: Record<string, { min: number; max: number }> = {
+  // Carboidratos - porções realistas
+  'carboidrato': { min: 40, max: 300 },
+  'carboidratos': { min: 40, max: 300 },
+  'grãos': { min: 40, max: 250 },
+  'cereais': { min: 30, max: 200 },
+  'pães': { min: 25, max: 150 },
+  'massas': { min: 60, max: 250 },
+  'tubérculos': { min: 50, max: 300 },
+  
+  // Proteínas - porções realistas
+  'proteína': { min: 60, max: 250 },
+  'proteínas': { min: 60, max: 250 },
+  'carnes': { min: 80, max: 250 },
+  'aves': { min: 80, max: 250 },
+  'peixes': { min: 80, max: 250 },
+  'frutos do mar': { min: 60, max: 200 },
+  'ovos': { min: 50, max: 200 },
+  
+  // Laticínios
+  'laticínios': { min: 30, max: 300 },
+  'queijos': { min: 20, max: 100 },
+  'leite': { min: 100, max: 400 },
+  'iogurtes': { min: 100, max: 300 },
+  
+  // Vegetais e frutas
+  'vegetais': { min: 30, max: 300 },
+  'verduras': { min: 20, max: 200 },
+  'legumes': { min: 40, max: 250 },
+  'frutas': { min: 50, max: 300 },
+  'saladas': { min: 30, max: 200 },
+  
+  // Gorduras - porções pequenas
+  'gorduras': { min: 5, max: 50 },
+  'óleos': { min: 5, max: 30 },
+  'oleaginosas': { min: 10, max: 60 },
+  'castanhas': { min: 10, max: 50 },
+  
+  // Suplementos e outros
+  'suplementos': { min: 10, max: 100 },
+  'bebidas': { min: 100, max: 500 },
+  'condimentos': { min: 5, max: 30 },
+};
+
+// Default limits for unknown categories
+const DEFAULT_MIN_GRAMS = 20;
+const DEFAULT_MAX_GRAMS = 400;
+
+/**
+ * Get min/max limits for a food based on its category
+ */
+function getCategoryLimits(category: string): { min: number; max: number } {
+  const normalizedCategory = category.toLowerCase().trim();
+  
+  // Try exact match first
+  if (CATEGORY_LIMITS[normalizedCategory]) {
+    return CATEGORY_LIMITS[normalizedCategory];
+  }
+  
+  // Try partial match
+  for (const [key, limits] of Object.entries(CATEGORY_LIMITS)) {
+    if (normalizedCategory.includes(key) || key.includes(normalizedCategory)) {
+      return limits;
+    }
+  }
+  
+  return { min: DEFAULT_MIN_GRAMS, max: DEFAULT_MAX_GRAMS };
+}
 
 /**
  * Calculate macros for a given quantity
@@ -191,9 +257,10 @@ function optimizeQuantities(
       
       for (const food of foods) {
         const currentQty = quantities.get(food.meal_option_food_id) || food.quantity_grams;
+        const limits = getCategoryLimits(food.category);
         
         // Try increasing
-        const increasedQty = Math.min(currentQty + stepSize, MAX_GRAMS);
+        const increasedQty = Math.min(currentQty + stepSize, limits.max);
         quantities.set(food.meal_option_food_id, increasedQty);
         const increasedError = calcError(calcTotalMacros(foods, quantities), targets, settings);
         
@@ -204,7 +271,7 @@ function optimizeQuantities(
         }
         
         // Try decreasing
-        const decreasedQty = Math.max(currentQty - stepSize, MIN_GRAMS);
+        const decreasedQty = Math.max(currentQty - stepSize, limits.min);
         quantities.set(food.meal_option_food_id, decreasedQty);
         const decreasedError = calcError(calcTotalMacros(foods, quantities), targets, settings);
         
@@ -220,9 +287,12 @@ function optimizeQuantities(
     }
   }
   
-  // Round to nearest integer
-  for (const [id, qty] of quantities.entries()) {
-    quantities.set(id, Math.round(qty));
+  // Round to nearest integer and clamp to category limits
+  for (const food of foods) {
+    const qty = quantities.get(food.meal_option_food_id) || food.quantity_grams;
+    const limits = getCategoryLimits(food.category);
+    const clampedQty = Math.max(limits.min, Math.min(limits.max, Math.round(qty)));
+    quantities.set(food.meal_option_food_id, clampedQty);
   }
   
   return quantities;
