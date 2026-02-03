@@ -41,6 +41,7 @@ import {
   type Supplement,
   type NutritionalGaps,
 } from '@/lib/supplement-recommendations';
+import { MealReplacementSection } from '@/components/MealReplacementCard';
 
 interface MealData {
   id: string;
@@ -570,6 +571,8 @@ export default function MealPlanPage() {
           </div>
 
           {supplementsEnabled ? (
+            <div className="space-y-8">
+              {/* Suplementos base por objetivo */}
               <SupplementsContent 
                 goal={(profile?.goal as UserGoal) || 'maintain'}
                 planMacros={planTotals}
@@ -580,12 +583,32 @@ export default function MealPlanPage() {
                   fat_target: profile?.fat_target ?? null,
                 }}
               />
+
+              {/* Substituições de refeições com suplementos + alimentos */}
+              {meals.length > 0 && (
+                <MealReplacementSection
+                  meals={meals.map(meal => {
+                    const firstOption = meal.meal_options[0];
+                    return {
+                      name: MEAL_NAMES[meal.name as MealType] || meal.name,
+                      macros: {
+                        calories: firstOption?.total_calories || 0,
+                        protein: firstOption?.total_protein || 0,
+                        carbs: firstOption?.total_carbs || 0,
+                        fat: firstOption?.total_fat || 0,
+                      },
+                    };
+                  })}
+                  userGoal={(profile?.goal as 'lose_weight' | 'maintain' | 'gain_muscle') || 'maintain'}
+                />
+              )}
+            </div>
           ) : (
             <Card className="border-muted bg-muted/5">
               <CardContent className="py-8 text-center">
                 <Pill className="w-10 h-10 mx-auto mb-3 text-muted-foreground/50" />
                 <p className="text-muted-foreground">
-                  Ative o toggle acima para ver recomendações de suplementação personalizadas.
+                  Ative o toggle acima para ver recomendações de suplementação e substituições de refeição.
                 </p>
               </CardContent>
             </Card>
