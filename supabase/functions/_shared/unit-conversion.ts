@@ -133,11 +133,12 @@ export function applyUnitConversion(
   }
 
   // Aplicar conversão determinística
+  // Tolerância de 15% para permitir conversões práticas em unidades naturais
   const result = convertGramsToUnit(
     quantityGrams,
     food.unit_weight_grams,
     food.unit_increment,
-    5 // tolerância de 5%
+    15 // tolerância de 15%
   );
 
   // Preencher unit_name se conversão bem-sucedida

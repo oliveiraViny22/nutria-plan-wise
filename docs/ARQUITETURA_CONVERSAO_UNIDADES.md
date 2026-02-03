@@ -60,7 +60,7 @@ unit_conversion_locked BOOLEAN -- Se TRUE, não reavaliar
 2. Para cada alimento:
    a. Verificar se unit_enabled = true
    b. Se sim, chamar convert_grams_to_unit()
-   c. Verificar tolerância de ±5%
+   c. Verificar tolerância de ±15%
    d. Se válido: usar unidades
    e. Se inválido: fallback para gramas
 3. Persistir display_quantity, display_unit, calculated_grams
@@ -102,17 +102,17 @@ function convertGramsToUnit(
 2. `roundedUnits = round(rawUnits / unitIncrement) * unitIncrement`
 3. `finalGrams = roundedUnits * unitWeightGrams`
 4. `errorPercent = |finalGrams - grams| / grams * 100`
-5. Se `errorPercent <= 5%`: sucesso
-6. Se `errorPercent > 5%`: fallback para gramas
+5. Se `errorPercent <= 15%`: sucesso
+6. Se `errorPercent > 15%`: fallback para gramas
 
 ### Exemplo:
 ```
-Input: 95g de ovo (unit_weight = 50g, increment = 1)
-rawUnits = 95 / 50 = 1.9
-roundedUnits = round(1.9 / 1) * 1 = 2
-finalGrams = 2 * 50 = 100g
-errorPercent = |100 - 95| / 95 * 100 = 5.26%
-Resultado: 5.26% > 5% → Fallback para "95g"
+Input: 135g de pão francês (unit_weight = 50g, increment = 1)
+rawUnits = 135 / 50 = 2.7
+roundedUnits = round(2.7 / 1) * 1 = 3
+finalGrams = 3 * 50 = 150g
+errorPercent = |150 - 135| / 135 * 100 = 11.1%
+Resultado: 11.1% <= 15% → "3 unidades (150g)"
 ```
 
 ---
