@@ -39,7 +39,9 @@ import { AIRebalancer } from '@/components/AIRebalancer';
 import { SupplementToggle } from '@/components/SupplementToggle';
 
 import { UpgradeDialog } from '@/components/UpgradeDialog';
-import { AdherenceWidget } from '@/components/AdherenceWidget';
+import { WeeklyAdherenceChart } from '@/components/WeeklyAdherenceChart';
+import { DailyLogCTA } from '@/components/DailyLogCTA';
+import { EmptyPlanState } from '@/components/EmptyPlanState';
 import { OnboardingTutorial } from '@/components/OnboardingTutorial';
 import { DashboardSkeleton } from '@/components/DashboardSkeleton';
 import { SuccessAnimation } from '@/components/SuccessAnimation';
@@ -80,6 +82,7 @@ export default function Dashboard() {
   const [upgradeLimit, setUpgradeLimit] = useState<number>(0);
   const [planReleased, setPlanReleased] = useState(false);
   const [showSuccessAnimation, setShowSuccessAnimation] = useState(false);
+  const [todayMealsLogged, setTodayMealsLogged] = useState(0);
 
   // Handle checkout success
   useEffect(() => {
@@ -127,6 +130,29 @@ export default function Dashboard() {
 
     if (!error && data) {
       setMeals(data as Meal[]);
+      // Fetch today's logged meals count
+      await fetchTodayLogs(planId, data.length);
+    }
+  };
+
+  const fetchTodayLogs = async (planId: string, totalMeals: number) => {
+    const today = new Date().toISOString().split('T')[0];
+    const { data: logData } = await supabase
+      .from('daily_logs')
+      .select(`
+        meal_logs (id, status)
+      `)
+      .eq('diet_plan_id', planId)
+      .eq('log_date', today)
+      .single();
+
+    if (logData?.meal_logs) {
+      const logged = logData.meal_logs.filter((ml: any) => 
+        ml.status && ml.status !== 'pending' && ml.status !== 'PENDENTE'
+      ).length;
+      setTodayMealsLogged(logged);
+    } else {
+      setTodayMealsLogged(0);
     }
   };
 
@@ -466,14 +492,28 @@ export default function Dashboard() {
 
         </motion.section>
 
-        {/* Adherence Widget - only for paid users with a plan */}
+        {/* Daily Log CTA - only for paid users with a plan */}
+        {currentDietPlan && subscriptionPlan && subscriptionPlan.type !== 'gratuito' && (
+          <motion.section
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.12 }}
+          >
+            <DailyLogCTA 
+              mealsLogged={todayMealsLogged}
+              totalMeals={meals.length}
+            />
+          </motion.section>
+        )}
+
+        {/* Weekly Adherence Chart - only for paid users with a plan */}
         {currentDietPlan && subscriptionPlan && subscriptionPlan.type !== 'gratuito' && (
           <motion.section
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.15 }}
           >
-            <AdherenceWidget />
+            <WeeklyAdherenceChart />
           </motion.section>
         )}
 
@@ -653,20 +693,12 @@ export default function Dashboard() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.3 }}
-            className="text-center py-12"
           >
-            <div className="w-20 h-20 rounded-full bg-muted flex items-center justify-center mx-auto mb-4">
-              <UtensilsCrossed className="w-10 h-10 text-muted-foreground" />
-            </div>
-            <h3 className="font-semibold text-foreground mb-2">
-              Nenhum plano gerado
-            </h3>
-            <p className="text-muted-foreground text-sm">
-              {isLinkedStudent 
-                ? 'Aguarde seu nutricionista criar seu plano alimentar'
-                : 'Clique no botão acima para gerar seu primeiro plano alimentar'
-              }
-            </p>
+            <EmptyPlanState
+              onGeneratePlan={generateMealPlanV5}
+              isGenerating={generating || generatingV5}
+              isLinkedStudent={isLinkedStudent}
+            />
           </motion.section>
         )}
 
