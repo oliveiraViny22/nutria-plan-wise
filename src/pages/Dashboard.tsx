@@ -57,6 +57,7 @@ import { useSuccessSound } from '@/hooks/useSuccessSound';
 import { supabase } from '@/integrations/supabase/client';
 import { DietPlan, Meal, GOALS, MEAL_NAMES, MealType } from '@/lib/types';
 import { toast } from 'sonner';
+import { UsageLimitsBadge } from '@/components/UsageLimitsBadge';
 
 export default function Dashboard() {
   const { profile, signOut } = useAuth();
@@ -451,6 +452,24 @@ export default function Dashboard() {
               : 'Acompanhe seu plano alimentar'}
           </p>
         </motion.section>
+
+        {/* Usage Limits Summary - only show for non-admin, non-linked users */}
+        {!isAdmin && !isLinkedStudent && currentDietPlan && (
+          <motion.section
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.05 }}
+          >
+            <div className="flex flex-wrap gap-2">
+              <UsageLimitsBadge feature="diet" compact />
+              <UsageLimitsBadge feature="substitution" compact />
+              <UsageLimitsBadge feature="adjustment" compact />
+              {subscriptionPlan?.has_chat && (
+                <UsageLimitsBadge feature="chat" compact />
+              )}
+            </div>
+          </motion.section>
+        )}
 
         {/* Stats Cards + Goals - Reorganized layout */}
         <motion.section
