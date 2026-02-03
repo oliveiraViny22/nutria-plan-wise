@@ -31,7 +31,7 @@ import { GENERATOR_CONTRACT } from "../_shared/nutrition-contracts.ts";
 import type { Food, MacroTargets, MealWithOptions, MealResult, UserProfile } from "./types.ts";
 import { MEAL_NAMES, MEAL_TYPES_MAP } from "./constants.ts";
 import { logInfo, logError } from "./logger.ts";
-import { filterEligibleFoods } from "./food-filter.ts";
+import { filterEligibleFoods, validateFatShare } from "./food-filter.ts";
 import { loadAnchorFoods } from "./anchor-selection.ts";
 import { loadTemplatesWithRoles } from "./template-loader.ts";
 import { buildMealWithAnchors } from "./meal-builder.ts";
@@ -188,6 +188,35 @@ serve(async (req) => {
     // Extrair primeira opção de cada refeição para validação
     let meals: MealResult[] = mealsWithOptions.map(m => m.options[0]);
 
+    // Definir alvos de macros (movido para antes das validações)
+    const targets: MacroTargets = {
+      calories: profile.daily_calories || 2000,
+      protein: profile.protein_target || 100,
+      carbs: profile.carbs_target || 250,
+      fat: profile.fat_target || 65,
+    };
+
+    // NOVO v5.1: Validar dominância de gordura por alimento
+    const allFoodsWithQuantity = meals.flatMap(m => 
+      m.foods.map(f => ({ food: f.food, quantity_grams: f.quantity_grams }))
+    );
+    
+    const fatShareValidation = validateFatShare(allFoodsWithQuantity, targets.fat);
+    
+    if (fatShareValidation.status === "FAIL") {
+      logError("Dominância de gordura detectada", fatShareValidation);
+      return createErrorResponse(
+        `Plano estruturalmente inválido: ${fatShareValidation.food} contribui ${fatShareValidation.fatShare}% da gordura diária`,
+        400,
+        corsHeaders,
+        { 
+          code: "FAT_DOMINANCE_DETECTED", 
+          details: fatShareValidation,
+          action: "Regenerar plano ou trocar alimento por opção mais magra"
+        }
+      );
+    }
+
     // Validar estrutura
     const validation = validateStructure(meals);
 
@@ -201,16 +230,9 @@ serve(async (req) => {
       );
     }
 
-    logInfo("Validação estrutural OK");
+    logInfo("Validação estrutural OK (incluindo fat share)");
 
     // Ajuste proporcional para fechar metas calóricas
-    const targets: MacroTargets = {
-      calories: profile.daily_calories || 2000,
-      protein: profile.protein_target || 100,
-      carbs: profile.carbs_target || 250,
-      fat: profile.fat_target || 65,
-    };
-    
     const scaleResult = scaleToCalorieTarget(mealsWithOptions, targets);
     
     logInfo("Ajuste calórico aplicado", {

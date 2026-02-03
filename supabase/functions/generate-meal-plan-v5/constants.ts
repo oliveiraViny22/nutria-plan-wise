@@ -86,3 +86,26 @@ export const ROLE_ALIASES: Record<string, string[]> = {
   laticinio: ["laticinios"],
   laticinios: ["laticinio"],
 };
+
+// =====================================================
+// CONTROLE DE PROTEÍNAS GORDAS (v5.1)
+// =====================================================
+
+/** Critérios para proteínas magras (elegíveis como base) */
+export const LEAN_PROTEIN_RULES = {
+  MIN_PROTEIN_PER_100G: 15,      // g mínimo de proteína
+  MAX_FAT_PER_100G: 10,          // g máximo de gordura
+  MAX_CALORIES_PER_100G: 200,    // kcal máximo
+};
+
+/** Critérios para proteínas gordas (bloqueadas como base) */
+export const HIGH_FAT_PROTEIN_RULES = {
+  FAT_PER_100G: 20,              // g de gordura (threshold)
+  CALORIES_PER_100G: 300,        // kcal (threshold)
+};
+
+/** Failsafe nutricional: nenhum alimento domina a gordura diária */
+export const MAX_FAT_SHARE_PER_FOOD = 0.6; // 60% da gordura diária
+
+/** Porção máxima para proteínas gordas (quando permitidas) */
+export const MAX_HIGH_FAT_PROTEIN_PORTION = 40; // g

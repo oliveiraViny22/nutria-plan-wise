@@ -7,8 +7,12 @@ import {
   EXCLUDED_PURE_FATS, 
   HIGH_FAT_FOODS,
   CATEGORY_QUANTITY_LIMITS,
+  LEAN_PROTEIN_RULES,
+  HIGH_FAT_PROTEIN_RULES,
+  MAX_HIGH_FAT_PROTEIN_PORTION,
+  MAX_FAT_SHARE_PER_FOOD,
 } from "./constants.ts";
-import { logDebug } from "./logger.ts";
+import { logDebug, logWarn } from "./logger.ts";
 import {
   isValidCategory,
   EXCLUDED_FROM_AUTO_PLAN,
@@ -23,6 +27,39 @@ export function isPureFat(foodName: string): boolean {
 export function isHighFatFood(foodName: string): boolean {
   const nameLower = foodName.toLowerCase();
   return HIGH_FAT_FOODS.some(term => nameLower.includes(term));
+}
+
+// =====================================================
+// CLASSIFICAÇÃO DE PROTEÍNAS (v5.1)
+// =====================================================
+
+/**
+ * Verifica se um alimento é uma proteína magra elegível como base.
+ * Critério: alta proteína, baixa gordura, calorias controladas.
+ */
+export function isLeanProtein(food: Food): boolean {
+  return (
+    food.protein >= LEAN_PROTEIN_RULES.MIN_PROTEIN_PER_100G &&
+    food.fat <= LEAN_PROTEIN_RULES.MAX_FAT_PER_100G &&
+    food.calories <= LEAN_PROTEIN_RULES.MAX_CALORIES_PER_100G
+  );
+}
+
+/**
+ * Verifica se um alimento é uma proteína com alta gordura (bloqueada como base).
+ * Critério: tem proteína significativa mas gordura dominante ou calorias altas.
+ */
+export function isHighFatProtein(food: Food): boolean {
+  // Precisa ter proteína mínima para ser considerada "proteína"
+  if (food.protein < LEAN_PROTEIN_RULES.MIN_PROTEIN_PER_100G) {
+    return false;
+  }
+  
+  return (
+    food.fat >= HIGH_FAT_PROTEIN_RULES.FAT_PER_100G ||
+    food.fat > food.protein || // gordura domina a proteína
+    food.calories >= HIGH_FAT_PROTEIN_RULES.CALORIES_PER_100G
+  );
 }
 
 /**
@@ -123,9 +160,30 @@ function calculateNutritionalScore(
   return score;
 }
 
+// =====================================================
+// PAPÉIS QUE EXIGEM PROTEÍNA MAGRA
+// =====================================================
+
+const LEAN_PROTEIN_REQUIRED_ROLES = [
+  "proteina_principal",
+  "proteina",
+  "proteina_base",
+];
+
+/**
+ * Verifica se um papel exige proteína magra.
+ */
+function requiresLeanProtein(roleName: string): boolean {
+  return LEAN_PROTEIN_REQUIRED_ROLES.some(r => 
+    roleName.toLowerCase().includes(r)
+  );
+}
+
 /**
  * Seleciona um alimento para um papel usando seleção ponderada.
  * Prioriza alimentos preferidos E que melhor preenchem déficits de macros.
+ * 
+ * v5.1: Papéis de proteína base exigem proteínas magras.
  */
 export function selectFoodForRole(
   role: TemplateRole,
@@ -135,15 +193,53 @@ export function selectFoodForRole(
   macroDeficits?: MacroDeficits
 ): Food | null {
   const preferredSet = new Set(preferredFoods.map((p) => p.toLowerCase()));
+  const isProteinBaseRole = requiresLeanProtein(role.role_name);
 
   // Filtrar por categorias do papel
-  const candidates = eligibleFoods.filter((f) => {
+  let candidates = eligibleFoods.filter((f) => {
     if (usedFoodIds.has(f.id)) return false;
     const cat = (f.category || "").toLowerCase();
-    return role.categories.includes(cat);
+    if (!role.categories.includes(cat)) return false;
+    
+    // v5.1: Papéis de proteína base exigem proteínas magras
+    if (isProteinBaseRole && cat === "proteinas") {
+      // Bloquear proteínas com alta gordura
+      if (isHighFatProtein(f)) {
+        logDebug("Bloqueando proteína gorda como base", {
+          name: f.name,
+          fat: f.fat,
+          protein: f.protein,
+          calories: f.calories,
+        });
+        return false;
+      }
+      
+      // Preferir proteínas magras
+      if (!isLeanProtein(f)) {
+        logDebug("Proteína rejeitada por não ser magra", { name: f.name });
+        return false;
+      }
+    }
+    
+    return true;
   });
 
-  if (candidates.length === 0) return null;
+  if (candidates.length === 0) {
+    // Fallback: se não há proteínas magras, aceitar não-gordas
+    if (isProteinBaseRole) {
+      logWarn("Nenhuma proteína magra disponível, usando fallback");
+      candidates = eligibleFoods.filter((f) => {
+        if (usedFoodIds.has(f.id)) return false;
+        const cat = (f.category || "").toLowerCase();
+        if (!role.categories.includes(cat)) return false;
+        // Ainda bloquear as muito gordas
+        if (cat === "proteinas" && isHighFatProtein(f)) return false;
+        return true;
+      });
+    }
+    
+    if (candidates.length === 0) return null;
+  }
 
   // Identificar alimentos preferidos
   const preferred = candidates.filter((f) => {
@@ -256,6 +352,8 @@ export function calculateSmartQuantity(
 /**
  * Calcula quantidade aproximada baseada no papel e limites da categoria.
  * Mantida para compatibilidade - usar calculateSmartQuantity quando possível.
+ * 
+ * v5.1: Limita porções de proteínas gordas.
  */
 export function calculateApproximateQuantity(role: TemplateRole, food?: Food): number {
   let mid = (role.min_quantity_grams + role.max_quantity_grams) / 2;
@@ -278,6 +376,17 @@ export function calculateApproximateQuantity(role: TemplateRole, food?: Food): n
       logDebug("Limitando porção de alimento gorduroso", { name: food.name, max });
     }
     
+    // v5.1: Proteínas gordas têm limite de porção adicional
+    if (isHighFatProtein(food)) {
+      max = Math.min(max, MAX_HIGH_FAT_PROTEIN_PORTION);
+      logDebug("Limitando porção de proteína gorda", { 
+        name: food.name, 
+        max,
+        fat: food.fat,
+        protein: food.protein 
+      });
+    }
+    
     mid = (min + max) / 2;
   }
 
@@ -287,4 +396,56 @@ export function calculateApproximateQuantity(role: TemplateRole, food?: Food): n
 
   // Arredondar para 5g
   return Math.round(clamped / 5) * 5;
+}
+
+// =====================================================
+// VALIDAÇÃO DE DOMINÂNCIA DE GORDURA (v5.1)
+// =====================================================
+
+interface FoodWithQuantity {
+  food: Food;
+  quantity_grams: number;
+}
+
+interface FatShareValidation {
+  status: "PASS" | "FAIL";
+  reason?: string;
+  food?: string;
+  fatShare?: number;
+}
+
+/**
+ * Valida que nenhum alimento domina a gordura diária do plano.
+ * Nenhum alimento deve contribuir mais que MAX_FAT_SHARE_PER_FOOD (60%) da gordura.
+ */
+export function validateFatShare(
+  foods: FoodWithQuantity[],
+  targetFat: number
+): FatShareValidation {
+  if (targetFat <= 0) {
+    return { status: "PASS" };
+  }
+
+  for (const item of foods) {
+    const foodFatContrib = (item.food.fat / 100) * item.quantity_grams;
+    const fatShare = foodFatContrib / targetFat;
+    
+    if (fatShare > MAX_FAT_SHARE_PER_FOOD) {
+      logWarn("Alimento domina gordura do plano", {
+        name: item.food.name,
+        fatContrib: foodFatContrib.toFixed(1),
+        targetFat,
+        share: `${(fatShare * 100).toFixed(0)}%`,
+      });
+      
+      return {
+        status: "FAIL",
+        reason: `Alimento excede ${MAX_FAT_SHARE_PER_FOOD * 100}% da gordura diária`,
+        food: item.food.name,
+        fatShare: Math.round(fatShare * 100),
+      };
+    }
+  }
+
+  return { status: "PASS" };
 }
