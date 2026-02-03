@@ -1719,13 +1719,20 @@ serve(async (req) => {
     const anyConverged = optionResults.some(r => r.converged);
 
     // Determinar status baseado na validação final
+    // CORRIGIDO: Priorizar o status da validação final sobre a convergência
     let status: "valid" | "valid_with_alert" | "error";
-    if (finalValidation.status === "VALIDATED" && allConverged) {
-      status = "valid";
-    } else if (finalValidation.status === "VALIDATED_WITH_TOLERANCE" || anyConverged) {
+    if (finalValidation.status === "VALIDATED") {
+      // Plano validado - status depende apenas se convergiu perfeitamente
+      status = allConverged ? "valid" : "valid_with_alert";
+    } else if (finalValidation.status === "VALIDATED_WITH_TOLERANCE") {
+      // Validado com tolerância clínica - sempre alerta
       status = "valid_with_alert";
-    } else {
+    } else if (finalValidation.status === "STRUCTURALLY_INVALID") {
+      // Estruturalmente inválido - erro
       status = "error";
+    } else {
+      // Fallback para casos não mapeados
+      status = anyConverged ? "valid_with_alert" : "error";
     }
 
     // Calcular totais iniciais para compatibilidade
