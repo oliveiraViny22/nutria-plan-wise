@@ -12,12 +12,14 @@ import { Button } from '@/components/ui/button';
 import { MobileNav } from '@/components/MobileNav';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { MacroChart } from '@/components/MacroChart';
+import { SupplementCard } from '@/components/SupplementCard';
 import { supabase } from '@/integrations/supabase/client';
 import { useLinkedStudent } from '@/hooks/useLinkedStudent';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useAccountPermissions } from '@/hooks/useAccountPermissions';
 import { useSubscription } from '@/hooks/useSubscription';
 import { useSubstitution } from '@/hooks/useSubstitution';
+import { useAuth } from '@/contexts/AuthContext';
 import { Meal, Food, MEAL_NAMES, MealType, MealOption, MealOptionFood } from '@/lib/types';
 import { getCategoryLabel, getCategoryColor, isValidCategory } from '@/lib/food-categories';
 import { toast } from 'sonner';
@@ -79,6 +81,7 @@ export default function MealDetail() {
   const { mealId } = useParams();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const { profile } = useAuth();
   const { isLinkedStudent } = useLinkedStudent();
   const { isProfessional } = useUserRole();
   
@@ -577,6 +580,23 @@ export default function MealDetail() {
                     );
                   })}
                 </motion.section>
+
+                {/* Supplement Card - Only if user has supplements enabled */}
+                {(profile as any)?.include_supplements && meal?.name && profile?.goal && (
+                  <motion.section 
+                    initial={{ opacity: 0, y: 10 }} 
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.2 }}
+                  >
+                    <SupplementCard
+                      mealType={meal.name}
+                      goal={profile.goal}
+                      mealName={MEAL_NAMES[meal.name as MealType] || meal.name}
+                      dailyCalories={profile.daily_calories || undefined}
+                      proteinTarget={profile.protein_target || undefined}
+                    />
+                  </motion.section>
+                )}
               </TabsContent>
             ))}
           </Tabs>
