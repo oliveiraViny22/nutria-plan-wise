@@ -397,77 +397,81 @@ export default function MealPlanPage() {
           </div>
         </section>
 
-        <Separator className="print:hidden" />
+        {/* Supplements Section - Only show if toggle is enabled */}
+        {profile?.include_supplements && (
+          <>
+            <Separator className="print:hidden" />
 
-        {/* Supplements Section */}
-        <section className="print:break-before-page">
-          <div className="flex items-center gap-2 mb-4">
-            <Pill className="w-5 h-5 text-purple-500" />
-            <h2 className="text-xl font-semibold">Suplementação Recomendada</h2>
-          </div>
-
-          <Card className="border-purple-500/20 bg-gradient-to-br from-purple-500/5 to-transparent">
-            <CardContent className="pt-6">
-              <p className="text-sm text-muted-foreground mb-4">
-                As sugestões de suplementação são personalizadas com base no seu objetivo e podem ser 
-                visualizadas em cada refeição. Abaixo está um resumo geral:
-              </p>
-
-              <div className="grid md:grid-cols-2 gap-4">
-                {/* Morning supplements */}
-                <div className="p-4 rounded-lg bg-background/60 border border-border/50">
-                  <h4 className="font-medium text-sm mb-2 flex items-center gap-2">
-                    🌅 Manhã
-                  </h4>
-                  <ul className="space-y-1 text-sm text-muted-foreground">
-                    <li>• Whey Protein (30g) - pós café da manhã</li>
-                    <li>• Creatina Monohidratada (5g) - dose única</li>
-                    <li>• Multivitamínico (1 cápsula)</li>
-                  </ul>
-                </div>
-
-                {/* Afternoon supplements */}
-                <div className="p-4 rounded-lg bg-background/60 border border-border/50">
-                  <h4 className="font-medium text-sm mb-2 flex items-center gap-2">
-                    ☀️ Tarde
-                  </h4>
-                  <ul className="space-y-1 text-sm text-muted-foreground">
-                    <li>• Whey Protein (30g) - lanche da tarde</li>
-                    <li>• BCAA (5g) - se treinar</li>
-                  </ul>
-                </div>
-
-                {/* Evening supplements */}
-                <div className="p-4 rounded-lg bg-background/60 border border-border/50">
-                  <h4 className="font-medium text-sm mb-2 flex items-center gap-2">
-                    🌙 Noite
-                  </h4>
-                  <ul className="space-y-1 text-sm text-muted-foreground">
-                    <li>• Ômega-3 (1000mg) - com o jantar</li>
-                    <li>• Zinco (15mg) - antes de dormir</li>
-                    <li>• Magnésio (200mg) - antes de dormir</li>
-                  </ul>
-                </div>
-
-                {/* Before sleep */}
-                <div className="p-4 rounded-lg bg-background/60 border border-border/50">
-                  <h4 className="font-medium text-sm mb-2 flex items-center gap-2">
-                    😴 Antes de Dormir
-                  </h4>
-                  <ul className="space-y-1 text-sm text-muted-foreground">
-                    <li>• Caseína (30g) - proteína de absorção lenta</li>
-                    <li>• ZMA - para recuperação noturna</li>
-                  </ul>
-                </div>
+            <section className="print:break-before-page">
+              <div className="flex items-center gap-2 mb-4">
+                <Pill className="w-5 h-5 text-purple-500" />
+                <h2 className="text-xl font-semibold">Suplementação Recomendada</h2>
               </div>
 
-              <p className="text-xs text-muted-foreground mt-4 italic">
-                ⚠️ Suplementos são opcionais e complementares à alimentação. 
-                Consulte um profissional de saúde antes de iniciar qualquer suplementação.
-              </p>
-            </CardContent>
-          </Card>
-        </section>
+              <Card className="border-purple-500/20 bg-gradient-to-br from-purple-500/5 to-transparent">
+                <CardContent className="pt-6">
+                  <p className="text-sm text-muted-foreground mb-4">
+                    As sugestões de suplementação são personalizadas com base no seu objetivo e podem ser 
+                    visualizadas em cada refeição. Abaixo está um resumo geral:
+                  </p>
+
+                  <div className="grid md:grid-cols-2 gap-4">
+                    {/* Morning supplements */}
+                    <div className="p-4 rounded-lg bg-background/60 border border-border/50">
+                      <h4 className="font-medium text-sm mb-2 flex items-center gap-2">
+                        🌅 Manhã
+                      </h4>
+                      <ul className="space-y-1 text-sm text-muted-foreground">
+                        <li>• Whey Protein (30g) - pós café da manhã</li>
+                        <li>• Creatina Monohidratada (5g) - dose única</li>
+                        <li>• Multivitamínico (1 cápsula)</li>
+                      </ul>
+                    </div>
+
+                    {/* Afternoon supplements */}
+                    <div className="p-4 rounded-lg bg-background/60 border border-border/50">
+                      <h4 className="font-medium text-sm mb-2 flex items-center gap-2">
+                        ☀️ Tarde
+                      </h4>
+                      <ul className="space-y-1 text-sm text-muted-foreground">
+                        <li>• Whey Protein (30g) - lanche da tarde</li>
+                        <li>• BCAA (5g) - se treinar</li>
+                      </ul>
+                    </div>
+
+                    {/* Evening supplements */}
+                    <div className="p-4 rounded-lg bg-background/60 border border-border/50">
+                      <h4 className="font-medium text-sm mb-2 flex items-center gap-2">
+                        🌙 Noite
+                      </h4>
+                      <ul className="space-y-1 text-sm text-muted-foreground">
+                        <li>• Ômega-3 (1000mg) - com o jantar</li>
+                        <li>• Zinco (15mg) - antes de dormir</li>
+                        <li>• Magnésio (200mg) - antes de dormir</li>
+                      </ul>
+                    </div>
+
+                    {/* Before sleep */}
+                    <div className="p-4 rounded-lg bg-background/60 border border-border/50">
+                      <h4 className="font-medium text-sm mb-2 flex items-center gap-2">
+                        😴 Antes de Dormir
+                      </h4>
+                      <ul className="space-y-1 text-sm text-muted-foreground">
+                        <li>• Caseína (30g) - proteína de absorção lenta</li>
+                        <li>• ZMA - para recuperação noturna</li>
+                      </ul>
+                    </div>
+                  </div>
+
+                  <p className="text-xs text-muted-foreground mt-4 italic">
+                    ⚠️ Suplementos são opcionais e complementares à alimentação. 
+                    Consulte um profissional de saúde antes de iniciar qualquer suplementação.
+                  </p>
+                </CardContent>
+              </Card>
+            </section>
+          </>
+        )}
 
         <Separator className="print:hidden" />
 
