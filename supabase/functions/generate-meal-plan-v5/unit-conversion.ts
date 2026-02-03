@@ -35,8 +35,9 @@ export function applyUnitConversion(
   const finalGrams = roundedUnits * food.unit_weight_grams;
   const errorPercent = grams > 0 ? (Math.abs(finalGrams - grams) / grams) * 100 : 0;
 
-  // Tolerância de 5%
-  if (errorPercent <= 5) {
+  // Tolerância de 15% para permitir conversões práticas em unidades naturais
+  // Ex: 135g de pão francês → 3 unidades (150g) = 11% erro → aceitável
+  if (errorPercent <= 15) {
     return {
       display_quantity: roundedUnits,
       display_unit: food.unit_name,
