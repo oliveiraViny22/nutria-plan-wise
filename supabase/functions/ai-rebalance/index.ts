@@ -25,12 +25,19 @@ const corsHeaders = {
 // ============================================
 
 type Objective = "cut" | "maintain" | "bulk";
+type G10Status = "PASS" | "ALLOW_REBALANCE";
 
 interface MacroTargets {
   calories: number;
   protein: number;
   carbs: number;
   fat: number;
+}
+
+interface G10Metadata {
+  g10Status: G10Status;
+  implicitFatRatio: number;
+  implicitFatWarning?: string;
 }
 
 interface MealOptionFood {
@@ -94,6 +101,12 @@ interface RebalanceResult {
     original_grams: number;
     new_grams: number;
   }>;
+  // NOVO: Metadados G-10
+  meta?: {
+    g10Status: G10Status;
+    implicitFatRatio: number;
+    normalizationApplied: boolean;
+  };
 }
 
 // ============================================
@@ -487,6 +500,7 @@ interface CorrectionPipelineResult {
   adjustments: Adjustment[];
   iterations: number;
   converged: boolean;
+  normalizationApplied: boolean;
   structurallyInvalid?: {
     reason: string;
     fat_percent: number;
@@ -501,10 +515,12 @@ function runCorrectionPipeline(
   targets: MacroTargets,
   objective: Objective,
   settings: OptimizerSettings,
+  g10Metadata: G10Metadata,
   maxCycles: number = 3
 ): CorrectionPipelineResult {
   const adjustments: Adjustment[] = [];
   let iterations = 0;
+  let normalizationApplied = false;
 
   // Pré-calcular contribuições por 100g
   const contributions = new Map<string, MacroTargets>();
@@ -553,7 +569,7 @@ function runCorrectionPipeline(
 
     if (validation.valid) {
       console.log(`Plano válido após ${iterations} ciclo(s)`);
-      return { quantities, adjustments, iterations, converged: true };
+      return { quantities, adjustments, iterations, converged: true, normalizationApplied };
     }
 
     console.log(`Ciclo ${iterations}: ${validation.errors.join("; ")}`);
@@ -788,11 +804,20 @@ function runCorrectionPipeline(
     // Corrige excesso de gordura proveniente de fontes mistas (proteína + gordura)
     // ANTES de qualquer tentativa de adicionar gordura (Etapa 5).
     // Esta etapa NUNCA adiciona gordura - apenas reduz ou substitui.
+    //
+    // REGRA G-10 PROGRESSIVA:
+    // - Se g10Status === "ALLOW_REBALANCE", esta etapa é OBRIGATÓRIA
+    // - Deve normalizar antes de qualquer validação
     
     const preNormalizationTotals = calculateTotals(foods, quantities);
     const preNormalizationPercents = calculatePercents(preNormalizationTotals, targets);
     
+    // Condição para executar: 
+    // 1. g10Status === "ALLOW_REBALANCE" (OBRIGATÓRIO)
+    // 2. OU condições antigas (fat > 110%, calories > 105%, ou gordura moderadamente alta)
+    const isG10AllowRebalance = g10Metadata.g10Status === "ALLOW_REBALANCE";
     const shouldRunNormalization = 
+      isG10AllowRebalance ||
       preNormalizationPercents.fat > 110 || 
       preNormalizationPercents.calories > 105 ||
       (preNormalizationPercents.protein >= 95 && 
@@ -801,6 +826,10 @@ function runCorrectionPipeline(
        preNormalizationPercents.fat > 100);
     
     if (shouldRunNormalization) {
+      normalizationApplied = true;
+      console.log(`[ETAPA 4.5] Iniciando normalização de gordura implícita`);
+      console.log(`[ETAPA 4.5] G-10 Status: ${g10Metadata.g10Status}, Ratio: ${g10Metadata.implicitFatRatio}`);
+      console.log(`[ETAPA 4.5] Estado atual: Gordura ${preNormalizationPercents.fat.toFixed(1)}%, Calorias ${preNormalizationPercents.calories.toFixed(1)}%`);
       console.log(`[ETAPA 4.5] Iniciando normalização de gordura implícita`);
       console.log(`[ETAPA 4.5] Estado atual: Gordura ${preNormalizationPercents.fat.toFixed(1)}%, Calorias ${preNormalizationPercents.calories.toFixed(1)}%`);
       
@@ -892,6 +921,7 @@ function runCorrectionPipeline(
             adjustments,
             iterations,
             converged: false,
+            normalizationApplied: true,
             structurallyInvalid: {
               reason: "Excesso de gordura proveniente de fontes mistas (proteína + gordura)",
               fat_percent: Math.round(afterNormPercents.fat * 10) / 10,
@@ -911,18 +941,29 @@ function runCorrectionPipeline(
     // ETAPA 5: ADIÇÃO DE GORDURA (CONDICIONAL)
     // ==========================================
     // Gordura SÓ pode ser adicionada se TODAS as condições forem atendidas:
+    // - g10Status NÃO é "ALLOW_REBALANCE" (bloqueado quando há excesso moderado)
     // - Proteína ≥ 95% da meta
     // - Carboidratos entre 90% e 110% da meta
     // - Calorias totais <= 95% da meta
     // - Não há mais ajuste possível em proteína ou carbs
+    //
+    // REGRA G-10: Quando g10Status === "ALLOW_REBALANCE", esta etapa é BLOQUEADA
+    // O plano não pode ter gordura adicionada até que a normalização resolva o excesso.
+    
     const afterFatReduction = calculateTotals(foods, quantities);
     const afterFatPercents = calculatePercents(afterFatReduction, targets);
 
-    const proteinOk = afterFatPercents.protein >= 95;
-    const carbsOk = afterFatPercents.carbs >= 90 && afterFatPercents.carbs <= 110;
-    const caloriesLow = afterFatPercents.calories <= 95;
+    // BLOQUEIO G-10: Se status é ALLOW_REBALANCE, não adicionar gordura
+    if (g10Metadata.g10Status === "ALLOW_REBALANCE") {
+      console.log(`[ETAPA 5] ⛔ BLOQUEADA - g10Status é ALLOW_REBALANCE`);
+      console.log(`[ETAPA 5] Gordura atual: ${afterFatPercents.fat.toFixed(1)}%, Calorias: ${afterFatPercents.calories.toFixed(1)}%`);
+      // Pular diretamente para próxima iteração ou saída
+    } else {
+      const proteinOk = afterFatPercents.protein >= 95;
+      const carbsOk = afterFatPercents.carbs >= 90 && afterFatPercents.carbs <= 110;
+      const caloriesLow = afterFatPercents.calories <= 95;
 
-    if (proteinOk && carbsOk && caloriesLow) {
+      if (proteinOk && carbsOk && caloriesLow) {
       const caloricDeficit = targets.calories - afterFatReduction.calories;
       const fatNeeded = Math.round(caloricDeficit / 9); // 9 kcal por grama de gordura
       
@@ -976,20 +1017,21 @@ function runCorrectionPipeline(
           });
         }
       }
-    } else {
-      if (!proteinOk) {
-        console.log(`[ETAPA 5] Proteína insuficiente (${afterFatPercents.protein.toFixed(1)}% < 95%) - não adicionar gordura`);
+      } else {
+        if (!proteinOk) {
+          console.log(`[ETAPA 5] Proteína insuficiente (${afterFatPercents.protein.toFixed(1)}% < 95%) - não adicionar gordura`);
+        }
+        if (!carbsOk) {
+          console.log(`[ETAPA 5] Carboidratos fora do range (${afterFatPercents.carbs.toFixed(1)}%) - não adicionar gordura`);
+        }
+        if (!caloriesLow) {
+          console.log(`[ETAPA 5] Calorias não estão baixas (${afterFatPercents.calories.toFixed(1)}%) - não adicionar gordura`);
+        }
       }
-      if (!carbsOk) {
-        console.log(`[ETAPA 5] Carboidratos fora do range (${afterFatPercents.carbs.toFixed(1)}%) - não adicionar gordura`);
-      }
-      if (!caloriesLow) {
-        console.log(`[ETAPA 5] Calorias não estão baixas (${afterFatPercents.calories.toFixed(1)}%) - não adicionar gordura`);
-      }
-    }
+    } // Fim do else (g10Status !== "ALLOW_REBALANCE")
   }
 
-  return { quantities, adjustments, iterations, converged: false };
+  return { quantities, adjustments, iterations, converged: false, normalizationApplied };
 }
 
 // ============================================
@@ -1014,7 +1056,7 @@ serve(async (req) => {
   }
 
   try {
-    const { planId, targets, goal } = await req.json();
+    const { planId, targets, goal, g10_status, implicit_fat_ratio, implicit_fat_warning } = await req.json();
 
     if (!planId || !targets) {
       return new Response(
@@ -1032,7 +1074,16 @@ serve(async (req) => {
 
     // Mapear objetivo
     const objective = mapGoalToObjective(goal);
+    
+    // Construir metadados G-10 (default para PASS se não fornecido)
+    const g10Metadata: G10Metadata = {
+      g10Status: (g10_status as G10Status) || "PASS",
+      implicitFatRatio: implicit_fat_ratio || 0,
+      implicitFatWarning: implicit_fat_warning,
+    };
+    
     console.log(`Objetivo: ${objective} (goal recebido: ${goal})`);
+    console.log(`G-10 Metadata: status=${g10Metadata.g10Status}, ratio=${g10Metadata.implicitFatRatio}`);
     console.log(`Usando settings: prot_floor=${settings.protein_floor}%, cal_tol=${settings.calories_tolerance}%`);
 
     // Buscar refeições
@@ -1084,6 +1135,7 @@ serve(async (req) => {
       adjustments: Adjustment[];
       iterations: number;
       converged: boolean;
+      normalizationApplied: boolean;
       foodChanges: Array<{
         food_id: string;
         food_name: string;
@@ -1144,6 +1196,7 @@ serve(async (req) => {
           adjustments: [],
           iterations: 0,
           converged: true,
+          normalizationApplied: false,
           foodChanges: [],
         });
         continue;
@@ -1159,6 +1212,7 @@ serve(async (req) => {
         targets, 
         objective,
         settings,
+        g10Metadata,
         3
       );
 
@@ -1249,6 +1303,7 @@ serve(async (req) => {
         adjustments: pipelineResult.adjustments,
         iterations: totalIterations,
         converged: refinementResult.converged,
+        normalizationApplied: pipelineResult.normalizationApplied,
         foodChanges: optionFoodChanges,
       });
     }
@@ -1283,6 +1338,9 @@ serve(async (req) => {
     const allFoodChanges = optionResults.flatMap(r => r.foodChanges);
     const totalIterations = Math.max(...optionResults.map(r => r.iterations));
 
+    // Verificar se normalization foi aplicada em alguma opção
+    const anyNormalizationApplied = optionResults.some(r => r.normalizationApplied);
+
     const result: RebalanceResult = {
       status,
       objective,
@@ -1295,14 +1353,21 @@ serve(async (req) => {
         original_grams: fc.original_grams,
         new_grams: fc.new_grams,
       })),
+      // NOVO: Metadados G-10
+      meta: {
+        g10Status: g10Metadata.g10Status,
+        implicitFatRatio: g10Metadata.implicitFatRatio,
+        normalizationApplied: anyNormalizationApplied,
+      },
     };
 
     // Log de resumo
     console.log(`\n=== RESUMO ===`);
+    console.log(`G-10 Status: ${g10Metadata.g10Status}, Normalization Applied: ${anyNormalizationApplied}`);
     for (const opt of optionResults) {
       const calDiff = Math.abs(opt.finalTotals.calories - targets.calories);
       const protDiff = Math.abs(opt.finalTotals.protein - targets.protein);
-      console.log(`Opção ${opt.optionNumber}: Cal ±${calDiff.toFixed(0)}kcal, Prot ±${protDiff.toFixed(1)}g, Convergiu: ${opt.converged}`);
+      console.log(`Opção ${opt.optionNumber}: Cal ±${calDiff.toFixed(0)}kcal, Prot ±${protDiff.toFixed(1)}g, Convergiu: ${opt.converged}, Norm: ${opt.normalizationApplied}`);
     }
 
     // Retornar no formato esperado pelo frontend
@@ -1312,6 +1377,12 @@ serve(async (req) => {
       currentMacros: currentTotals,
       targetMacros: targets,
       proposedMacros: primaryResult.finalTotals,
+      // NOVO: Metadados G-10 no nível raiz para fácil acesso
+      g10Meta: {
+        g10Status: g10Metadata.g10Status,
+        implicitFatRatio: g10Metadata.implicitFatRatio,
+        normalizationApplied: anyNormalizationApplied,
+      },
       // Incluir resultados de todas as opções
       optionResults: optionResults.map(opt => ({
         optionNumber: opt.optionNumber,
@@ -1319,6 +1390,7 @@ serve(async (req) => {
         iterations: opt.iterations,
         finalTotals: opt.finalTotals,
         foodChanges: opt.foodChanges.length,
+        normalizationApplied: opt.normalizationApplied,
       })),
       adjustments: allFoodChanges.map((fc) => ({
         mealOptionFoodId: fc.mealOptionFoodId,
@@ -1333,7 +1405,7 @@ serve(async (req) => {
       })),
       explanation: status === "error"
         ? `Não foi possível atingir as metas. Verifique se as metas são realistas para os alimentos disponíveis.`
-        : `Plano ajustado em ${totalIterations} iteração(ões) para ${objective === "cut" ? "emagrecimento" : objective === "bulk" ? "ganho de massa" : "manutenção"}. ${optionResults.length} opção(ões) processada(s).`,
+        : `Plano ajustado em ${totalIterations} iteração(ões) para ${objective === "cut" ? "emagrecimento" : objective === "bulk" ? "ganho de massa" : "manutenção"}. ${optionResults.length} opção(ões) processada(s).${anyNormalizationApplied ? ' Normalização de gordura implícita aplicada.' : ''}`,
       warnings: status === "error"
         ? primaryValidation.errors
         : status === "valid_with_alert"
