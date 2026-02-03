@@ -1198,6 +1198,92 @@ function runCorrectionPipeline(
     }
 
     // ==========================================
+    // ETAPA 4.6: CARB-FIRST LOGIC (BULK ONLY)
+    // ==========================================
+    // NO BULK: Calorias extras DEVEM vir primeiro de carboidratos.
+    // Gordura só pode ser usada quando carboidratos já estiverem ≥100% da meta.
+    // Isso define prioridade energética, não substitui carbs ≥ 80%.
+    //
+    // REGRA CANÔNICA: Em bulk, quem cresce é o carbo.
+    // A gordura só entra quando o carbo já fez o trabalho.
+    
+    const beforeCarbFirst = calculateTotals(foods, quantities);
+    const beforeCarbFirstPercents = calculatePercents(beforeCarbFirst, targets);
+    
+    const BULK_CARB_FIRST_THRESHOLD = 100; // 100% da meta
+    const BULK_CARB_MAX = 110; // Não empurrar carbs além de 110%
+    
+    if (objective === "bulk") {
+      const caloriesPercent = beforeCarbFirstPercents.calories;
+      const carbsPercent = beforeCarbFirstPercents.carbs;
+      
+      console.log(`[ETAPA 4.6] BULK Carb-First: Cal=${caloriesPercent.toFixed(1)}%, Carbs=${carbsPercent.toFixed(1)}%`);
+      
+      // Se ainda falta caloria E carboidratos estão abaixo de 100%
+      if (caloriesPercent < 95 && carbsPercent < BULK_CARB_FIRST_THRESHOLD) {
+        console.log(`[ETAPA 4.6] Aplicando carb-first: aumentando carboidratos antes de permitir gordura`);
+        
+        // Calcular calorias faltantes
+        const targetCalories = targets.calories * 0.95; // Mínimo aceitável
+        const caloriesNeeded = targetCalories - beforeCarbFirst.calories;
+        
+        // Calcular quanto carbs podemos adicionar sem ultrapassar 110%
+        const maxCarbsGrams = targets.carbs * (BULK_CARB_MAX / 100);
+        const carbsToAdd = Math.min(
+          (caloriesNeeded / KCAL_PER_GRAM.carbs), // Gramas de carb para calorias necessárias
+          maxCarbsGrams - beforeCarbFirst.carbs   // Margem até 110%
+        );
+        
+        if (carbsToAdd > 5) {
+          // Distribuir entre alimentos de carboidrato
+          let remainingCarbsToAdd = carbsToAdd;
+          
+          for (const food of carbFoods) {
+            if (remainingCarbsToAdd <= 2) break;
+            
+            const contrib = contributions.get(food.id)!;
+            if (contrib.carbs <= 0) continue;
+            
+            const currentGrams = quantities.get(food.id) || food.quantity_grams;
+            const limits = getCategoryLimits(food.food.category);
+            
+            // Quanto gramas adicionar para atingir os carbs desejados
+            const gramsNeeded = (remainingCarbsToAdd * 100) / contrib.carbs;
+            const gramsToAdd = Math.min(gramsNeeded, limits.max - currentGrams);
+            
+            if (gramsToAdd < 5) continue;
+            
+            const newGrams = Math.round(currentGrams + gramsToAdd);
+            quantities.set(food.id, newGrams);
+            
+            const carbsAdded = (gramsToAdd / 100) * contrib.carbs;
+            const calsAdded = (gramsToAdd / 100) * contrib.calories;
+            remainingCarbsToAdd -= carbsAdded;
+            
+            console.log(`[ETAPA 4.6] +${Math.round(gramsToAdd)}g ${food.food.name} (+${carbsAdded.toFixed(1)}g carbs, +${Math.round(calsAdded)}kcal)`);
+            
+            adjustments.push({
+              nutrient: "carbs",
+              action: "increase",
+              delta: `+${Math.round(gramsToAdd)}g ${food.food.name} (carb-first)`,
+            });
+          }
+          
+          const afterCarbFirst = calculateTotals(foods, quantities);
+          const afterCarbFirstPercents = calculatePercents(afterCarbFirst, targets);
+          
+          console.log(`[ETAPA 4.6] Resultado: Cal=${afterCarbFirstPercents.calories.toFixed(1)}%, Carbs=${afterCarbFirstPercents.carbs.toFixed(1)}%`);
+        } else {
+          console.log(`[ETAPA 4.6] Pouco espaço para adicionar carbs (${carbsToAdd.toFixed(1)}g) - prosseguindo`);
+        }
+      } else if (caloriesPercent >= 95) {
+        console.log(`[ETAPA 4.6] Calorias já suficientes (${caloriesPercent.toFixed(1)}%) - carb-first não necessário`);
+      } else if (carbsPercent >= BULK_CARB_FIRST_THRESHOLD) {
+        console.log(`[ETAPA 4.6] Carbs já ≥100% (${carbsPercent.toFixed(1)}%) - gordura permitida se necessário`);
+      }
+    }
+
+    // ==========================================
     // ETAPA 5: ADIÇÃO DE GORDURA (CONDICIONAL)
     // ==========================================
     // Gordura SÓ pode ser adicionada se TODAS as condições forem atendidas:
@@ -1206,6 +1292,7 @@ function runCorrectionPipeline(
     // - Carboidratos entre 90% e 110% da meta
     // - Calorias totais <= 95% da meta
     // - Não há mais ajuste possível em proteína ou carbs
+    // - BULK: Carboidratos devem estar ≥100% da meta (carb-first rule)
     //
     // REGRA G-10: Quando g10Status === "ALLOW_REBALANCE", esta etapa é BLOQUEADA
     // O plano não pode ter gordura adicionada até que a normalização resolva o excesso.
@@ -1222,8 +1309,11 @@ function runCorrectionPipeline(
       const proteinOk = afterFatPercents.protein >= 95;
       const carbsOk = afterFatPercents.carbs >= 90 && afterFatPercents.carbs <= 110;
       const caloriesLow = afterFatPercents.calories <= 95;
+      
+      // BULK CARB-FIRST: Só permite gordura se carboidratos já estiverem ≥100%
+      const carbFirstOk = objective !== "bulk" || afterFatPercents.carbs >= BULK_CARB_FIRST_THRESHOLD;
 
-      if (proteinOk && carbsOk && caloriesLow) {
+      if (proteinOk && carbsOk && caloriesLow && carbFirstOk) {
       const caloricDeficit = targets.calories - afterFatReduction.calories;
       const fatNeeded = Math.round(caloricDeficit / 9); // 9 kcal por grama de gordura
       
