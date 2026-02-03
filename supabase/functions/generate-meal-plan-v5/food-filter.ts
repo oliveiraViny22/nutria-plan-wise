@@ -7,6 +7,9 @@ import {
   EXCLUDED_PURE_FATS, 
   HIGH_FAT_FOODS,
   CATEGORY_QUANTITY_LIMITS,
+  SNACK_QUANTITY_LIMITS,
+  BLOCKED_SNACK_PROTEINS,
+  ALLOWED_SNACK_PROTEINS,
   LEAN_PROTEIN_RULES,
   HIGH_FAT_PROTEIN_RULES,
   MAX_HIGH_FAT_PROTEIN_PORTION,
@@ -17,6 +20,7 @@ import {
   LEAN_CARB_RULES,
   HIGH_FAT_CARB_THRESHOLD,
   IMPLICIT_FAT_LIMITS,
+  SNACK_MEALS,
 } from "./constants.ts";
 import { logDebug, logWarn, logInfo } from "./logger.ts";
 import {
@@ -276,6 +280,35 @@ function requiresLeanProtein(roleName: string): boolean {
 }
 
 // =====================================================
+// CLASSIFICAÇÃO DE PROTEÍNAS PARA LANCHES (v5.8)
+// =====================================================
+
+/**
+ * Verifica se uma proteína é bloqueada para lanches.
+ * Frutos do mar, carnes que requerem preparo elaborado não são práticos.
+ */
+export function isBlockedSnackProtein(food: Food): boolean {
+  const nameLower = food.name.toLowerCase();
+  return BLOCKED_SNACK_PROTEINS.some(term => nameLower.includes(term));
+}
+
+/**
+ * Verifica se uma proteína é permitida para lanches.
+ * Proteínas práticas e fáceis de consumir.
+ */
+export function isAllowedSnackProtein(food: Food): boolean {
+  const nameLower = food.name.toLowerCase();
+  return ALLOWED_SNACK_PROTEINS.some(term => nameLower.includes(term));
+}
+
+/**
+ * Verifica se o papel é de proteína leve (para lanches).
+ */
+function isLightProteinRole(roleName: string): boolean {
+  return roleName.toLowerCase().includes("proteina_leve");
+}
+
+// =====================================================
 // CLASSIFICAÇÃO DE OLEAGINOSAS E PASTAS (v5.5)
 // =====================================================
 
@@ -393,18 +426,22 @@ function isCarbRole(roleName: string): boolean {
  * v5.1: Papéis de proteína base exigem proteínas magras.
  * v5.2: Papéis de laticínio preferem laticínios magros.
  * v5.3: Papéis de carboidrato bloqueiam carboidratos gordos (Granola, Croissant, etc.)
+ * v5.8: Papéis de proteína leve bloqueiam frutos do mar e carnes elaboradas.
  */
 export function selectFoodForRole(
   role: TemplateRole,
   eligibleFoods: Food[],
   usedFoodIds: Set<string>,
   preferredFoods: string[],
-  macroDeficits?: MacroDeficits
+  macroDeficits?: MacroDeficits,
+  mealType?: string
 ): Food | null {
   const preferredSet = new Set(preferredFoods.map((p) => p.toLowerCase()));
   const isProteinBaseRole = requiresLeanProtein(role.role_name);
   const isLaticinioRole = isDairyRole(role.role_name);
   const isCarbBaseRole = isCarbRole(role.role_name);
+  const isProteinaLeveRole = isLightProteinRole(role.role_name);
+  const isSnackMeal = mealType ? SNACK_MEALS.includes(mealType) : false;
 
   // Filtrar por categorias do papel
   let candidates = eligibleFoods.filter((f) => {
@@ -422,6 +459,24 @@ export function selectFoodForRole(
         protein: f.protein,
       });
       return false;
+    }
+    
+    // v5.8: Papéis de proteína leve (lanches) bloqueiam frutos do mar e carnes elaboradas
+    // EXCETO se o admin liberou manualmente
+    if (isProteinaLeveRole && cat === "proteinas" && !isManuallyUnblocked(f.id)) {
+      if (isBlockedSnackProtein(f)) {
+        logDebug("Bloqueando proteína imprática para lanche", {
+          name: f.name,
+          reason: "frutos do mar ou carne elaborada",
+        });
+        return false;
+      }
+      
+      // Preferir proteínas permitidas para lanches
+      if (!isAllowedSnackProtein(f) && !isManuallyUnblocked(f.id)) {
+        logDebug("Proteína não ideal para lanche, mas permitida como fallback", { name: f.name });
+        // Não bloqueia, apenas não prioriza
+      }
     }
     
     // v5.1: Papéis de proteína base exigem proteínas magras
