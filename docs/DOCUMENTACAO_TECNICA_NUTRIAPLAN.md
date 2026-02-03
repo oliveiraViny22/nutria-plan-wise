@@ -1,8 +1,8 @@
 # DOCUMENTAÇÃO TÉCNICA OFICIAL — NUTRIAPLAN
 
-## Versão do Documento: 2.6
+## Versão do Documento: 2.7
 ## Data de Geração: 18 de Janeiro de 2026
-## Última Atualização: 23 de Janeiro de 2026
+## Última Atualização: 03 de Fevereiro de 2026
 
 ---
 
@@ -10,6 +10,7 @@
 
 | Versão | Data | Alterações |
 |--------|------|------------|
+| 2.7 | 03/02/2026 | **Motor de Geração v5.5-v5.7 (Gordura Implícita)**: Implementadas regras estritas para garantir planos estruturalmente válidos. v5.5: Bloqueio global de oleaginosas/pastas de amendoim como seleções primárias (gordura 40-60g/100g). v5.6: Bloqueio de sementes gordurosas (Linhaça ≥30g fat, Chia, Gergelim, Soja em Grão). v5.7: Bloqueio de laticínios muito gordurosos (Leite de Coco, Queijos Amarelos ≥20g fat). **Rebalanceador ai-rebalance v5.5**: Alimentos gordura-dominante (fat ≥ protein) não são mais protegidos na fase de redução. Estágio 4.5 permite cortes de até 70% em fontes gordurosas. Resultado: convergência de ±1g nos macros e eliminação de planos STRUCTURALLY_INVALID. |
 | 2.6 | 23/01/2026 | **Fluxo de Alteração de Objetivo**: Implementado wizard guiado para alteração de objetivo com governança diferenciada por perfil. Usuários autônomos passam por wizard de 3 etapas (escolha, confirmação, recálculo). Alunos vinculados usam sistema de solicitações ao profissional. Tabela `objective_change_policies` para configuração de políticas. Novo tipo de solicitação `objective_change`. Recálculo automático de metas via Mifflin-St Jeor. |
 | 2.5 | 23/01/2026 | **Governança de Rebalanceamento por Adesão**: Implementada política que usa adesão como critério de governança. Alta (≥80%): rebalanceamento completo. Média (50-79%): apenas redistribuição/simplificação. Baixa (<50%): rebalanceamento bloqueado. Backend é fonte única de decisão. IA apenas consome permissões. |
 | 2.4 | 21/01/2026 | Auditoria completa de fluxos de usuário. Atualização de limites do plano gratuito (1 dieta, 3 substituições, 1 ajuste). Sincronização de permissões com banco de dados v2. Verificação de can_substitute no MealDetail. Correção de contagem de uso para ajustes no MacroRebalancer. |
@@ -2198,9 +2199,58 @@ TMB = 10 × peso(kg) + 6.25 × altura(cm) - 5 × idade - 161
 | **Adesão** | Taxa de conformidade com o plano alimentar |
 | **Grace Period** | Período de carência após falha de pagamento |
 | **Idempotência** | Garantia de que operação pode ser executada múltiplas vezes com mesmo resultado |
+| **Gordura Implícita** | Gordura proveniente de alimentos não classificados como "gorduras puras" (ex: proteínas, laticínios) |
+| **STRUCTURALLY_INVALID** | Status de plano impossível de rebalancear por composição inicial inadequada |
+
+## G. Regras de Gordura Implícita (v5.5-v5.7)
+
+O motor de geração `generate-meal-plan-v5` e o rebalanceador `ai-rebalance` implementam regras estritas para controlar a gordura implícita e garantir planos estruturalmente válidos.
+
+### G.1 Problema Resolvido
+
+Planos gerados com alta gordura implícita (140-170% da meta) eram impossíveis de rebalancear porque:
+1. Oleaginosas (50-65g fat/100g) estavam sendo selecionadas como fontes proteicas
+2. Laticínios gordurosos (20-30g fat/100g) dominavam a meta diária
+3. O rebalanceador protegia esses alimentos por terem proteína significativa
+
+### G.2 Regras do Gerador (food-filter.ts)
+
+| Versão | Regra | Alimentos Bloqueados |
+|--------|-------|---------------------|
+| v5.1 | Proteínas Magras | Max 8g fat/100g, max 220kcal/100g. Bloqueia: Salmão (13g), Filé Mignon (8.8g), Coxa de Frango (11g) |
+| v5.2 | Laticínios Magros | Max 8g fat/100g. Bloqueia: Queijo Prato (28g), Mussarela (22g), Cream Cheese Light (12g) |
+| v5.3 | Carboidratos Limpos | Max 5g fat/100g. Bloqueia: Granola (14g), Farofa Pronta (12g) |
+| v5.5 | Bloqueio Oleaginosas | Categoria "oleaginosas" e pastas de amendoim (40-65g fat/100g) |
+| v5.6 | Bloqueio Sementes | Linhaça (42g), Chia (31g), Gergelim (49g) quando ≥30g fat. Soja em Grão quando ≥8g fat |
+| v5.7 | Bloqueio Laticínios Gordos | Leite de Coco (24g), Queijo Minas Padrão (25g), Parmesão (30g), Requeijão Cremoso (23g) |
+
+### G.3 Regras do Rebalanceador (ai-rebalance/index.ts)
+
+| Estágio | Regra | Comportamento |
+|---------|-------|--------------|
+| Estágio 4 | Proteção Proteica | Alimentos com ≥10g prot/100g são protegidos de cortes calóricos |
+| Estágio 4 (v5.5) | Exceção Gordura-Dominante | Se `fat ≥ protein`, o alimento **NÃO** é protegido |
+| Estágio 4.5 | Normalização Implícita | Prioriza redução de fontes mistas (Abacate, Ovo) até atingir ≤110% da meta de gordura |
+| Estágio 4.5 (v5.5) | Corte Agressivo | Permite redução de até 70% em alimentos gordura-dominantes |
+
+### G.4 Limites de Validação
+
+```
+PASS:           Gordura ≤ 100% da meta → Plano OK
+ALLOW_REBALANCE: Gordura 100-120% → Enviado ao rebalanceador
+HARD_FAIL:      Gordura > 120% → Regenerar plano (STRUCTURALLY_INVALID)
+```
+
+### G.5 Resultado Final
+
+Com as regras v5.5-v5.7, o sistema converge para:
+- **Calorias**: ±5kcal da meta
+- **Proteína**: ±1g da meta
+- **Carboidratos**: ±1g da meta
+- **Gordura**: 100% exato da meta
 
 ---
 
 *Documento consolidado em 18 de Janeiro de 2026*
-*Atualizado em 21 de Janeiro de 2026*
+*Atualizado em 03 de Fevereiro de 2026*
 *Versão 2.2 - NutriaPlan*
