@@ -51,11 +51,12 @@ export const CATEGORY_QUANTITY_LIMITS: Record<string, { min: number; max: number
 // =====================================================
 
 export const SNACK_QUANTITY_LIMITS: Record<string, { min: number; max: number }> = {
-  frutas: { min: 80, max: 150 },    // Reduzido de 200 para 150
-  proteinas: { min: 20, max: 50 },  // Proteínas leves apenas
+  frutas: { min: 80, max: 150 },       // Reduzido de 200 para 150
+  proteinas: { min: 60, max: 150 },    // Aumentado para permitir frango/patinho moído
   laticinios: { min: 100, max: 200 },
   gorduras: { min: 5, max: 15 },
   oleaginosas: { min: 10, max: 25 },
+  carboidratos: { min: 80, max: 150 }, // (v5.8) Purê de batata para lanches
 };
 
 // =====================================================
@@ -85,8 +86,9 @@ export const BLOCKED_SNACK_PROTEINS = [
   "picanha",
   "costela",
   "lombo",
-  "patinho",
+  // "patinho" removido - Patinho Moído é prático para lanches
   "coxão",
+  "patinho cozido",  // Bloqueia patinho cozido inteiro, mas permite moído
 ];
 
 /**
@@ -103,6 +105,8 @@ export const ALLOWED_SNACK_PROTEINS = [
   "blanquet",
   "presunto de peru",
   "frango desfiado",
+  "patinho moído",          // (v5.8) Carne moída prática para lanches com purê
+  "sanduíche natural",      // (v5.8) Opção completa de lanche
   "whey",
 ];
 
