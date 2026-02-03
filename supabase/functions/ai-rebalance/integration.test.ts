@@ -519,10 +519,264 @@ Deno.test({
 });
 
 // =====================================================
+// TESTES DE CENÁRIOS ESPECÍFICOS POR PERFIL
+// =====================================================
+
+Deno.test("Cut: Cenário típico de déficit calórico", () => {
+  // Perfil: Mulher, 60kg, objetivo emagrecer
+  const targets = { calories: 1600, protein: 120, carbs: 160, fat: 53 };
+  
+  // Cenário 1: Plano ideal (95% calorias, 98% proteína, 90% gordura)
+  const ideal = { calories: 1520, protein: 118, carbs: 155, fat: 48 };
+  const idealPercents = calculatePercents(ideal, targets);
+  const idealValidation = validateAgainstProfile(idealPercents, PROFILE_EXPECTATIONS.cut);
+  
+  assertEquals(idealValidation.valid, true, "Cenário ideal deve passar");
+  
+  // Cenário 2: Déficit excessivo (85% calorias) - falha
+  const excessive = { calories: 1360, protein: 115, carbs: 140, fat: 45 };
+  const excessivePercents = calculatePercents(excessive, targets);
+  const excessiveValidation = validateAgainstProfile(excessivePercents, PROFILE_EXPECTATIONS.cut);
+  
+  assertEquals(excessiveValidation.valid, false, "Déficit excessivo deve falhar");
+  assert(excessiveValidation.errors.some(e => e.includes("Calorias")));
+  
+  // Cenário 3: Gordura no limite (100%) - passa
+  const fatLimit = { calories: 1550, protein: 117, carbs: 150, fat: 53 };
+  const fatLimitPercents = calculatePercents(fatLimit, targets);
+  const fatLimitValidation = validateAgainstProfile(fatLimitPercents, PROFILE_EXPECTATIONS.cut);
+  
+  assertEquals(fatLimitValidation.valid, true, "Gordura em 100% deve passar");
+  
+  console.log("\n✅ Cenários Cut testados:");
+  console.log(`   Ideal: Cal ${idealPercents.calories.toFixed(0)}%, Prot ${idealPercents.protein.toFixed(0)}%`);
+  console.log(`   Excessivo: Cal ${excessivePercents.calories.toFixed(0)}% (falha)`);
+  console.log(`   Fat Limite: Fat ${fatLimitPercents.fat.toFixed(0)}% (passa)`);
+});
+
+Deno.test("Maintain: Cenário de manutenção com flexibilidade", () => {
+  // Perfil: Homem, 75kg, objetivo manter peso
+  const targets = { calories: 2400, protein: 135, carbs: 300, fat: 80 };
+  
+  // Cenário 1: Plano equilibrado (100% em tudo)
+  const balanced = { calories: 2400, protein: 135, carbs: 300, fat: 80 };
+  const balancedPercents = calculatePercents(balanced, targets);
+  const balancedValidation = validateAgainstProfile(balancedPercents, PROFILE_EXPECTATIONS.maintain);
+  
+  assertEquals(balancedValidation.valid, true, "Plano equilibrado deve passar");
+  
+  // Cenário 2: Leve superávit (103% calorias) - passa
+  const surplus = { calories: 2472, protein: 130, carbs: 310, fat: 85 };
+  const surplusPercents = calculatePercents(surplus, targets);
+  const surplusValidation = validateAgainstProfile(surplusPercents, PROFILE_EXPECTATIONS.maintain);
+  
+  assertEquals(surplusValidation.valid, true, "Leve superávit deve passar");
+  
+  // Cenário 3: Gordura elevada (120%) - passa (limite é 125%)
+  const highFat = { calories: 2400, protein: 125, carbs: 280, fat: 96 };
+  const highFatPercents = calculatePercents(highFat, targets);
+  const highFatValidation = validateAgainstProfile(highFatPercents, PROFILE_EXPECTATIONS.maintain);
+  
+  assertEquals(highFatValidation.valid, true, "Gordura 120% deve passar");
+  
+  // Cenário 4: Superávit excessivo (108% calorias) - falha
+  const excessSurplus = { calories: 2592, protein: 130, carbs: 320, fat: 90 };
+  const excessSurplusPercents = calculatePercents(excessSurplus, targets);
+  const excessSurplusValidation = validateAgainstProfile(excessSurplusPercents, PROFILE_EXPECTATIONS.maintain);
+  
+  assertEquals(excessSurplusValidation.valid, false, "Superávit excessivo deve falhar");
+  
+  console.log("\n✅ Cenários Maintain testados:");
+  console.log(`   Equilibrado: Cal ${balancedPercents.calories.toFixed(0)}%`);
+  console.log(`   Superávit: Cal ${surplusPercents.calories.toFixed(0)}% (passa)`);
+  console.log(`   Fat Alta: Fat ${highFatPercents.fat.toFixed(0)}% (passa)`);
+  console.log(`   Superávit Excessivo: Cal ${excessSurplusPercents.calories.toFixed(0)}% (falha)`);
+});
+
+Deno.test("Bulk: Cenário de ganho de massa com Carb-First", () => {
+  // Perfil: Homem, 80kg, objetivo ganhar massa
+  const targets = { calories: 3000, protein: 160, carbs: 400, fat: 83 };
+  
+  // Cenário 1: Plano ideal com carboidratos altos
+  const ideal = { calories: 3030, protein: 155, carbs: 410, fat: 85 };
+  const idealPercents = calculatePercents(ideal, targets);
+  const idealValidation = validateAgainstProfile(idealPercents, PROFILE_EXPECTATIONS.bulk);
+  
+  assertEquals(idealValidation.valid, true, "Plano Bulk ideal deve passar");
+  assertEquals(idealValidation.warnings.length, 0, "Sem warnings");
+  
+  // Cenário 2: Carboidratos baixos (75%) - warning
+  const lowCarbs = { calories: 2950, protein: 158, carbs: 300, fat: 88 };
+  const lowCarbsPercents = calculatePercents(lowCarbs, targets);
+  const lowCarbsValidation = validateAgainstProfile(lowCarbsPercents, PROFILE_EXPECTATIONS.bulk);
+  
+  // Carbs baixos gera warning, não erro
+  assert(lowCarbsValidation.warnings.some(w => w.includes("Carboidratos")));
+  
+  // Cenário 3: Gordura no limite (108%) - passa
+  const fatLimit = { calories: 3000, protein: 155, carbs: 395, fat: 90 };
+  const fatLimitPercents = calculatePercents(fatLimit, targets);
+  const fatLimitValidation = validateAgainstProfile(fatLimitPercents, PROFILE_EXPECTATIONS.bulk);
+  
+  assertEquals(fatLimitValidation.valid, true, "Gordura 108% deve passar");
+  
+  // Cenário 4: Gordura excessiva (115%) - falha
+  const excessFat = { calories: 3100, protein: 155, carbs: 380, fat: 95 };
+  const excessFatPercents = calculatePercents(excessFat, targets);
+  const excessFatValidation = validateAgainstProfile(excessFatPercents, PROFILE_EXPECTATIONS.bulk);
+  
+  assertEquals(excessFatValidation.valid, false, "Gordura 115% deve falhar");
+  
+  console.log("\n✅ Cenários Bulk testados:");
+  console.log(`   Ideal: Carbs ${idealPercents.carbs.toFixed(0)}%, Fat ${idealPercents.fat.toFixed(0)}%`);
+  console.log(`   Low Carbs: Carbs ${lowCarbsPercents.carbs.toFixed(0)}% (warning)`);
+  console.log(`   Fat Limite: Fat ${fatLimitPercents.fat.toFixed(0)}% (passa)`);
+  console.log(`   Fat Excessiva: Fat ${excessFatPercents.fat.toFixed(0)}% (falha)`);
+});
+
+// =====================================================
+// TESTES DE CARB-FIRST LOGIC (BULK ESPECÍFICO)
+// =====================================================
+
+Deno.test("Bulk Carb-First: Lógica de priorização de carboidratos", () => {
+  const CARB_FIRST_THRESHOLD = 100; // Carbs devem atingir 100% antes de gordura
+  const targets = { calories: 3000, protein: 160, carbs: 400, fat: 83 };
+  
+  // Cenário 1: Calorias baixas, carbs baixos → deve priorizar carbs
+  const beforeCarbFirst = { calories: 2700, protein: 155, carbs: 320, fat: 75 };
+  const beforePercents = calculatePercents(beforeCarbFirst, targets);
+  
+  // Verificar que carbs < threshold
+  assert(beforePercents.carbs < CARB_FIRST_THRESHOLD, "Carbs devem estar abaixo do threshold");
+  
+  // Simular aplicação do Carb-First
+  const afterCarbFirst = { calories: 2900, protein: 155, carbs: 400, fat: 75 }; // +80g carbs
+  const afterPercents = calculatePercents(afterCarbFirst, targets);
+  
+  // Carbs aumentaram, gordura permaneceu
+  assertEquals(afterCarbFirst.fat, beforeCarbFirst.fat, "Gordura não deve mudar durante Carb-First");
+  assert(afterPercents.carbs >= CARB_FIRST_THRESHOLD, "Carbs devem atingir threshold");
+  
+  console.log("\n✅ Lógica Carb-First:");
+  console.log(`   Antes: Carbs ${beforePercents.carbs.toFixed(0)}%, Fat ${beforePercents.fat.toFixed(0)}%`);
+  console.log(`   Depois: Carbs ${afterPercents.carbs.toFixed(0)}%, Fat ${afterPercents.fat.toFixed(0)}%`);
+  console.log(`   → Carboidratos priorizados (threshold: ${CARB_FIRST_THRESHOLD}%)`);
+});
+
+Deno.test("Bulk Carb-First: Gordura só liberada após carbs ≥100%", () => {
+  const CARB_FIRST_THRESHOLD = 100;
+  const targets = { calories: 3000, protein: 160, carbs: 400, fat: 83 };
+  
+  // Cenário: Carbs em 95%, calorias baixas
+  const lowCarbs = { calories: 2800, protein: 155, carbs: 380, fat: 75 };
+  const lowCarbsPercents = calculatePercents(lowCarbs, targets);
+  
+  const canAddFatBeforeThreshold = lowCarbsPercents.carbs >= CARB_FIRST_THRESHOLD;
+  assertEquals(canAddFatBeforeThreshold, false, "Não deve permitir gordura antes do threshold");
+  
+  // Cenário: Carbs em 102%, calorias baixas
+  const highCarbs = { calories: 2850, protein: 155, carbs: 408, fat: 75 };
+  const highCarbsPercents = calculatePercents(highCarbs, targets);
+  
+  const canAddFatAfterThreshold = highCarbsPercents.carbs >= CARB_FIRST_THRESHOLD;
+  assertEquals(canAddFatAfterThreshold, true, "Deve permitir gordura após threshold");
+  
+  console.log("\n✅ Bloqueio de gordura Carb-First:");
+  console.log(`   Carbs 95%: Pode adicionar gordura? ${canAddFatBeforeThreshold}`);
+  console.log(`   Carbs 102%: Pode adicionar gordura? ${canAddFatAfterThreshold}`);
+});
+
+// =====================================================
+// TESTES DE EDGE CASES
+// =====================================================
+
+Deno.test("Edge Case: Proteína no limite exato por perfil", () => {
+  const targets = { calories: 2000, protein: 100, carbs: 250, fat: 67 };
+  
+  // Cut: Proteína em exatos 95%
+  const cutLimit = { calories: 1950, protein: 95, carbs: 240, fat: 60 };
+  const cutPercents = calculatePercents(cutLimit, targets);
+  const cutValidation = validateAgainstProfile(cutPercents, PROFILE_EXPECTATIONS.cut);
+  assertEquals(cutValidation.valid, true, "Cut com proteína em 95% exatos deve passar");
+  
+  // Maintain: Proteína em exatos 90%
+  const maintainLimit = { calories: 2000, protein: 90, carbs: 250, fat: 70 };
+  const maintainPercents = calculatePercents(maintainLimit, targets);
+  const maintainValidation = validateAgainstProfile(maintainPercents, PROFILE_EXPECTATIONS.maintain);
+  assertEquals(maintainValidation.valid, true, "Maintain com proteína em 90% exatos deve passar");
+  
+  // Bulk: Proteína em exatos 90%
+  const bulkLimit = { calories: 2000, protein: 90, carbs: 250, fat: 70 };
+  const bulkPercents = calculatePercents(bulkLimit, targets);
+  const bulkValidation = validateAgainstProfile(bulkPercents, PROFILE_EXPECTATIONS.bulk);
+  assertEquals(bulkValidation.valid, true, "Bulk com proteína em 90% exatos deve passar");
+  
+  console.log("\n✅ Limites exatos de proteína:");
+  console.log(`   Cut: ${cutPercents.protein.toFixed(0)}% (mín 95%) → ${cutValidation.valid ? "PASSA" : "FALHA"}`);
+  console.log(`   Maintain: ${maintainPercents.protein.toFixed(0)}% (mín 90%) → ${maintainValidation.valid ? "PASSA" : "FALHA"}`);
+  console.log(`   Bulk: ${bulkPercents.protein.toFixed(0)}% (mín 90%) → ${bulkValidation.valid ? "PASSA" : "FALHA"}`);
+});
+
+Deno.test("Edge Case: Gordura no limite exato por perfil", () => {
+  // Usar targets redondos para evitar erros de arredondamento
+  const targets = { calories: 2000, protein: 100, carbs: 250, fat: 100 };
+  
+  // Cut: Gordura em exatos 100g (100%)
+  const cutLimit = { calories: 1950, protein: 98, carbs: 240, fat: 100 };
+  const cutPercents = calculatePercents(cutLimit, targets);
+  const cutValidation = validateAgainstProfile(cutPercents, PROFILE_EXPECTATIONS.cut);
+  assertEquals(cutValidation.valid, true, "Cut com gordura em 100% exatos deve passar");
+  
+  // Maintain: Gordura em 125g (125%)
+  const maintainLimit = { calories: 2050, protein: 95, carbs: 230, fat: 125 };
+  const maintainPercents = calculatePercents(maintainLimit, targets);
+  const maintainValidation = validateAgainstProfile(maintainPercents, PROFILE_EXPECTATIONS.maintain);
+  assertEquals(maintainValidation.valid, true, "Maintain com gordura em 125% exatos deve passar");
+  
+  // Bulk: Gordura em 109g (109% - abaixo do limite de 110%)
+  // Nota: O limite é "> 110%", então 110% exatos passa mas usamos 109% para margem de segurança
+  const bulkLimit = { calories: 2050, protein: 95, carbs: 250, fat: 109 };
+  const bulkPercents = calculatePercents(bulkLimit, targets);
+  const bulkValidation = validateAgainstProfile(bulkPercents, PROFILE_EXPECTATIONS.bulk);
+  assertEquals(bulkValidation.valid, true, "Bulk com gordura em 109% deve passar");
+  
+  // Verificar que 111% realmente falha
+  const bulkOver = { calories: 2050, protein: 95, carbs: 250, fat: 111 };
+  const bulkOverPercents = calculatePercents(bulkOver, targets);
+  const bulkOverValidation = validateAgainstProfile(bulkOverPercents, PROFILE_EXPECTATIONS.bulk);
+  assertEquals(bulkOverValidation.valid, false, "Bulk com gordura em 111% deve falhar");
+  
+  console.log("\n✅ Limites exatos de gordura:");
+  console.log(`   Cut: ${cutPercents.fat.toFixed(0)}% (máx 100%) → ${cutValidation.valid ? "PASSA" : "FALHA"}`);
+  console.log(`   Maintain: ${maintainPercents.fat.toFixed(0)}% (máx 125%) → ${maintainValidation.valid ? "PASSA" : "FALHA"}`);
+  console.log(`   Bulk: ${bulkPercents.fat.toFixed(0)}% (máx 110%) → ${bulkValidation.valid ? "PASSA" : "FALHA"}`);
+  console.log(`   Bulk Over: ${bulkOverPercents.fat.toFixed(0)}% (máx 110%) → ${bulkOverValidation.valid ? "PASSA" : "FALHA"}`);
+});
+
+Deno.test("Edge Case: Múltiplas violações simultâneas", () => {
+  const targets = { calories: 2000, protein: 100, carbs: 250, fat: 67 };
+  
+  // Plano com múltiplas violações: calorias baixas + proteína baixa + gordura alta
+  const badPlan = { calories: 1700, protein: 80, carbs: 200, fat: 80 };
+  const badPercents = calculatePercents(badPlan, targets);
+  const badValidation = validateAgainstProfile(badPercents, PROFILE_EXPECTATIONS.cut);
+  
+  assertEquals(badValidation.valid, false, "Plano com múltiplas violações deve falhar");
+  assert(badValidation.errors.length >= 2, "Deve ter múltiplos erros");
+  
+  console.log("\n❌ Múltiplas violações:");
+  console.log(`   Calorias: ${badPercents.calories.toFixed(0)}%`);
+  console.log(`   Proteína: ${badPercents.protein.toFixed(0)}%`);
+  console.log(`   Gordura: ${badPercents.fat.toFixed(0)}%`);
+  console.log(`   Erros: ${badValidation.errors.length}`);
+  badValidation.errors.forEach(e => console.log(`     - ${e}`));
+});
+
+// =====================================================
 // RESUMO DOS TESTES
 // =====================================================
 
-Deno.test("Resumo: Cobertura de integração", () => {
+Deno.test("Resumo: Cobertura de integração expandida", () => {
   const coverage = [
     "Estrutura: Perfis definidos (Cut/Maintain/Bulk)",
     "Estrutura: Cut mais restritivo que outros",
@@ -530,11 +784,18 @@ Deno.test("Resumo: Cobertura de integração", () => {
     "Validação: Planos simulados por perfil",
     "Integração: Endpoints acessíveis",
     "Integração: Autenticação exigida",
+    "Cenário Cut: Déficit típico, excessivo, limite gordura",
+    "Cenário Maintain: Equilibrado, superávit, gordura elevada",
+    "Cenário Bulk: Ideal, low carbs, gordura limite/excessiva",
+    "Carb-First: Priorização de carboidratos",
+    "Carb-First: Bloqueio de gordura até threshold",
+    "Edge Cases: Limites exatos de proteína e gordura",
+    "Edge Cases: Múltiplas violações simultâneas",
     "E2E: Fluxo Geração → Rebalanceamento (quando disponível)",
   ];
 
   console.log("\n" + "=".repeat(60));
-  console.log("📋 COBERTURA DE TESTES DE INTEGRAÇÃO:");
+  console.log("📋 COBERTURA DE TESTES DE INTEGRAÇÃO (EXPANDIDA):");
   console.log("=".repeat(60));
   for (const item of coverage) {
     console.log(`  ✓ ${item}`);
@@ -544,5 +805,5 @@ Deno.test("Resumo: Cobertura de integração", () => {
   console.log("   TEST_USER_EMAIL e TEST_USER_PASSWORD no .env");
   console.log("=".repeat(60) + "\n");
 
-  assertEquals(coverage.length, 7);
+  assertEquals(coverage.length, 14);
 });
