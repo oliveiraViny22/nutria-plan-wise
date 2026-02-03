@@ -115,12 +115,19 @@ function MacroComparisonCard({
     primary: 'bg-primary/15',
   };
 
+  // Helper para formatar números com no máximo 2 casas decimais
+  const fmt = (n: number) => Number.isInteger(n) ? n : parseFloat(n.toFixed(2));
+  const fmtDiff = (n: number) => {
+    const val = fmt(n);
+    return val > 0 ? `+${val}` : String(val);
+  };
+
   return (
     <div className="p-3 rounded-xl bg-card border border-border/50 shadow-sm overflow-hidden">
       <div className="flex items-center justify-between mb-2 gap-2">
         <span className="text-sm font-semibold text-foreground truncate">{label}</span>
         <span className={`text-xs font-semibold whitespace-nowrap ${colorClasses[colorVar].split(' ')[1]}`}>
-          Meta: {target}{unit}
+          Meta: {fmt(target)}{unit}
         </span>
       </div>
       
@@ -128,11 +135,11 @@ function MacroComparisonCard({
         <div className="flex-1 min-w-0">
           <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-0.5">Atual</div>
           <div className="flex items-baseline gap-1 flex-wrap">
-            <span className="text-lg font-bold text-foreground">{current}</span>
+            <span className="text-lg font-bold text-foreground">{fmt(current)}</span>
             <span className="text-xs text-muted-foreground">{unit}</span>
             {currentDiff !== 0 && (
               <span className={`text-xs font-medium whitespace-nowrap ${currentDiff < 0 ? 'text-destructive' : 'text-amber-500'}`}>
-                ({currentDiff > 0 ? '+' : ''}{currentDiff})
+                ({fmtDiff(currentDiff)})
               </span>
             )}
           </div>
@@ -144,7 +151,7 @@ function MacroComparisonCard({
           <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-0.5">Proposto</div>
           <div className="flex items-baseline gap-1 justify-end flex-wrap">
             <span className={`text-lg font-bold ${improved ? 'text-primary' : 'text-foreground'}`}>
-              {proposed}
+              {fmt(proposed)}
             </span>
             <span className="text-xs text-muted-foreground">{unit}</span>
             {improved && <Check className="w-3.5 h-3.5 text-primary shrink-0" />}
@@ -582,16 +589,6 @@ export function AIRebalancer({
                     </div>
                   )}
 
-                  {/* Strategy Explanation */}
-                  {result.explanation && (
-                    <div className="flex items-start gap-3 p-4 rounded-xl bg-primary/5 border border-primary/20">
-                      <Lightbulb className="w-5 h-5 text-primary shrink-0 mt-0.5" />
-                      <div>
-                        <p className="text-sm font-medium text-foreground mb-1">Sobre este rebalanceamento</p>
-                        <p className="text-sm text-muted-foreground">{result.explanation}</p>
-                      </div>
-                    </div>
-                  )}
 
                   {/* Warnings */}
                   {result.warnings && result.warnings.length > 0 && (
