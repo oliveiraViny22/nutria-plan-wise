@@ -239,6 +239,53 @@ function requiresLeanProtein(roleName: string): boolean {
   );
 }
 
+// =====================================================
+// CLASSIFICAÇÃO DE OLEAGINOSAS E PASTAS (v5.5)
+// =====================================================
+
+/**
+ * Verifica se um alimento é uma oleaginosa ou pasta de amendoim.
+ * Estes alimentos são bloqueados como seleções primárias por terem
+ * gordura massiva (40-60g/100g) que impede normalização.
+ */
+export function isHighFatNutOrSpread(food: Food): boolean {
+  const category = (food.category || "").toLowerCase();
+  const nameLower = food.name.toLowerCase();
+  
+  // Categoria oleaginosas
+  if (category === "oleaginosas") return true;
+  
+  // Pastas de amendoim/castanha (qualquer categoria)
+  const highFatKeywords = [
+    "pasta de amendoim",
+    "manteiga de amendoim",
+    "pasta de castanha",
+    "manteiga de castanha",
+    "creme de amendoim",
+    "tahine",
+  ];
+  
+  if (highFatKeywords.some(kw => nameLower.includes(kw))) return true;
+  
+  // Oleaginosas específicas que podem estar em outras categorias
+  const nutKeywords = [
+    "castanha",
+    "amêndoa",
+    "amendoim",
+    "nozes",
+    "pistache",
+    "avelã",
+    "macadâmia",
+  ];
+  
+  // Verificar se é oleaginosa com alta gordura (>40g/100g)
+  if (nutKeywords.some(kw => nameLower.includes(kw)) && food.fat >= 40) {
+    return true;
+  }
+  
+  return false;
+}
+
 /**
  * Verifica se um papel é de laticínio.
  */
@@ -280,6 +327,17 @@ export function selectFoodForRole(
     if (usedFoodIds.has(f.id)) return false;
     const cat = (f.category || "").toLowerCase();
     if (!role.categories.includes(cat)) return false;
+    
+    // v5.5: BLOQUEIO GLOBAL de oleaginosas e pastas de amendoim como seleções primárias
+    // Estes alimentos têm gordura massiva (40-60g/100g) que impede normalização
+    if (isHighFatNutOrSpread(f)) {
+      logDebug("Bloqueando oleaginosa/pasta como seleção primária", {
+        name: f.name,
+        fat: f.fat,
+        protein: f.protein,
+      });
+      return false;
+    }
     
     // v5.1: Papéis de proteína base exigem proteínas magras
     if (isProteinBaseRole && cat === "proteinas") {

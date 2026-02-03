@@ -909,12 +909,19 @@ function runCorrectionPipeline(
           if (contrib.fat <= 0) continue;
           
           // ============================================
-          // PROTEÇÃO DE PROTEÍNA - REGRA CRÍTICA
+          // PROTEÇÃO DE PROTEÍNA - REGRA CRÍTICA (v5.5 ATUALIZADA)
           // ============================================
-          // NUNCA reduzir alimentos com proteína significativa
-          if (contrib.protein >= 10) {
-            console.log(`[GORDURA] Protegendo ${food.food.name} (${contrib.protein.toFixed(1)}g prot/100g)`);
+          // Proteger alimentos onde proteína domina gordura
+          // NÃO proteger alimentos onde gordura >= proteína (ex: oleaginosas, pastas)
+          const fatDominant = contrib.fat >= contrib.protein;
+          if (contrib.protein >= 10 && !fatDominant) {
+            console.log(`[GORDURA] Protegendo ${food.food.name} (${contrib.protein.toFixed(1)}g prot/100g, gordura não dominante)`);
             continue;
+          }
+          
+          // Log para alimentos com gordura dominante que serão reduzidos
+          if (fatDominant && contrib.protein >= 10) {
+            console.log(`[GORDURA] Não protegendo ${food.food.name} - gordura dominante (fat=${contrib.fat.toFixed(1)}g > prot=${contrib.protein.toFixed(1)}g)`);
           }
 
           const currentGrams = quantities.get(food.id) || food.quantity_grams;
@@ -982,18 +989,38 @@ function runCorrectionPipeline(
       
       // Identificar fontes mistas de alta densidade lipídica
       // Critério: ≥8g gordura/100g E ≥15g proteína/100g
+      // v5.5: Incluir também oleaginosas/pastas onde gordura > proteína
       const mixedFatSources = foods.filter(f => {
         const contrib = contributions.get(f.id)!;
-        return contrib.fat >= 8 && contrib.protein >= 15;
+        const cat = (f.food.category || "").toLowerCase();
+        
+        // Fontes mistas tradicionais (proteína + gordura moderada)
+        const isMixedSource = contrib.fat >= 8 && contrib.protein >= 15;
+        
+        // v5.5: Oleaginosas/pastas (gordura domina proteína)
+        const isFatDominant = contrib.fat >= contrib.protein && contrib.fat >= 20;
+        const isOleaginosa = cat === "oleaginosas" || cat.includes("oleaginosa");
+        
+        return isMixedSource || (isFatDominant && (isOleaginosa || contrib.protein >= 10));
       });
       
       console.log(`[ETAPA 4.5] Fontes mistas identificadas: ${mixedFatSources.length}`);
       
       if (mixedFatSources.length > 0) {
         // Ordenar por densidade de gordura (maior primeiro)
+        // v5.5: Priorizar alimentos onde gordura > proteína
         mixedFatSources.sort((a, b) => {
           const contribA = contributions.get(a.id)!;
           const contribB = contributions.get(b.id)!;
+          
+          // Priorizar alimentos onde gordura domina
+          const fatDominantA = contribA.fat >= contribA.protein ? 1 : 0;
+          const fatDominantB = contribB.fat >= contribB.protein ? 1 : 0;
+          
+          if (fatDominantB !== fatDominantA) {
+            return fatDominantB - fatDominantA; // Fat dominant primeiro
+          }
+          
           return contribB.fat - contribA.fat;
         });
         
@@ -1009,9 +1036,12 @@ function runCorrectionPipeline(
           const currentGrams = quantities.get(food.id) || food.quantity_grams;
           const limits = getCategoryLimits(food.food.category);
           
-          // Calcular quanto podemos reduzir mantendo proteína
-          // Usar limite mínimo ou 60% da quantidade atual (o que for maior)
-          const minToKeep = Math.max(limits.min, currentGrams * 0.6);
+          // v5.5: Permitir redução mais agressiva para alimentos onde gordura domina
+          const fatDominant = contrib.fat >= contrib.protein;
+          const minKeepRatio = fatDominant ? 0.3 : 0.6; // 30% para gordura dominante, 60% para outros
+          
+          // Calcular quanto podemos reduzir
+          const minToKeep = Math.max(limits.min, currentGrams * minKeepRatio);
           const maxReduction = currentGrams - minToKeep;
           
           if (maxReduction < 5) continue;
@@ -1024,13 +1054,18 @@ function runCorrectionPipeline(
           
           if (actualReduction < 5) continue;
           
-          // Verificar se proteína total não cairá abaixo de 95%
+          // v5.5: Verificação de proteína mais flexível para alimentos onde gordura domina
           const proteinLost = actualReduction * proteinPerGram;
           const newProteinTotal = preNormalizationTotals.protein - proteinLost;
           const newProteinPercent = (newProteinTotal / targets.protein) * 100;
           
-          if (newProteinPercent < 95) {
-            console.log(`[ETAPA 4.5] Pulando ${food.food.name} - reduziria proteína para ${newProteinPercent.toFixed(1)}%`);
+          // Permitir redução se:
+          // 1. Proteína fica acima de 95%
+          // 2. OU gordura domina e proteína fica acima de 90%
+          const minProteinThreshold = fatDominant ? 90 : 95;
+          
+          if (newProteinPercent < minProteinThreshold) {
+            console.log(`[ETAPA 4.5] Pulando ${food.food.name} - reduziria proteína para ${newProteinPercent.toFixed(1)}% (min: ${minProteinThreshold}%)`);
             continue;
           }
           
@@ -1040,7 +1075,7 @@ function runCorrectionPipeline(
           const fatRemoved = actualReduction * fatPerGram;
           remainingExcess -= fatRemoved;
           
-          console.log(`[ETAPA 4.5] Estratégia A: -${Math.round(actualReduction)}g ${food.food.name} (-${fatRemoved.toFixed(1)}g gordura, -${(actualReduction * proteinPerGram).toFixed(1)}g proteína)`);
+          console.log(`[ETAPA 4.5] Estratégia A: -${Math.round(actualReduction)}g ${food.food.name} (-${fatRemoved.toFixed(1)}g gordura, -${(actualReduction * proteinPerGram).toFixed(1)}g proteína)${fatDominant ? ' [gordura dominante]' : ''}`);
           
           adjustments.push({
             nutrient: "fat",
