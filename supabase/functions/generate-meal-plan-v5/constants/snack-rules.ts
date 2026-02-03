@@ -73,6 +73,9 @@ export const ALLOWED_SNACK_CARBS = [
  * Ex: Mingau de Aveia é mais adequado para ceia do que jantar.
  */
 export const BLOCKED_FOODS_BY_MEAL: Record<string, string[]> = {
+  breakfast: [
+    "pipoca",           // Mais adequada como lanche
+  ],
   dinner: [
     "mingau",
     "mingau de aveia",
