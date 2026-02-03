@@ -16,6 +16,7 @@ import {
 } from "../_shared/nutrition-contracts.ts";
 import { createLogger, logAIUsage, type RebalanceMetrics } from "../_shared/logger.ts";
 import { getCorsHeaders } from "../_shared/security.ts";
+import { getFeatureFlag, FLAGS } from "../_shared/feature-flags.ts";
 
 const log = createLogger('ai-rebalance');
 
@@ -1449,6 +1450,18 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
+    // ============================================
+    // FEATURE FLAG: Rebalancer V2
+    // ============================================
+    // Verifica se a nova versão está habilitada
+    // Por enquanto, apenas loga para preparar rollout seguro
+    const useV2 = await getFeatureFlag(supabase, FLAGS.REBALANCER_V2, false);
+    if (useV2) {
+      log.info("Rebalancer V2 flag is ENABLED - using enhanced algorithm");
+      // TODO: Implementar lógica V2 quando pronta
+      // Por enquanto, continua com V1 mas com logging extra
+    }
+
     // Obter user_id do plano para logging de métricas
     const { data: planData } = await supabase
       .from("diet_plans")
@@ -1812,6 +1825,7 @@ serve(async (req) => {
       finalValidation: finalValidation.status,
       note: finalValidation.note,
       optionsCount: optionResults.length,
+      useV2, // Flag de versão
     });
 
     // Logar métricas de rebalanceamento para análise
