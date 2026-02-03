@@ -5,17 +5,21 @@ const FREQUENCIES = [523.25, 659.25, 783.99]; // C5, E5, G5 (major chord arpeggi
 const DURATION = 0.12;
 const GAIN = 0.15; // Subtle volume
 
-// Haptic pattern for success feedback (vibration in ms)
-const HAPTIC_PATTERN = [50, 30, 80]; // Short pulse, pause, longer pulse
+// Haptic patterns for different feedback types
+const HAPTIC_PATTERNS = {
+  success: [50, 30, 80],      // Short pulse, pause, longer pulse
+  start: [30],                 // Quick tap when starting
+  warning: [100, 50, 100],    // Double pulse for warnings
+};
 
 export function useSuccessSound() {
   const audioContextRef = useRef<AudioContext | null>(null);
 
-  const triggerHapticFeedback = useCallback(() => {
+  const triggerHapticFeedback = useCallback((pattern: 'success' | 'start' | 'warning' = 'success') => {
     try {
       // Check for Vibration API support
       if ('vibrate' in navigator) {
-        navigator.vibrate(HAPTIC_PATTERN);
+        navigator.vibrate(HAPTIC_PATTERNS[pattern]);
       }
     } catch (error) {
       // Silently fail - haptic is optional enhancement
@@ -25,7 +29,7 @@ export function useSuccessSound() {
 
   const playSuccessSound = useCallback(() => {
     // Trigger haptic feedback on mobile devices
-    triggerHapticFeedback();
+    triggerHapticFeedback('success');
 
     try {
       // Create or reuse AudioContext
@@ -68,5 +72,10 @@ export function useSuccessSound() {
     }
   }, [triggerHapticFeedback]);
 
-  return { playSuccessSound, triggerHapticFeedback };
+  // Vibração rápida para indicar início de operação
+  const triggerStartFeedback = useCallback(() => {
+    triggerHapticFeedback('start');
+  }, [triggerHapticFeedback]);
+
+  return { playSuccessSound, triggerHapticFeedback, triggerStartFeedback };
 }
