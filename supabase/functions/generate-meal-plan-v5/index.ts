@@ -71,10 +71,11 @@ serve(async (req) => {
 
     logInfo("Iniciando geração v5", { userId: user.id });
 
-    // Carregar perfil e limites do plano em paralelo
-    const [profileResult, planLimitsResult] = await Promise.all([
+    // Carregar perfil, limites do plano e verificar se pode usar o recurso em paralelo
+    const [profileResult, planLimitsResult, canUseDietResult] = await Promise.all([
       supabase.from("profiles").select("*").eq("user_id", user.id).single(),
       supabase.rpc("get_user_plan", { _user_id: user.id }),
+      supabase.rpc("can_use_feature", { _user_id: user.id, _feature: "diet" }),
     ]);
 
     const { data: profile, error: profileError } = profileResult;
@@ -86,8 +87,22 @@ serve(async (req) => {
       return createErrorResponse("Complete o onboarding primeiro", 400, corsHeaders);
     }
 
-    // Determinar limite de opções do plano
+    // VALIDAÇÃO DE LIMITE DE DIETAS
     const planData = planLimitsResult.data?.[0];
+    const canUseDiet = canUseDietResult.data;
+    
+    if (!canUseDiet) {
+      const dietLimit = planData?.diet_limit || 0;
+      logInfo("Limite de dietas atingido", { userId: user.id, dietLimit });
+      return createErrorResponse(
+        `Você atingiu o limite de ${dietLimit} dieta(s) do seu plano. Faça upgrade para gerar mais planos.`,
+        403,
+        corsHeaders,
+        { code: "DIET_LIMIT_REACHED", upgradeRequired: true }
+      );
+    }
+
+    // Determinar limite de opções do plano
     const mealOptionsLimit = planData?.meal_options_limit ?? 1;
     logInfo("Limite de opções do plano", { mealOptionsLimit, planName: planData?.plan_name });
 
@@ -306,7 +321,10 @@ serve(async (req) => {
     // Salvar plano
     const planId = await savePlanWithOptions(supabase, user.id, mealsWithOptions);
 
-    logInfo("Plano salvo", { planId, optionsPerMeal: mealOptionsLimit });
+    // Incrementar uso de dieta após salvar com sucesso
+    await supabase.rpc("increment_usage", { _user_id: user.id, _feature: "diet" });
+
+    logInfo("Plano salvo e uso incrementado", { planId, optionsPerMeal: mealOptionsLimit });
 
     // Usar totais do resultado da otimização (após ambos os ajustes)
     const finalTotals = calculatePlanTotals(mealsWithOptions);
