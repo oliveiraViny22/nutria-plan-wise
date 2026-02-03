@@ -331,27 +331,105 @@ interface ObjectiveRules {
 
 function getObjectiveRules(objective: Objective, settings: OptimizerSettings): ObjectiveRules {
   // Usar configurações do admin para definir regras por objetivo
+  let rules: ObjectiveRules;
+  
   switch (objective) {
     case "cut":
-      return {
+      rules = {
         calories: { min: 100 - settings.calories_tolerance, max: 100 },
         protein: { min: settings.protein_floor },
         fat: { max: settings.fat_ceiling },
       };
+      break;
     case "bulk":
-      return {
+      rules = {
         calories: { min: 100 - settings.calories_tolerance, max: 100 + settings.calories_tolerance },
         protein: { min: Math.max(settings.protein_floor - 5, 85) }, // Bulk pode ter piso um pouco menor
         carbs: { min: settings.carbs_floor },
         fat: { max: settings.fat_ceiling + 10 }, // Bulk permite mais gordura
       };
+      break;
     case "maintain":
     default:
-      return {
+      rules = {
         calories: { min: 100 - settings.calories_tolerance, max: 100 + settings.calories_tolerance },
         protein: { min: Math.max(settings.protein_floor - 10, 80) },
+        fat: { max: settings.fat_ceiling + 5 }, // Manutenção também tem limite de gordura
       };
+      break;
   }
+  
+  return rules;
+}
+
+// ============================================
+// LOGGING ESTRUTURADO POR PERFIL
+// ============================================
+
+function logProfileRules(objective: Objective, rules: ObjectiveRules, settings: OptimizerSettings): void {
+  const profileNames: Record<Objective, string> = {
+    cut: "EMAGRECER (Cut)",
+    maintain: "MANTER (Maintain)", 
+    bulk: "GANHAR MASSA (Bulk)",
+  };
+  
+  console.log(`\n╔══════════════════════════════════════════════════════════════╗`);
+  console.log(`║  PERFIL NUTRICIONAL: ${profileNames[objective].padEnd(36)}   ║`);
+  console.log(`╠══════════════════════════════════════════════════════════════╣`);
+  console.log(`║  REGRAS APLICADAS:                                           ║`);
+  console.log(`║  ├─ Calorias: ${rules.calories.min}% - ${rules.calories.max}%`.padEnd(63) + `║`);
+  console.log(`║  ├─ Proteína mín: ${rules.protein.min}%`.padEnd(63) + `║`);
+  if (rules.carbs) {
+    console.log(`║  ├─ Carboidratos mín: ${rules.carbs.min}%`.padEnd(63) + `║`);
+  }
+  if (rules.fat) {
+    console.log(`║  └─ Gordura máx: ${rules.fat.max}%`.padEnd(63) + `║`);
+  } else {
+    console.log(`║  └─ Gordura máx: sem limite`.padEnd(63) + `║`);
+  }
+  console.log(`╠══════════════════════════════════════════════════════════════╣`);
+  console.log(`║  CONFIGURAÇÕES DO ADMIN:                                     ║`);
+  console.log(`║  ├─ Protein Floor: ${settings.protein_floor}%`.padEnd(63) + `║`);
+  console.log(`║  ├─ Protein Ceiling: ${settings.protein_ceiling}%`.padEnd(63) + `║`);
+  console.log(`║  ├─ Carbs Floor: ${settings.carbs_floor}%`.padEnd(63) + `║`);
+  console.log(`║  ├─ Fat Ceiling: ${settings.fat_ceiling}%`.padEnd(63) + `║`);
+  console.log(`║  └─ Calories Tolerance: ±${settings.calories_tolerance}%`.padEnd(63) + `║`);
+  console.log(`╚══════════════════════════════════════════════════════════════╝\n`);
+}
+
+function logPipelineStage(stage: number, name: string, before: MacroTargets, after: MacroTargets, targets: MacroTargets): void {
+  const beforePercents = calculatePercents(before, targets);
+  const afterPercents = calculatePercents(after, targets);
+  
+  const calDelta = afterPercents.calories - beforePercents.calories;
+  const protDelta = afterPercents.protein - beforePercents.protein;
+  const fatDelta = afterPercents.fat - beforePercents.fat;
+  
+  console.log(`┌─────────────────────────────────────────────────────────────┐`);
+  console.log(`│ ETAPA ${stage}: ${name.padEnd(48)} │`);
+  console.log(`├─────────────────────────────────────────────────────────────┤`);
+  console.log(`│ Antes  → Cal: ${beforePercents.calories.toFixed(1)}%, Prot: ${beforePercents.protein.toFixed(1)}%, Fat: ${beforePercents.fat.toFixed(1)}%`.padEnd(62) + `│`);
+  console.log(`│ Depois → Cal: ${afterPercents.calories.toFixed(1)}%, Prot: ${afterPercents.protein.toFixed(1)}%, Fat: ${afterPercents.fat.toFixed(1)}%`.padEnd(62) + `│`);
+  console.log(`│ Delta  → Cal: ${calDelta >= 0 ? '+' : ''}${calDelta.toFixed(1)}pp, Prot: ${protDelta >= 0 ? '+' : ''}${protDelta.toFixed(1)}pp, Fat: ${fatDelta >= 0 ? '+' : ''}${fatDelta.toFixed(1)}pp`.padEnd(62) + `│`);
+  console.log(`└─────────────────────────────────────────────────────────────┘`);
+}
+
+function logFinalResult(objective: Objective, totals: MacroTargets, targets: MacroTargets, iterations: number, converged: boolean): void {
+  const percents = calculatePercents(totals, targets);
+  const status = converged ? "✅ CONVERGIDO" : "⚠️ NÃO CONVERGIU";
+  
+  console.log(`\n╔══════════════════════════════════════════════════════════════╗`);
+  console.log(`║  RESULTADO FINAL                                             ║`);
+  console.log(`╠══════════════════════════════════════════════════════════════╣`);
+  console.log(`║  Status: ${status}`.padEnd(63) + `║`);
+  console.log(`║  Iterações: ${iterations}`.padEnd(63) + `║`);
+  console.log(`╠══════════════════════════════════════════════════════════════╣`);
+  console.log(`║  MACROS FINAIS:                                              ║`);
+  console.log(`║  ├─ Calorias: ${totals.calories.toFixed(0)} kcal (${percents.calories.toFixed(1)}%)`.padEnd(63) + `║`);
+  console.log(`║  ├─ Proteína: ${totals.protein.toFixed(1)}g (${percents.protein.toFixed(1)}%)`.padEnd(63) + `║`);
+  console.log(`║  ├─ Carboidratos: ${totals.carbs.toFixed(1)}g (${percents.carbs.toFixed(1)}%)`.padEnd(63) + `║`);
+  console.log(`║  └─ Gordura: ${totals.fat.toFixed(1)}g (${percents.fat.toFixed(1)}%)`.padEnd(63) + `║`);
+  console.log(`╚══════════════════════════════════════════════════════════════╝\n`);
 }
 
 // ============================================
@@ -1257,6 +1335,12 @@ serve(async (req) => {
     // Mapear objetivo
     const objective = mapGoalToObjective(goal);
     
+    // Obter regras específicas do perfil
+    const profileRules = getObjectiveRules(objective, settings);
+    
+    // LOG DETALHADO: Mostrar perfil e regras aplicadas
+    logProfileRules(objective, profileRules, settings);
+    
     // Construir metadados G-10 (default para PASS se não fornecido)
     const g10Metadata: G10Metadata = {
       g10Status: (g10_status as G10Status) || "PASS",
@@ -1264,9 +1348,9 @@ serve(async (req) => {
       implicitFatWarning: implicit_fat_warning,
     };
     
-    console.log(`Objetivo: ${objective} (goal recebido: ${goal})`);
-    console.log(`G-10 Metadata: status=${g10Metadata.g10Status}, ratio=${g10Metadata.implicitFatRatio}`);
-    console.log(`Usando settings: prot_floor=${settings.protein_floor}%, cal_tol=${settings.calories_tolerance}%`);
+    console.log(`[REBALANCER] Objetivo: ${objective} (goal recebido: ${goal})`);
+    console.log(`[REBALANCER] G-10 Metadata: status=${g10Metadata.g10Status}, ratio=${(g10Metadata.implicitFatRatio * 100).toFixed(0)}%`);
+    console.log(`[REBALANCER] Targets: Cal=${targets.calories}kcal, Prot=${targets.protein}g, Carbs=${targets.carbs}g, Fat=${targets.fat}g`);
 
     // Buscar refeições
     const { data: meals, error: mealsError } = await supabase
@@ -1447,8 +1531,8 @@ serve(async (req) => {
       const optionFinalTotals = calculateTotals(optionFoods, refinementResult.quantities);
       const totalIterations = pipelineResult.iterations + refinementResult.iterations;
       
-      console.log(`Opção ${optionNumber} - Totais finais: ${JSON.stringify(optionFinalTotals)}`);
-      console.log(`Opção ${optionNumber} - Iterações: ${totalIterations} (pipeline: ${pipelineResult.iterations}, refinamento: ${refinementResult.iterations})`);
+      // LOG DETALHADO: Resultado desta opção
+      logFinalResult(objective, optionFinalTotals, targets, totalIterations, refinementResult.converged);
 
       // Montar mudanças de alimentos
       const optionFoodChanges: OptionResult['foodChanges'] = [];
@@ -1459,7 +1543,7 @@ serve(async (req) => {
         const diff = Math.abs(final - original);
 
         if (diff >= 1) {
-          console.log(`  ${food.food.name}: ${original}g → ${final}g (diff: ${diff})`);
+          console.log(`  [AJUSTE] ${food.food.name}: ${original}g → ${final}g (Δ ${diff.toFixed(0)}g)`);
         }
 
         if (diff >= 1) { // Mudança: reportar todas as diferenças >= 1g
