@@ -42,6 +42,7 @@ import { UpgradeDialog } from '@/components/UpgradeDialog';
 import { WeeklyAdherenceChart } from '@/components/WeeklyAdherenceChart';
 import { DailyLogCTA } from '@/components/DailyLogCTA';
 import { EmptyPlanState } from '@/components/EmptyPlanState';
+import { AdherenceStreak } from '@/components/AdherenceStreak';
 import { OnboardingTutorial } from '@/components/OnboardingTutorial';
 import { DashboardSkeleton } from '@/components/DashboardSkeleton';
 import { SuccessAnimation } from '@/components/SuccessAnimation';
@@ -512,7 +513,9 @@ export default function Dashboard() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.15 }}
+            className="space-y-3"
           >
+            <AdherenceStreak />
             <WeeklyAdherenceChart />
           </motion.section>
         )}
