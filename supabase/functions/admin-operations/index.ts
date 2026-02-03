@@ -1,14 +1,16 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+import { getCorsHeaders, validate, CLIENT_ERRORS, getErrorForLogging } from "../_shared/security.ts";
 
 const logStep = (step: string, details?: unknown) => {
-  const detailsStr = details ? ` - ${JSON.stringify(details)}` : '';
-  console.log(`[ADMIN-OPERATIONS] ${step}${detailsStr}`);
+  // Sanitize details to avoid logging sensitive data
+  const safeDetails = details ? JSON.stringify(details, (key, value) => {
+    if (['password', 'token', 'secret', 'authorization'].includes(key.toLowerCase())) {
+      return '[REDACTED]';
+    }
+    return value;
+  }) : '';
+  console.log(`[ADMIN-OPERATIONS] ${step}${safeDetails ? ` - ${safeDetails}` : ''}`);
 };
 
 // Categorias canônicas oficiais (ÚNICAS válidas)
@@ -33,6 +35,8 @@ interface FoodRow {
 }
 
 serve(async (req) => {
+  const corsHeaders = getCorsHeaders(req);
+  
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -77,18 +81,41 @@ serve(async (req) => {
 
     logStep("Admin access verified");
 
-    const body = await req.json();
+    // Validate and parse body
+    // deno-lint-ignore no-explicit-any
+    let body: any;
+    try {
+      body = await req.json();
+    } catch {
+      return new Response(
+        JSON.stringify({ error: CLIENT_ERRORS.INVALID_REQUEST }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    
     const { action, ...params } = body;
+    
+    // Validate action is a non-empty string
+    if (!validate.isNonEmptyString(action)) {
+      return new Response(
+        JSON.stringify({ error: "Ação inválida ou não especificada" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    
     logStep("Action requested", { action });
 
     let result: unknown;
 
     switch (action) {
       case 'get_settings':
-        result = await getSettings(supabaseAdmin, params.category);
+        result = await getSettings(supabaseAdmin, params.category as string | undefined);
         break;
 
       case 'update_setting':
+        if (!validate.isNonEmptyString(params.key)) {
+          throw new Error("Chave de configuração inválida");
+        }
         result = await updateSetting(supabaseAdmin, userId, params.key, params.value, req.headers);
         break;
 
@@ -97,19 +124,32 @@ serve(async (req) => {
         break;
 
       case 'validate_food_csv':
-        result = await validateFoodCSV(params.rows);
+        if (!validate.isArray(params.rows)) {
+          throw new Error("Dados do CSV inválidos");
+        }
+        result = await validateFoodCSV(params.rows as Record<string, unknown>[]);
         break;
 
       case 'import_foods':
-        result = await importFoods(supabaseAdmin, userId, params.importId, params.foods);
+        if (!validate.isNonEmptyString(params.importId) || !validate.isArray(params.foods)) {
+          throw new Error("Dados de importação inválidos");
+        }
+        result = await importFoods(supabaseAdmin, userId, params.importId as string, params.foods as FoodRow[]);
         break;
 
       case 'create_import_record':
-        result = await createImportRecord(supabaseAdmin, userId, params.filename, params.totalRows);
+        if (!validate.isNonEmptyString(params.filename) || !validate.isNumber(params.totalRows)) {
+          throw new Error("Dados de importação inválidos");
+        }
+        result = await createImportRecord(supabaseAdmin, userId, params.filename as string, params.totalRows as number);
         break;
 
       case 'get_audit_logs':
-        result = await getAuditLogs(supabaseAdmin, params.limit || 50, params.offset || 0);
+        result = await getAuditLogs(
+          supabaseAdmin, 
+          typeof params.limit === 'number' ? params.limit : 50, 
+          typeof params.offset === 'number' ? params.offset : 0
+        );
         break;
 
       case 'get_food_template':
@@ -117,15 +157,24 @@ serve(async (req) => {
         break;
 
       case 'change_user_password':
-        result = await changeUserPassword(supabaseAdmin, userId, params.targetUserId, params.newPassword, req.headers);
+        if (!validate.isUUID(params.targetUserId) || !validate.isNonEmptyString(params.newPassword)) {
+          throw new Error("Dados de senha inválidos");
+        }
+        result = await changeUserPassword(supabaseAdmin, userId, params.targetUserId as string, params.newPassword as string, req.headers);
         break;
 
       case 'preview_delete_user':
-        result = await previewDeleteUser(supabaseAdmin, params.targetUserId);
+        if (!validate.isUUID(params.targetUserId)) {
+          throw new Error("ID de usuário inválido");
+        }
+        result = await previewDeleteUser(supabaseAdmin, params.targetUserId as string);
         break;
 
       case 'delete_user':
-        result = await deleteUser(supabaseAdmin, userId, params.targetUserId, req.headers);
+        if (!validate.isUUID(params.targetUserId)) {
+          throw new Error("ID de usuário inválido");
+        }
+        result = await deleteUser(supabaseAdmin, userId, params.targetUserId as string, req.headers);
         break;
 
       case 'get_plans':
@@ -133,23 +182,40 @@ serve(async (req) => {
         break;
 
       case 'update_plan':
-        result = await updatePlan(supabaseAdmin, userId, params.planId, params.updates, req.headers);
+        if (!validate.isUUID(params.planId)) {
+          throw new Error("ID de plano inválido");
+        }
+        result = await updatePlan(supabaseAdmin, userId, params.planId as string, params.updates as Record<string, unknown>, req.headers);
         break;
 
       case 'search_foods':
-        result = await searchFoods(supabaseAdmin, params.query, params.limit, params.offset);
+        result = await searchFoods(
+          supabaseAdmin, 
+          params.query as string, 
+          typeof params.limit === 'number' ? params.limit : undefined, 
+          typeof params.offset === 'number' ? params.offset : undefined
+        );
         break;
 
       case 'update_food':
-        result = await updateFood(supabaseAdmin, userId, params.foodId, params.updates, req.headers);
+        if (!validate.isUUID(params.foodId)) {
+          throw new Error("ID de alimento inválido");
+        }
+        result = await updateFood(supabaseAdmin, userId, params.foodId as string, params.updates as Record<string, unknown>, req.headers);
         break;
 
       case 'batch_update_foods':
-        result = await batchUpdateFoods(supabaseAdmin, userId, params.updates, req.headers);
+        if (!validate.isArray(params.updates)) {
+          throw new Error("Dados de atualização inválidos");
+        }
+        result = await batchUpdateFoods(supabaseAdmin, userId, params.updates as { foodId: string; updates: { category?: string; processing_level?: string } }[], req.headers);
         break;
 
       case 'delete_food':
-        result = await deleteFood(supabaseAdmin, userId, params.foodId, req.headers);
+        if (!validate.isUUID(params.foodId)) {
+          throw new Error("ID de alimento inválido");
+        }
+        result = await deleteFood(supabaseAdmin, userId, params.foodId as string, req.headers);
         break;
 
       case 'normalize_food_names':
@@ -157,11 +223,17 @@ serve(async (req) => {
         break;
 
       case 'get_user_usage':
-        result = await getUserUsage(supabaseAdmin, params.userId);
+        if (!validate.isUUID(params.userId)) {
+          throw new Error("ID de usuário inválido");
+        }
+        result = await getUserUsage(supabaseAdmin, params.userId as string);
         break;
 
       case 'update_user_usage':
-        result = await updateUserUsage(supabaseAdmin, userId, params.targetUserId, params.updates, req.headers);
+        if (!validate.isUUID(params.targetUserId)) {
+          throw new Error("ID de usuário inválido");
+        }
+        result = await updateUserUsage(supabaseAdmin, userId, params.targetUserId as string, params.updates as Record<string, unknown>, req.headers);
         break;
 
       default:
