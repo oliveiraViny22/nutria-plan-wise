@@ -8,6 +8,8 @@ import {
   Timer,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { UsageLimitsBadge } from '@/components/UsageLimitsBadge';
+import { useUsageLimits } from '@/hooks/useUsageLimits';
 
 interface EmptyPlanStateProps {
   onGeneratePlan: () => void;
@@ -45,6 +47,9 @@ export function EmptyPlanState({ onGeneratePlan, isGenerating, isLinkedStudent }
     );
   }
 
+  const { usage, isLimitReached, isAdmin } = useUsageLimits();
+  const dietLimitReached = isLimitReached('diet');
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -67,7 +72,7 @@ export function EmptyPlanState({ onGeneratePlan, isGenerating, isLinkedStudent }
         </motion.div>
 
         {/* Content */}
-        <div className="text-center mb-6">
+        <div className="text-center mb-4">
           <h3 className="text-xl sm:text-2xl font-bold text-foreground mb-2">
             Crie seu plano alimentar
           </h3>
@@ -76,6 +81,13 @@ export function EmptyPlanState({ onGeneratePlan, isGenerating, isLinkedStudent }
             balanceadas para atingir seus objetivos.
           </p>
         </div>
+        
+        {/* Usage Limits Badge */}
+        {!isAdmin && usage && (
+          <div className="flex justify-center mb-6">
+            <UsageLimitsBadge feature="diet" showLabel />
+          </div>
+        )}
 
         {/* Features */}
         <div className="grid grid-cols-3 gap-3 mb-6 max-w-sm mx-auto">
@@ -124,8 +136,8 @@ export function EmptyPlanState({ onGeneratePlan, isGenerating, isLinkedStudent }
           <Button
             size="lg"
             onClick={onGeneratePlan}
-            disabled={isGenerating}
-            className="bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 text-primary-foreground shadow-lg shadow-primary/25 gap-2 px-8"
+            disabled={isGenerating || dietLimitReached}
+            className="bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 text-primary-foreground shadow-lg shadow-primary/25 gap-2 px-8 disabled:opacity-50"
           >
             {isGenerating ? (
               <>
@@ -136,6 +148,10 @@ export function EmptyPlanState({ onGeneratePlan, isGenerating, isLinkedStudent }
                   <Sparkles className="w-5 h-5" />
                 </motion.div>
                 <span>Gerando plano...</span>
+              </>
+            ) : dietLimitReached ? (
+              <>
+                <span>Limite atingido</span>
               </>
             ) : (
               <>
