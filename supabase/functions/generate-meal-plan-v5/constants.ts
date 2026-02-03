@@ -109,6 +109,27 @@ export const HIGH_FAT_PROTEIN_RULES = {
   CALORIES_PER_100G: 300,        // kcal (threshold)
 };
 
+// =====================================================
+// CONTROLE DE LATICÍNIOS GORDOS (v5.2)
+// =====================================================
+
+/**
+ * Critérios para laticínios limpos (preferidos para refeições).
+ * Calibrado com dados reais do banco (2026-02-03):
+ * - Permite: Cottage (4.3g), Minas Frescal (1.4g), Iogurte Grego Light (0g), Ricota (10g)
+ * - Bloqueia: Queijo Prato (28g), Mussarela (22g), Requeijão Cremoso (23g)
+ */
+export const LEAN_DAIRY_RULES = {
+  MAX_FAT_PER_100G: 10,          // g máximo de gordura
+  MAX_CALORIES_PER_100G: 150,    // kcal máximo
+};
+
+/** Laticínios com alta gordura - limitar porções drasticamente */
+export const HIGH_FAT_DAIRY_THRESHOLD = 15; // g gordura por 100g
+
+/** Porção máxima para laticínios gordos (queijos amarelos) */
+export const MAX_HIGH_FAT_DAIRY_PORTION = 30; // g (1 fatia)
+
 /** Failsafe nutricional: nenhum alimento domina a gordura diária */
 export const MAX_FAT_SHARE_PER_FOOD = 0.6; // 60% da gordura diária
 
