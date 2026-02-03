@@ -25,6 +25,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSuccessSound } from '@/hooks/useSuccessSound';
+import { SuccessAnimation } from '@/components/SuccessAnimation';
 import { toast } from 'sonner';
 
 interface MacroTargets {
@@ -236,6 +237,7 @@ export function AIRebalancer({
   const [loading, setLoading] = useState(false);
   const [applying, setApplying] = useState(false);
   const [result, setResult] = useState<AIRebalanceResult | null>(null);
+  const [showSuccessAnimation, setShowSuccessAnimation] = useState(false);
 
   const handleOptimize = async () => {
     setLoading(true);
@@ -416,10 +418,15 @@ export function AIRebalancer({
         });
       }
 
-      toast.success('Metas nutricionais atingidas! Plano ajustado. ✅');
-      playSuccessSound();
       setShowDialog(false);
       setResult(null);
+      
+      // Show success animation overlay
+      setShowSuccessAnimation(true);
+      setTimeout(() => setShowSuccessAnimation(false), 2500);
+      
+      toast.success('Metas nutricionais atingidas! Plano ajustado. ✅');
+      playSuccessSound();
       onComplete();
     } catch (error: unknown) {
       console.error('Error applying AI adjustments:', error);
@@ -440,6 +447,13 @@ export function AIRebalancer({
 
   return (
     <>
+      {/* Success Animation Overlay */}
+      {showSuccessAnimation && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-background/80 backdrop-blur-sm">
+          <SuccessAnimation show={showSuccessAnimation} message="Plano ajustado!" />
+        </div>
+      )}
+
       <Button
         variant="outline"
         size={compact ? "default" : "default"}
