@@ -461,18 +461,34 @@ export function calculateMealReplacement(
     }
   }
 
-  // 2. CARBOIDRATOS: Adicionar fonte de carboidrato se necessário
+  // 2. CARBOIDRATOS: Adicionar fontes de carboidrato proporcionalmente ao déficit
+  const carbDeficit = targetMacros.carbs - currentMacros.carbs;
+  const isHighCarbMeal = targetMacros.carbs >= 60; // Refeições com muitos carboidratos
+  
+  // Banana (sempre que possível - carboidrato rápido)
   if (remaining().carbs >= 10 && remaining().calories >= 45) {
-    const bananaScale = calculateOptimalScale(FOOD_CATALOG['Banana'].macros, 1, 0.5);
+    // Para refeições com muitos carbos, usar mais banana
+    const bananaDesiredScale = isHighCarbMeal && carbDeficit > 40 ? 1.5 : 1;
+    const bananaScale = calculateOptimalScale(FOOD_CATALOG['Banana'].macros, bananaDesiredScale, 0.5);
     if (bananaScale >= 0.5) {
       addItem('Banana', FOOD_CATALOG, 'food', bananaScale);
     }
   }
   
+  // Aveia (carboidrato complexo)
   if (remaining().carbs >= 15 && remaining().calories >= 75) {
-    const oatsScale = calculateOptimalScale(FOOD_CATALOG['Aveia em Flocos'].macros, remaining().carbs >= 25 ? 1 : 0.5, 0.5);
+    const oatsDesiredScale = isHighCarbMeal && remaining().carbs >= 40 ? 1.5 : (remaining().carbs >= 25 ? 1 : 0.5);
+    const oatsScale = calculateOptimalScale(FOOD_CATALOG['Aveia em Flocos'].macros, oatsDesiredScale, 0.5);
     if (oatsScale >= 0.5) {
       addItem('Aveia em Flocos', FOOD_CATALOG, 'food', oatsScale);
+    }
+  }
+  
+  // Batata Doce (para refeições com alto déficit de carboidratos)
+  if (isHighCarbMeal && remaining().carbs >= 25 && remaining().calories >= 100) {
+    const sweetPotatoScale = calculateOptimalScale(FOOD_CATALOG['Batata Doce'].macros, 1, 0.5);
+    if (sweetPotatoScale >= 0.5) {
+      addItem('Batata Doce', FOOD_CATALOG, 'food', sweetPotatoScale);
     }
   }
 
@@ -521,72 +537,73 @@ export function calculateMealReplacement(
   );
   
   if (hasProteinPowder) {
-    const milkType = userGoal === 'lose_weight' ? 'Leite Desnatado' : 
+    // Calcular se estamos em deficit calórico significativo
+    const currentCaloriePercent = (currentMacros.calories / targetMacros.calories) * 100;
+    const inSignificantDeficit = currentCaloriePercent < 75; // Menos de 75% das calorias atingidas
+    const hasLargeCarboDeficit = remaining().carbs > 30; // Ainda precisa de muitos carboidratos
+    
+    // Decisão inteligente de líquido:
+    // - Se em deficit significativo E grande deficit de carbos → usar água/leite amêndoas para deixar espaço para alimentos sólidos
+    // - Senão → seguir a lógica baseada no objetivo
+    
+    let liquidChoice: 'Água' | 'Leite de Amêndoas' | 'Leite Desnatado' | 'Leite Integral';
+    let liquidReason: string;
+    
+    if (inSignificantDeficit && hasLargeCarboDeficit) {
+      // Quando há grande deficit, água é melhor para maximizar espaço para carboidratos sólidos
+      liquidChoice = 'Água';
+      liquidReason = '💧 Escolhida para maximizar espaço calórico para alimentos sólidos (deficit de carboidratos detectado)';
+    } else if (remaining().calories < 40) {
+      // Sem espaço calórico → água
+      liquidChoice = 'Água';
+      liquidReason = '💧 Escolhida por não adicionar calorias (limite atingido)';
+    } else if (remaining().calories < 80) {
+      // Pouco espaço → leite de amêndoas
+      liquidChoice = 'Leite de Amêndoas';
+      liquidReason = '🥛 Escolhido por ter apenas 30kcal (calorias limitadas)';
+    } else {
+      // Espaço suficiente → baseado no objetivo
+      liquidChoice = userGoal === 'lose_weight' ? 'Leite Desnatado' : 
                      userGoal === 'gain_muscle' ? 'Leite Integral' : 'Leite Desnatado';
-    
-    // Mínimo 150ml (0.75 scale) para shake bebível
-    const minScale = 0.75;
-    const milkCaloriesNeeded = FOOD_CATALOG[milkType].macros.calories * minScale;
-    const optimalScale = calculateOptimalScale(FOOD_CATALOG[milkType].macros, 1, minScale);
-    
-    if (optimalScale >= minScale && remaining().calories >= milkCaloriesNeeded) {
-      // Adicionar leite com justificativa
-      const milkItem = FOOD_CATALOG[milkType];
-      const finalScale = Math.round(optimalScale * 4) / 4;
-      const scaledMacros = {
-        calories: Math.round(milkItem.macros.calories * finalScale),
-        protein: Math.round(milkItem.macros.protein * finalScale * 10) / 10,
-        carbs: Math.round(milkItem.macros.carbs * finalScale * 10) / 10,
-        fat: Math.round(milkItem.macros.fat * finalScale * 10) / 10,
-      };
-      
-      const goalReason = userGoal === 'lose_weight' 
+      liquidReason = userGoal === 'lose_weight' 
         ? '🎯 Escolhido por ser baixo em calorias (ideal para emagrecimento)'
         : userGoal === 'gain_muscle'
         ? '💪 Escolhido por fornecer calorias extras (ideal para ganho de massa)'
         : '⚖️ Escolhido para equilibrar calorias e proteína';
+    }
+    
+    const liquidItem = FOOD_CATALOG[liquidChoice];
+    
+    if (liquidChoice === 'Água') {
+      items.push({
+        name: 'Água',
+        quantity: '150-200ml',
+        macros: { calories: 0, protein: 0, carbs: 0, fat: 0 },
+        type: 'food',
+        notes: 'Necessário para diluir o shake',
+        reason: liquidReason,
+      });
+    } else {
+      // Mínimo 150ml (0.75 scale) para shake bebível
+      const minScale = 0.75;
+      const optimalScale = calculateOptimalScale(liquidItem.macros, 1, minScale);
+      const finalScale = Math.round(Math.max(minScale, optimalScale) * 4) / 4;
+      
+      const scaledMacros = scaleMacros(liquidItem.macros, finalScale);
       
       items.push({
-        name: milkType,
+        name: liquidChoice,
         quantity: `${Math.round(200 * finalScale)}ml`,
         macros: scaledMacros,
         type: 'food',
-        notes: milkItem.notes,
-        reason: goalReason,
+        notes: liquidItem.notes,
+        reason: liquidReason,
       });
       
       currentMacros.protein += scaledMacros.protein;
       currentMacros.calories += scaledMacros.calories;
       currentMacros.carbs += scaledMacros.carbs;
       currentMacros.fat += scaledMacros.fat;
-    } else {
-      // Se não couber leite calórico, usar leite de amêndoas (baixa caloria)
-      if (remaining().calories >= 20) {
-        const almondMilk = FOOD_CATALOG['Leite de Amêndoas'];
-        items.push({
-          name: 'Leite de Amêndoas',
-          quantity: '200ml',
-          macros: { ...almondMilk.macros },
-          type: 'food',
-          notes: almondMilk.notes,
-          reason: '🥛 Escolhido por ter apenas 30kcal (calorias limitadas nesta refeição)',
-        });
-        
-        currentMacros.protein += almondMilk.macros.protein;
-        currentMacros.calories += almondMilk.macros.calories;
-        currentMacros.carbs += almondMilk.macros.carbs;
-        currentMacros.fat += almondMilk.macros.fat;
-      } else {
-        // Adicionar água como última opção
-        items.push({
-          name: 'Água',
-          quantity: '150-200ml',
-          macros: { calories: 0, protein: 0, carbs: 0, fat: 0 },
-          type: 'food',
-          notes: 'Necessário para diluir o shake',
-          reason: '💧 Escolhida por não adicionar calorias (limite de calorias atingido)',
-        });
-      }
     }
   }
 
