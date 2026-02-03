@@ -10,7 +10,7 @@ import type {
   TemplateRole,
   AnchorsByRole,
 } from "./types.ts";
-import { MEAL_NAMES, ITEM_COUNTS } from "./constants.ts";
+import { MEAL_NAMES } from "./constants.ts";
 import { applyUnitConversion } from "./unit-conversion.ts";
 import { selectFoodForRole, calculateApproximateQuantity } from "./food-filter.ts";
 import { selectAnchorForOption, normalizeRoleName, getRoleAliases } from "./anchor-selection.ts";
@@ -32,7 +32,8 @@ export function buildMealWithAnchors(
   usedGlobalIds: Set<string>,
   preferredFoods: string[],
   anchorsByRole: AnchorsByRole[],
-  previousOptionsUsedIds: Set<string>
+  previousOptionsUsedIds: Set<string>,
+  itemCounts: Record<string, { min: number; max: number }>
 ): MealResult {
   const { template, roles } = templateData;
   const foods: FoodSelection[] = [];
@@ -123,7 +124,7 @@ export function buildMealWithAnchors(
   }
 
   // PASSO 3: Processar papéis opcionais
-  const itemLimits = ITEM_COUNTS[mealType] || { min: 2, max: 4 };
+  const itemLimits = itemCounts[mealType] || { min: 2, max: 4 };
   const targetItems = Math.floor(
     Math.random() * (itemLimits.max - itemLimits.min + 1)
   ) + itemLimits.min;

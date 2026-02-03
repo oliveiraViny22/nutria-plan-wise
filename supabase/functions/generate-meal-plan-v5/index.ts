@@ -29,7 +29,7 @@ import { GENERATOR_CONTRACT } from "../_shared/nutrition-contracts.ts";
 
 // Módulos internos
 import type { Food, MacroTargets, MealWithOptions, MealResult, UserProfile } from "./types.ts";
-import { MEAL_NAMES, MEAL_TYPES_MAP } from "./constants.ts";
+import { MEAL_NAMES, MEAL_TYPES_MAP, ITEM_COUNTS, ITEM_COUNTS_LIGHT_DINNER } from "./constants.ts";
 import { logInfo, logError, logWarn } from "./logger.ts";
 import { filterEligibleFoods, validateFatShare, validateImplicitFat, loadBlockOverrides } from "./food-filter.ts";
 import { loadAnchorFoods } from "./anchor-selection.ts";
@@ -94,8 +94,19 @@ serve(async (req) => {
     // Determinar refeições
     const mealsPerDay = profile.meals_per_day || 4;
     const mealTypes = MEAL_TYPES_MAP[mealsPerDay] || MEAL_TYPES_MAP[4];
+    
+    // v5.9: Preferência de refeição noturna
+    const eveningMealPreference = profile.evening_meal_preference || 'no_preference';
+    const itemCounts = eveningMealPreference === 'light_dinner' 
+      ? ITEM_COUNTS_LIGHT_DINNER 
+      : ITEM_COUNTS;
 
-    logInfo("Configuração", { mealsPerDay, mealTypes, mealOptionsLimit });
+    logInfo("Configuração", { 
+      mealsPerDay, 
+      mealTypes, 
+      mealOptionsLimit,
+      eveningMealPreference,
+    });
 
     // Carregar templates, âncoras e overrides de bloqueio em paralelo
     const [templates, anchorFoods] = await Promise.all([
@@ -159,7 +170,8 @@ serve(async (req) => {
           usedGlobalIds,
           profile.preferred_foods || [],
           mealAnchorsByRole,
-          previousOptionsUsedIds
+          previousOptionsUsedIds,
+          itemCounts
         );
         
         // Rastrear alimentos usados

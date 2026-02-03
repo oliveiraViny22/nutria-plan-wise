@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, ArrowRight, Check, Loader2, Utensils, Heart, Ban } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, Loader2, Utensils, Heart, Ban, Moon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -54,11 +54,31 @@ export default function Onboarding() {
     goal: '' as 'lose_weight' | 'maintain' | 'gain_muscle' | '',
     activity_level: '' as 'sedentary' | 'light' | 'moderate' | 'active' | 'very_active' | '',
     meals_per_day: 4,
+    evening_meal_preference: 'no_preference' as 'full_dinner' | 'light_dinner' | 'no_preference',
     preferences: [] as string[],
     restrictions: [] as string[],
     preferred_foods: [] as string[], // Alimentos preferidos específicos
     avoided_foods: [] as string[],   // Alimentos evitados específicos
   });
+
+  // Opções de preferência de refeição noturna
+  const EVENING_MEAL_OPTIONS = [
+    { 
+      value: 'full_dinner' as const, 
+      label: 'Jantar completo + Ceia leve',
+      description: 'Jantar tradicional com proteína e acompanhamentos, ceia com mingau ou frutas'
+    },
+    { 
+      value: 'light_dinner' as const, 
+      label: 'Jantar leve + Ceia substancial',
+      description: 'Jantar mais leve e ceia mais completa, ideal para quem janta tarde'
+    },
+    { 
+      value: 'no_preference' as const, 
+      label: 'Sem preferência',
+      description: 'O sistema decide a melhor distribuição'
+    },
+  ];
 
   const calculateTargets = () => {
     const { age, sex, height, weight, goal, activity_level } = formData;
@@ -126,6 +146,7 @@ export default function Onboarding() {
           goal: formData.goal || null,
           activity_level: formData.activity_level || null,
           meals_per_day: formData.meals_per_day,
+          evening_meal_preference: formData.meals_per_day >= 5 ? formData.evening_meal_preference : 'no_preference',
           preferences: formData.preferences,
           restrictions: formData.restrictions,
           preferred_foods: formData.preferred_foods,
@@ -433,6 +454,50 @@ export default function Onboarding() {
                       </button>
                     ))}
                   </div>
+
+                  {/* Pergunta condicional para 5+ refeições */}
+                  <AnimatePresence>
+                    {formData.meals_per_day >= 5 && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="overflow-hidden"
+                      >
+                        <div className="pt-4 sm:pt-6 border-t border-border">
+                          <div className="flex items-center gap-2 mb-3 sm:mb-4">
+                            <Moon className="w-5 h-5 text-primary" />
+                            <h4 className="font-medium text-sm sm:text-base">
+                              Como você prefere suas refeições noturnas?
+                            </h4>
+                          </div>
+                          <div className="grid gap-2 sm:gap-3">
+                            {EVENING_MEAL_OPTIONS.map((option) => (
+                              <button
+                                key={option.value}
+                                type="button"
+                                onClick={() =>
+                                  setFormData({ ...formData, evening_meal_preference: option.value })
+                                }
+                                className={`p-3 sm:p-4 rounded-lg sm:rounded-xl border text-left transition-all ${
+                                  formData.evening_meal_preference === option.value
+                                    ? 'border-primary bg-primary/10'
+                                    : 'border-border hover:border-primary/50'
+                                }`}
+                              >
+                                <span className="font-medium text-foreground text-sm sm:text-base block">
+                                  {option.label}
+                                </span>
+                                <span className="text-xs sm:text-sm text-muted-foreground">
+                                  {option.description}
+                                </span>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </div>
               </motion.div>
             )}

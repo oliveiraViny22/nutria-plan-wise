@@ -899,6 +899,7 @@ export type Database = {
           created_at: string
           daily_calories: number | null
           email: string | null
+          evening_meal_preference: string | null
           fat_target: number | null
           goal: string | null
           height: number | null
@@ -924,6 +925,7 @@ export type Database = {
           created_at?: string
           daily_calories?: number | null
           email?: string | null
+          evening_meal_preference?: string | null
           fat_target?: number | null
           goal?: string | null
           height?: number | null
@@ -949,6 +951,7 @@ export type Database = {
           created_at?: string
           daily_calories?: number | null
           email?: string | null
+          evening_meal_preference?: string | null
           fat_target?: number | null
           goal?: string | null
           height?: number | null
