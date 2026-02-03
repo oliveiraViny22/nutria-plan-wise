@@ -130,3 +130,17 @@ export interface UserProfile {
   restrictions: string[] | null;
   onboarding_completed: boolean | null;
 }
+
+// =====================================================
+// TIPOS DE CONTEXTO DE PLANO (v5.8)
+// =====================================================
+
+export type PlanContext = "automatic" | "professional";
+
+export interface PlanGenerationConfig {
+  context: PlanContext;
+  userId: string;
+  professionalId?: string | null;
+  mealsPerDay: number;
+  mealOptionsLimit: number;
+}
