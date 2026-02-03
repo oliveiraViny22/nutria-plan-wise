@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Pill, ChevronDown, ChevronUp, Loader2, AlertCircle, Sparkles, Clock, Info } from 'lucide-react';
+import { Pill, ChevronDown, ChevronUp, Loader2, AlertCircle, Sparkles, Clock, Info, Zap } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -20,7 +20,7 @@ interface Supplement {
   timing: string;
   benefit: string;
   priority: 'essential' | 'recommended' | 'optional';
-  doseType?: 'single_daily' | 'contextual' | 'meal_replacement';
+  doseType?: 'single_daily' | 'complement' | 'meal_replacement';
   hasMacros?: boolean;
   macros?: {
     calories: number;
@@ -31,7 +31,7 @@ interface Supplement {
 }
 
 interface SupplementSuggestion {
-  mode: 'complement' | 'replacement';
+  mode: 'complement' | 'replacement' | 'wildcard';
   mealType: string;
   supplements: Supplement[];
   reasoning: string;
@@ -49,7 +49,8 @@ interface SupplementCardProps {
   mealName: string;
   dailyCalories?: number;
   proteinTarget?: number;
-  mealSkipped?: boolean;
+  currentMealCalories?: number;
+  currentMealProtein?: number;
   alreadySuggestedToday?: string[];
 }
 
@@ -67,8 +68,8 @@ const PRIORITY_LABELS = {
 
 const DOSE_TYPE_LABELS: Record<string, string> = {
   single_daily: 'Dose única/dia',
-  meal_replacement: 'Substituto',
-  contextual: 'Complementar',
+  meal_replacement: 'Calórico',
+  complement: 'Complementar',
 };
 
 export function SupplementCard({ 
@@ -77,11 +78,12 @@ export function SupplementCard({
   mealName,
   dailyCalories,
   proteinTarget,
-  mealSkipped = false,
+  currentMealCalories,
+  currentMealProtein,
   alreadySuggestedToday = [],
 }: SupplementCardProps) {
   const { user } = useAuth();
-  const [isOpen, setIsOpen] = useState(mealSkipped); // Auto-abrir se refeição pulada
+  const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [suggestion, setSuggestion] = useState<SupplementSuggestion | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -100,7 +102,8 @@ export function SupplementCard({
           goal,
           dailyCalories,
           proteinTarget,
-          mealSkipped,
+          currentMealCalories,
+          currentMealProtein,
           alreadySuggestedToday,
         },
       });
@@ -118,7 +121,7 @@ export function SupplementCard({
     } finally {
       setLoading(false);
     }
-  }, [user, hasFetched, mealType, goal, dailyCalories, proteinTarget, mealSkipped, alreadySuggestedToday]);
+  }, [user, hasFetched, mealType, goal, dailyCalories, proteinTarget, currentMealCalories, currentMealProtein, alreadySuggestedToday]);
 
   // Fetch when opened for the first time
   useEffect(() => {
@@ -126,13 +129,6 @@ export function SupplementCard({
       fetchSuggestions();
     }
   }, [isOpen, hasFetched, loading, fetchSuggestions]);
-
-  // Auto-abrir e buscar se refeição foi pulada
-  useEffect(() => {
-    if (mealSkipped && !hasFetched) {
-      setIsOpen(true);
-    }
-  }, [mealSkipped, hasFetched]);
 
   const handleRetry = useCallback(() => {
     setHasFetched(false);
@@ -142,39 +138,29 @@ export function SupplementCard({
 
   if (!goal) return null;
 
-  const isReplacementMode = suggestion?.mode === 'replacement';
-  const cardTitle = isReplacementMode 
-    ? 'Suplementação para Compensar' 
-    : 'Suplementação Complementar';
-  const cardSubtitle = isReplacementMode
-    ? `Substituto para ${mealName} pulado`
-    : `Complementar ao ${mealName}`;
+  // Verificar se há suplementos com macros
+  const hasCalorieSupplements = suggestion?.supplements.some(s => s.hasMacros) ?? false;
 
   return (
-    <Card className={`border-purple-500/20 bg-gradient-to-br from-purple-500/5 to-transparent overflow-hidden ${mealSkipped ? 'ring-2 ring-amber-500/50' : ''}`}>
+    <Card className="border-purple-500/20 bg-gradient-to-br from-purple-500/5 to-transparent overflow-hidden">
       <Collapsible open={isOpen} onOpenChange={setIsOpen}>
         <CollapsibleTrigger asChild>
           <CardHeader className="cursor-pointer hover:bg-muted/30 transition-colors py-3 px-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center ${mealSkipped ? 'bg-amber-500/20' : 'bg-purple-500/20'}`}>
-                  <Pill className={`h-4 w-4 ${mealSkipped ? 'text-amber-500' : 'text-purple-500'}`} />
+                <div className="w-8 h-8 rounded-full bg-purple-500/20 flex items-center justify-center">
+                  <Pill className="h-4 w-4 text-purple-500" />
                 </div>
                 <div>
                   <CardTitle className="text-sm font-medium flex items-center gap-2">
-                    {cardTitle}
+                    Suplementação Coringa
                     <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
                       <Sparkles className="h-3 w-3 mr-1" />
                       IA
                     </Badge>
-                    {mealSkipped && (
-                      <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-amber-500/50 text-amber-600">
-                        Refeição pulada
-                      </Badge>
-                    )}
                   </CardTitle>
                   <p className="text-xs text-muted-foreground">
-                    {cardSubtitle}
+                    Opções extras para {mealName}
                   </p>
                 </div>
               </div>
@@ -225,16 +211,16 @@ export function SupplementCard({
                   exit={{ opacity: 0 }}
                   className="space-y-3"
                 >
-                  {/* Aviso importante para modo complemento */}
-                  {!isReplacementMode && (
-                    <div className="flex items-start gap-2 p-2 rounded-lg bg-blue-500/10 border border-blue-500/20 text-xs">
-                      <Info className="h-4 w-4 text-blue-500 shrink-0 mt-0.5" />
-                      <p className="text-muted-foreground">
-                        <strong className="text-foreground">Suplementos complementares</strong> não afetam 
-                        as calorias ou macros do seu plano. São sugestões opcionais para otimizar resultados.
-                      </p>
-                    </div>
-                  )}
+                  {/* Aviso sobre o conceito "coringa" */}
+                  <div className="flex items-start gap-2 p-2 rounded-lg bg-purple-500/10 border border-purple-500/20 text-xs">
+                    <Zap className="h-4 w-4 text-purple-500 shrink-0 mt-0.5" />
+                    <p className="text-muted-foreground">
+                      <strong className="text-foreground">Opções coringa:</strong> Suplementos opcionais 
+                      para ajudar a atingir suas metas. {hasCalorieSupplements ? 
+                        'Suplementos calóricos são exibidos com seus macros.' : 
+                        'Estas sugestões não afetam suas calorias.'}
+                    </p>
+                  </div>
 
                   {/* Lista de suplementos */}
                   {suggestion.supplements.map((supp, idx) => (
@@ -268,7 +254,7 @@ export function SupplementCard({
                           >
                             {PRIORITY_LABELS[supp.priority]}
                           </Badge>
-                          {supp.doseType && (
+                          {supp.doseType && DOSE_TYPE_LABELS[supp.doseType] && (
                             <span className="text-[9px] text-muted-foreground">
                               {DOSE_TYPE_LABELS[supp.doseType]}
                             </span>
@@ -286,7 +272,7 @@ export function SupplementCard({
                         {supp.benefit}
                       </p>
 
-                      {/* Macros para suplementos de substituição */}
+                      {/* Macros para suplementos calóricos */}
                       {supp.hasMacros && supp.macros && (
                         <div className="flex gap-3 pt-2 border-t border-border/30 text-xs">
                           <span className="text-amber-600">{supp.macros.calories} kcal</span>
@@ -298,11 +284,11 @@ export function SupplementCard({
                     </div>
                   ))}
 
-                  {/* Total de macros para modo substituição */}
-                  {isReplacementMode && suggestion.totalMacros && (
+                  {/* Total de macros se houver suplementos calóricos */}
+                  {suggestion.totalMacros && (
                     <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 space-y-2">
                       <h5 className="text-xs font-medium text-amber-700 dark:text-amber-400">
-                        Total para compensação:
+                        Total de macros (suplementos calóricos):
                       </h5>
                       <div className="flex gap-4 text-sm font-medium">
                         <span className="text-amber-600">{suggestion.totalMacros.calories} kcal</span>
@@ -311,7 +297,7 @@ export function SupplementCard({
                         <span className="text-orange-600">{suggestion.totalMacros.fat}g G</span>
                       </div>
                       <p className="text-[10px] text-muted-foreground">
-                        ⚠️ Estes macros são para compensar a refeição pulada, não são adicionais ao plano.
+                        💡 Use estes suplementos como opção para atingir suas metas diárias.
                       </p>
                     </div>
                   )}
@@ -330,9 +316,7 @@ export function SupplementCard({
                   exit={{ opacity: 0 }}
                   className="text-center py-4 text-sm text-muted-foreground"
                 >
-                  {mealSkipped 
-                    ? 'Nenhum suplemento de substituição disponível para esta refeição'
-                    : 'Nenhum suplemento complementar recomendado para este horário'}
+                  Nenhum suplemento recomendado para este horário
                 </motion.div>
               )}
             </AnimatePresence>
