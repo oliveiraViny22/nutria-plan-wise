@@ -77,11 +77,17 @@ interface Adjustment {
 }
 
 interface RebalanceResult {
-  status: "valid" | "valid_with_alert" | "error";
+  status: "valid" | "valid_with_alert" | "error" | "structurally_invalid";
   objective: Objective;
   iterations: number;
   final_totals: MacroTargets;
   adjustments: Adjustment[];
+  structural_issue?: {
+    reason: string;
+    fat_percent: number;
+    calories_percent: number;
+    action: string;
+  };
   food_changes?: Array<{
     food_id: string;
     food_name: string;
@@ -476,6 +482,19 @@ function runFinalRefinement(
   return { quantities, iterations, converged: false };
 }
 
+interface CorrectionPipelineResult {
+  quantities: Map<string, number>;
+  adjustments: Adjustment[];
+  iterations: number;
+  converged: boolean;
+  structurallyInvalid?: {
+    reason: string;
+    fat_percent: number;
+    calories_percent: number;
+    action: string;
+  };
+}
+
 function runCorrectionPipeline(
   foods: FoodWithMeta[],
   quantities: Map<string, number>,
@@ -483,7 +502,7 @@ function runCorrectionPipeline(
   objective: Objective,
   settings: OptimizerSettings,
   maxCycles: number = 3
-): { quantities: Map<string, number>; adjustments: Adjustment[]; iterations: number; converged: boolean } {
+): CorrectionPipelineResult {
   const adjustments: Adjustment[] = [];
   let iterations = 0;
 
@@ -860,17 +879,26 @@ function runCorrectionPipeline(
         
         console.log(`[ETAPA 4.5] Resultado: Gordura ${afterNormPercents.fat.toFixed(1)}%, Calorias ${afterNormPercents.calories.toFixed(1)}%`);
         
-        // VALIDAÇÃO: Se ainda excede limites, marcar como estruturalmente inválido
+        // VALIDAÇÃO CRÍTICA: Se ainda excede limites, INTERROMPER FLUXO
         if (afterNormPercents.fat > 110 || afterNormPercents.calories > 105) {
-          console.warn(`[ETAPA 4.5] STATUS: STRUCTURALLY_INVALID - Excesso de gordura de fontes mistas`);
-          console.warn(`[ETAPA 4.5] REASON: Excess fat from mixed protein sources`);
-          console.warn(`[ETAPA 4.5] ACTION: Consider regenerating plan with leaner protein sources`);
-          // Adicionar flag para o frontend
-          adjustments.push({
-            nutrient: "structure",
-            action: "warning",
-            delta: "STRUCTURALLY_INVALID: Fontes proteicas com alto teor de gordura",
-          });
+          console.error(`[ETAPA 4.5] ❌ STRUCTURALLY_INVALID - Fluxo interrompido`);
+          console.error(`[ETAPA 4.5] Gordura: ${afterNormPercents.fat.toFixed(1)}% (limite: 110%)`);
+          console.error(`[ETAPA 4.5] Calorias: ${afterNormPercents.calories.toFixed(1)}% (limite: 105%)`);
+          console.error(`[ETAPA 4.5] ACTION: Regenerar plano com fontes proteicas mais magras`);
+          
+          // RETORNAR IMEDIATAMENTE - NÃO VALIDAR, NÃO EXIBIR COMO GERADO
+          return {
+            quantities,
+            adjustments,
+            iterations,
+            converged: false,
+            structurallyInvalid: {
+              reason: "Excesso de gordura proveniente de fontes mistas (proteína + gordura)",
+              fat_percent: Math.round(afterNormPercents.fat * 10) / 10,
+              calories_percent: Math.round(afterNormPercents.calories * 10) / 10,
+              action: "Regenerar plano com fontes proteicas mais magras (ex: peito de frango, tilápia, clara de ovo)",
+            },
+          };
         }
       } else {
         console.log(`[ETAPA 4.5] Nenhuma fonte mista encontrada - prosseguindo`);
@@ -1124,7 +1152,7 @@ serve(async (req) => {
       // Criar cópia do mapa inicial
       const workingQuantities = new Map(optionInitialQuantities);
 
-      // FASE 1: Pipeline de correção macro (4 etapas)
+      // FASE 1: Pipeline de correção macro (4 etapas + 4.5)
       const pipelineResult = runCorrectionPipeline(
         optionFoods, 
         workingQuantities, 
@@ -1133,6 +1161,35 @@ serve(async (req) => {
         settings,
         3
       );
+
+      // VERIFICAR INVALIDAÇÃO ESTRUTURAL DA ETAPA 4.5
+      if (pipelineResult.structurallyInvalid) {
+        console.error(`Opção ${optionNumber}: STRUCTURALLY_INVALID detectado`);
+        
+        // Calcular totais finais para retorno
+        const invalidTotals = calculateTotals(optionFoods, pipelineResult.quantities);
+        
+        return new Response(
+          JSON.stringify({
+            status: "structurally_invalid",
+            objective,
+            iterations: pipelineResult.iterations,
+            final_totals: {
+              calories: Math.round(invalidTotals.calories),
+              protein: Math.round(invalidTotals.protein),
+              carbs: Math.round(invalidTotals.carbs),
+              fat: Math.round(invalidTotals.fat),
+            },
+            adjustments: pipelineResult.adjustments,
+            structural_issue: pipelineResult.structurallyInvalid,
+            food_changes: [],
+          }),
+          {
+            status: 200, // 200 para que o frontend possa processar a resposta
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
+      }
 
       // FASE 2: Refinamento final para precisão ±1g
       // Pré-calcular contribuições
