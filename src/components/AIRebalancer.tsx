@@ -470,12 +470,12 @@ export function AIRebalancer({
               ) : (
                 <Sparkles className="w-5 h-5 text-primary" />
               )}
-              {isAlreadyOptimized ? 'Plano Otimizado' : 'Proposta de Otimização'}
+              {isAlreadyOptimized ? 'Metas Atingidas' : 'Validação Nutricional'}
             </DialogTitle>
             <DialogDescription>
               {isAlreadyOptimized 
                 ? 'Seu plano já está alinhado com suas metas'
-                : 'Análise inteligente do seu plano com sugestões personalizadas'
+                : 'Conferência de metas e ajustes necessários'
               }
             </DialogDescription>
           </DialogHeader>
