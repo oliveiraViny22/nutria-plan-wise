@@ -14,6 +14,8 @@ import {
   LEAN_DAIRY_RULES,
   HIGH_FAT_DAIRY_THRESHOLD,
   MAX_HIGH_FAT_DAIRY_PORTION,
+  LEAN_CARB_RULES,
+  HIGH_FAT_CARB_THRESHOLD,
 } from "./constants.ts";
 import { logDebug, logWarn } from "./logger.ts";
 import {
@@ -92,6 +94,31 @@ export function isHighFatDairy(food: Food): boolean {
   if (category !== "laticinios") return false;
   
   return food.fat >= HIGH_FAT_DAIRY_THRESHOLD;
+}
+
+// =====================================================
+// CLASSIFICAÇÃO DE CARBOIDRATOS (v5.3)
+// =====================================================
+
+/**
+ * Verifica se um alimento é um carboidrato com alta gordura.
+ * Bloqueia: Granola (14g fat), Farofa Pronta, Croissant, etc.
+ */
+export function isHighFatCarb(food: Food): boolean {
+  const category = (food.category || "").toLowerCase();
+  if (category !== "carboidratos") return false;
+  
+  return food.fat >= HIGH_FAT_CARB_THRESHOLD;
+}
+
+/**
+ * Verifica se um carboidrato é limpo (baixa gordura).
+ */
+export function isLeanCarb(food: Food): boolean {
+  const category = (food.category || "").toLowerCase();
+  if (category !== "carboidratos") return false;
+  
+  return food.fat <= LEAN_CARB_RULES.MAX_FAT_PER_100G;
 }
 
 /**
@@ -220,11 +247,20 @@ function isDairyRole(roleName: string): boolean {
 }
 
 /**
+ * Verifica se um papel é de carboidrato base.
+ */
+function isCarbRole(roleName: string): boolean {
+  return roleName.toLowerCase().includes("carboidrato") || 
+         roleName.toLowerCase().includes("carbo");
+}
+
+/**
  * Seleciona um alimento para um papel usando seleção ponderada.
  * Prioriza alimentos preferidos E que melhor preenchem déficits de macros.
  * 
  * v5.1: Papéis de proteína base exigem proteínas magras.
  * v5.2: Papéis de laticínio preferem laticínios magros.
+ * v5.3: Papéis de carboidrato bloqueiam carboidratos gordos (Granola, Croissant, etc.)
  */
 export function selectFoodForRole(
   role: TemplateRole,
@@ -236,6 +272,7 @@ export function selectFoodForRole(
   const preferredSet = new Set(preferredFoods.map((p) => p.toLowerCase()));
   const isProteinBaseRole = requiresLeanProtein(role.role_name);
   const isLaticinioRole = isDairyRole(role.role_name);
+  const isCarbBaseRole = isCarbRole(role.role_name);
 
   // Filtrar por categorias do papel
   let candidates = eligibleFoods.filter((f) => {
@@ -268,6 +305,17 @@ export function selectFoodForRole(
       // Bloquear laticínios muito gordos como primeira seleção
       if (isHighFatDairy(f)) {
         logDebug("Bloqueando laticínio gordo como primeira escolha", {
+          name: f.name,
+          fat: f.fat,
+        });
+        return false;
+      }
+    }
+    
+    // v5.3: Papéis de carboidrato bloqueiam carboidratos gordos
+    if (isCarbBaseRole && cat === "carboidratos") {
+      if (isHighFatCarb(f)) {
+        logDebug("Bloqueando carboidrato gordo como base", {
           name: f.name,
           fat: f.fat,
         });
