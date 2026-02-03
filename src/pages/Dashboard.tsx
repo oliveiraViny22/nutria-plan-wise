@@ -20,6 +20,7 @@ import {
   HelpCircle,
   Layers,
   ClipboardCheck,
+  FileText,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Logo } from '@/components/Logo';
@@ -591,16 +592,26 @@ export default function Dashboard() {
               <h2 className="text-lg font-semibold text-foreground">
                 Plano de Hoje
               </h2>
-              {/* Only show daily log button for paid users */}
-              {subscriptionPlan && subscriptionPlan.type !== 'gratuito' && (
-                <Link to="/daily-log">
+              <div className="flex items-center gap-2">
+                {/* View full plan button */}
+                <Link to="/meal-plan">
                   <Button variant="outline" size="sm" className="gap-2">
-                    <ClipboardCheck className="h-4 w-4" />
-                    <span className="hidden sm:inline">Registrar consumo</span>
-                    <span className="sm:hidden">Registrar</span>
+                    <FileText className="h-4 w-4" />
+                    <span className="hidden sm:inline">Ver Plano Completo</span>
+                    <span className="sm:hidden">Plano</span>
                   </Button>
                 </Link>
-              )}
+                {/* Only show daily log button for paid users */}
+                {subscriptionPlan && subscriptionPlan.type !== 'gratuito' && (
+                  <Link to="/daily-log">
+                    <Button variant="outline" size="sm" className="gap-2">
+                      <ClipboardCheck className="h-4 w-4" />
+                      <span className="hidden sm:inline">Registrar consumo</span>
+                      <span className="sm:hidden">Registrar</span>
+                    </Button>
+                  </Link>
+                )}
+              </div>
             </div>
             <div className="space-y-3">
               {meals.map((meal, index) => (
