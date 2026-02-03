@@ -232,7 +232,7 @@ const FOOD_CATALOG: Record<string, CatalogItem> = {
     macros: { calories: 70, protein: 7, carbs: 10, fat: 0 },
     notes: 'Base líquida para shakes',
     scalable: true,
-    minPortion: 0.5,
+    minPortion: 0.75, // Mínimo 150ml para shake bebível
     maxPortion: 2,
   },
   'Leite Integral': {
@@ -240,7 +240,7 @@ const FOOD_CATALOG: Record<string, CatalogItem> = {
     macros: { calories: 120, protein: 6, carbs: 9, fat: 6 },
     notes: 'Mais calórico, ideal para ganho de massa',
     scalable: true,
-    minPortion: 0.5,
+    minPortion: 0.75, // Mínimo 150ml para shake bebível
     maxPortion: 2,
   },
   'Leite de Amêndoas': {
@@ -248,7 +248,15 @@ const FOOD_CATALOG: Record<string, CatalogItem> = {
     macros: { calories: 30, protein: 1, carbs: 1, fat: 2.5 },
     notes: 'Baixo em calorias, alternativa vegana',
     scalable: true,
-    minPortion: 1,
+    minPortion: 1, // Mínimo 200ml
+    maxPortion: 2,
+  },
+  'Água': {
+    portion: '200ml',
+    macros: { calories: 0, protein: 0, carbs: 0, fat: 0 },
+    notes: 'Opção zero-caloria para diluir o shake',
+    scalable: true,
+    minPortion: 0.75, // Mínimo 150ml
     maxPortion: 2,
   },
 };
@@ -505,14 +513,37 @@ export function calculateMealReplacement(
     }
   }
 
-  // 5. LÍQUIDO: Base para shake (apenas se tiver suplemento)
-  if (items.some(i => i.type === 'supplement') && remaining().calories >= 35) {
+  // 5. LÍQUIDO: Base para shake (obrigatório se tiver suplemento em pó)
+  const hasProteinPowder = items.some(i => 
+    i.type === 'supplement' && 
+    (i.name.includes('Whey') || i.name.includes('Caseína') || i.name.includes('Albumina'))
+  );
+  
+  if (hasProteinPowder) {
     const milkType = userGoal === 'lose_weight' ? 'Leite Desnatado' : 
                      userGoal === 'gain_muscle' ? 'Leite Integral' : 'Leite Desnatado';
     
-    const scale = calculateOptimalScale(FOOD_CATALOG[milkType].macros, 1, 0.5);
-    if (scale >= 0.5) {
-      addItem(milkType, FOOD_CATALOG, 'food', scale);
+    // Mínimo 150ml (0.75 scale) para shake bebível
+    const minScale = 0.75;
+    const optimalScale = calculateOptimalScale(FOOD_CATALOG[milkType].macros, 1, minScale);
+    
+    if (optimalScale >= minScale && remaining().calories >= FOOD_CATALOG[milkType].macros.calories * minScale) {
+      addItem(milkType, FOOD_CATALOG, 'food', optimalScale);
+    } else {
+      // Se não couber leite calórico, usar água + leite de amêndoas (baixa caloria)
+      // Garantir pelo menos 150ml de líquido para consistência adequada
+      if (remaining().calories >= 20) {
+        addItem('Leite de Amêndoas', FOOD_CATALOG, 'food', 1); // 200ml, só 30kcal
+      } else {
+        // Adicionar nota sobre diluir em água
+        items.push({
+          name: 'Água',
+          quantity: '150-200ml',
+          macros: { calories: 0, protein: 0, carbs: 0, fat: 0 },
+          type: 'food',
+          notes: 'Necessário para diluir o shake - sem calorias',
+        });
+      }
     }
   }
 
