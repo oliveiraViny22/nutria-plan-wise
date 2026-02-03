@@ -251,6 +251,18 @@ export function AIRebalancer({
         return;
       }
 
+      // Tratar caso de plano estruturalmente inválido (v5.1)
+      if (data.status === 'structurally_invalid') {
+        const structuralIssue = data.structural_issue;
+        console.error('[AIRebalancer] Plano estruturalmente inválido:', structuralIssue);
+        
+        toast.error('Plano precisa ser regenerado', {
+          description: structuralIssue?.reason || 'A composição atual tem excesso de gordura que não pode ser corrigido por ajustes simples.',
+          duration: 10000,
+        });
+        return;
+      }
+
       setResult(data);
       setShowDialog(true);
     } catch (error: unknown) {
