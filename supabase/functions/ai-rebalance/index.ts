@@ -1253,7 +1253,7 @@ function runCorrectionPipeline(
             
             if (gramsToAdd < 5) continue;
             
-            const newGrams = Math.round(currentGrams + gramsToAdd);
+            const newGrams = Math.min(limits.max, Math.round(currentGrams + gramsToAdd));
             quantities.set(food.id, newGrams);
             
             const carbsAdded = (gramsToAdd / 100) * contrib.carbs;
