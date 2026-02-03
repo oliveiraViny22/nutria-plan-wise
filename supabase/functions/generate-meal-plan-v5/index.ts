@@ -31,7 +31,7 @@ import { GENERATOR_CONTRACT } from "../_shared/nutrition-contracts.ts";
 import type { Food, MacroTargets, MealWithOptions, MealResult, UserProfile } from "./types.ts";
 import { MEAL_NAMES, MEAL_TYPES_MAP } from "./constants.ts";
 import { logInfo, logError } from "./logger.ts";
-import { filterEligibleFoods, validateFatShare } from "./food-filter.ts";
+import { filterEligibleFoods, validateFatShare, validateImplicitFat } from "./food-filter.ts";
 import { loadAnchorFoods } from "./anchor-selection.ts";
 import { loadTemplatesWithRoles } from "./template-loader.ts";
 import { buildMealWithAnchors } from "./meal-builder.ts";
@@ -217,6 +217,29 @@ serve(async (req) => {
       );
     }
 
+    // NOVO v5.5 (G-10): Validar limite global de gordura implícita (80% da meta)
+    const implicitFatValidation = validateImplicitFat(allFoodsWithQuantity, targets.fat);
+    
+    if (implicitFatValidation.status === "FAIL") {
+      logError("G-10 VIOLADA: Gordura implícita excede limite", implicitFatValidation);
+      return createErrorResponse(
+        `Gordura implícita (${implicitFatValidation.totalImplicitFat}g) excede 80% da meta (${implicitFatValidation.maxAllowed}g)`,
+        400,
+        corsHeaders,
+        { 
+          code: "IMPLICIT_FAT_EXCEEDED", 
+          details: implicitFatValidation,
+          action: "Regenerar plano com proteínas mais magras"
+        }
+      );
+    }
+    
+    logInfo("G-10 OK", { 
+      implicitFat: implicitFatValidation.totalImplicitFat,
+      maxAllowed: implicitFatValidation.maxAllowed,
+      ratio: `${(implicitFatValidation.ratio * 100).toFixed(0)}%`
+    });
+
     // Validar estrutura
     const validation = validateStructure(meals);
 
@@ -230,7 +253,7 @@ serve(async (req) => {
       );
     }
 
-    logInfo("Validação estrutural OK (incluindo fat share)");
+    logInfo("Validação estrutural OK (incluindo fat share e G-10)");
 
     // Ajuste proporcional para fechar metas calóricas
     const scaleResult = scaleToCalorieTarget(mealsWithOptions, targets);

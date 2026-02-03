@@ -137,6 +137,17 @@ export const MAX_FAT_SHARE_PER_FOOD = 0.6; // 60% da gordura diária
 export const MAX_HIGH_FAT_PROTEIN_PORTION = 40; // g
 
 // =====================================================
+// REGRA G-10: LIMITE GLOBAL DE GORDURA IMPLÍCITA
+// =====================================================
+
+/**
+ * A gordura implícita total (de proteínas/carboidratos) não pode exceder
+ * este percentual da meta diária. Os 20% restantes ficam reservados
+ * para o Rebalanceador fazer ajustes finos.
+ */
+export const MAX_IMPLICIT_FAT_RATIO = 0.80; // 80% da meta diária
+
+// =====================================================
 // CONTROLE DE CARBOIDRATOS GORDOS (v5.3)
 // =====================================================
 
