@@ -126,10 +126,12 @@ export default function MealDetail() {
     proposal,
     candidates,
     error: substitutionError,
+    showAll,
     findCandidates,
     selectCandidate,
     confirmSubstitution: confirmSub,
     reset: resetSubstitution,
+    setShowAll,
     canSubstitute: checkCanSubstitute,
     getImpact,
     requiresRebalance,
@@ -601,9 +603,11 @@ export default function MealDetail() {
         error={substitutionError}
         impact={getImpact()}
         requiresRebalance={requiresRebalance()}
+        showAll={showAll}
         onSelectCandidate={handleSelectCandidate}
         onConfirm={confirmSubstitution}
         onBack={handleBackToCandidates}
+        onToggleShowAll={setShowAll}
       />
 
       {/* Dialog de remoção - APENAS para profissionais */}

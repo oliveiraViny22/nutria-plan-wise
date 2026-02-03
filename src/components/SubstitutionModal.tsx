@@ -17,6 +17,9 @@ import {
   AlertTriangle,
   Info,
   Scale,
+  Eye,
+  EyeOff,
+  ShieldAlert,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -51,9 +54,11 @@ interface SubstitutionModalProps {
   error: SubstituteError | null;
   impact: 'low' | 'medium' | 'high' | null;
   requiresRebalance: boolean;
+  showAll: boolean;
   onSelectCandidate: (candidateId: string) => void;
   onConfirm: () => void;
   onBack: () => void;
+  onToggleShowAll: (showAll: boolean) => void;
 }
 
 // =====================================================
@@ -172,6 +177,7 @@ function CandidateItem({
   const similarity = getSimilarityLabel(candidate.score);
   const percentage = Math.round(candidate.score * 100);
   const food = candidate.food;
+  const hasWarning = candidate.hasProcessingWarning;
   
   // Calcular macros para a porção sugerida
   const baseGrams = parseFloat(food.serving_size?.match(/(\d+)/)?.[1] || '100');
@@ -185,16 +191,36 @@ function CandidateItem({
     <motion.button
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      className="w-full text-left p-3 rounded-lg border border-border hover:border-primary/50 hover:bg-muted/50 transition-all duration-200"
+      className={`w-full text-left p-3 rounded-lg border transition-all duration-200 ${
+        hasWarning 
+          ? 'border-amber-500/50 hover:border-amber-500 hover:bg-amber-500/5' 
+          : 'border-border hover:border-primary/50 hover:bg-muted/50'
+      }`}
       onClick={onSelect}
     >
       <div className="flex items-start justify-between gap-2 mb-2">
         <div className="min-w-0 flex-1">
-          <p className="font-medium text-sm truncate">{food.name}</p>
+          <div className="flex items-center gap-1.5">
+            <p className="font-medium text-sm truncate">{food.name}</p>
+            {hasWarning && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <ShieldAlert className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs">
+                    <p className="text-xs">
+                      Alimento ultraprocessado. Pode conter aditivos e ter menor qualidade nutricional.
+                    </p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
+          </div>
           <p className="text-xs text-muted-foreground">{candidate.newPortionGrams}g</p>
         </div>
         <div className="flex flex-col items-end gap-1 flex-shrink-0">
-          <Badge variant={similarity.variant} className="text-xs">
+          <Badge variant={hasWarning ? 'outline' : similarity.variant} className={`text-xs ${hasWarning ? 'border-amber-500/50 text-amber-600' : ''}`}>
             {percentage}%
           </Badge>
           <span className="text-[10px] text-muted-foreground">{similarity.label}</span>
@@ -216,6 +242,13 @@ function CandidateItem({
           G: {portionFat}g
         </Badge>
       </div>
+      
+      {hasWarning && (
+        <p className="text-[10px] text-amber-600 mt-1.5 flex items-center gap-1">
+          <AlertTriangle className="w-3 h-3" />
+          Ultraprocessado
+        </p>
+      )}
     </motion.button>
   );
 }
@@ -235,9 +268,11 @@ export function SubstitutionModal({
   error,
   impact,
   requiresRebalance,
+  showAll,
   onSelectCandidate,
   onConfirm,
   onBack,
+  onToggleShowAll,
 }: SubstitutionModalProps) {
   const food = selectedFood?.food as Food | undefined;
   
@@ -317,22 +352,69 @@ export function SubstitutionModal({
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <p className="text-sm font-medium">Escolha um equivalente:</p>
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-6 w-6">
-                        <Info className="w-3.5 h-3.5 text-muted-foreground" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent className="max-w-xs">
-                      <p className="text-xs">
-                        Mostramos apenas alimentos da mesma categoria nutricional para manter o equilíbrio do seu plano.
-                        O score indica quão similar é a composição nutricional.
-                      </p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
+                <div className="flex items-center gap-1">
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button 
+                          variant={showAll ? 'secondary' : 'ghost'} 
+                          size="sm" 
+                          className="h-7 text-xs gap-1"
+                          onClick={() => onToggleShowAll(!showAll)}
+                        >
+                          {showAll ? (
+                            <>
+                              <EyeOff className="w-3 h-3" />
+                              Ocultar extras
+                            </>
+                          ) : (
+                            <>
+                              <Eye className="w-3 h-3" />
+                              Ver todos
+                            </>
+                          )}
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-xs">
+                        <p className="text-xs">
+                          {showAll 
+                            ? 'Mostrar apenas alimentos recomendados (sem ultraprocessados)'
+                            : 'Incluir alimentos ultraprocessados na lista (não recomendado)'}
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-6 w-6">
+                          <Info className="w-3.5 h-3.5 text-muted-foreground" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-xs">
+                        <p className="text-xs">
+                          Mostramos apenas alimentos da mesma categoria nutricional para manter o equilíbrio do seu plano.
+                          O score indica quão similar é a composição nutricional.
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </div>
               </div>
+              
+              {/* Aviso quando showAll está ativo */}
+              {showAll && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  className="p-2 bg-amber-500/10 rounded-lg flex items-start gap-2 border border-amber-500/20"
+                >
+                  <AlertTriangle className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
+                  <p className="text-xs text-amber-700 dark:text-amber-400">
+                    Alimentos ultraprocessados estão visíveis. Prefira opções naturais quando possível.
+                  </p>
+                </motion.div>
+              )}
               
               {isLoading ? (
                 <div className="flex items-center justify-center py-8">
@@ -341,7 +423,7 @@ export function SubstitutionModal({
                 </div>
               ) : candidates.length > 0 ? (
                 <div className="max-h-60 overflow-y-auto space-y-2 pr-1">
-                  {candidates.slice(0, 10).map((c) => (
+                  {candidates.slice(0, 15).map((c) => (
                     <CandidateItem
                       key={c.food.id}
                       candidate={c}
@@ -350,9 +432,22 @@ export function SubstitutionModal({
                   ))}
                 </div>
               ) : !error && (
-                <p className="text-sm text-muted-foreground text-center py-4">
-                  Nenhum alimento equivalente disponível
-                </p>
+                <div className="text-center py-4 space-y-2">
+                  <p className="text-sm text-muted-foreground">
+                    Nenhum alimento equivalente disponível
+                  </p>
+                  {!showAll && (
+                    <Button 
+                      variant="link" 
+                      size="sm" 
+                      className="text-xs"
+                      onClick={() => onToggleShowAll(true)}
+                    >
+                      <Eye className="w-3 h-3 mr-1" />
+                      Ver todos da categoria
+                    </Button>
+                  )}
+                </div>
               )}
             </div>
           )}

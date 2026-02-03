@@ -25,6 +25,8 @@ export interface SubstituteOptions {
   forceRebalance?: boolean;
   /** IDs of foods already in the meal option (to exclude from candidates) */
   excludeFoodIds?: string[];
+  /** Show all foods from category, including ultraprocessed (with warning) */
+  showAll?: boolean;
 }
 
 export interface SubstituteCandidate {
@@ -34,6 +36,8 @@ export interface SubstituteCandidate {
   deltaMacros: DeltaMacros;
   requiresRebalance: boolean;
   substituteType: SubstituteType;
+  /** True if this candidate has processing level warning (ultraprocessed) */
+  hasProcessingWarning?: boolean;
 }
 
 export interface DeltaMacros {
@@ -448,6 +452,7 @@ export function findSubstituteCandidates(
   
   // Normalizar categoria do source para comparação case-insensitive
   const normalizedSourceCategory = sourceFood.category?.toLowerCase().trim();
+  const showAll = options?.showAll ?? false;
   
   // Filtrar candidatos válidos com logging detalhado
   const validCandidates = availableFoods.filter(food => {
@@ -462,11 +467,23 @@ export function findSubstituteCandidates(
       return false;
     }
     
-    // Candidato precisa ser substituível
-    const blockReason = getSubstitutionBlockReason(food);
-    if (blockReason) {
-      rejectionStats.notSubstitutable++;
+    // Suplementos nunca são válidos
+    if (food.category === 'suplementos') {
       return false;
+    }
+    
+    // Categoria precisa ser canônica
+    if (!food.category || !isValidCategory(food.category)) {
+      return false;
+    }
+    
+    // Se showAll=false, verificar nível de processamento
+    if (!showAll) {
+      const blockReason = getSubstitutionBlockReason(food);
+      if (blockReason) {
+        rejectionStats.notSubstitutable++;
+        return false;
+      }
     }
     
     // Por padrão, mesma categoria é obrigatória (case-insensitive)
@@ -486,12 +503,27 @@ export function findSubstituteCandidates(
   }
   
   // Calcular score para cada candidato
-  const scoredCandidates = validCandidates.map(candidate => 
-    scoreCandidate(sourceFood, sourceGrams, candidate)
-  );
+  const scoredCandidates = validCandidates.map(candidate => {
+    const scored = scoreCandidate(sourceFood, sourceGrams, candidate);
+    
+    // Marcar se tem aviso de processamento (ultraprocessado)
+    const processingLevel = candidate.processing_level?.toLowerCase().replace(/\s+/g, '_');
+    const hasProcessingWarning = processingLevel === 'ultraprocessado' || processingLevel === 'suplemento';
+    
+    return {
+      ...scored,
+      hasProcessingWarning,
+    };
+  });
   
-  // Ordenar por score decrescente
-  scoredCandidates.sort((a, b) => b.score - a.score);
+  // Ordenar por score decrescente (alimentos com warning vão ao final)
+  scoredCandidates.sort((a, b) => {
+    // Primeiro, priorizar alimentos sem warning
+    if (a.hasProcessingWarning && !b.hasProcessingWarning) return 1;
+    if (!a.hasProcessingWarning && b.hasProcessingWarning) return -1;
+    // Depois, ordenar por score
+    return b.score - a.score;
+  });
   
   return scoredCandidates;
 }

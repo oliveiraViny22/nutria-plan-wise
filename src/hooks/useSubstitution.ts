@@ -35,12 +35,14 @@ export interface UseSubstitutionReturn {
   proposal: SubstituteProposal | null;
   candidates: SubstituteCandidate[];
   error: SubstituteError | null;
+  showAll: boolean;
   
   // Ações
   findCandidates: (sourceFood: Food, sourceGrams: number, availableFoods: Food[], excludeFoodIds?: string[]) => void;
   selectCandidate: (candidateId: string) => void;
   confirmSubstitution: (mealOptionFoodId: string, optionId: string) => Promise<boolean>;
   reset: () => void;
+  setShowAll: (showAll: boolean) => void;
   
   // Helpers
   canSubstitute: (food: Food) => boolean;
@@ -68,7 +70,8 @@ export function useSubstitution(options?: UseSubstitutionOptions): UseSubstituti
   const [proposal, setProposal] = useState<SubstituteProposal | null>(null);
   const [candidates, setCandidates] = useState<SubstituteCandidate[]>([]);
   const [error, setError] = useState<SubstituteError | null>(null);
-  const [sourceData, setSourceData] = useState<{ food: Food; grams: number } | null>(null);
+  const [sourceData, setSourceData] = useState<{ food: Food; grams: number; availableFoods: Food[]; excludeFoodIds?: string[] } | null>(null);
+  const [showAll, setShowAllState] = useState(false);
 
   /**
    * Busca candidatos para substituição
@@ -97,7 +100,7 @@ export function useSubstitution(options?: UseSubstitutionOptions): UseSubstituti
         availableFoods,
         undefined, // targetFoodId - será selecionado pelo usuário
         governanceContext,
-        excludeFoodIds ? { excludeFoodIds } : undefined
+        excludeFoodIds ? { excludeFoodIds, showAll } : { showAll }
       );
       
       if (!result.success) {
@@ -108,7 +111,7 @@ export function useSubstitution(options?: UseSubstitutionOptions): UseSubstituti
       }
       
       setCandidates(result.candidates || []);
-      setSourceData({ food: sourceFood, grams: sourceGrams });
+      setSourceData({ food: sourceFood, grams: sourceGrams, availableFoods, excludeFoodIds });
       
       // NÃO definir proposta automaticamente - deixar o usuário escolher
       // A proposta só será criada quando o usuário selecionar um candidato
@@ -120,7 +123,7 @@ export function useSubstitution(options?: UseSubstitutionOptions): UseSubstituti
     } finally {
       setIsLoading(false);
     }
-  }, [can_substitute, options]);
+  }, [can_substitute, options, showAll]);
 
   /**
    * Seleciona um candidato específico
@@ -269,7 +272,52 @@ export function useSubstitution(options?: UseSubstitutionOptions): UseSubstituti
     setSourceData(null);
     setIsLoading(false);
     setIsConfirming(false);
+    setShowAllState(false);
   }, []);
+
+  /**
+   * Alterna modo "Ver todos" e re-busca candidatos
+   */
+  const setShowAll = useCallback((value: boolean) => {
+    setShowAllState(value);
+    
+    // Re-buscar candidatos se temos dados de origem
+    if (sourceData) {
+      setIsLoading(true);
+      setError(null);
+      setProposal(null);
+      
+      try {
+        const governanceContext: GovernanceContext = {
+          planStatus: 'active',
+          userHasPermission: can_substitute,
+        };
+        
+        const result = substituteItem(
+          sourceData.food,
+          sourceData.grams,
+          sourceData.availableFoods,
+          undefined,
+          governanceContext,
+          { excludeFoodIds: sourceData.excludeFoodIds, showAll: value }
+        );
+        
+        if (!result.success) {
+          setError(result.error || 'NO_CANDIDATES');
+          setCandidates([]);
+          return;
+        }
+        
+        setCandidates(result.candidates || []);
+      } catch (err) {
+        console.error('Error finding candidates:', err);
+        setError('NO_CANDIDATES');
+        setCandidates([]);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+  }, [sourceData, can_substitute]);
 
   /**
    * Verifica se um alimento pode ser substituído
@@ -308,10 +356,12 @@ export function useSubstitution(options?: UseSubstitutionOptions): UseSubstituti
     proposal,
     candidates,
     error,
+    showAll,
     findCandidates,
     selectCandidate,
     confirmSubstitution,
     reset,
+    setShowAll,
     canSubstitute,
     getProposalMessage,
     getImpact,
