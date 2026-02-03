@@ -24,6 +24,7 @@ import {
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useSuccessSound } from '@/hooks/useSuccessSound';
 import { toast } from 'sonner';
 
 interface MacroTargets {
@@ -229,6 +230,7 @@ export function AIRebalancer({
   compact = false,
 }: AIRebalancerProps) {
   const { user } = useAuth();
+  const { playSuccessSound, triggerStartFeedback } = useSuccessSound();
   const [showDialog, setShowDialog] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -238,6 +240,7 @@ export function AIRebalancer({
   const handleOptimize = async () => {
     setLoading(true);
     setResult(null);
+    triggerStartFeedback(); // Vibração rápida ao iniciar otimização
     
     try {
       const { data, error } = await supabase.functions.invoke('ai-rebalance', {
@@ -414,6 +417,7 @@ export function AIRebalancer({
       }
 
       toast.success('Plano otimizado com IA! 🧠');
+      playSuccessSound(); // Som + vibração ao otimizar
       setShowDialog(false);
       setResult(null);
       onComplete();

@@ -47,6 +47,7 @@ import { useSubscription } from '@/hooks/useSubscription';
 import { useLinkedStudent } from '@/hooks/useLinkedStudent';
 import { useAccountPermissions } from '@/hooks/useAccountPermissions';
 import { useUsageLimits } from '@/hooks/useUsageLimits';
+import { useSuccessSound } from '@/hooks/useSuccessSound';
 import { supabase } from '@/integrations/supabase/client';
 import { DietPlan, Meal, GOALS, MEAL_NAMES, MealType } from '@/lib/types';
 import { toast } from 'sonner';
@@ -64,6 +65,7 @@ export default function Dashboard() {
     isSubscribed,
   } = useSubscription();
   const { usage, isLimitReached, refresh: refreshUsage } = useUsageLimits();
+  const { playSuccessSound, triggerStartFeedback } = useSuccessSound();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [currentDietPlan, setCurrentDietPlan] = useState<DietPlan | null>(null);
@@ -137,6 +139,7 @@ export default function Dashboard() {
     }
 
     setGenerating(true);
+    triggerStartFeedback(); // Vibração rápida ao iniciar geração
     try {
       const response = await supabase.functions.invoke('generate-meal-plan', {
         body: {
@@ -158,6 +161,7 @@ export default function Dashboard() {
       if (response.error) throw response.error;
 
       toast.success('Plano alimentar gerado com sucesso!');
+      playSuccessSound(); // Som + vibração ao gerar plano
       await fetchCurrentPlan();
       await refreshUsage();
     } catch (error: any) {
@@ -186,6 +190,7 @@ export default function Dashboard() {
     }
 
     setGeneratingV5(true);
+    triggerStartFeedback(); // Vibração rápida ao iniciar geração v5
     try {
       const response = await supabase.functions.invoke('generate-meal-plan-v5', {
         body: {
@@ -207,6 +212,7 @@ export default function Dashboard() {
       if (response.error) throw response.error;
 
       toast.success('Plano alimentar v5 gerado com sucesso! ✨');
+      playSuccessSound(); // Som + vibração ao gerar plano v5
       await fetchCurrentPlan();
       await refreshUsage();
     } catch (error: any) {
