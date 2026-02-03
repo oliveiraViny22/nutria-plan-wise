@@ -110,6 +110,21 @@ export const ALLOWED_SNACK_PROTEINS = [
   "whey",
 ];
 
+/**
+ * Carboidratos PERMITIDOS para lanches - práticos e versáteis (v5.8)
+ */
+export const ALLOWED_SNACK_CARBS = [
+  "pão integral",
+  "pão de forma integral",
+  "tapioca",
+  "crepioca",
+  "wrap integral",
+  "torrada integral",
+  "aveia",
+  "mingau",
+  "purê de batata",
+];
+
 export const CATEGORY_SCALE_LIMITS: Record<string, { min: number; max: number }> = {
   proteinas: { min: 50, max: 350 },
   carboidratos: { min: 50, max: 400 },
