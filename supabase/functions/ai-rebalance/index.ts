@@ -17,6 +17,7 @@ import {
 import { createLogger, logAIUsage, type RebalanceMetrics } from "../_shared/logger.ts";
 import { getCorsHeaders } from "../_shared/security.ts";
 import { getFeatureFlag, FLAGS } from "../_shared/feature-flags.ts";
+import { checkRateLimit, createRateLimitResponse, RATE_LIMITS } from "../_shared/rate-limit.ts";
 
 const log = createLogger('ai-rebalance');
 
@@ -1450,6 +1451,37 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
+    // Obter user_id do plano para rate limiting e métricas
+    const { data: planData } = await supabase
+      .from("diet_plans")
+      .select("user_id")
+      .eq("id", planId)
+      .single();
+    
+    const userId = planData?.user_id as string | null;
+
+    // ============================================
+    // RATE LIMITING
+    // ============================================
+    if (userId) {
+      const rateLimitConfig = RATE_LIMITS['ai-rebalance'];
+      const rateLimitResult = await checkRateLimit(supabase, userId, rateLimitConfig);
+      
+      if (!rateLimitResult.allowed) {
+        log.warn("Rate limit exceeded", { 
+          userId, 
+          remaining: rateLimitResult.remaining,
+          resetAfterMs: rateLimitResult.resetAfterMs 
+        });
+        return createRateLimitResponse(rateLimitResult, rateLimitConfig, corsHeaders);
+      }
+      
+      log.info("Rate limit check passed", { 
+        remaining: rateLimitResult.remaining,
+        currentCount: rateLimitResult.currentCount 
+      });
+    }
+
     // ============================================
     // FEATURE FLAG: Rebalancer V2
     // ============================================
@@ -1461,15 +1493,6 @@ serve(async (req) => {
       // TODO: Implementar lógica V2 quando pronta
       // Por enquanto, continua com V1 mas com logging extra
     }
-
-    // Obter user_id do plano para logging de métricas
-    const { data: planData } = await supabase
-      .from("diet_plans")
-      .select("user_id")
-      .eq("id", planId)
-      .single();
-    
-    const userId = planData?.user_id as string | null;
 
     // Carregar configurações do admin
     const settings = await loadOptimizerSettings(supabase);

@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { getCorsHeaders, CLIENT_ERRORS, validate, getErrorForLogging, createErrorResponse, createSuccessResponse } from "../_shared/security.ts";
 import { createLogger } from "../_shared/logger.ts";
+import { checkRateLimit, createRateLimitResponse, RATE_LIMITS } from "../_shared/rate-limit.ts";
 
 const log = createLogger('explain-substitution');
 
@@ -91,8 +92,22 @@ serve(async (req) => {
     const userId = userData.user.id;
     log.info("User authenticated", { userId });
     
-    // Check usage limits
+    // Rate limiting check
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, { auth: { persistSession: false } });
+    const rateLimitConfig = RATE_LIMITS['explain-substitution'];
+    const rateLimitResult = await checkRateLimit(supabaseAdmin, userId, rateLimitConfig);
+    
+    if (!rateLimitResult.allowed) {
+      log.warn("Rate limit exceeded", { 
+        userId, 
+        resetAfterMs: rateLimitResult.resetAfterMs 
+      });
+      return createRateLimitResponse(rateLimitResult, rateLimitConfig, corsHeaders);
+    }
+    
+    log.info("Rate limit check passed", { remaining: rateLimitResult.remaining });
+    
+    // Check usage limits
     const { data: canUse, error: canUseError } = await supabaseAdmin.rpc('can_use_feature', {
       _user_id: userId,
       _feature: 'substitution'
