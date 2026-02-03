@@ -16,6 +16,7 @@ import {
   MAX_HIGH_FAT_DAIRY_PORTION,
   LEAN_CARB_RULES,
   HIGH_FAT_CARB_THRESHOLD,
+  MAX_IMPLICIT_FAT_RATIO,
 } from "./constants.ts";
 import { logDebug, logWarn } from "./logger.ts";
 import {
@@ -578,4 +579,88 @@ export function validateFatShare(
   }
 
   return { status: "PASS" };
+}
+
+// =====================================================
+// REGRA G-10: VALIDAÇÃO DE GORDURA IMPLÍCITA GLOBAL
+// =====================================================
+
+interface ImplicitFatValidation {
+  status: "PASS" | "FAIL";
+  totalImplicitFat: number;
+  maxAllowed: number;
+  ratio: number;
+  excess?: number;
+}
+
+/**
+ * Valida que a gordura implícita total do plano não excede 80% da meta.
+ * G-10: Os 20% restantes ficam reservados para o Rebalanceador.
+ * 
+ * @param foods Lista de alimentos com quantidades
+ * @param targetFat Meta de gordura diária
+ */
+export function validateImplicitFat(
+  foods: FoodWithQuantity[],
+  targetFat: number
+): ImplicitFatValidation {
+  if (targetFat <= 0) {
+    return { 
+      status: "PASS", 
+      totalImplicitFat: 0, 
+      maxAllowed: 0, 
+      ratio: 0 
+    };
+  }
+
+  // Calcular gordura implícita total (excluindo categoria "gorduras")
+  let totalImplicitFat = 0;
+  
+  for (const item of foods) {
+    const category = (item.food.category || "").toLowerCase();
+    
+    // Gorduras explícitas não contam como "implícitas"
+    if (category === "gorduras" || category === "oleaginosas") {
+      continue;
+    }
+    
+    const fatContrib = (item.food.fat / 100) * item.quantity_grams;
+    totalImplicitFat += fatContrib;
+  }
+
+  const maxAllowed = targetFat * MAX_IMPLICIT_FAT_RATIO;
+  const ratio = totalImplicitFat / targetFat;
+
+  if (totalImplicitFat > maxAllowed) {
+    const excess = totalImplicitFat - maxAllowed;
+    
+    logWarn("G-10 VIOLADA: Gordura implícita excede 80%", {
+      totalImplicitFat: totalImplicitFat.toFixed(1),
+      maxAllowed: maxAllowed.toFixed(1),
+      targetFat,
+      ratio: `${(ratio * 100).toFixed(0)}%`,
+      excess: excess.toFixed(1),
+    });
+    
+    return {
+      status: "FAIL",
+      totalImplicitFat: Math.round(totalImplicitFat * 10) / 10,
+      maxAllowed: Math.round(maxAllowed * 10) / 10,
+      ratio: Math.round(ratio * 100) / 100,
+      excess: Math.round(excess * 10) / 10,
+    };
+  }
+
+  logDebug("G-10 OK: Gordura implícita dentro do limite", {
+    totalImplicitFat: totalImplicitFat.toFixed(1),
+    maxAllowed: maxAllowed.toFixed(1),
+    ratio: `${(ratio * 100).toFixed(0)}%`,
+  });
+
+  return {
+    status: "PASS",
+    totalImplicitFat: Math.round(totalImplicitFat * 10) / 10,
+    maxAllowed: Math.round(maxAllowed * 10) / 10,
+    ratio: Math.round(ratio * 100) / 100,
+  };
 }
