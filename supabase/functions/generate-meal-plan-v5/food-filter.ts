@@ -22,7 +22,7 @@ import {
   IMPLICIT_FAT_LIMITS,
   SNACK_MEALS,
   BLOCKED_FOODS_BY_MEAL,
-} from "./constants.ts";
+} from "./constants/index.ts";
 import { logDebug, logWarn, logInfo } from "./logger.ts";
 import {
   isValidCategory,

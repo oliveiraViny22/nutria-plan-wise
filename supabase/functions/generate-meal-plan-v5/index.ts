@@ -29,7 +29,7 @@ import { GENERATOR_CONTRACT } from "../_shared/nutrition-contracts.ts";
 
 // Módulos internos
 import type { Food, MacroTargets, MealWithOptions, MealResult, UserProfile } from "./types.ts";
-import { MEAL_NAMES, MEAL_TYPES_MAP, ITEM_COUNTS, ITEM_COUNTS_LIGHT_DINNER } from "./constants.ts";
+import { MEAL_NAMES, MEAL_TYPES_MAP, ITEM_COUNTS, ITEM_COUNTS_LIGHT_DINNER } from "./constants/index.ts";
 import { logInfo, logError, logWarn } from "./logger.ts";
 import { filterEligibleFoods, validateFatShare, validateImplicitFat, loadBlockOverrides } from "./food-filter.ts";
 import { loadAnchorFoods } from "./anchor-selection.ts";

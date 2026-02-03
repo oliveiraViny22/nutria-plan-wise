@@ -3,7 +3,7 @@
 // =====================================================
 
 import type { MealResult, MealWithOptions, MacroTargets, StructuralValidation, NutritionalValidation } from "./types.ts";
-import { ITEM_COUNTS, MAIN_MEALS } from "./constants.ts";
+import { ITEM_COUNTS, MAIN_MEALS } from "./constants/index.ts";
 import { logDebug, logWarn } from "./logger.ts";
 import { GENERATOR_CONTRACT, validateGeneratedPlan } from "../_shared/nutrition-contracts.ts";
 
