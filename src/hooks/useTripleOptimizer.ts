@@ -468,6 +468,24 @@ export function useTripleOptimizer() {
         throw new Error(`IA falhou: ${aiResponse.error.message}`);
       }
       
+      // NOVO v5.1: Verificar se o plano é estruturalmente inválido
+      if (aiResponse.data?.status === 'structurally_invalid') {
+        const structuralIssue = aiResponse.data.structural_issue;
+        console.error('[Triple] Plano estruturalmente inválido:', structuralIssue);
+        
+        // Mensagem amigável para o usuário
+        const reason = structuralIssue?.reason || 'Excesso de gordura proveniente de fontes mistas';
+        const fatPercent = structuralIssue?.fat_percent || 'N/A';
+        const action = structuralIssue?.action || 'Regenerar plano com fontes proteicas mais magras';
+        
+        throw new Error(
+          `🚫 Plano não pode ser otimizado\n\n` +
+          `Problema: ${reason}\n` +
+          `Gordura atual: ${fatPercent}% da meta\n\n` +
+          `Solução: ${action}`
+        );
+      }
+      
       // A IA já aplicou as mudanças no banco - buscar novos valores
       const { data: updatedFoods } = await supabase
         .from('meal_option_foods')
@@ -578,7 +596,19 @@ export function useTripleOptimizer() {
     } catch (error: any) {
       console.error('[Triple] Error:', error);
       setPhase({ name: 'error', progress: 0, message: error.message });
-      toast.error('Erro: ' + error.message);
+      
+      // Mensagem especial para plano estruturalmente inválido
+      if (error.message?.includes('Plano não pode ser otimizado')) {
+        toast.error('Plano precisa ser regenerado', {
+          description: 'A composição atual tem excesso de gordura que não pode ser corrigido por ajustes. Gere um novo plano para aplicar as novas regras de proteínas magras.',
+          duration: 10000,
+        });
+      } else {
+        toast.error('Erro na otimização', {
+          description: error.message,
+          duration: 5000,
+        });
+      }
       return null;
     } finally {
       setIsOptimizing(false);
