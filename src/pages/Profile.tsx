@@ -57,6 +57,7 @@ import { ObjectiveChangeWizard } from '@/components/ObjectiveChangeWizard';
 import { StudentObjectiveRequestDialog } from '@/components/StudentObjectiveRequestDialog';
 import { UpgradeDialog } from '@/components/UpgradeDialog';
 import { FoodPreferencesManager } from '@/components/FoodPreferencesManager';
+import { SupplementToggle } from '@/components/SupplementToggle';
 import { useLinkedStudent } from '@/hooks/useLinkedStudent';
 import { useSubscription } from '@/hooks/useSubscription';
 import { useMetabolicCalculations } from '@/hooks/useMetabolicCalculations';
@@ -680,6 +681,14 @@ export default function Profile() {
                         <span className="text-sm text-muted-foreground">Nenhuma restrição definida</span>
                       )}
                     </div>
+                  </div>
+
+                  {/* Supplement Toggle */}
+                  <div className="mb-6">
+                    <p className="text-sm font-medium mb-3">Suplementação</p>
+                    <SupplementToggle 
+                      initialValue={(profile as any)?.include_supplements || false}
+                    />
                   </div>
 
                   {/* Request Change Button - Only for paid users */}

@@ -903,6 +903,7 @@ export type Database = {
           goal: string | null
           height: number | null
           id: string
+          include_supplements: boolean | null
           meals_per_day: number | null
           name: string | null
           onboarding_completed: boolean | null
@@ -927,6 +928,7 @@ export type Database = {
           goal?: string | null
           height?: number | null
           id?: string
+          include_supplements?: boolean | null
           meals_per_day?: number | null
           name?: string | null
           onboarding_completed?: boolean | null
@@ -951,6 +953,7 @@ export type Database = {
           goal?: string | null
           height?: number | null
           id?: string
+          include_supplements?: boolean | null
           meals_per_day?: number | null
           name?: string | null
           onboarding_completed?: boolean | null
