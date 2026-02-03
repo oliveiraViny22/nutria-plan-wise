@@ -6,7 +6,7 @@
 // =====================================================
 
 import type { Food, FoodSelection, MealResult, MealWithOptions, MacroTotals, MacroTargets } from "./types.ts";
-import { CATEGORY_SCALE_LIMITS, DEFAULT_SCALE_LIMITS } from "./constants.ts";
+import { CATEGORY_SCALE_LIMITS, DEFAULT_SCALE_LIMITS } from "./constants/index.ts";
 import { applyUnitConversion } from "./unit-conversion.ts";
 import { logInfo, logDebug } from "./logger.ts";
 import { GENERATOR_CONTRACT, KCAL_PER_GRAM } from "../_shared/nutrition-contracts.ts";

@@ -10,7 +10,7 @@ import type {
   TemplateRole,
   AnchorsByRole,
 } from "./types.ts";
-import { MEAL_NAMES } from "./constants.ts";
+import { MEAL_NAMES } from "./constants/index.ts";
 import { applyUnitConversion } from "./unit-conversion.ts";
 import { selectFoodForRole, calculateApproximateQuantity } from "./food-filter.ts";
 import { selectAnchorForOption, normalizeRoleName, getRoleAliases } from "./anchor-selection.ts";

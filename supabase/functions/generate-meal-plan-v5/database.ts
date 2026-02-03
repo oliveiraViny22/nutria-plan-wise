@@ -3,7 +3,7 @@
 // =====================================================
 
 import type { MealWithOptions } from "./types.ts";
-import { MEAL_NAMES } from "./constants.ts";
+import { MEAL_NAMES } from "./constants/index.ts";
 import { logInfo, logError } from "./logger.ts";
 
 /**
