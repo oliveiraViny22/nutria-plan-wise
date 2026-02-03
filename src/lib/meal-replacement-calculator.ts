@@ -25,7 +25,7 @@ export interface MealReplacement {
   items: ReplacementItem[];
   totalMacros: MacroTarget;
   accuracy: {
-    calories: number; // % do original
+    calories: number;
     protein: number;
     carbs: number;
     fat: number;
@@ -33,117 +33,321 @@ export interface MealReplacement {
   tips: string[];
 }
 
+interface CatalogItem {
+  portion: string;
+  macros: MacroTarget;
+  notes: string;
+  scalable?: boolean; // Se pode ajustar a porção
+  minPortion?: number; // Porção mínima em fração (0.5 = metade)
+  maxPortion?: number; // Porção máxima em fração (2 = dobro)
+}
+
 /**
  * Catálogo de suplementos com macros por porção
  */
-const SUPPLEMENT_CATALOG: Record<string, { portion: string; macros: MacroTarget; notes: string }> = {
+const SUPPLEMENT_CATALOG: Record<string, CatalogItem> = {
   'Whey Protein Isolado': {
     portion: '30g (1 scoop)',
     macros: { calories: 120, protein: 25, carbs: 2, fat: 1 },
     notes: 'Alta absorção, ideal pós-treino',
+    scalable: true,
+    minPortion: 0.5,
+    maxPortion: 2,
   },
   'Whey Protein Concentrado': {
     portion: '30g (1 scoop)',
     macros: { calories: 130, protein: 24, carbs: 4, fat: 2 },
-    notes: 'Custo-benefício, versatil',
+    notes: 'Custo-benefício, versátil',
+    scalable: true,
+    minPortion: 0.5,
+    maxPortion: 2,
   },
   'Caseína': {
     portion: '30g (1 scoop)',
     macros: { calories: 110, protein: 24, carbs: 3, fat: 0.5 },
     notes: 'Liberação lenta (6-8h), ideal antes de dormir',
-  },
-  'Hipercalórico': {
-    portion: '100g (2 scoops)',
-    macros: { calories: 400, protein: 20, carbs: 70, fat: 6 },
-    notes: 'Rico em carboidratos, ideal para ganho de massa',
+    scalable: true,
+    minPortion: 0.5,
+    maxPortion: 2,
   },
   'Albumina': {
     portion: '40g (2 scoops)',
     macros: { calories: 140, protein: 32, carbs: 2, fat: 0.5 },
     notes: 'Proteína de ovo, absorção média',
+    scalable: true,
+    minPortion: 0.5,
+    maxPortion: 1.5,
   },
   'Maltodextrina': {
     portion: '30g',
     macros: { calories: 120, protein: 0, carbs: 30, fat: 0 },
     notes: 'Carboidrato de rápida absorção',
+    scalable: true,
+    minPortion: 0.5,
+    maxPortion: 2,
   },
   'Dextrose': {
     portion: '30g',
     macros: { calories: 120, protein: 0, carbs: 30, fat: 0 },
     notes: 'Recuperação glicogênica imediata',
-  },
-  'Creatina': {
-    portion: '5g',
-    macros: { calories: 0, protein: 0, carbs: 0, fat: 0 },
-    notes: 'Não substitui macros, apenas complementa',
+    scalable: true,
+    minPortion: 0.5,
+    maxPortion: 2,
   },
 };
 
 /**
- * Catálogo de alimentos complementares com macros
+ * Catálogo expandido de alimentos com macros
  */
-const FOOD_CATALOG: Record<string, { portion: string; macros: MacroTarget; notes: string }> = {
+const FOOD_CATALOG: Record<string, CatalogItem> = {
+  // Gorduras saudáveis
   'Pasta de Amendoim Integral': {
     portion: '30g (2 colheres)',
     macros: { calories: 180, protein: 8, carbs: 6, fat: 14 },
     notes: 'Gordura saudável + proteína vegetal',
-  },
-  'Banana': {
-    portion: '1 unidade (100g)',
-    macros: { calories: 90, protein: 1, carbs: 23, fat: 0 },
-    notes: 'Carboidrato de rápida absorção + potássio',
-  },
-  'Aveia em Flocos': {
-    portion: '40g (4 colheres)',
-    macros: { calories: 150, protein: 5, carbs: 27, fat: 3 },
-    notes: 'Fibras + carboidrato complexo',
-  },
-  'Iogurte Grego Natural': {
-    portion: '170g (1 pote)',
-    macros: { calories: 150, protein: 15, carbs: 8, fat: 6 },
-    notes: 'Alto teor proteico + probióticos',
-  },
-  'Leite Desnatado': {
-    portion: '200ml',
-    macros: { calories: 70, protein: 7, carbs: 10, fat: 0 },
-    notes: 'Base líquida para shakes',
-  },
-  'Leite Integral': {
-    portion: '200ml',
-    macros: { calories: 120, protein: 6, carbs: 9, fat: 6 },
-    notes: 'Mais calórico, ideal para bulking',
+    scalable: true,
+    minPortion: 0.5,
+    maxPortion: 2,
   },
   'Castanha de Caju': {
     portion: '30g (10 unidades)',
     macros: { calories: 170, protein: 5, carbs: 9, fat: 13 },
     notes: 'Gordura saudável + minerais',
+    scalable: true,
+    minPortion: 0.5,
+    maxPortion: 1.5,
   },
-  'Mel': {
-    portion: '20g (1 colher)',
-    macros: { calories: 60, protein: 0, carbs: 17, fat: 0 },
-    notes: 'Carboidrato simples natural',
+  'Castanha do Pará': {
+    portion: '20g (4 unidades)',
+    macros: { calories: 130, protein: 3, carbs: 2, fat: 13 },
+    notes: 'Rica em selênio + gordura saudável',
+    scalable: true,
+    minPortion: 0.5,
+    maxPortion: 1.5,
   },
-  'Ovo Cozido': {
-    portion: '1 unidade (50g)',
-    macros: { calories: 75, protein: 6, carbs: 0.5, fat: 5 },
-    notes: 'Proteína completa + gordura',
+  'Nozes': {
+    portion: '30g (6 unidades)',
+    macros: { calories: 195, protein: 5, carbs: 4, fat: 19 },
+    notes: 'Ômega-3 vegetal + antioxidantes',
+    scalable: true,
+    minPortion: 0.5,
+    maxPortion: 1.5,
   },
-  'Queijo Cottage': {
-    portion: '100g',
-    macros: { calories: 100, protein: 12, carbs: 3, fat: 4 },
-    notes: 'Alto teor proteico + cálcio',
-  },
-  'Pão Integral': {
-    portion: '2 fatias (50g)',
-    macros: { calories: 130, protein: 5, carbs: 24, fat: 2 },
-    notes: 'Carboidrato complexo + fibras',
+  'Amêndoas': {
+    portion: '30g (20 unidades)',
+    macros: { calories: 170, protein: 6, carbs: 6, fat: 15 },
+    notes: 'Vitamina E + magnésio',
+    scalable: true,
+    minPortion: 0.5,
+    maxPortion: 1.5,
   },
   'Abacate': {
     portion: '100g (1/2 unidade)',
     macros: { calories: 160, protein: 2, carbs: 8, fat: 15 },
     notes: 'Gordura monoinsaturada',
+    scalable: true,
+    minPortion: 0.5,
+    maxPortion: 1.5,
+  },
+  
+  // Carboidratos
+  'Banana': {
+    portion: '1 unidade (100g)',
+    macros: { calories: 90, protein: 1, carbs: 23, fat: 0 },
+    notes: 'Carboidrato de rápida absorção + potássio',
+    scalable: true,
+    minPortion: 0.5,
+    maxPortion: 2,
+  },
+  'Aveia em Flocos': {
+    portion: '40g (4 colheres)',
+    macros: { calories: 150, protein: 5, carbs: 27, fat: 3 },
+    notes: 'Fibras + carboidrato complexo',
+    scalable: true,
+    minPortion: 0.5,
+    maxPortion: 2,
+  },
+  'Mel': {
+    portion: '20g (1 colher)',
+    macros: { calories: 60, protein: 0, carbs: 17, fat: 0 },
+    notes: 'Carboidrato simples natural',
+    scalable: true,
+    minPortion: 0.5,
+    maxPortion: 2,
+  },
+  'Pão Integral': {
+    portion: '2 fatias (50g)',
+    macros: { calories: 130, protein: 5, carbs: 24, fat: 2 },
+    notes: 'Carboidrato complexo + fibras',
+    scalable: true,
+    minPortion: 0.5,
+    maxPortion: 2,
+  },
+  'Batata Doce': {
+    portion: '150g (1 unidade média)',
+    macros: { calories: 130, protein: 2, carbs: 30, fat: 0 },
+    notes: 'Carboidrato de baixo índice glicêmico',
+    scalable: true,
+    minPortion: 0.5,
+    maxPortion: 2,
+  },
+  
+  // Proteínas
+  'Iogurte Grego Natural': {
+    portion: '170g (1 pote)',
+    macros: { calories: 150, protein: 15, carbs: 8, fat: 6 },
+    notes: 'Alto teor proteico + probióticos',
+    scalable: true,
+    minPortion: 0.5,
+    maxPortion: 1.5,
+  },
+  'Ovo Cozido': {
+    portion: '1 unidade (50g)',
+    macros: { calories: 75, protein: 6, carbs: 0.5, fat: 5 },
+    notes: 'Proteína completa + gordura',
+    scalable: true,
+    minPortion: 1,
+    maxPortion: 3,
+  },
+  'Queijo Cottage': {
+    portion: '100g',
+    macros: { calories: 100, protein: 12, carbs: 3, fat: 4 },
+    notes: 'Alto teor proteico + cálcio',
+    scalable: true,
+    minPortion: 0.5,
+    maxPortion: 2,
+  },
+  'Ricota': {
+    portion: '100g',
+    macros: { calories: 140, protein: 11, carbs: 3, fat: 10 },
+    notes: 'Proteína + cálcio',
+    scalable: true,
+    minPortion: 0.5,
+    maxPortion: 1.5,
+  },
+  
+  // Líquidos
+  'Leite Desnatado': {
+    portion: '200ml',
+    macros: { calories: 70, protein: 7, carbs: 10, fat: 0 },
+    notes: 'Base líquida para shakes',
+    scalable: true,
+    minPortion: 0.5,
+    maxPortion: 2,
+  },
+  'Leite Integral': {
+    portion: '200ml',
+    macros: { calories: 120, protein: 6, carbs: 9, fat: 6 },
+    notes: 'Mais calórico, ideal para ganho de massa',
+    scalable: true,
+    minPortion: 0.5,
+    maxPortion: 2,
+  },
+  'Leite de Amêndoas': {
+    portion: '200ml',
+    macros: { calories: 30, protein: 1, carbs: 1, fat: 2.5 },
+    notes: 'Baixo em calorias, alternativa vegana',
+    scalable: true,
+    minPortion: 1,
+    maxPortion: 2,
   },
 };
+
+/**
+ * Calcula os macros escalados para uma porção
+ */
+function scaleMacros(macros: MacroTarget, scale: number): MacroTarget {
+  return {
+    calories: Math.round(macros.calories * scale),
+    protein: Math.round(macros.protein * scale * 10) / 10,
+    carbs: Math.round(macros.carbs * scale * 10) / 10,
+    fat: Math.round(macros.fat * scale * 10) / 10,
+  };
+}
+
+/**
+ * Formata a quantidade baseada no scale
+ */
+function formatQuantity(originalPortion: string, scale: number): string {
+  if (scale === 1) return originalPortion;
+  
+  // Extrai a quantidade numérica da porção
+  const match = originalPortion.match(/^(\d+(?:,\d+)?(?:\.\d+)?)\s*(.*)$/);
+  if (match) {
+    const num = parseFloat(match[1].replace(',', '.'));
+    const unit = match[2];
+    const newNum = Math.round(num * scale * 10) / 10;
+    return `${newNum}${unit ? ' ' + unit : ''}`;
+  }
+  
+  // Para porções como "1 unidade (100g)"
+  const unitMatch = originalPortion.match(/(\d+)\s*(unidade|fatia|pote|scoop)/i);
+  if (unitMatch) {
+    const num = parseInt(unitMatch[1]);
+    const unit = unitMatch[2];
+    const newNum = Math.round(num * scale);
+    const gramsMatch = originalPortion.match(/\((\d+)g\)/);
+    const newGrams = gramsMatch ? Math.round(parseInt(gramsMatch[1]) * scale) : null;
+    return `${newNum} ${unit}${newNum > 1 && !unit.endsWith('s') ? 's' : ''}${newGrams ? ` (${newGrams}g)` : ''}`;
+  }
+  
+  // Para "Xg (Y scoops)" ou similar
+  const gramsMatch = originalPortion.match(/^(\d+)g/);
+  if (gramsMatch) {
+    const grams = parseInt(gramsMatch[1]);
+    const newGrams = Math.round(grams * scale);
+    const scoopMatch = originalPortion.match(/\((\d+)\s*scoop/i);
+    if (scoopMatch) {
+      const scoops = parseInt(scoopMatch[1]);
+      const newScoops = Math.round(scoops * scale * 10) / 10;
+      return `${newGrams}g (${newScoops} scoop${newScoops !== 1 ? 's' : ''})`;
+    }
+    return `${newGrams}g`;
+  }
+  
+  return `${scale}x ${originalPortion}`;
+}
+
+/**
+ * Calcula a pontuação de um item baseado no que ainda precisamos
+ */
+function scoreItem(item: CatalogItem, remaining: MacroTarget, goal: string): number {
+  let score = 0;
+  const macros = item.macros;
+  
+  // Penaliza se exceder calorias
+  if (macros.calories > remaining.calories * 1.1) {
+    score -= 100;
+  }
+  
+  // Prioriza proteína para cut e muscle gain
+  if (goal === 'lose_weight' || goal === 'gain_muscle') {
+    if (remaining.protein > 0 && macros.protein > 0) {
+      score += (macros.protein / macros.calories) * 100; // Densidade proteica
+    }
+  }
+  
+  // Prioriza carboidratos para muscle gain
+  if (goal === 'gain_muscle' && remaining.carbs > 10) {
+    if (macros.carbs > 0) {
+      score += (macros.carbs / macros.calories) * 50;
+    }
+  }
+  
+  // Prioriza baixa gordura para cut
+  if (goal === 'lose_weight') {
+    if (macros.fat < 5) {
+      score += 20;
+    }
+  }
+  
+  // Penaliza se adicionar muito de algo que já atingimos
+  if (remaining.protein <= 0 && macros.protein > 5) score -= 30;
+  if (remaining.carbs <= 0 && macros.carbs > 10) score -= 30;
+  if (remaining.fat <= 0 && macros.fat > 5) score -= 30;
+  
+  return score;
+}
 
 /**
  * Calcula a combinação ideal de suplementos + alimentos para substituir uma refeição
@@ -155,131 +359,123 @@ export function calculateMealReplacement(
   const items: ReplacementItem[] = [];
   let remaining = { ...targetMacros };
   
-  // Prioridade baseada no objetivo
-  const proteinFirst = userGoal === 'lose_weight' || userGoal === 'gain_muscle';
+  // Limite máximo de calorias (105% do original)
+  const maxCalories = targetMacros.calories * 1.05;
+  let currentCalories = 0;
   
-  // 1. PROTEÍNA: Usar Whey como base
-  if (remaining.protein >= 20) {
-    const wheyType = userGoal === 'lose_weight' ? 'Whey Protein Isolado' : 'Whey Protein Concentrado';
-    const whey = SUPPLEMENT_CATALOG[wheyType];
-    const scoops = Math.min(2, Math.ceil(remaining.protein / whey.macros.protein));
+  // Função para verificar se podemos adicionar um item
+  const canAddItem = (macros: MacroTarget, scale: number = 1): boolean => {
+    const scaledCalories = macros.calories * scale;
+    return (currentCalories + scaledCalories) <= maxCalories;
+  };
+  
+  // Função para adicionar um item
+  const addItem = (name: string, catalog: Record<string, CatalogItem>, type: 'supplement' | 'food', scale: number = 1) => {
+    const item = catalog[name];
+    if (!item) return false;
+    
+    const scaledMacros = scaleMacros(item.macros, scale);
+    if (!canAddItem(item.macros, scale)) return false;
     
     items.push({
-      name: wheyType,
-      quantity: scoops === 1 ? '30g (1 scoop)' : `${scoops * 30}g (${scoops} scoops)`,
-      macros: {
-        calories: whey.macros.calories * scoops,
-        protein: whey.macros.protein * scoops,
-        carbs: whey.macros.carbs * scoops,
-        fat: whey.macros.fat * scoops,
-      },
-      type: 'supplement',
-      notes: whey.notes,
+      name,
+      quantity: formatQuantity(item.portion, scale),
+      macros: scaledMacros,
+      type,
+      notes: item.notes,
     });
     
-    remaining.protein -= whey.macros.protein * scoops;
-    remaining.calories -= whey.macros.calories * scoops;
-    remaining.carbs -= whey.macros.carbs * scoops;
-    remaining.fat -= whey.macros.fat * scoops;
+    remaining.protein -= scaledMacros.protein;
+    remaining.calories -= scaledMacros.calories;
+    remaining.carbs -= scaledMacros.carbs;
+    remaining.fat -= scaledMacros.fat;
+    currentCalories += scaledMacros.calories;
+    
+    return true;
+  };
+  
+  // 1. PROTEÍNA: Usar Whey como base se precisar de muita proteína
+  if (remaining.protein >= 15) {
+    const wheyType = userGoal === 'lose_weight' ? 'Whey Protein Isolado' : 'Whey Protein Concentrado';
+    const whey = SUPPLEMENT_CATALOG[wheyType];
+    
+    // Calcular quantos scoops precisamos (sem exceder)
+    const idealScoops = Math.min(2, Math.ceil(remaining.protein / whey.macros.protein));
+    let actualScoops = idealScoops;
+    
+    // Reduzir se exceder calorias
+    while (actualScoops > 0 && !canAddItem(whey.macros, actualScoops)) {
+      actualScoops -= 0.5;
+    }
+    
+    if (actualScoops >= 0.5) {
+      addItem(wheyType, SUPPLEMENT_CATALOG, 'supplement', actualScoops);
+    }
   }
 
-  // 2. CARBOIDRATOS: Adicionar fonte de carboidrato
-  if (remaining.carbs >= 15) {
-    // Para bulking: hipercalórico ou maltodextrina
-    if (userGoal === 'gain_muscle' && remaining.calories >= 200) {
-      const hiper = SUPPLEMENT_CATALOG['Hipercalórico'];
-      items.push({
-        name: 'Hipercalórico',
-        quantity: hiper.portion,
-        macros: { ...hiper.macros },
-        type: 'supplement',
-        notes: hiper.notes,
-      });
-      remaining.protein -= hiper.macros.protein;
-      remaining.calories -= hiper.macros.calories;
-      remaining.carbs -= hiper.macros.carbs;
-      remaining.fat -= hiper.macros.fat;
-    } else {
-      // Aveia + Banana para carboidratos saudáveis
-      if (remaining.carbs >= 25) {
-        const aveia = FOOD_CATALOG['Aveia em Flocos'];
-        items.push({
-          name: 'Aveia em Flocos',
-          quantity: aveia.portion,
-          macros: { ...aveia.macros },
-          type: 'food',
-          notes: aveia.notes,
-        });
-        remaining.protein -= aveia.macros.protein;
-        remaining.calories -= aveia.macros.calories;
-        remaining.carbs -= aveia.macros.carbs;
-        remaining.fat -= aveia.macros.fat;
-      }
-      
-      if (remaining.carbs >= 15) {
-        const banana = FOOD_CATALOG['Banana'];
-        items.push({
-          name: 'Banana',
-          quantity: banana.portion,
-          macros: { ...banana.macros },
-          type: 'food',
-          notes: banana.notes,
-        });
-        remaining.protein -= banana.macros.protein;
-        remaining.calories -= banana.macros.calories;
-        remaining.carbs -= banana.macros.carbs;
-        remaining.fat -= banana.macros.fat;
+  // 2. CARBOIDRATOS: Adicionar fonte de carboidrato se necessário
+  if (remaining.carbs >= 15 && canAddItem(FOOD_CATALOG['Banana'].macros)) {
+    addItem('Banana', FOOD_CATALOG, 'food');
+  }
+  
+  if (remaining.carbs >= 20 && canAddItem(FOOD_CATALOG['Aveia em Flocos'].macros, 0.5)) {
+    const scale = remaining.carbs >= 30 ? 1 : 0.5;
+    if (canAddItem(FOOD_CATALOG['Aveia em Flocos'].macros, scale)) {
+      addItem('Aveia em Flocos', FOOD_CATALOG, 'food', scale);
+    }
+  }
+
+  // 3. GORDURA: Adicionar gordura saudável se necessário (variar entre opções)
+  if (remaining.fat >= 8) {
+    // Escolher aleatoriamente entre opções de gordura para variedade
+    const fatOptions = ['Pasta de Amendoim Integral', 'Castanha de Caju', 'Nozes', 'Amêndoas'];
+    const shuffled = fatOptions.sort(() => Math.random() - 0.5);
+    
+    for (const option of shuffled) {
+      const item = FOOD_CATALOG[option];
+      if (canAddItem(item.macros)) {
+        addItem(option, FOOD_CATALOG, 'food');
+        break;
       }
     }
   }
 
-  // 3. GORDURA: Adicionar gordura saudável se necessário
-  if (remaining.fat >= 8) {
-    const pastaAmendoim = FOOD_CATALOG['Pasta de Amendoim Integral'];
-    items.push({
-      name: 'Pasta de Amendoim Integral',
-      quantity: pastaAmendoim.portion,
-      macros: { ...pastaAmendoim.macros },
-      type: 'food',
-      notes: pastaAmendoim.notes,
-    });
-    remaining.protein -= pastaAmendoim.macros.protein;
-    remaining.calories -= pastaAmendoim.macros.calories;
-    remaining.carbs -= pastaAmendoim.macros.carbs;
-    remaining.fat -= pastaAmendoim.macros.fat;
+  // 4. PROTEÍNA ADICIONAL: Se ainda precisar
+  if (remaining.protein >= 8) {
+    const proteinOptions = ['Iogurte Grego Natural', 'Ovo Cozido', 'Queijo Cottage'];
+    
+    for (const option of proteinOptions) {
+      const item = FOOD_CATALOG[option];
+      if (canAddItem(item.macros)) {
+        // Para ovos, calcular quantidade ideal
+        if (option === 'Ovo Cozido') {
+          const numEggs = Math.min(3, Math.ceil(remaining.protein / item.macros.protein));
+          if (canAddItem(item.macros, numEggs)) {
+            addItem(option, FOOD_CATALOG, 'food', numEggs);
+          }
+        } else {
+          addItem(option, FOOD_CATALOG, 'food');
+        }
+        break;
+      }
+    }
   }
 
-  // 4. PROTEÍNA ADICIONAL: Se ainda precisar de proteína
-  if (remaining.protein >= 10) {
-    const iogurte = FOOD_CATALOG['Iogurte Grego Natural'];
-    items.push({
-      name: 'Iogurte Grego Natural',
-      quantity: iogurte.portion,
-      macros: { ...iogurte.macros },
-      type: 'food',
-      notes: iogurte.notes,
-    });
-    remaining.protein -= iogurte.macros.protein;
-    remaining.calories -= iogurte.macros.calories;
-    remaining.carbs -= iogurte.macros.carbs;
-    remaining.fat -= iogurte.macros.fat;
-  }
-
-  // 5. LÍQUIDO: Base para shake
+  // 5. LÍQUIDO: Base para shake (apenas se tiver suplemento)
   if (items.some(i => i.type === 'supplement')) {
-    const leite = userGoal === 'lose_weight' ? FOOD_CATALOG['Leite Desnatado'] : FOOD_CATALOG['Leite Integral'];
-    const leiteName = userGoal === 'lose_weight' ? 'Leite Desnatado' : 'Leite Integral';
-    items.push({
-      name: leiteName,
-      quantity: leite.portion,
-      macros: { ...leite.macros },
-      type: 'food',
-      notes: leite.notes,
-    });
-    remaining.calories -= leite.macros.calories;
-    remaining.protein -= leite.macros.protein;
-    remaining.carbs -= leite.macros.carbs;
-    remaining.fat -= leite.macros.fat;
+    const milkType = userGoal === 'lose_weight' ? 'Leite Desnatado' : 
+                     userGoal === 'gain_muscle' ? 'Leite Integral' : 'Leite Desnatado';
+    
+    if (canAddItem(FOOD_CATALOG[milkType].macros)) {
+      addItem(milkType, FOOD_CATALOG, 'food');
+    }
+  }
+
+  // 6. AJUSTE FINO: Se ainda tiver espaço para calorias/carboidratos
+  if (remaining.carbs >= 10 && remaining.calories >= 50) {
+    if (canAddItem(FOOD_CATALOG['Mel'].macros)) {
+      addItem('Mel', FOOD_CATALOG, 'food');
+    }
   }
 
   // Calcular totais
@@ -310,11 +506,25 @@ export function calculateMealReplacement(
   if (accuracy.carbs < 80) {
     tips.push('💡 Adicione 1 fatia de pão integral ou mais banana para os carboidratos.');
   }
-  if (accuracy.calories > 110) {
+  if (accuracy.calories > 105) {
     tips.push('⚠️ Esta substituição excede ligeiramente as calorias originais.');
+  } else if (accuracy.calories < 90) {
+    tips.push('💡 Adicione mais alimentos para atingir as calorias necessárias.');
   }
   if (items.length > 5) {
     tips.push('📝 Prepare os ingredientes com antecedência para facilitar o consumo.');
+  }
+
+  // Dica de preparo baseada nos itens
+  const hasWhey = items.some(i => i.name.includes('Whey'));
+  const hasOats = items.some(i => i.name.includes('Aveia'));
+  const hasBanana = items.some(i => i.name === 'Banana');
+  const hasNuts = items.some(i => ['Pasta de Amendoim Integral', 'Castanha de Caju', 'Nozes', 'Amêndoas', 'Castanha do Pará'].includes(i.name));
+  
+  if (hasWhey && (hasOats || hasBanana)) {
+    tips.push('🥤 Bata todos os ingredientes no liquidificador para um shake completo.');
+  } else if (hasNuts && !hasWhey) {
+    tips.push('🥜 Consuma as oleaginosas como snack ou adicione ao iogurte/aveia.');
   }
 
   return {
