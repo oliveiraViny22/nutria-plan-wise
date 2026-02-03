@@ -460,12 +460,12 @@ export default function Dashboard() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.05 }}
           >
-            <div className="flex flex-wrap gap-2">
-              <UsageLimitsBadge feature="diet" compact />
-              <UsageLimitsBadge feature="substitution" compact />
-              <UsageLimitsBadge feature="adjustment" compact />
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <UsageLimitsBadge feature="diet" />
+              <UsageLimitsBadge feature="substitution" />
+              <UsageLimitsBadge feature="adjustment" />
               {subscriptionPlan?.has_chat && (
-                <UsageLimitsBadge feature="chat" compact />
+                <UsageLimitsBadge feature="chat" />
               )}
             </div>
           </motion.section>
