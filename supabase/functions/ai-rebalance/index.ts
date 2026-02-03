@@ -1461,6 +1461,32 @@ serve(async (req) => {
     const userId = planData?.user_id as string | null;
 
     // ============================================
+    // VALIDAÇÃO DE LIMITE DE AJUSTES (REBALANCER)
+    // ============================================
+    if (userId) {
+      const { data: canUseAdjustment } = await supabase.rpc("can_use_feature", {
+        _user_id: userId,
+        _feature: "adjustment",
+      });
+
+      if (!canUseAdjustment) {
+        const { data: planInfo } = await supabase.rpc("get_user_plan", { _user_id: userId });
+        const adjustmentLimit = planInfo?.[0]?.adjustment_limit || 0;
+        
+        log.warn("Adjustment limit reached", { userId, adjustmentLimit });
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: `Você atingiu o limite de ${adjustmentLimit} ajuste(s) do seu plano. Faça upgrade para continuar ajustando seus planos.`,
+            code: "ADJUSTMENT_LIMIT_REACHED",
+            upgradeRequired: true,
+          }),
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
+
+    // ============================================
     // RATE LIMITING
     // ============================================
     if (userId) {
@@ -1854,6 +1880,12 @@ serve(async (req) => {
     // Logar métricas de rebalanceamento para análise
     const convergenceTimeMs = Math.round(performance.now() - startTime);
     if (userId) {
+      // Incrementar uso de ajuste apenas se foi bem-sucedido
+      if (status !== "error") {
+        await supabase.rpc("increment_usage", { _user_id: userId, _feature: "adjustment" });
+        log.info("Adjustment usage incremented", { userId });
+      }
+      
       await logRebalanceMetrics(supabase, userId, {
         iterations: totalIterations,
         convergenceTimeMs,
