@@ -33,9 +33,19 @@ const PLURAL_MAP: Record<string, string> = {
  * formatQuantityDisplay(150, 'g') // "150g"
  * formatQuantityDisplay(1.5, 'fatia') // "1.5 fatias"
  */
+/**
+ * Formata quantidade para exibição humana.
+ * Mostra unidades E gramas quando aplicável.
+ * 
+ * @example
+ * formatQuantityDisplay(2, 'unidade', 100) // "2 unidades (100g)"
+ * formatQuantityDisplay(150, 'g') // "150g"
+ * formatQuantityDisplay(1.5, 'fatia', 45) // "1.5 fatias (45g)"
+ */
 export function formatQuantityDisplay(
   displayQuantity: number,
-  displayUnit: string
+  displayUnit: string,
+  gramsValue?: number
 ): string {
   if (displayUnit === 'g') {
     return `${Math.round(displayQuantity)}g`;
@@ -51,6 +61,11 @@ export function formatQuantityDisplay(
   // Formatar número (inteiro se possível, senão 1 casa decimal)
   const formattedQty = Number.isInteger(qty) ? qty : qty.toFixed(1);
 
+  // Se temos o valor em gramas, mostrar ambos
+  if (gramsValue != null && gramsValue > 0) {
+    return `${formattedQty} ${unit} (${Math.round(gramsValue)}g)`;
+  }
+
   return `${formattedQty} ${unit}`;
 }
 
@@ -63,7 +78,9 @@ export function formatQuantityDisplay(
  */
 export function getMealFoodDisplay(item: MealFood | MealOptionFood): string {
   if (item.display_quantity != null && item.display_unit) {
-    return formatQuantityDisplay(item.display_quantity, item.display_unit);
+    // Obter gramas reais para exibição dual (unidade + gramas)
+    const grams = getActualGrams(item);
+    return formatQuantityDisplay(item.display_quantity, item.display_unit, grams);
   }
   
   // Fallback: exibir em gramas (suporta ambos os schemas)
