@@ -63,6 +63,7 @@ import { ObjectiveChangePoliciesManager } from '@/components/admin/ObjectiveChan
 import { MealAnchorFoodsManager } from '@/components/admin/MealAnchorFoodsManager';
 import { MealTemplatesManager } from '@/components/admin/MealTemplatesManager';
 import { OptimizerSettingsManager } from '@/components/admin/OptimizerSettingsManager';
+import { FoodBlockRulesManager } from '@/components/admin/FoodBlockRulesManager';
 
 
 const CHART_COLORS = [
@@ -757,6 +758,10 @@ export default function Admin() {
             <TabsTrigger value="policies" className="flex items-center gap-2">
               <Target className="h-4 w-4" />
               Políticas
+            </TabsTrigger>
+            <TabsTrigger value="blocks" className="flex items-center gap-2">
+              <AlertCircle className="h-4 w-4" />
+              Bloqueios
             </TabsTrigger>
           </TabsList>
 
@@ -1959,6 +1964,11 @@ export default function Admin() {
               {/* Optimizer Settings */}
               <OptimizerSettingsManager />
             </div>
+          </TabsContent>
+
+          {/* Food Block Rules Tab */}
+          <TabsContent value="blocks">
+            <FoodBlockRulesManager />
           </TabsContent>
         </Tabs>
       </main>
