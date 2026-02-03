@@ -66,6 +66,7 @@ import { OptimizerSettingsManager } from '@/components/admin/OptimizerSettingsMa
 import { FoodBlockRulesManager } from '@/components/admin/FoodBlockRulesManager';
 import { TemplateAnchorPreview } from '@/components/admin/TemplateAnchorPreview';
 import { QuickStartTemplates } from '@/components/admin/QuickStartTemplates';
+import { FeatureFlagsManager } from '@/components/admin/FeatureFlagsManager';
 
 
 const CHART_COLORS = [
@@ -764,6 +765,10 @@ export default function Admin() {
             <TabsTrigger value="blocks" className="flex items-center gap-2">
               <AlertCircle className="h-4 w-4" />
               Bloqueios
+            </TabsTrigger>
+            <TabsTrigger value="flags" className="flex items-center gap-2">
+              <Sparkles className="h-4 w-4" />
+              Feature Flags
             </TabsTrigger>
           </TabsList>
 
@@ -1977,6 +1982,11 @@ export default function Admin() {
           {/* Food Block Rules Tab */}
           <TabsContent value="blocks">
             <FoodBlockRulesManager />
+          </TabsContent>
+
+          {/* Feature Flags Tab */}
+          <TabsContent value="flags">
+            <FeatureFlagsManager />
           </TabsContent>
         </Tabs>
       </main>
