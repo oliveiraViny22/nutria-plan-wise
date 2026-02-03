@@ -21,6 +21,7 @@ import {
   HIGH_FAT_CARB_THRESHOLD,
   IMPLICIT_FAT_LIMITS,
   SNACK_MEALS,
+  BLOCKED_FOODS_BY_MEAL,
 } from "./constants.ts";
 import { logDebug, logWarn, logInfo } from "./logger.ts";
 import {
@@ -309,6 +310,22 @@ function isLightProteinRole(roleName: string): boolean {
 }
 
 // =====================================================
+// BLOQUEIO POR TIPO DE REFEIÇÃO (v5.9)
+// =====================================================
+
+/**
+ * Verifica se um alimento é bloqueado para um tipo de refeição específico.
+ * Usado para adequação cultural (ex: mingau só na ceia, não no jantar).
+ */
+export function isBlockedForMealType(food: Food, mealType: string): boolean {
+  const blockedTerms = BLOCKED_FOODS_BY_MEAL[mealType];
+  if (!blockedTerms || blockedTerms.length === 0) return false;
+  
+  const nameLower = food.name.toLowerCase();
+  return blockedTerms.some(term => nameLower.includes(term));
+}
+
+// =====================================================
 // CLASSIFICAÇÃO DE OLEAGINOSAS E PASTAS (v5.5)
 // =====================================================
 
@@ -448,6 +465,17 @@ export function selectFoodForRole(
     if (usedFoodIds.has(f.id)) return false;
     const cat = (f.category || "").toLowerCase();
     if (!role.categories.includes(cat)) return false;
+    
+    // v5.9: BLOQUEIO POR TIPO DE REFEIÇÃO (adequação cultural)
+    // Ex: Mingau de Aveia só deve aparecer na ceia, não no jantar
+    if (mealType && isBlockedForMealType(f, mealType)) {
+      logDebug("Bloqueando alimento por inadequação cultural", {
+        name: f.name,
+        mealType,
+        reason: "alimento não adequado para esta refeição",
+      });
+      return false;
+    }
     
     // v5.5: BLOQUEIO GLOBAL de oleaginosas e pastas de amendoim como seleções primárias
     // Estes alimentos têm gordura massiva (40-60g/100g) que impede normalização
