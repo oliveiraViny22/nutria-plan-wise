@@ -249,3 +249,23 @@ export const LEAN_CARB_RULES = {
 
 /** Carboidratos com alta gordura - bloquear como base */
 export const HIGH_FAT_CARB_THRESHOLD = 5; // g gordura por 100g
+
+// =====================================================
+// BLOQUEIOS POR TIPO DE REFEIÇÃO (v5.9)
+// =====================================================
+
+/**
+ * Alimentos bloqueados para refeições específicas por adequação cultural.
+ * Ex: Mingau de Aveia é mais adequado para ceia do que jantar.
+ */
+export const BLOCKED_FOODS_BY_MEAL: Record<string, string[]> = {
+  dinner: [
+    "mingau",
+    "mingau de aveia",
+    "aveia em flocos",  // Quando usado para mingau
+  ],
+  lunch: [
+    "mingau",
+    "mingau de aveia",
+  ],
+};
