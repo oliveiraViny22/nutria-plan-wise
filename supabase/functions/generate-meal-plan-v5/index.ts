@@ -217,13 +217,14 @@ serve(async (req) => {
       );
     }
 
-    // NOVO v5.5 (G-10): Validar limite global de gordura implícita (80% da meta)
+    // REGRA G-10 PROGRESSIVA: Classificar gordura implícita
     const implicitFatValidation = validateImplicitFat(allFoodsWithQuantity, targets.fat);
     
-    if (implicitFatValidation.status === "FAIL") {
-      logError("G-10 VIOLADA: Gordura implícita excede limite", implicitFatValidation);
+    // REGENERATE: Excesso severo (>120%) → erro e regenerar
+    if (implicitFatValidation.status === "REGENERATE") {
+      logError("G-10 HARD FAIL: Excesso severo de gordura implícita", implicitFatValidation);
       return createErrorResponse(
-        `Gordura implícita (${implicitFatValidation.totalImplicitFat}g) excede 80% da meta (${implicitFatValidation.maxAllowed}g)`,
+        `Gordura implícita (${implicitFatValidation.totalImplicitFat}g) excede 120% da meta (${targets.fat}g). Regenerando plano.`,
         400,
         corsHeaders,
         { 
@@ -234,10 +235,18 @@ serve(async (req) => {
       );
     }
     
+    // Metadata para passar ao rebalanceador
+    const g10Metadata = {
+      g10Status: implicitFatValidation.status, // PASS | ALLOW_REBALANCE
+      implicitFatRatio: implicitFatValidation.ratio,
+      implicitFatWarning: implicitFatValidation.warning,
+    };
+    
     logInfo("G-10 OK", { 
       implicitFat: implicitFatValidation.totalImplicitFat,
       maxAllowed: implicitFatValidation.maxAllowed,
-      ratio: `${(implicitFatValidation.ratio * 100).toFixed(0)}%`
+      ratio: `${(implicitFatValidation.ratio * 100).toFixed(0)}%`,
+      status: implicitFatValidation.status,
     });
 
     // Validar estrutura
@@ -311,13 +320,17 @@ serve(async (req) => {
         message: isWithinTolerance 
           ? `Plano gerado com ${mealOptionsLimit} opção(ões) por refeição. Calorias dentro da meta (${finalDiffPercent.toFixed(1)}% de diferença).`
           : `Plano gerado com ${mealOptionsLimit} opção(ões) por refeição. Rebalanceamento pode refinar os valores.`,
-        requires_rebalancing: !isWithinTolerance,
+        requires_rebalancing: !isWithinTolerance || g10Metadata.g10Status === "ALLOW_REBALANCE",
         options_per_meal: mealOptionsLimit,
         scale_applied: scaleResult.scaleFactor !== 1,
         scale_factor: scaleResult.scaleFactor,
         scale_iterations: scaleResult.iterations,
         scale_converged: scaleResult.converged,
         protein_adjusted: scaleResult.proteinAdjusted,
+        // NOVO: Metadados G-10 progressivo para o rebalanceador
+        g10_status: g10Metadata.g10Status,
+        implicit_fat_ratio: g10Metadata.implicitFatRatio,
+        implicit_fat_warning: g10Metadata.implicitFatWarning,
         totals: {
           calories: totalCals,
           protein: totalProt,

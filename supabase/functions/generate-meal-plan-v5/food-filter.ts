@@ -16,7 +16,7 @@ import {
   MAX_HIGH_FAT_DAIRY_PORTION,
   LEAN_CARB_RULES,
   HIGH_FAT_CARB_THRESHOLD,
-  MAX_IMPLICIT_FAT_RATIO,
+  IMPLICIT_FAT_LIMITS,
 } from "./constants.ts";
 import { logDebug, logWarn } from "./logger.ts";
 import {
@@ -582,26 +582,54 @@ export function validateFatShare(
 }
 
 // =====================================================
-// REGRA G-10: VALIDAÇÃO DE GORDURA IMPLÍCITA GLOBAL
+// REGRA G-10: VALIDAÇÃO DE GORDURA IMPLÍCITA (PROGRESSIVO)
 // =====================================================
 
+export type ImplicitFatStatus = "PASS" | "ALLOW_REBALANCE" | "REGENERATE";
+
 interface ImplicitFatValidation {
-  status: "PASS" | "FAIL";
+  status: ImplicitFatStatus;
   totalImplicitFat: number;
   maxAllowed: number;
   ratio: number;
   excess?: number;
+  warning?: string;
+  reason?: string;
 }
 
 /**
- * Valida que a gordura implícita total do plano não excede 80% da meta.
- * G-10: Os 20% restantes ficam reservados para o Rebalanceador.
+ * Calcula a gordura implícita total (excluindo gorduras e oleaginosas).
+ */
+function calculateImplicitFat(foods: FoodWithQuantity[]): number {
+  let total = 0;
+  
+  for (const item of foods) {
+    const category = (item.food.category || "").toLowerCase();
+    
+    // Gorduras explícitas não contam como "implícitas"
+    if (category === "gorduras" || category === "oleaginosas") {
+      continue;
+    }
+    
+    const fatContrib = (item.food.fat / 100) * item.quantity_grams;
+    total += fatContrib;
+  }
+  
+  return total;
+}
+
+/**
+ * Classifica o status da gordura implícita segundo a regra G-10 progressiva.
  * 
- * @param foods Lista de alimentos com quantidades
+ * - PASS: ≤100% → plano OK
+ * - ALLOW_REBALANCE: 100%-120% → plano bom, enviar ao rebalanceador
+ * - REGENERATE: >120% → plano estruturalmente ruim
+ * 
+ * @param implicitFat Gordura implícita calculada
  * @param targetFat Meta de gordura diária
  */
-export function validateImplicitFat(
-  foods: FoodWithQuantity[],
+export function classifyImplicitFat(
+  implicitFat: number,
   targetFat: number
 ): ImplicitFatValidation {
   if (targetFat <= 0) {
@@ -613,54 +641,73 @@ export function validateImplicitFat(
     };
   }
 
-  // Calcular gordura implícita total (excluindo categoria "gorduras")
-  let totalImplicitFat = 0;
-  
-  for (const item of foods) {
-    const category = (item.food.category || "").toLowerCase();
-    
-    // Gorduras explícitas não contam como "implícitas"
-    if (category === "gorduras" || category === "oleaginosas") {
-      continue;
-    }
-    
-    const fatContrib = (item.food.fat / 100) * item.quantity_grams;
-    totalImplicitFat += fatContrib;
-  }
+  const ratio = implicitFat / targetFat;
+  const maxAllowed = targetFat * IMPLICIT_FAT_LIMITS.ALLOW;
 
-  const maxAllowed = targetFat * MAX_IMPLICIT_FAT_RATIO;
-  const ratio = totalImplicitFat / targetFat;
-
-  if (totalImplicitFat > maxAllowed) {
-    const excess = totalImplicitFat - maxAllowed;
-    
-    logWarn("G-10 VIOLADA: Gordura implícita excede 80%", {
-      totalImplicitFat: totalImplicitFat.toFixed(1),
-      maxAllowed: maxAllowed.toFixed(1),
+  // PASS: ≤100% da meta
+  if (ratio <= IMPLICIT_FAT_LIMITS.PASS) {
+    logDebug("G-10 PASS: Gordura implícita dentro do limite ideal", {
+      totalImplicitFat: implicitFat.toFixed(1),
       targetFat,
       ratio: `${(ratio * 100).toFixed(0)}%`,
-      excess: excess.toFixed(1),
     });
     
     return {
-      status: "FAIL",
-      totalImplicitFat: Math.round(totalImplicitFat * 10) / 10,
+      status: "PASS",
+      totalImplicitFat: Math.round(implicitFat * 10) / 10,
       maxAllowed: Math.round(maxAllowed * 10) / 10,
       ratio: Math.round(ratio * 100) / 100,
-      excess: Math.round(excess * 10) / 10,
     };
   }
 
-  logDebug("G-10 OK: Gordura implícita dentro do limite", {
-    totalImplicitFat: totalImplicitFat.toFixed(1),
-    maxAllowed: maxAllowed.toFixed(1),
-    ratio: `${(ratio * 100).toFixed(0)}%`,
-  });
+  // ALLOW_REBALANCE: 100%-120% da meta
+  if (ratio <= IMPLICIT_FAT_LIMITS.ALLOW) {
+    logDebug("G-10 ALLOW_REBALANCE: Excesso moderado, rebalanceável", {
+      totalImplicitFat: implicitFat.toFixed(1),
+      targetFat,
+      ratio: `${(ratio * 100).toFixed(0)}%`,
+    });
+    
+    return {
+      status: "ALLOW_REBALANCE",
+      totalImplicitFat: Math.round(implicitFat * 10) / 10,
+      maxAllowed: Math.round(maxAllowed * 10) / 10,
+      ratio: Math.round(ratio * 100) / 100,
+      warning: "Excesso moderado de gordura implícita",
+    };
+  }
 
+  // REGENERATE: >120% da meta
+  const excess = implicitFat - maxAllowed;
+  
+  logWarn("G-10 REGENERATE: Excesso severo, regenerar plano", {
+    totalImplicitFat: implicitFat.toFixed(1),
+    maxAllowed: maxAllowed.toFixed(1),
+    targetFat,
+    ratio: `${(ratio * 100).toFixed(0)}%`,
+    excess: excess.toFixed(1),
+  });
+  
   return {
-    status: "PASS",
-    totalImplicitFat: Math.round(totalImplicitFat * 10) / 10,
+    status: "REGENERATE",
+    totalImplicitFat: Math.round(implicitFat * 10) / 10,
     maxAllowed: Math.round(maxAllowed * 10) / 10,
     ratio: Math.round(ratio * 100) / 100,
+    excess: Math.round(excess * 10) / 10,
+    reason: "Excesso severo de gordura implícita",
   };
+}
+
+/**
+ * Valida a gordura implícita do plano usando a regra G-10 progressiva.
+ * 
+ * @param foods Lista de alimentos com quantidades
+ * @param targetFat Meta de gordura diária
+ */
+export function validateImplicitFat(
+  foods: FoodWithQuantity[],
+  targetFat: number
+): ImplicitFatValidation {
+  const totalImplicitFat = calculateImplicitFat(foods);
+  return classifyImplicitFat(totalImplicitFat, targetFat);
 }
