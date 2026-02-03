@@ -67,6 +67,7 @@ import { FoodBlockRulesManager } from '@/components/admin/FoodBlockRulesManager'
 import { TemplateAnchorPreview } from '@/components/admin/TemplateAnchorPreview';
 import { QuickStartTemplates } from '@/components/admin/QuickStartTemplates';
 import { FeatureFlagsManager } from '@/components/admin/FeatureFlagsManager';
+import { RateLimitsManager } from '@/components/admin/RateLimitsManager';
 
 
 const CHART_COLORS = [
@@ -1986,7 +1987,10 @@ export default function Admin() {
 
           {/* Feature Flags Tab */}
           <TabsContent value="flags">
-            <FeatureFlagsManager />
+            <div className="space-y-6">
+              <FeatureFlagsManager />
+              <RateLimitsManager />
+            </div>
           </TabsContent>
         </Tabs>
       </main>
