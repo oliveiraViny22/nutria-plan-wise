@@ -14,11 +14,10 @@ import {
   KCAL_PER_GRAM,
   REBALANCER_CONTRACT,
 } from "../_shared/nutrition-contracts.ts";
+import { createLogger, logAIUsage, type RebalanceMetrics } from "../_shared/logger.ts";
+import { getCorsHeaders } from "../_shared/security.ts";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+const log = createLogger('ai-rebalance');
 
 // ============================================
 // CONSTANTES OFICIAIS DE VALIDAÇÃO (PATCH FINAL)
@@ -1401,11 +1400,42 @@ function mapGoalToObjective(goal: string | undefined): Objective {
 // ============================================
 
 serve(async (req) => {
+  const corsHeaders = getCorsHeaders(req);
+  const startTime = performance.now();
+  
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
+  // Helper para logar métricas de rebalanceamento
+  // deno-lint-ignore no-explicit-any
+  const logRebalanceMetrics = async (
+    supabaseClient: any,
+    userId: string,
+    metrics: RebalanceMetrics
+  ) => {
+    await logAIUsage(supabaseClient, {
+      userId,
+      functionName: 'ai-rebalance',
+      model: 'internal/rebalancer',
+      success: metrics.status !== 'error' && metrics.status !== 'structurally_invalid',
+      metadata: {
+        iterations: metrics.iterations,
+        convergenceTimeMs: metrics.convergenceTimeMs,
+        status: metrics.status,
+        objective: metrics.objective,
+        g10Status: metrics.g10Status,
+        normalizationApplied: metrics.normalizationApplied,
+        calorieDelta: metrics.calorieDelta,
+        proteinDelta: metrics.proteinDelta,
+        optionsProcessed: metrics.optionsProcessed,
+      },
+    });
+  };
+
   try {
+    log.info("Function started");
+    
     const { planId, targets, goal, g10_status, implicit_fat_ratio, implicit_fat_warning } = await req.json();
 
     if (!planId || !targets) {
@@ -1418,6 +1448,15 @@ serve(async (req) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
+
+    // Obter user_id do plano para logging de métricas
+    const { data: planData } = await supabase
+      .from("diet_plans")
+      .select("user_id")
+      .eq("id", planId)
+      .single();
+    
+    const userId = planData?.user_id as string | null;
 
     // Carregar configurações do admin
     const settings = await loadOptimizerSettings(supabase);
@@ -1767,13 +1806,28 @@ serve(async (req) => {
     };
 
     // Log de resumo
-    console.log(`\n=== RESUMO ===`);
-    console.log(`G-10 Status: ${g10Metadata.g10Status}, Normalization Applied: ${anyNormalizationApplied}`);
-    console.log(`Validação Final: ${finalValidation.status}${finalValidation.note ? ` (${finalValidation.note})` : ''}`);
-    for (const opt of optionResults) {
-      const calDiff = Math.abs(opt.finalTotals.calories - targets.calories);
-      const protDiff = Math.abs(opt.finalTotals.protein - targets.protein);
-      console.log(`Opção ${opt.optionNumber}: Cal ±${calDiff.toFixed(0)}kcal, Prot ±${protDiff.toFixed(1)}g, Convergiu: ${opt.converged}, Norm: ${opt.normalizationApplied}`);
+    log.info("Rebalance complete", {
+      g10Status: g10Metadata.g10Status,
+      normalizationApplied: anyNormalizationApplied,
+      finalValidation: finalValidation.status,
+      note: finalValidation.note,
+      optionsCount: optionResults.length,
+    });
+
+    // Logar métricas de rebalanceamento para análise
+    const convergenceTimeMs = Math.round(performance.now() - startTime);
+    if (userId) {
+      await logRebalanceMetrics(supabase, userId, {
+        iterations: totalIterations,
+        convergenceTimeMs,
+        status,
+        objective,
+        g10Status: g10Metadata.g10Status,
+        normalizationApplied: anyNormalizationApplied,
+        calorieDelta: Math.abs(primaryResult.finalTotals.calories - targets.calories),
+        proteinDelta: Math.abs(primaryResult.finalTotals.protein - targets.protein),
+        optionsProcessed: optionResults.length,
+      });
     }
 
     // Retornar no formato esperado pelo frontend

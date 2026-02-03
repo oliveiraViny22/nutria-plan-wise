@@ -1,36 +1,17 @@
 // =====================================================
 // LOGGER DO GERADOR v5
+// Re-exporta o logger compartilhado com configurações específicas
 // =====================================================
 
-type LogLevel = "debug" | "info" | "warn" | "error";
+import { createLogger, type LogContext } from "../_shared/logger.ts";
 
-// Em produção, só loga info, warn e error
-// Em desenvolvimento, loga tudo
-const IS_PRODUCTION = Deno.env.get("DENO_ENV") === "production";
-const MIN_LEVEL: LogLevel = IS_PRODUCTION ? "info" : "debug";
+// Criar instância do logger para o gerador v5
+const logger = createLogger('generate-meal-plan-v5');
 
-const LEVEL_ORDER: Record<LogLevel, number> = {
-  debug: 0,
-  info: 1,
-  warn: 2,
-  error: 3,
-};
-
-function shouldLog(level: LogLevel): boolean {
-  return LEVEL_ORDER[level] >= LEVEL_ORDER[MIN_LEVEL];
-}
-
-export function log(step: string, data?: unknown, level: LogLevel = "info"): void {
-  if (!shouldLog(level)) return;
-  
-  const timestamp = new Date().toISOString();
-  const prefix = `[GEN-V5] ${timestamp} | ${step}`;
-  
-  if (data) {
-    console.log(prefix, JSON.stringify(data));
-  } else {
-    console.log(prefix);
-  }
+// Re-exportar com assinaturas compatíveis
+export function log(step: string, data?: unknown, level: "debug" | "info" | "warn" | "error" = "info"): void {
+  const context = data ? (typeof data === 'object' ? data as LogContext : { data }) : undefined;
+  logger[level](`[${step}]`, context);
 }
 
 export function logDebug(step: string, data?: unknown): void {
