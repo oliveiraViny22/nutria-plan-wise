@@ -46,6 +46,66 @@ export const CATEGORY_QUANTITY_LIMITS: Record<string, { min: number; max: number
   oleaginosas: { min: 10, max: 30 },
 };
 
+// =====================================================
+// LIMITES ESPECÍFICOS PARA LANCHES (v5.8)
+// =====================================================
+
+export const SNACK_QUANTITY_LIMITS: Record<string, { min: number; max: number }> = {
+  frutas: { min: 80, max: 150 },    // Reduzido de 200 para 150
+  proteinas: { min: 20, max: 50 },  // Proteínas leves apenas
+  laticinios: { min: 100, max: 200 },
+  gorduras: { min: 5, max: 15 },
+  oleaginosas: { min: 10, max: 25 },
+};
+
+// =====================================================
+// ALIMENTOS BLOQUEADOS PARA LANCHES (v5.8)
+// =====================================================
+
+/** 
+ * Proteínas que NÃO são adequadas para lanches.
+ * Frutos do mar, carnes que requerem preparo elaborado.
+ */
+export const BLOCKED_SNACK_PROTEINS = [
+  "camarão",
+  "atum",
+  "salmão",
+  "sardinha",
+  "tilápia",
+  "peixe",
+  "bacalhau",
+  "lagosta",
+  "caranguejo",
+  "lula",
+  "polvo",
+  "mexilhão",
+  "ostra",
+  "filé mignon",
+  "alcatra",
+  "picanha",
+  "costela",
+  "lombo",
+  "patinho",
+  "coxão",
+];
+
+/**
+ * Proteínas PERMITIDAS para lanches - práticas e fáceis de consumir.
+ */
+export const ALLOWED_SNACK_PROTEINS = [
+  "iogurte",
+  "cottage",
+  "ricota",
+  "queijo minas",
+  "ovo",
+  "clara",
+  "peito de peru",
+  "blanquet",
+  "presunto de peru",
+  "frango desfiado",
+  "whey",
+];
+
 export const CATEGORY_SCALE_LIMITS: Record<string, { min: number; max: number }> = {
   proteinas: { min: 50, max: 350 },
   carboidratos: { min: 50, max: 400 },
