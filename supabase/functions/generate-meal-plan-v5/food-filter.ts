@@ -11,6 +11,9 @@ import {
   HIGH_FAT_PROTEIN_RULES,
   MAX_HIGH_FAT_PROTEIN_PORTION,
   MAX_FAT_SHARE_PER_FOOD,
+  LEAN_DAIRY_RULES,
+  HIGH_FAT_DAIRY_THRESHOLD,
+  MAX_HIGH_FAT_DAIRY_PORTION,
 } from "./constants.ts";
 import { logDebug, logWarn } from "./logger.ts";
 import {
@@ -60,6 +63,35 @@ export function isHighFatProtein(food: Food): boolean {
     food.fat > food.protein || // gordura domina a proteína
     food.calories >= HIGH_FAT_PROTEIN_RULES.CALORIES_PER_100G
   );
+}
+
+// =====================================================
+// CLASSIFICAÇÃO DE LATICÍNIOS (v5.2)
+// =====================================================
+
+/**
+ * Verifica se um alimento é um laticínio magro elegível como base.
+ * Critério: baixa gordura e calorias controladas.
+ */
+export function isLeanDairy(food: Food): boolean {
+  const category = (food.category || "").toLowerCase();
+  if (category !== "laticinios") return false;
+  
+  return (
+    food.fat <= LEAN_DAIRY_RULES.MAX_FAT_PER_100G &&
+    food.calories <= LEAN_DAIRY_RULES.MAX_CALORIES_PER_100G
+  );
+}
+
+/**
+ * Verifica se um alimento é um laticínio com alta gordura.
+ * Critério: gordura acima do threshold (queijos amarelos, requeijão integral).
+ */
+export function isHighFatDairy(food: Food): boolean {
+  const category = (food.category || "").toLowerCase();
+  if (category !== "laticinios") return false;
+  
+  return food.fat >= HIGH_FAT_DAIRY_THRESHOLD;
 }
 
 /**
@@ -180,10 +212,19 @@ function requiresLeanProtein(roleName: string): boolean {
 }
 
 /**
+ * Verifica se um papel é de laticínio.
+ */
+function isDairyRole(roleName: string): boolean {
+  return roleName.toLowerCase().includes("laticinio") || 
+         roleName.toLowerCase().includes("laticinios");
+}
+
+/**
  * Seleciona um alimento para um papel usando seleção ponderada.
  * Prioriza alimentos preferidos E que melhor preenchem déficits de macros.
  * 
  * v5.1: Papéis de proteína base exigem proteínas magras.
+ * v5.2: Papéis de laticínio preferem laticínios magros.
  */
 export function selectFoodForRole(
   role: TemplateRole,
@@ -194,6 +235,7 @@ export function selectFoodForRole(
 ): Food | null {
   const preferredSet = new Set(preferredFoods.map((p) => p.toLowerCase()));
   const isProteinBaseRole = requiresLeanProtein(role.role_name);
+  const isLaticinioRole = isDairyRole(role.role_name);
 
   // Filtrar por categorias do papel
   let candidates = eligibleFoods.filter((f) => {
@@ -221,6 +263,18 @@ export function selectFoodForRole(
       }
     }
     
+    // v5.2: Papéis de laticínio bloqueiam laticínios muito gordos como primeira escolha
+    if (isLaticinioRole && cat === "laticinios") {
+      // Bloquear laticínios muito gordos como primeira seleção
+      if (isHighFatDairy(f)) {
+        logDebug("Bloqueando laticínio gordo como primeira escolha", {
+          name: f.name,
+          fat: f.fat,
+        });
+        return false;
+      }
+    }
+    
     return true;
   });
 
@@ -234,6 +288,17 @@ export function selectFoodForRole(
         if (!role.categories.includes(cat)) return false;
         // Ainda bloquear as muito gordas
         if (cat === "proteinas" && isHighFatProtein(f)) return false;
+        return true;
+      });
+    }
+    
+    // Fallback para laticínios: aceitar gordos mas com log
+    if (isLaticinioRole) {
+      logWarn("Nenhum laticínio magro disponível, usando fallback com laticínio gordo");
+      candidates = eligibleFoods.filter((f) => {
+        if (usedFoodIds.has(f.id)) return false;
+        const cat = (f.category || "").toLowerCase();
+        if (!role.categories.includes(cat)) return false;
         return true;
       });
     }
@@ -344,6 +409,12 @@ export function calculateSmartQuantity(
     logDebug("Limitando porção de alimento gorduroso", { name: food.name, max });
   }
   
+  // v5.2: Laticínios gordos têm limite de porção
+  if (isHighFatDairy(food)) {
+    max = Math.min(max, MAX_HIGH_FAT_DAIRY_PORTION);
+    logDebug("Limitando porção de laticínio gordo", { name: food.name, max });
+  }
+  
   // Clampar e arredondar
   targetGrams = Math.max(min, Math.min(max, targetGrams));
   return Math.round(targetGrams / 5) * 5;
@@ -354,6 +425,7 @@ export function calculateSmartQuantity(
  * Mantida para compatibilidade - usar calculateSmartQuantity quando possível.
  * 
  * v5.1: Limita porções de proteínas gordas.
+ * v5.2: Limita porções de laticínios gordos.
  */
 export function calculateApproximateQuantity(role: TemplateRole, food?: Food): number {
   let mid = (role.min_quantity_grams + role.max_quantity_grams) / 2;
@@ -384,6 +456,16 @@ export function calculateApproximateQuantity(role: TemplateRole, food?: Food): n
         max,
         fat: food.fat,
         protein: food.protein 
+      });
+    }
+    
+    // v5.2: Laticínios gordos têm limite de porção (queijos amarelos)
+    if (isHighFatDairy(food)) {
+      max = Math.min(max, MAX_HIGH_FAT_DAIRY_PORTION);
+      logDebug("Limitando porção de laticínio gordo", { 
+        name: food.name, 
+        max,
+        fat: food.fat 
       });
     }
     
