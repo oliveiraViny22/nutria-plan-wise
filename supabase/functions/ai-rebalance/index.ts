@@ -71,8 +71,8 @@ interface FoodWithMeta extends MealOptionFood {
 }
 
 interface Adjustment {
-  nutrient: "calories" | "protein" | "carbs" | "fat";
-  action: "increase" | "decrease";
+  nutrient: "calories" | "protein" | "carbs" | "fat" | "structure";
+  action: "increase" | "decrease" | "implicit_reduction" | "warning";
   delta: string;
 }
 
@@ -764,12 +764,128 @@ function runCorrectionPipeline(
     }
 
     // ==========================================
+    // ETAPA 4.5: NORMALIZAÇÃO DE GORDURA IMPLÍCITA
+    // ==========================================
+    // Corrige excesso de gordura proveniente de fontes mistas (proteína + gordura)
+    // ANTES de qualquer tentativa de adicionar gordura (Etapa 5).
+    // Esta etapa NUNCA adiciona gordura - apenas reduz ou substitui.
+    
+    const preNormalizationTotals = calculateTotals(foods, quantities);
+    const preNormalizationPercents = calculatePercents(preNormalizationTotals, targets);
+    
+    const shouldRunNormalization = 
+      preNormalizationPercents.fat > 110 || 
+      preNormalizationPercents.calories > 105 ||
+      (preNormalizationPercents.protein >= 95 && 
+       preNormalizationPercents.carbs >= 90 && 
+       preNormalizationPercents.carbs <= 110 &&
+       preNormalizationPercents.fat > 100);
+    
+    if (shouldRunNormalization) {
+      console.log(`[ETAPA 4.5] Iniciando normalização de gordura implícita`);
+      console.log(`[ETAPA 4.5] Estado atual: Gordura ${preNormalizationPercents.fat.toFixed(1)}%, Calorias ${preNormalizationPercents.calories.toFixed(1)}%`);
+      
+      // Identificar fontes mistas de alta densidade lipídica
+      // Critério: ≥8g gordura/100g E ≥15g proteína/100g
+      const mixedFatSources = foods.filter(f => {
+        const contrib = contributions.get(f.id)!;
+        return contrib.fat >= 8 && contrib.protein >= 15;
+      });
+      
+      console.log(`[ETAPA 4.5] Fontes mistas identificadas: ${mixedFatSources.length}`);
+      
+      if (mixedFatSources.length > 0) {
+        // Ordenar por densidade de gordura (maior primeiro)
+        mixedFatSources.sort((a, b) => {
+          const contribA = contributions.get(a.id)!;
+          const contribB = contributions.get(b.id)!;
+          return contribB.fat - contribA.fat;
+        });
+        
+        // Calcular excesso de gordura a corrigir
+        const fatExcessGrams = preNormalizationTotals.fat - targets.fat;
+        let remainingExcess = fatExcessGrams;
+        
+        // ESTRATÉGIA A: Redução de porção (preservando proteína mínima)
+        for (const food of mixedFatSources) {
+          if (remainingExcess <= 2) break;
+          
+          const contrib = contributions.get(food.id)!;
+          const currentGrams = quantities.get(food.id) || food.quantity_grams;
+          const limits = getCategoryLimits(food.food.category);
+          
+          // Calcular quanto podemos reduzir mantendo proteína
+          // Usar limite mínimo ou 60% da quantidade atual (o que for maior)
+          const minToKeep = Math.max(limits.min, currentGrams * 0.6);
+          const maxReduction = currentGrams - minToKeep;
+          
+          if (maxReduction < 5) continue;
+          
+          // Calcular redução necessária para remover gordura
+          const fatPerGram = contrib.fat / 100;
+          const proteinPerGram = contrib.protein / 100;
+          const gramsToRemoveForFat = remainingExcess / fatPerGram;
+          const actualReduction = Math.min(gramsToRemoveForFat, maxReduction);
+          
+          if (actualReduction < 5) continue;
+          
+          // Verificar se proteína total não cairá abaixo de 95%
+          const proteinLost = actualReduction * proteinPerGram;
+          const newProteinTotal = preNormalizationTotals.protein - proteinLost;
+          const newProteinPercent = (newProteinTotal / targets.protein) * 100;
+          
+          if (newProteinPercent < 95) {
+            console.log(`[ETAPA 4.5] Pulando ${food.food.name} - reduziria proteína para ${newProteinPercent.toFixed(1)}%`);
+            continue;
+          }
+          
+          const newGrams = Math.round(currentGrams - actualReduction);
+          quantities.set(food.id, newGrams);
+          
+          const fatRemoved = actualReduction * fatPerGram;
+          remainingExcess -= fatRemoved;
+          
+          console.log(`[ETAPA 4.5] Estratégia A: -${Math.round(actualReduction)}g ${food.food.name} (-${fatRemoved.toFixed(1)}g gordura, -${(actualReduction * proteinPerGram).toFixed(1)}g proteína)`);
+          
+          adjustments.push({
+            nutrient: "fat",
+            action: "implicit_reduction",
+            delta: `-${Math.round(actualReduction)}g ${food.food.name}`,
+          });
+        }
+        
+        // Recalcular após ajustes
+        const afterNormalization = calculateTotals(foods, quantities);
+        const afterNormPercents = calculatePercents(afterNormalization, targets);
+        
+        console.log(`[ETAPA 4.5] Resultado: Gordura ${afterNormPercents.fat.toFixed(1)}%, Calorias ${afterNormPercents.calories.toFixed(1)}%`);
+        
+        // VALIDAÇÃO: Se ainda excede limites, marcar como estruturalmente inválido
+        if (afterNormPercents.fat > 110 || afterNormPercents.calories > 105) {
+          console.warn(`[ETAPA 4.5] STATUS: STRUCTURALLY_INVALID - Excesso de gordura de fontes mistas`);
+          console.warn(`[ETAPA 4.5] REASON: Excess fat from mixed protein sources`);
+          console.warn(`[ETAPA 4.5] ACTION: Consider regenerating plan with leaner protein sources`);
+          // Adicionar flag para o frontend
+          adjustments.push({
+            nutrient: "structure",
+            action: "warning",
+            delta: "STRUCTURALLY_INVALID: Fontes proteicas com alto teor de gordura",
+          });
+        }
+      } else {
+        console.log(`[ETAPA 4.5] Nenhuma fonte mista encontrada - prosseguindo`);
+      }
+    } else {
+      console.log(`[ETAPA 4.5] Condições não atingidas - pulando normalização`);
+    }
+
+    // ==========================================
     // ETAPA 5: ADIÇÃO DE GORDURA (CONDICIONAL)
     // ==========================================
     // Gordura SÓ pode ser adicionada se TODAS as condições forem atendidas:
     // - Proteína ≥ 95% da meta
     // - Carboidratos entre 90% e 110% da meta
-    // - Calorias totais < 95% da meta
+    // - Calorias totais <= 95% da meta
     // - Não há mais ajuste possível em proteína ou carbs
     const afterFatReduction = calculateTotals(foods, quantities);
     const afterFatPercents = calculatePercents(afterFatReduction, targets);
