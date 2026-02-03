@@ -492,57 +492,49 @@ export default function MealPlanPage() {
 
                   <CollapsibleContent className="print:!block">
                     <CardContent className="pt-0">
-                      <Tabs defaultValue="1" className="w-full">
-                        <TabsList className="grid w-full print:hidden" style={{ gridTemplateColumns: `repeat(${meal.meal_options.length}, 1fr)` }}>
-                          {meal.meal_options.map(opt => (
-                            <TabsTrigger key={opt.id} value={opt.option_number.toString()}>
-                              Opção {opt.option_number}
-                            </TabsTrigger>
-                          ))}
-                        </TabsList>
-
+                      {/* Grid layout para exibir opções lado a lado */}
+                      <div className={`grid gap-4 ${
+                        meal.meal_options.length === 1 ? 'grid-cols-1' :
+                        meal.meal_options.length === 2 ? 'grid-cols-1 md:grid-cols-2' :
+                        'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
+                      }`}>
                         {meal.meal_options.map(option => (
-                          <TabsContent key={option.id} value={option.option_number.toString()} className="print:!block print:!opacity-100">
-                            {/* Print label for option */}
-                            <div className="hidden print:block print:font-medium print:text-sm print:mb-2">
-                              Opção {option.option_number}
+                          <div key={option.id} className="p-4 rounded-lg bg-muted/30 border border-border/50">
+                            {/* Header da opção */}
+                            <div className="flex items-center justify-between mb-3">
+                              <span className="font-medium text-sm">Opção {option.option_number}</span>
+                              <Badge variant="outline" className="text-[10px] bg-primary/10">
+                                {option.total_calories || 0} kcal
+                              </Badge>
                             </div>
                             
                             {/* Macros summary */}
-                            <div className="flex flex-wrap gap-3 mb-3 text-xs">
-                              <Badge variant="outline" className="bg-amber-500/10">
-                                {option.total_calories || 0} kcal
-                              </Badge>
-                              <Badge variant="outline" className="bg-blue-500/10">
+                            <div className="flex flex-wrap gap-2 mb-3 text-xs">
+                              <Badge variant="outline" className="bg-blue-500/10 text-[10px]">
                                 P: {option.total_protein || 0}g
                               </Badge>
-                              <Badge variant="outline" className="bg-yellow-500/10">
+                              <Badge variant="outline" className="bg-yellow-500/10 text-[10px]">
                                 C: {option.total_carbs || 0}g
                               </Badge>
-                              <Badge variant="outline" className="bg-orange-500/10">
+                              <Badge variant="outline" className="bg-orange-500/10 text-[10px]">
                                 G: {option.total_fat || 0}g
                               </Badge>
                             </div>
 
                             {/* Foods list */}
-                            <div className="space-y-2">
+                            <div className="space-y-1.5">
                               {option.meal_option_foods.map(mof => (
-                                <div key={mof.id} className="flex items-center justify-between py-2 border-b border-border/50 last:border-0">
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-sm font-medium">{mof.food.name}</span>
-                                    <Badge variant="secondary" className="text-[10px]">
-                                      {mof.food.category}
-                                    </Badge>
-                                  </div>
-                                  <span className="text-sm text-muted-foreground">
+                                <div key={mof.id} className="flex items-center justify-between py-1 border-b border-border/30 last:border-0">
+                                  <span className="text-xs font-medium truncate flex-1 mr-2">{mof.food.name}</span>
+                                  <span className="text-xs text-muted-foreground whitespace-nowrap">
                                     {formatQuantity(mof.quantity_grams, mof.display_quantity, mof.display_unit)}
                                   </span>
                                 </div>
                               ))}
                             </div>
-                          </TabsContent>
+                          </div>
                         ))}
-                      </Tabs>
+                      </div>
                     </CardContent>
                   </CollapsibleContent>
                 </Collapsible>
