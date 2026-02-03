@@ -453,11 +453,11 @@ export default function MealPlanPage() {
           </CardContent>
         </Card>
 
-        {/* Meals Section */}
-        <section>
+        {/* Meals Section - Página 1 do PDF */}
+        <section className="print-page-1">
           <div className="flex items-center gap-2 mb-4">
-            <Utensils className="w-5 h-5 text-primary" />
-            <h2 className="text-xl font-semibold">Refeições do Dia</h2>
+            <Utensils className="w-5 h-5 text-primary print:w-4 print:h-4" />
+            <h2 className="text-xl font-semibold print:text-lg">Refeições do Dia</h2>
           </div>
 
           <div className="space-y-4">
@@ -543,14 +543,14 @@ export default function MealPlanPage() {
           </div>
         </section>
 
-        {/* Supplements Section - Toggle always visible */}
         <Separator className="print:hidden" />
 
-        <section className="print:break-before-page">
+        {/* Supplements Section - Página 2 do PDF */}
+        <section className="print-page-2 print:break-before-page">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
-              <Pill className="w-5 h-5 text-purple-500" />
-              <h2 className="text-xl font-semibold">Suplementação Recomendada</h2>
+              <Pill className="w-5 h-5 text-purple-500 print:w-4 print:h-4" />
+              <h2 className="text-xl font-semibold print:text-lg">Suplementação Recomendada</h2>
             </div>
             <div className="flex items-center gap-2 print:hidden">
               <Label htmlFor="supplements-toggle" className="text-sm text-muted-foreground cursor-pointer">
@@ -646,12 +646,13 @@ export default function MealPlanPage() {
         </div>
       </main>
 
-      {/* Print styles */}
+      {/* Print styles - Otimizado para 2 páginas A4 */}
       <style>{`
         @media print {
           body {
             -webkit-print-color-adjust: exact;
             print-color-adjust: exact;
+            font-size: 10px;
           }
           .print\\:hidden {
             display: none !important;
@@ -666,7 +667,107 @@ export default function MealPlanPage() {
             break-before: page;
           }
           @page {
-            margin: 1.5cm;
+            margin: 0.8cm 1cm;
+            size: A4;
+          }
+          /* Página 1: Plano alimentar - forçar quebra após */
+          .print-page-1 {
+            page-break-after: always;
+          }
+          /* Página 2: Suplementação e dicas */
+          .print-page-2 {
+            page-break-before: always;
+          }
+          /* Cards de refeição mais compactos */
+          .grid {
+            gap: 0.4rem !important;
+          }
+          /* Forçar 3 colunas para opções na impressão */
+          [class*="grid-cols"] {
+            grid-template-columns: repeat(3, 1fr) !important;
+          }
+          /* Fontes menores para caber */
+          .text-xl {
+            font-size: 14px !important;
+          }
+          .text-lg {
+            font-size: 12px !important;
+          }
+          .text-base {
+            font-size: 11px !important;
+          }
+          .text-sm {
+            font-size: 9px !important;
+          }
+          .text-xs {
+            font-size: 8px !important;
+          }
+          .text-\\[10px\\], .text-\\[8px\\] {
+            font-size: 7px !important;
+          }
+          /* Padding compacto */
+          .p-4, .pt-6, .pt-4 {
+            padding: 0.4rem !important;
+          }
+          .p-3, .py-3 {
+            padding: 0.3rem !important;
+          }
+          .p-2, .py-2 {
+            padding: 0.2rem !important;
+          }
+          /* Espaçamento reduzido */
+          .space-y-4 > * + *, .space-y-3 > * + * {
+            margin-top: 0.3rem !important;
+          }
+          .space-y-8 > * + * {
+            margin-top: 0.6rem !important;
+          }
+          .space-y-2 > * + *, .space-y-1\\.5 > * + * {
+            margin-top: 0.15rem !important;
+          }
+          .gap-4, .gap-3 {
+            gap: 0.3rem !important;
+          }
+          .gap-2 {
+            gap: 0.2rem !important;
+          }
+          .mb-4, .mb-3 {
+            margin-bottom: 0.3rem !important;
+          }
+          /* Resumo diário compacto */
+          .grid-cols-4, .md\\:grid-cols-4 {
+            grid-template-columns: repeat(4, 1fr) !important;
+            gap: 0.25rem !important;
+          }
+          /* Cards de refeição */
+          .rounded-lg {
+            border-radius: 4px !important;
+          }
+          /* Badges menores */
+          .rounded-full {
+            padding: 0.1rem 0.3rem !important;
+          }
+          /* Ocultar elementos desnecessários na impressão */
+          .print\\:hidden, button, [role="button"] {
+            display: none !important;
+          }
+          /* Header da refeição */
+          .w-8.h-8 {
+            width: 1.25rem !important;
+            height: 1.25rem !important;
+          }
+          .w-10.h-10 {
+            width: 1.5rem !important;
+            height: 1.5rem !important;
+          }
+          /* Collapsibles sempre abertos na impressão */
+          [data-state="closed"] {
+            display: block !important;
+          }
+          [data-state="closed"] > * {
+            display: block !important;
+            visibility: visible !important;
+            height: auto !important;
           }
         }
       `}</style>
