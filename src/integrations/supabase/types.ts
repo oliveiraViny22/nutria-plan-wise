@@ -1227,6 +1227,14 @@ export type Database = {
         }[]
       }
       generate_canonical_name: { Args: { food_name: string }; Returns: string }
+      get_feature_flag: {
+        Args: { _default_value?: boolean; _flag_key: string }
+        Returns: boolean
+      }
+      get_rollout_percent: {
+        Args: { _default_value?: number; _flag_key: string }
+        Returns: number
+      }
       get_usage_info: {
         Args: { _feature: string; _user_id: string }
         Returns: {
@@ -1293,6 +1301,10 @@ export type Database = {
       }
       increment_usage: {
         Args: { _feature: string; _user_id: string }
+        Returns: boolean
+      }
+      is_in_rollout: {
+        Args: { _flag_key: string; _user_id: string }
         Returns: boolean
       }
       remove_accents: { Args: { input_text: string }; Returns: string }
