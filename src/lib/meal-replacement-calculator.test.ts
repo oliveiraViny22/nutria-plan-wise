@@ -231,4 +231,125 @@ describe('meal-replacement-calculator', () => {
       expect(getAccuracyStatus(150).label).toBe('Acima');
     });
   });
+
+  describe('Cenários Extremos', () => {
+    it('deve lidar com 0g de proteína alvo', () => {
+      const target: MacroTarget = { calories: 300, protein: 0, carbs: 60, fat: 8 };
+      const result = calculateMealReplacement(target, 'maintain');
+      
+      // Não deve adicionar whey quando não precisa de proteína
+      const hasWhey = result.items.some(i => i.name.includes('Whey'));
+      expect(hasWhey).toBe(false);
+      
+      // Deve focar em carboidratos e gorduras
+      expect(result.totalMacros.carbs).toBeGreaterThan(0);
+    });
+
+    it('deve lidar com 0g de gordura alvo', () => {
+      const target: MacroTarget = { calories: 350, protein: 30, carbs: 50, fat: 0 };
+      const result = calculateMealReplacement(target, 'lose_weight');
+      
+      // Não deve adicionar oleaginosas quando não precisa de gordura
+      const hasFatSource = result.items.some(i => 
+        ['Pasta de Amendoim Integral', 'Castanha de Caju', 'Nozes', 'Amêndoas'].includes(i.name)
+      );
+      expect(hasFatSource).toBe(false);
+      
+      // Deve ter proteína adequada
+      expect(result.totalMacros.protein).toBeGreaterThan(15);
+    });
+
+    it('deve lidar com 0g de carboidrato alvo', () => {
+      const target: MacroTarget = { calories: 300, protein: 35, carbs: 0, fat: 12 };
+      const result = calculateMealReplacement(target, 'lose_weight');
+      
+      // Não deve adicionar banana/aveia quando não precisa de carbs
+      const hasCarbSource = result.items.some(i => 
+        ['Banana', 'Aveia em Flocos', 'Mel'].includes(i.name)
+      );
+      expect(hasCarbSource).toBe(false);
+    });
+
+    it('deve lidar com refeição muito pequena (< 150 kcal)', () => {
+      const target: MacroTarget = { calories: 120, protein: 15, carbs: 5, fat: 3 };
+      const result = calculateMealReplacement(target, 'lose_weight');
+      
+      // Deve retornar algo mesmo com calorias muito baixas
+      expect(result.items.length).toBeGreaterThan(0);
+      
+      // Não deve exceder muito as calorias
+      expect(result.accuracy.calories).toBeLessThanOrEqual(150);
+    });
+
+    it('deve lidar com refeição muito grande (> 800 kcal)', () => {
+      const target: MacroTarget = { calories: 900, protein: 50, carbs: 100, fat: 30 };
+      const result = calculateMealReplacement(target, 'gain_muscle');
+      
+      // Deve ter múltiplos itens para atingir metas altas
+      expect(result.items.length).toBeGreaterThanOrEqual(3);
+      
+      // Deve atingir pelo menos 70% das calorias
+      expect(result.accuracy.calories).toBeGreaterThanOrEqual(70);
+    });
+
+    it('deve lidar com proteína muito alta (> 50g)', () => {
+      const target: MacroTarget = { calories: 500, protein: 60, carbs: 30, fat: 12 };
+      const result = calculateMealReplacement(target, 'gain_muscle');
+      
+      // Deve ter whey para atingir proteína alta
+      const hasWhey = result.items.some(i => i.name.includes('Whey'));
+      expect(hasWhey).toBe(true);
+      
+      // Deve atingir pelo menos 60% da proteína alvo
+      expect(result.totalMacros.protein).toBeGreaterThanOrEqual(36);
+    });
+
+    it('deve lidar com proporção extrema de macros (90% carboidrato)', () => {
+      const target: MacroTarget = { calories: 400, protein: 5, carbs: 90, fat: 3 };
+      const result = calculateMealReplacement(target, 'maintain');
+      
+      // Deve ter fonte de carboidrato
+      const hasCarbSource = result.items.some(i => 
+        ['Banana', 'Aveia em Flocos', 'Mel', 'Batata Doce'].includes(i.name)
+      );
+      expect(hasCarbSource).toBe(true);
+    });
+
+    it('deve lidar com proporção extrema de macros (70% gordura)', () => {
+      const target: MacroTarget = { calories: 400, protein: 10, carbs: 10, fat: 35 };
+      const result = calculateMealReplacement(target, 'maintain');
+      
+      // Deve ter fonte de gordura
+      const hasFatSource = result.items.some(i => 
+        ['Pasta de Amendoim Integral', 'Castanha de Caju', 'Nozes', 'Amêndoas', 'Abacate'].includes(i.name)
+      );
+      expect(hasFatSource).toBe(true);
+    });
+
+    it('deve garantir consistência entre múltiplas execuções', () => {
+      const target: MacroTarget = { calories: 400, protein: 25, carbs: 40, fat: 12 };
+      
+      const result1 = calculateMealReplacement(target, 'maintain');
+      const result2 = calculateMealReplacement(target, 'maintain');
+      
+      // Mesmos inputs devem gerar mesmos outputs
+      expect(result1.items.length).toBe(result2.items.length);
+      expect(result1.totalMacros.calories).toBe(result2.totalMacros.calories);
+    });
+
+    it('deve retornar justificativas para todos os líquidos', () => {
+      const target: MacroTarget = { calories: 400, protein: 25, carbs: 40, fat: 12 };
+      const result = calculateMealReplacement(target, 'maintain');
+      
+      const liquidItems = result.items.filter(i => 
+        ['Leite Desnatado', 'Leite Integral', 'Leite de Amêndoas', 'Água'].includes(i.name)
+      );
+      
+      // Todos os líquidos devem ter justificativa
+      liquidItems.forEach(liquid => {
+        expect(liquid.reason).toBeDefined();
+        expect(liquid.reason!.length).toBeGreaterThan(10);
+      });
+    });
+  });
 });
