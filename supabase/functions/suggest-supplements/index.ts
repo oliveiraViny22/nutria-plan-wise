@@ -1,3 +1,16 @@
+// ============================================================
+// EDGE FUNCTION: SUGESTÃO INTELIGENTE DE SUPLEMENTAÇÃO v2
+// ============================================================
+// Modos:
+// - complement: Sugestões complementares (não afetam macros)
+// - replacement: Substituição de refeição pulada (tem macros)
+//
+// Regras:
+// - Suplementos de dose única (creatina, vitaminas) apenas 1x/dia
+// - Suplementos contextuais (pré-treino, BCAA) não sugeridos
+// - Substituição apenas quando mealSkipped=true
+// ============================================================
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const corsHeaders = {
@@ -10,27 +23,30 @@ interface SupplementRequest {
   goal: string;
   dailyCalories?: number;
   proteinTarget?: number;
+  mealSkipped?: boolean; // NOVO: Indica se a refeição foi pulada
+  alreadySuggestedToday?: string[]; // NOVO: Suplementos já sugeridos hoje
 }
 
-interface Supplement {
-  name: string;
-  dosage: string;
-  timing: string;
-  benefit: string;
-  priority: 'essential' | 'recommended' | 'optional';
-}
+// Suplementos de dose única (não repetir no dia)
+const SINGLE_DAILY_SUPPLEMENTS = [
+  'creatina', 'multivitamínico', 'vitamina d', 'ômega-3', 'zinco', 'magnésio', 'vitamina b12', 'ferro'
+];
 
-interface SupplementSuggestion {
-  mealType: string;
-  supplements: Supplement[];
-  reasoning: string;
-}
+// Mapeamento de refeição preferida para suplementos de dose única
+const SINGLE_DOSE_MEALS: Record<string, string[]> = {
+  creatina: ['breakfast', 'lunch'],
+  multivitamínico: ['breakfast'],
+  'vitamina d': ['breakfast', 'lunch'],
+  'ômega-3': ['lunch', 'dinner'],
+  zinco: ['dinner', 'supper'],
+  magnésio: ['dinner', 'supper'],
+};
 
 // Goal mapping for Portuguese
 const GOAL_MAP: Record<string, string> = {
-  'lose_weight': 'perda de peso',
+  'lose_weight': 'perda de peso (cutting)',
   'maintain': 'manutenção',
-  'gain_muscle': 'ganho de massa muscular',
+  'gain_muscle': 'ganho de massa muscular (bulking)',
 };
 
 // Meal type mapping
@@ -49,7 +65,14 @@ serve(async (req) => {
   }
 
   try {
-    const { mealType, goal, dailyCalories, proteinTarget } = await req.json() as SupplementRequest;
+    const { 
+      mealType, 
+      goal, 
+      dailyCalories, 
+      proteinTarget,
+      mealSkipped = false,
+      alreadySuggestedToday = [],
+    } = await req.json() as SupplementRequest;
     
     if (!goal || !mealType) {
       return new Response(
@@ -65,31 +88,114 @@ serve(async (req) => {
 
     const goalText = GOAL_MAP[goal] || goal;
     const mealText = MEAL_MAP[mealType] || mealType;
+    const mode = mealSkipped ? 'replacement' : 'complement';
 
-    const systemPrompt = `Você é um nutricionista especializado em suplementação esportiva e nutricional.
-Sua tarefa é sugerir suplementos adequados para o contexto informado.
+    // Determinar quais suplementos de dose única podem ser sugeridos nesta refeição
+    const eligibleSingleDose: string[] = [];
+    for (const [supp, preferredMeals] of Object.entries(SINGLE_DOSE_MEALS)) {
+      const alreadySuggested = alreadySuggestedToday.some(s => 
+        s.toLowerCase().includes(supp) || supp.includes(s.toLowerCase())
+      );
+      if (!alreadySuggested && preferredMeals.includes(mealType)) {
+        eligibleSingleDose.push(supp);
+      }
+    }
 
-REGRAS IMPORTANTES:
-1. Sugira apenas suplementos seguros e baseados em evidências científicas
-2. Considere o horário da refeição para timing de suplementação
-3. Não sugira mais de 3 suplementos por refeição
-4. Priorize suplementos essenciais antes dos opcionais
-5. Dosagens devem ser conservadoras e seguras
-6. Suplementos devem COMPLEMENTAR a alimentação, não substituí-la
+    // Construir prompt baseado no modo
+    let systemPrompt = '';
+    let userPrompt = '';
+
+    if (mode === 'replacement') {
+      // MODO SUBSTITUIÇÃO: Refeição pulada
+      systemPrompt = `Você é um nutricionista especializado em suplementação. 
+O usuário PULOU uma refeição e precisa de suplementos para compensar.
+
+REGRAS CRÍTICAS:
+1. Sugira APENAS suplementos proteicos/calóricos que compensem a refeição perdida
+2. Inclua os MACROS de cada suplemento sugerido
+3. Máximo 2 suplementos de substituição
+4. Foque em: Whey Protein, Caseína, Hipercalórico, Albumina
+5. NÃO sugira vitaminas, creatina ou suplementos sem calorias
+6. A soma dos macros deve aproximar o que seria consumido na refeição`;
+
+      userPrompt = `O usuário PULOU a refeição: ${mealText}
+
+Contexto:
+- Objetivo: ${goalText}
+${dailyCalories ? `- Calorias diárias totais: ${dailyCalories} kcal` : ''}
+${proteinTarget ? `- Meta de proteína diária: ${proteinTarget}g` : ''}
+
+Sugira suplementos proteicos para SUBSTITUIR esta refeição perdida.
+Inclua os macros (calorias, proteína, carboidratos, gordura) de cada suplemento.`;
+
+    } else {
+      // MODO COMPLEMENTO: Sugestões sem impacto calórico
+      systemPrompt = `Você é um nutricionista especializado em suplementação.
+Sua tarefa é sugerir suplementos COMPLEMENTARES que NÃO afetam as calorias do plano.
+
+REGRAS CRÍTICAS:
+1. NÃO sugira whey, hipercalórico ou qualquer suplemento calórico
+2. Foque em suplementos de dose única: vitaminas, minerais, creatina, ômega-3
+3. Máximo 2 suplementos por refeição
+4. APENAS sugira creatina se "${mealType}" for "breakfast" ou "lunch"
+5. APENAS sugira magnésio/zinco se "${mealType}" for "dinner" ou "supper"
+6. NÃO repita suplementos já sugeridos hoje: [${alreadySuggestedToday.join(', ')}]
+7. NÃO sugira BCAA, pré-treino ou suplementos de treino (são contextuais)
+
+SUPLEMENTOS ELEGÍVEIS para ${mealText}: ${eligibleSingleDose.length > 0 ? eligibleSingleDose.join(', ') : 'Nenhum de dose única disponível'}
 
 PRIORIDADES:
-- essential: Suplementos com forte evidência científica para o objetivo
-- recommended: Suplementos com boa evidência, mas não essenciais
-- optional: Suplementos que podem ajudar, mas são menos prioritários`;
+- essential: Suplementos essenciais para o objetivo
+- recommended: Suplementos recomendados
+- optional: Suplementos opcionais`;
 
-    const userPrompt = `Sugira suplementos para a seguinte situação:
-
+      userPrompt = `Contexto da refeição:
 - Refeição: ${mealText}
 - Objetivo: ${goalText}
 ${dailyCalories ? `- Calorias diárias: ${dailyCalories} kcal` : ''}
 ${proteinTarget ? `- Meta de proteína: ${proteinTarget}g` : ''}
+- Suplementos já sugeridos hoje: ${alreadySuggestedToday.length > 0 ? alreadySuggestedToday.join(', ') : 'Nenhum'}
 
-Retorne as sugestões usando a função suggest_supplements.`;
+Sugira suplementos COMPLEMENTARES (sem calorias) adequados para esta refeição.
+Se não houver suplementos adequados para este horário, retorne uma lista vazia.`;
+    }
+
+    // Definir schema de resposta baseado no modo
+    const supplementSchema = mode === 'replacement' ? {
+      type: "object",
+      properties: {
+        name: { type: "string", description: "Nome do suplemento" },
+        dosage: { type: "string", description: "Dosagem (ex: '30g', '1 scoop')" },
+        timing: { type: "string", description: "Quando consumir" },
+        benefit: { type: "string", description: "Benefício principal" },
+        priority: { type: "string", enum: ["essential", "recommended", "optional"] },
+        hasMacros: { type: "boolean", description: "Sempre true para substituição" },
+        macros: {
+          type: "object",
+          properties: {
+            calories: { type: "number" },
+            protein: { type: "number" },
+            carbs: { type: "number" },
+            fat: { type: "number" },
+          },
+          required: ["calories", "protein", "carbs", "fat"],
+        },
+      },
+      required: ["name", "dosage", "timing", "benefit", "priority", "hasMacros", "macros"],
+      additionalProperties: false,
+    } : {
+      type: "object",
+      properties: {
+        name: { type: "string", description: "Nome do suplemento" },
+        dosage: { type: "string", description: "Dosagem (ex: '5g', '1 cápsula')" },
+        timing: { type: "string", description: "Quando tomar" },
+        benefit: { type: "string", description: "Benefício principal" },
+        priority: { type: "string", enum: ["essential", "recommended", "optional"] },
+        hasMacros: { type: "boolean", description: "Sempre false para complemento" },
+      },
+      required: ["name", "dosage", "timing", "benefit", "priority", "hasMacros"],
+      additionalProperties: false,
+    };
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -108,45 +214,28 @@ Retorne as sugestões usando a função suggest_supplements.`;
             type: "function",
             function: {
               name: "suggest_supplements",
-              description: "Return supplement suggestions for the meal context",
+              description: "Return supplement suggestions",
               parameters: {
                 type: "object",
                 properties: {
                   supplements: {
                     type: "array",
-                    items: {
-                      type: "object",
-                      properties: {
-                        name: { 
-                          type: "string",
-                          description: "Nome do suplemento em português"
-                        },
-                        dosage: { 
-                          type: "string",
-                          description: "Dosagem recomendada (ex: '5g', '1 cápsula')"
-                        },
-                        timing: { 
-                          type: "string",
-                          description: "Quando tomar em relação à refeição"
-                        },
-                        benefit: { 
-                          type: "string",
-                          description: "Benefício principal para o objetivo"
-                        },
-                        priority: { 
-                          type: "string", 
-                          enum: ["essential", "recommended", "optional"],
-                          description: "Nível de prioridade do suplemento"
-                        },
-                      },
-                      required: ["name", "dosage", "timing", "benefit", "priority"],
-                      additionalProperties: false,
-                    },
+                    items: supplementSchema,
                   },
                   reasoning: {
                     type: "string",
-                    description: "Explicação breve do porquê dessas sugestões para o contexto"
+                    description: "Explicação breve das sugestões"
                   },
+                  totalMacros: mode === 'replacement' ? {
+                    type: "object",
+                    properties: {
+                      calories: { type: "number" },
+                      protein: { type: "number" },
+                      carbs: { type: "number" },
+                      fat: { type: "number" },
+                    },
+                    description: "Soma dos macros de todos os suplementos sugeridos"
+                  } : undefined,
                 },
                 required: ["supplements", "reasoning"],
                 additionalProperties: false,
@@ -178,7 +267,6 @@ Retorne as sugestões usando a função suggest_supplements.`;
 
     const data = await response.json();
     
-    // Extract tool call result
     const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
     if (!toolCall?.function?.arguments) {
       throw new Error("No tool call response from AI");
@@ -186,10 +274,24 @@ Retorne as sugestões usando a função suggest_supplements.`;
 
     const suggestionData = JSON.parse(toolCall.function.arguments);
     
-    const suggestion: SupplementSuggestion = {
+    // Filtrar suplementos inválidos e adicionar doseType
+    const validatedSupplements = (suggestionData.supplements || []).map((supp: any) => {
+      const isSingleDaily = SINGLE_DAILY_SUPPLEMENTS.some(s => 
+        supp.name.toLowerCase().includes(s)
+      );
+      return {
+        ...supp,
+        doseType: isSingleDaily ? 'single_daily' : (supp.hasMacros ? 'meal_replacement' : 'contextual'),
+        hasMacros: supp.hasMacros ?? false,
+      };
+    });
+
+    const suggestion = {
+      mode,
       mealType,
-      supplements: suggestionData.supplements || [],
+      supplements: validatedSupplements,
       reasoning: suggestionData.reasoning || '',
+      totalMacros: suggestionData.totalMacros,
     };
 
     return new Response(
