@@ -23,6 +23,8 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Separator } from '@/components/ui/separator';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 import { MobileNav } from '@/components/MobileNav';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { Logo } from '@/components/Logo';
@@ -101,11 +103,45 @@ function formatQuantity(grams: number, displayQty?: number | null, displayUnit?:
 
 export default function MealPlanPage() {
   const navigate = useNavigate();
-  const { profile, user } = useAuth();
+  const { profile, user, refreshProfile } = useAuth();
   const [loading, setLoading] = useState(true);
   const [meals, setMeals] = useState<MealData[]>([]);
   const [planTotals, setPlanTotals] = useState({ calories: 0, protein: 0, carbs: 0, fat: 0 });
   const [expandedMeals, setExpandedMeals] = useState<Record<string, boolean>>({});
+  const [supplementsEnabled, setSupplementsEnabled] = useState(profile?.include_supplements ?? false);
+  const [togglingSupplements, setTogglingSupplements] = useState(false);
+
+  // Sync local state with profile
+  useEffect(() => {
+    setSupplementsEnabled(profile?.include_supplements ?? false);
+  }, [profile?.include_supplements]);
+
+  const handleToggleSupplements = async (checked: boolean) => {
+    if (!user) return;
+    
+    setTogglingSupplements(true);
+    setSupplementsEnabled(checked);
+    
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ include_supplements: checked })
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+      
+      // Refresh profile to sync state
+      await refreshProfile?.();
+      
+      toast.success(checked ? 'Suplementação ativada' : 'Suplementação desativada');
+    } catch (error) {
+      console.error('Error toggling supplements:', error);
+      setSupplementsEnabled(!checked); // Revert on error
+      toast.error('Erro ao alterar configuração');
+    } finally {
+      setTogglingSupplements(false);
+    }
+  };
 
   useEffect(() => {
     if (user) {
@@ -397,16 +433,29 @@ export default function MealPlanPage() {
           </div>
         </section>
 
-        {/* Supplements Section - Only show if toggle is enabled */}
-        {profile?.include_supplements && (
-          <>
-            <Separator className="print:hidden" />
+        {/* Supplements Section - Toggle always visible */}
+        <Separator className="print:hidden" />
 
-            <section className="print:break-before-page">
-              <div className="flex items-center gap-2 mb-4">
-                <Pill className="w-5 h-5 text-purple-500" />
-                <h2 className="text-xl font-semibold">Suplementação Recomendada</h2>
-              </div>
+        <section className="print:break-before-page">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Pill className="w-5 h-5 text-purple-500" />
+              <h2 className="text-xl font-semibold">Suplementação Recomendada</h2>
+            </div>
+            <div className="flex items-center gap-2 print:hidden">
+              <Label htmlFor="supplements-toggle" className="text-sm text-muted-foreground cursor-pointer">
+                {supplementsEnabled ? 'Ativado' : 'Desativado'}
+              </Label>
+              <Switch
+                id="supplements-toggle"
+                checked={supplementsEnabled}
+                onCheckedChange={handleToggleSupplements}
+                disabled={togglingSupplements}
+              />
+            </div>
+          </div>
+
+          {supplementsEnabled ? (
 
               <Card className="border-purple-500/20 bg-gradient-to-br from-purple-500/5 to-transparent">
                 <CardContent className="pt-6">
@@ -469,9 +518,17 @@ export default function MealPlanPage() {
                   </p>
                 </CardContent>
               </Card>
-            </section>
-          </>
-        )}
+          ) : (
+            <Card className="border-muted bg-muted/5">
+              <CardContent className="py-8 text-center">
+                <Pill className="w-10 h-10 mx-auto mb-3 text-muted-foreground/50" />
+                <p className="text-muted-foreground">
+                  Ative o toggle acima para ver recomendações de suplementação personalizadas.
+                </p>
+              </CardContent>
+            </Card>
+          )}
+        </section>
 
         <Separator className="print:hidden" />
 
