@@ -21,6 +21,40 @@ const corsHeaders = {
 };
 
 // ============================================
+// CONSTANTES OFICIAIS DE VALIDAÇÃO (PATCH FINAL)
+// ============================================
+
+const VALIDATION_CONSTANTS = {
+  // Ranges nutricionais
+  CALORIES_MAX: 1.05,      // 105%
+  PROTEIN_MIN: 0.95,       // 95%
+  CARBS_MIN: 0.90,         // 90%
+  
+  // Gordura
+  FAT_MAX_STANDARD: 1.10,  // 110% - regra padrão
+  FAT_MAX_TOLERANCE: 1.15, // 115% - tolerância clínica final
+  
+  // Segurança (hard fail)
+  HARD_FAIL_CALORIES: 1.10, // 110%
+  HARD_FAIL_FAT: 1.20,      // 120%
+};
+
+// Status de validação final
+type FinalValidationStatus = "VALIDATED" | "VALIDATED_WITH_TOLERANCE" | "STRUCTURALLY_INVALID";
+
+interface FinalValidationResult {
+  status: FinalValidationStatus;
+  reason?: string;
+  note?: string;
+  metrics: {
+    caloriePercent: number;
+    proteinPercent: number;
+    carbPercent: number;
+    fatPercent: number;
+  };
+}
+
+// ============================================
 // TIPOS
 // ============================================
 
@@ -101,11 +135,124 @@ interface RebalanceResult {
     original_grams: number;
     new_grams: number;
   }>;
-  // NOVO: Metadados G-10
+  // Metadados G-10 e validação final
   meta?: {
     g10Status: G10Status;
     implicitFatRatio: number;
     normalizationApplied: boolean;
+    finalValidation?: FinalValidationResult;
+  };
+}
+
+// ============================================
+// FUNÇÃO DE VALIDAÇÃO FINAL (ÚNICA FONTE DA VERDADE)
+// ============================================
+
+interface PlanMetadata {
+  g10Status?: G10Status;
+  normalizationApplied?: boolean;
+}
+
+function validateFinalPlan(
+  totals: MacroTargets,
+  targets: MacroTargets,
+  meta?: PlanMetadata
+): FinalValidationResult {
+  const caloriePercent = targets.calories > 0 ? totals.calories / targets.calories : 1;
+  const proteinPercent = targets.protein > 0 ? totals.protein / targets.protein : 1;
+  const carbPercent = targets.carbs > 0 ? totals.carbs / targets.carbs : 1;
+  const fatPercent = targets.fat > 0 ? totals.fat / targets.fat : 1;
+
+  const g10Status = meta?.g10Status;
+  const normalizationApplied = meta?.normalizationApplied === true;
+
+  const metrics = {
+    caloriePercent: Math.round(caloriePercent * 1000) / 10,
+    proteinPercent: Math.round(proteinPercent * 1000) / 10,
+    carbPercent: Math.round(carbPercent * 1000) / 10,
+    fatPercent: Math.round(fatPercent * 1000) / 10,
+  };
+
+  // 1️⃣ HARD FAIL ABSOLUTO
+  if (
+    caloriePercent > VALIDATION_CONSTANTS.HARD_FAIL_CALORIES ||
+    fatPercent > VALIDATION_CONSTANTS.HARD_FAIL_FAT
+  ) {
+    console.log(`[VALIDAÇÃO FINAL] ❌ HARD FAIL - Calorias: ${metrics.caloriePercent}%, Gordura: ${metrics.fatPercent}%`);
+    return {
+      status: "STRUCTURALLY_INVALID",
+      reason: caloriePercent > VALIDATION_CONSTANTS.HARD_FAIL_CALORIES
+        ? `Excesso severo de calorias (${metrics.caloriePercent}% > ${VALIDATION_CONSTANTS.HARD_FAIL_CALORIES * 100}%)`
+        : `Excesso severo de gordura (${metrics.fatPercent}% > ${VALIDATION_CONSTANTS.HARD_FAIL_FAT * 100}%)`,
+      metrics,
+    };
+  }
+
+  // 2️⃣ CASO NORMAL (G-10 PASS)
+  if (g10Status === "PASS" || !g10Status) {
+    if (
+      caloriePercent <= VALIDATION_CONSTANTS.CALORIES_MAX &&
+      proteinPercent >= VALIDATION_CONSTANTS.PROTEIN_MIN &&
+      carbPercent >= VALIDATION_CONSTANTS.CARBS_MIN &&
+      fatPercent <= VALIDATION_CONSTANTS.FAT_MAX_STANDARD
+    ) {
+      console.log(`[VALIDAÇÃO FINAL] ✅ VALIDATED (G-10 PASS)`);
+      return { status: "VALIDATED", metrics };
+    }
+  }
+
+  // 3️⃣ CASO AJUSTÁVEL (G-10 ALLOW_REBALANCE)
+  if (g10Status === "ALLOW_REBALANCE") {
+    if (!normalizationApplied) {
+      console.log(`[VALIDAÇÃO FINAL] ❌ STRUCTURALLY_INVALID - Normalização era obrigatória`);
+      return {
+        status: "STRUCTURALLY_INVALID",
+        reason: "Normalization was required but not applied",
+        metrics,
+      };
+    }
+
+    if (
+      caloriePercent <= VALIDATION_CONSTANTS.CALORIES_MAX &&
+      proteinPercent >= VALIDATION_CONSTANTS.PROTEIN_MIN &&
+      carbPercent >= VALIDATION_CONSTANTS.CARBS_MIN &&
+      fatPercent <= VALIDATION_CONSTANTS.FAT_MAX_TOLERANCE
+    ) {
+      const isWithTolerance = fatPercent > VALIDATION_CONSTANTS.FAT_MAX_STANDARD;
+      if (isWithTolerance) {
+        console.log(`[VALIDAÇÃO FINAL] ⚠️ VALIDATED_WITH_TOLERANCE - Gordura: ${metrics.fatPercent}%`);
+        return {
+          status: "VALIDATED_WITH_TOLERANCE",
+          note: `Validado sob tolerância clínica de gordura (${metrics.fatPercent}% ≤ ${VALIDATION_CONSTANTS.FAT_MAX_TOLERANCE * 100}%)`,
+          metrics,
+        };
+      } else {
+        console.log(`[VALIDAÇÃO FINAL] ✅ VALIDATED (G-10 ALLOW_REBALANCE com normalização)`);
+        return { status: "VALIDATED", metrics };
+      }
+    }
+  }
+
+  // 4️⃣ FALHA PADRÃO
+  const reasons: string[] = [];
+  if (caloriePercent > VALIDATION_CONSTANTS.CALORIES_MAX) {
+    reasons.push(`Calorias ${metrics.caloriePercent}% > ${VALIDATION_CONSTANTS.CALORIES_MAX * 100}%`);
+  }
+  if (proteinPercent < VALIDATION_CONSTANTS.PROTEIN_MIN) {
+    reasons.push(`Proteína ${metrics.proteinPercent}% < ${VALIDATION_CONSTANTS.PROTEIN_MIN * 100}%`);
+  }
+  if (carbPercent < VALIDATION_CONSTANTS.CARBS_MIN) {
+    reasons.push(`Carboidratos ${metrics.carbPercent}% < ${VALIDATION_CONSTANTS.CARBS_MIN * 100}%`);
+  }
+  if (fatPercent > VALIDATION_CONSTANTS.FAT_MAX_TOLERANCE) {
+    reasons.push(`Gordura ${metrics.fatPercent}% > ${VALIDATION_CONSTANTS.FAT_MAX_TOLERANCE * 100}%`);
+  }
+
+  console.log(`[VALIDAÇÃO FINAL] ❌ STRUCTURALLY_INVALID - ${reasons.join(", ")}`);
+  return {
+    status: "STRUCTURALLY_INVALID",
+    reason: `Final validation criteria not met: ${reasons.join("; ")}`,
+    metrics,
   };
 }
 
@@ -1316,16 +1463,57 @@ serve(async (req) => {
     // Usar opção 1 como referência principal para compatibilidade
     const primaryResult = optionResults.find(r => r.optionNumber === 1) || optionResults[0];
     
+    // ============================================
+    // VALIDAÇÃO FINAL ÚNICA (PATCH FINAL)
+    // ============================================
+    // Usar validateFinalPlan como ÚNICA fonte da verdade
+    const finalValidation = validateFinalPlan(
+      primaryResult.finalTotals,
+      targets,
+      {
+        g10Status: g10Metadata.g10Status,
+        normalizationApplied: optionResults.some(r => r.normalizationApplied),
+      }
+    );
+    
+    console.log(`[PATCH FINAL] Resultado da validação: ${finalValidation.status}`);
+    console.log(`[PATCH FINAL] Métricas: Cal=${finalValidation.metrics.caloriePercent}%, Prot=${finalValidation.metrics.proteinPercent}%, Carb=${finalValidation.metrics.carbPercent}%, Fat=${finalValidation.metrics.fatPercent}%`);
+    
+    // Se validação final retornou STRUCTURALLY_INVALID, retornar imediatamente
+    if (finalValidation.status === "STRUCTURALLY_INVALID") {
+      console.log(`[PATCH FINAL] ❌ Plano STRUCTURALLY_INVALID: ${finalValidation.reason}`);
+      return new Response(
+        JSON.stringify({
+          status: "structurally_invalid",
+          objective,
+          iterations: Math.max(...optionResults.map(r => r.iterations)),
+          final_totals: primaryResult.finalTotals,
+          adjustments: primaryResult.adjustments,
+          structural_issue: {
+            reason: finalValidation.reason || "Final validation failed",
+            fat_percent: finalValidation.metrics.fatPercent,
+            calories_percent: finalValidation.metrics.caloriePercent,
+            action: "regenerate_plan",
+          },
+          food_changes: [],
+          finalValidation,
+        }),
+        {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+    
     // Verificar convergência de todas as opções
     const allConverged = optionResults.every(r => r.converged);
     const anyConverged = optionResults.some(r => r.converged);
 
-    // Determinar status baseado em todas as opções
-    const primaryValidation = validatePlan(primaryResult.finalTotals, targets, objective, settings);
+    // Determinar status baseado na validação final
     let status: "valid" | "valid_with_alert" | "error";
-    if (primaryValidation.valid && allConverged) {
+    if (finalValidation.status === "VALIDATED" && allConverged) {
       status = "valid";
-    } else if (anyConverged) {
+    } else if (finalValidation.status === "VALIDATED_WITH_TOLERANCE" || anyConverged) {
       status = "valid_with_alert";
     } else {
       status = "error";
@@ -1353,17 +1541,19 @@ serve(async (req) => {
         original_grams: fc.original_grams,
         new_grams: fc.new_grams,
       })),
-      // NOVO: Metadados G-10
+      // Metadados G-10 + Validação Final
       meta: {
         g10Status: g10Metadata.g10Status,
         implicitFatRatio: g10Metadata.implicitFatRatio,
         normalizationApplied: anyNormalizationApplied,
+        finalValidation,
       },
     };
 
     // Log de resumo
     console.log(`\n=== RESUMO ===`);
     console.log(`G-10 Status: ${g10Metadata.g10Status}, Normalization Applied: ${anyNormalizationApplied}`);
+    console.log(`Validação Final: ${finalValidation.status}${finalValidation.note ? ` (${finalValidation.note})` : ''}`);
     for (const opt of optionResults) {
       const calDiff = Math.abs(opt.finalTotals.calories - targets.calories);
       const protDiff = Math.abs(opt.finalTotals.protein - targets.protein);
@@ -1377,12 +1567,13 @@ serve(async (req) => {
       currentMacros: currentTotals,
       targetMacros: targets,
       proposedMacros: primaryResult.finalTotals,
-      // NOVO: Metadados G-10 no nível raiz para fácil acesso
+      // Metadados G-10 + Validação Final no nível raiz para fácil acesso
       g10Meta: {
         g10Status: g10Metadata.g10Status,
         implicitFatRatio: g10Metadata.implicitFatRatio,
         normalizationApplied: anyNormalizationApplied,
       },
+      finalValidation,
       // Incluir resultados de todas as opções
       optionResults: optionResults.map(opt => ({
         optionNumber: opt.optionNumber,
@@ -1403,13 +1594,20 @@ serve(async (req) => {
         newGrams: fc.new_grams,
         reason: `Ajuste para ${objective === "cut" ? "emagrecimento" : objective === "bulk" ? "ganho de massa" : "manutenção"}`,
       })),
-      explanation: status === "error"
+      explanation: finalValidation.status === "VALIDATED_WITH_TOLERANCE"
+        ? `Plano validado com tolerância clínica (gordura: ${finalValidation.metrics.fatPercent}%). ${optionResults.length} opção(ões) processada(s).${anyNormalizationApplied ? ' Normalização de gordura implícita aplicada.' : ''}`
+        : status === "error"
         ? `Não foi possível atingir as metas. Verifique se as metas são realistas para os alimentos disponíveis.`
         : `Plano ajustado em ${totalIterations} iteração(ões) para ${objective === "cut" ? "emagrecimento" : objective === "bulk" ? "ganho de massa" : "manutenção"}. ${optionResults.length} opção(ões) processada(s).${anyNormalizationApplied ? ' Normalização de gordura implícita aplicada.' : ''}`,
       warnings: status === "error"
-        ? primaryValidation.errors
+        ? [`Validação final falhou: ${finalValidation.reason || 'critérios não atendidos'}`]
         : status === "valid_with_alert"
-        ? optionResults.filter(r => !r.converged).map(r => `Opção ${r.optionNumber} não convergiu completamente`)
+        ? [
+            ...(finalValidation.status === "VALIDATED_WITH_TOLERANCE" 
+              ? [`Tolerância clínica aplicada: gordura em ${finalValidation.metrics.fatPercent}%`] 
+              : []),
+            ...optionResults.filter(r => !r.converged).map(r => `Opção ${r.optionNumber} não convergiu completamente`)
+          ]
         : [],
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
