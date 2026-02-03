@@ -1,6 +1,9 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders, CLIENT_ERRORS, validate, getErrorForLogging, createErrorResponse, createSuccessResponse } from "../_shared/security.ts";
+import { createLogger } from "../_shared/logger.ts";
+
+const log = createLogger('nutritional-chat');
 
 const MAX_MESSAGE_LENGTH = 2000;
 const MAX_CONTEXT_MESSAGES = 20; // Sliding window size
@@ -10,11 +13,6 @@ const MAX_SUMMARY_LENGTH = 500;
 
 // deno-lint-ignore no-explicit-any
 type AnySupabaseClient = SupabaseClient<any, any, any>;
-
-const logStep = (step: string, details?: unknown) => {
-  const detailsStr = details ? ` - ${JSON.stringify(details)}` : '';
-  console.log(`[NUTRITIONAL-CHAT] ${step}${detailsStr}`);
-};
 
 // Mensagens de limite por plano
 const LIMIT_MESSAGES: Record<string, string> = {
@@ -302,7 +300,7 @@ async function summarizeConversation(
       return summary.substring(0, MAX_SUMMARY_LENGTH);
     }
   } catch (error) {
-    logStep("Summarization failed", { error: getErrorForLogging(error) });
+    log.warn("Summarization failed", { error: getErrorForLogging(error) });
   }
   
   return '';
@@ -391,7 +389,7 @@ async function loadConversationHistory(
       oldMessages.map(m => ({ role: m.role, content: m.content })),
       apiKey
     );
-    logStep("Conversation summarized", { oldCount: oldMessages.length, summaryLength: summary.length });
+    log.debug("Conversation summarized", { oldCount: oldMessages.length, summaryLength: summary.length });
   }
   
   return {
@@ -408,7 +406,7 @@ serve(async (req) => {
   }
 
   try {
-    logStep("Function started");
+    log.info("Function started");
     
     // Parse and validate input
     let body: unknown;
@@ -429,16 +427,16 @@ serve(async (req) => {
     
     // Validate message
     if (!validate.isNonEmptyString(message)) {
-      logStep("Invalid message: not a string");
+      log.warn("Invalid message: not a string");
       return createErrorResponse(CLIENT_ERRORS.INVALID_REQUEST, 400, corsHeaders);
     }
     
     if (!validate.maxLength(message, MAX_MESSAGE_LENGTH)) {
-      logStep("Message too long", { length: message.length, max: MAX_MESSAGE_LENGTH });
+      log.warn("Message too long", { length: message.length, max: MAX_MESSAGE_LENGTH });
       return createErrorResponse(CLIENT_ERRORS.INVALID_REQUEST, 400, corsHeaders);
     }
     
-    logStep("Request validated", { messageLength: message.length });
+    log.info("Request validated", { messageLength: message.length });
     
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -454,16 +452,16 @@ serve(async (req) => {
     const token = authHeader.replace("Bearer ", "");
     const { data: { user } } = await supabase.auth.getUser(token);
     if (!user) {
-      logStep("Auth failed");
+      log.warn("Auth failed");
       return createErrorResponse(CLIENT_ERRORS.AUTH_FAILED, 401, corsHeaders);
     }
     
-    logStep("User authenticated", { userId: user.id });
+    log.info("User authenticated", { userId: user.id });
 
     // Check rate limit
     const rateLimitResult = await checkRateLimit(supabase, user.id);
     if (!rateLimitResult.allowed) {
-      logStep("Rate limited", { retryAfterMs: rateLimitResult.retryAfterMs });
+      log.info("Rate limited", { retryAfterMs: rateLimitResult.retryAfterMs });
       return createErrorResponse(
         `Aguarde ${Math.ceil((rateLimitResult.retryAfterMs || 2000) / 1000)} segundos antes de enviar outra mensagem.`,
         429,
@@ -516,7 +514,7 @@ serve(async (req) => {
       dietPlanStatus = activePlan.status;
     }
 
-    logStep("User plan fetched", { planName, planType, userType, dietPlanStatus, hasChat: plan.has_chat });
+    log.info("User plan fetched", { planName, planType, userType, dietPlanStatus, hasChat: plan.has_chat });
 
     // Check if chat is available for this plan
     if (!plan.has_chat) {
@@ -573,7 +571,7 @@ serve(async (req) => {
       LOVABLE_API_KEY || ''
     );
     
-    logStep("Conversation history loaded", { 
+    log.debug("Conversation history loaded", { 
       historyCount: historyMessages.length,
       hasSummary: Boolean(summary),
     });
@@ -618,7 +616,7 @@ serve(async (req) => {
       if (response.status === 402) {
         return createErrorResponse(CLIENT_ERRORS.PAYMENT_REQUIRED, 402, corsHeaders);
       }
-      logStep("AI API error", { status: response.status });
+      log.error("AI API error", { status: response.status });
       return createErrorResponse(CLIENT_ERRORS.SERVER_ERROR, 500, corsHeaders);
     }
 
@@ -655,7 +653,7 @@ serve(async (req) => {
       },
     }, corsHeaders);
   } catch (error) {
-    logStep("ERROR", { message: getErrorForLogging(error) });
+    log.error("Unexpected error", { message: getErrorForLogging(error) });
     return createErrorResponse(CLIENT_ERRORS.SERVER_ERROR, 500, corsHeaders);
   }
 });

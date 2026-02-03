@@ -1,11 +1,9 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { getCorsHeaders, CLIENT_ERRORS, validate, getErrorForLogging, createErrorResponse, createSuccessResponse } from "../_shared/security.ts";
+import { createLogger } from "../_shared/logger.ts";
 
-const logStep = (step: string, details?: unknown) => {
-  const detailsStr = details ? ` - ${JSON.stringify(details)}` : '';
-  console.log(`[EXPLAIN-SUBSTITUTION] ${step}${detailsStr}`);
-};
+const log = createLogger('explain-substitution');
 
 // Validate food object structure
 function isValidFood(food: unknown): food is { name: string; calories: number; protein: number; carbs: number; fat: number } {
@@ -29,7 +27,7 @@ serve(async (req) => {
   }
 
   try {
-    logStep("Function started");
+    log.info("Function started");
     
     // Parse and validate input
     let body: unknown;
@@ -52,12 +50,12 @@ serve(async (req) => {
     
     // Validate food objects
     if (!isValidFood(originalFood)) {
-      logStep("Invalid originalFood", { originalFood });
+      log.warn("Invalid originalFood", { originalFood });
       return createErrorResponse(CLIENT_ERRORS.INVALID_REQUEST, 400, corsHeaders);
     }
     
     if (!isValidFood(newFood)) {
-      logStep("Invalid newFood", { newFood });
+      log.warn("Invalid newFood", { newFood });
       return createErrorResponse(CLIENT_ERRORS.INVALID_REQUEST, 400, corsHeaders);
     }
     
@@ -68,7 +66,7 @@ serve(async (req) => {
     // Validate dailyCalories
     const safeDailyCalories = validate.isInRange(dailyCalories, 500, 10000) ? dailyCalories : 2000;
     
-    logStep("Request validated", { originalFood: originalFood.name, newFood: newFood.name });
+    log.info("Request validated", { originalFood: originalFood.name, newFood: newFood.name });
     
     // Validate usage limits
     const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
@@ -86,12 +84,12 @@ serve(async (req) => {
     const { data: userData, error: userError } = await supabaseClient.auth.getUser(token);
     
     if (userError || !userData.user) {
-      logStep("Auth failed", { error: userError?.message });
+      log.warn("Auth failed", { error: userError?.message });
       return createErrorResponse(CLIENT_ERRORS.AUTH_FAILED, 401, corsHeaders);
     }
     
     const userId = userData.user.id;
-    logStep("User authenticated", { userId });
+    log.info("User authenticated", { userId });
     
     // Check usage limits
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, { auth: { persistSession: false } });
@@ -101,7 +99,7 @@ serve(async (req) => {
     });
     
     if (canUseError || !canUse) {
-      logStep("Usage limit reached");
+      log.info("Usage limit reached");
       // IMPORTANT: return 200 so the client can handle gracefully without triggering a hard runtime error
       return createSuccessResponse(
         {
@@ -170,7 +168,7 @@ Explique brevemente se essa troca é adequada para o objetivo, focando nos núme
       if (response.status === 402) {
         return createErrorResponse(CLIENT_ERRORS.PAYMENT_REQUIRED, 402, corsHeaders);
       }
-      logStep("AI API error", { status: response.status });
+      log.error("AI API error", { status: response.status });
       return createErrorResponse(CLIENT_ERRORS.SERVER_ERROR, 500, corsHeaders);
     }
 
@@ -184,7 +182,7 @@ Explique brevemente se essa troca é adequada para o objetivo, focando nos núme
 
     return createSuccessResponse({ explanation: data.choices[0].message.content }, corsHeaders);
   } catch (error) {
-    logStep("ERROR", { message: getErrorForLogging(error) });
+    log.error("Unexpected error", { message: getErrorForLogging(error) });
     return createErrorResponse(CLIENT_ERRORS.SERVER_ERROR, 500, corsHeaders);
   }
 });
