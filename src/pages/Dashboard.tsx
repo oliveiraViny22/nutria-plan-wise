@@ -160,8 +160,8 @@ export default function Dashboard() {
 
       if (response.error) throw response.error;
 
-      toast.success('Plano alimentar gerado com sucesso!');
-      playSuccessSound(); // Som + vibração ao gerar plano
+      toast.success('Seu plano foi criado! Confira as opções de cada refeição.');
+      playSuccessSound();
       await fetchCurrentPlan();
       await refreshUsage();
     } catch (error: any) {
@@ -211,8 +211,8 @@ export default function Dashboard() {
 
       if (response.error) throw response.error;
 
-      toast.success('Plano alimentar v5 gerado com sucesso! ✨');
-      playSuccessSound(); // Som + vibração ao gerar plano v5
+      toast.success('Plano criado com sucesso! Verifique suas refeições. ✨');
+      playSuccessSound();
       await fetchCurrentPlan();
       await refreshUsage();
     } catch (error: any) {

@@ -416,8 +416,8 @@ export function AIRebalancer({
         });
       }
 
-      toast.success('Plano otimizado com IA! 🧠');
-      playSuccessSound(); // Som + vibração ao otimizar
+      toast.success('Metas nutricionais atingidas! Plano ajustado. ✅');
+      playSuccessSound();
       setShowDialog(false);
       setResult(null);
       onComplete();
