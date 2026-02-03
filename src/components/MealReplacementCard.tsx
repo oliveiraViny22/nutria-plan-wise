@@ -217,7 +217,15 @@ export function MealReplacementCard({
                         </span>
                       </div>
                       
-                      {item.notes && (
+                      {item.reason && (
+                        <div className="mt-2 p-2 rounded bg-primary/5 border border-primary/10">
+                          <p className="text-[10px] font-medium text-primary">
+                            {item.reason}
+                          </p>
+                        </div>
+                      )}
+                      
+                      {item.notes && !item.reason && (
                         <p className="text-[10px] text-muted-foreground mt-1 italic">
                           {item.notes}
                         </p>

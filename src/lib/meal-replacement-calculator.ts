@@ -18,6 +18,7 @@ export interface ReplacementItem {
   macros: MacroTarget;
   type: 'supplement' | 'food';
   notes?: string;
+  reason?: string; // Justificativa da escolha (ex: "Menor caloria para atingir meta")
 }
 
 export interface MealReplacement {
@@ -525,23 +526,65 @@ export function calculateMealReplacement(
     
     // Mínimo 150ml (0.75 scale) para shake bebível
     const minScale = 0.75;
+    const milkCaloriesNeeded = FOOD_CATALOG[milkType].macros.calories * minScale;
     const optimalScale = calculateOptimalScale(FOOD_CATALOG[milkType].macros, 1, minScale);
     
-    if (optimalScale >= minScale && remaining().calories >= FOOD_CATALOG[milkType].macros.calories * minScale) {
-      addItem(milkType, FOOD_CATALOG, 'food', optimalScale);
+    if (optimalScale >= minScale && remaining().calories >= milkCaloriesNeeded) {
+      // Adicionar leite com justificativa
+      const milkItem = FOOD_CATALOG[milkType];
+      const finalScale = Math.round(optimalScale * 4) / 4;
+      const scaledMacros = {
+        calories: Math.round(milkItem.macros.calories * finalScale),
+        protein: Math.round(milkItem.macros.protein * finalScale * 10) / 10,
+        carbs: Math.round(milkItem.macros.carbs * finalScale * 10) / 10,
+        fat: Math.round(milkItem.macros.fat * finalScale * 10) / 10,
+      };
+      
+      const goalReason = userGoal === 'lose_weight' 
+        ? '🎯 Escolhido por ser baixo em calorias (ideal para emagrecimento)'
+        : userGoal === 'gain_muscle'
+        ? '💪 Escolhido por fornecer calorias extras (ideal para ganho de massa)'
+        : '⚖️ Escolhido para equilibrar calorias e proteína';
+      
+      items.push({
+        name: milkType,
+        quantity: `${Math.round(200 * finalScale)}ml`,
+        macros: scaledMacros,
+        type: 'food',
+        notes: milkItem.notes,
+        reason: goalReason,
+      });
+      
+      currentMacros.protein += scaledMacros.protein;
+      currentMacros.calories += scaledMacros.calories;
+      currentMacros.carbs += scaledMacros.carbs;
+      currentMacros.fat += scaledMacros.fat;
     } else {
-      // Se não couber leite calórico, usar água + leite de amêndoas (baixa caloria)
-      // Garantir pelo menos 150ml de líquido para consistência adequada
+      // Se não couber leite calórico, usar leite de amêndoas (baixa caloria)
       if (remaining().calories >= 20) {
-        addItem('Leite de Amêndoas', FOOD_CATALOG, 'food', 1); // 200ml, só 30kcal
+        const almondMilk = FOOD_CATALOG['Leite de Amêndoas'];
+        items.push({
+          name: 'Leite de Amêndoas',
+          quantity: '200ml',
+          macros: { ...almondMilk.macros },
+          type: 'food',
+          notes: almondMilk.notes,
+          reason: '🥛 Escolhido por ter apenas 30kcal (calorias limitadas nesta refeição)',
+        });
+        
+        currentMacros.protein += almondMilk.macros.protein;
+        currentMacros.calories += almondMilk.macros.calories;
+        currentMacros.carbs += almondMilk.macros.carbs;
+        currentMacros.fat += almondMilk.macros.fat;
       } else {
-        // Adicionar nota sobre diluir em água
+        // Adicionar água como última opção
         items.push({
           name: 'Água',
           quantity: '150-200ml',
           macros: { calories: 0, protein: 0, carbs: 0, fat: 0 },
           type: 'food',
-          notes: 'Necessário para diluir o shake - sem calorias',
+          notes: 'Necessário para diluir o shake',
+          reason: '💧 Escolhida por não adicionar calorias (limite de calorias atingido)',
         });
       }
     }
