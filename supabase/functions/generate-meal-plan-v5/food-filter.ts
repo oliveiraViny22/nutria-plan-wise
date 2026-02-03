@@ -311,6 +311,26 @@ export function isHighFatNutOrSpread(food: Food): boolean {
     return true;
   }
   
+  // v5.7: LATICÍNIOS MUITO GORDUROSOS (Leite de Coco, Queijos Amarelos)
+  // Estes têm 20-30g de gordura/100g e dominam a meta de gordura
+  const highFatDairyKeywords = [
+    "leite de coco",
+    "creme de leite",
+    "queijo minas padrão",
+    "queijo prato",
+    "queijo mussarela",
+    "queijo parmesão",
+    "requeijão cremoso",
+  ];
+  
+  if (highFatDairyKeywords.some(kw => nameLower.includes(kw))) {
+    logDebug("Bloqueando laticínio muito gorduroso como seleção primária", {
+      name: food.name,
+      fat: food.fat,
+    });
+    return true;
+  }
+  
   return false;
 }
 
