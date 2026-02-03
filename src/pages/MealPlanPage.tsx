@@ -567,26 +567,28 @@ export default function MealPlanPage() {
 
           {supplementsEnabled ? (
             <div className="space-y-8">
-              {/* 1. Substituições de refeições (alternativas completas) - PRIMEIRO */}
+              {/* 1. Substituições de refeições - OCULTAS NA IMPRESSÃO (muito extensas) */}
               {meals.length > 0 && (
-                <MealReplacementSection
-                  meals={meals.map(meal => {
-                    const firstOption = meal.meal_options[0];
-                    return {
-                      name: MEAL_NAMES[meal.name as MealType] || meal.name,
-                      macros: {
-                        calories: firstOption?.total_calories || 0,
-                        protein: firstOption?.total_protein || 0,
-                        carbs: firstOption?.total_carbs || 0,
-                        fat: firstOption?.total_fat || 0,
-                      },
-                    };
-                  })}
-                  userGoal={(profile?.goal as 'lose_weight' | 'maintain' | 'gain_muscle') || 'maintain'}
-                />
+                <div className="print:hidden">
+                  <MealReplacementSection
+                    meals={meals.map(meal => {
+                      const firstOption = meal.meal_options[0];
+                      return {
+                        name: MEAL_NAMES[meal.name as MealType] || meal.name,
+                        macros: {
+                          calories: firstOption?.total_calories || 0,
+                          protein: firstOption?.total_protein || 0,
+                          carbs: firstOption?.total_carbs || 0,
+                          fat: firstOption?.total_fat || 0,
+                        },
+                      };
+                    })}
+                    userGoal={(profile?.goal as 'lose_weight' | 'maintain' | 'gain_muscle') || 'maintain'}
+                  />
+                </div>
               )}
 
-              {/* 2. Suplementos de micronutrientes (não alteram macros) - DEPOIS */}
+              {/* 2. Suplementos de micronutrientes - VISÍVEL NA IMPRESSÃO */}
               <SupplementsContent 
                 goal={(profile?.goal as UserGoal) || 'maintain'}
                 planMacros={planTotals}
@@ -612,26 +614,23 @@ export default function MealPlanPage() {
 
         <Separator className="print:hidden" />
 
-        {/* Tips Section */}
-        <section className="print:break-before-page">
+        {/* Tips Section - Mesmo na página 2, sem quebra adicional */}
+        <section>
           <div className="flex items-center gap-2 mb-4">
-            <Lightbulb className="w-5 h-5 text-yellow-500" />
-            <h2 className="text-xl font-semibold">{tips.title}</h2>
+            <Lightbulb className="w-5 h-5 text-yellow-500 print:w-4 print:h-4" />
+            <h2 className="text-xl font-semibold print:text-base">{tips.title}</h2>
           </div>
 
           <Card className="border-yellow-500/20 bg-gradient-to-br from-yellow-500/5 to-transparent">
-            <CardContent className="pt-6">
-              <div className="grid md:grid-cols-2 gap-3">
+            <CardContent className="pt-4 print:pt-2">
+              <div className="grid grid-cols-2 gap-2 print:gap-1">
                 {tips.tips.map((tip, idx) => (
-                  <motion.div
+                  <div
                     key={idx}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: idx * 0.1 }}
-                    className="p-3 rounded-lg bg-background/60 border border-border/50"
+                    className="p-2 rounded-lg bg-background/60 border border-border/50 print:p-1"
                   >
-                    <p className="text-sm">{tip}</p>
-                  </motion.div>
+                    <p className="text-sm print:text-[9px]">{tip}</p>
+                  </div>
                 ))}
               </div>
             </CardContent>
@@ -646,13 +645,16 @@ export default function MealPlanPage() {
         </div>
       </main>
 
-      {/* Print styles - Otimizado para 2 páginas A4 */}
+      {/* Print styles - Layout compacto para 2 páginas A4 */}
       <style>{`
         @media print {
+          * {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
           body {
-            -webkit-print-color-adjust: exact;
-            print-color-adjust: exact;
-            font-size: 10px;
+            font-size: 9px !important;
+            line-height: 1.2 !important;
           }
           .print\\:hidden {
             display: none !important;
@@ -660,114 +662,103 @@ export default function MealPlanPage() {
           .print\\:block {
             display: block !important;
           }
-          .print\\:break-inside-avoid {
-            break-inside: avoid;
-          }
-          .print\\:break-before-page {
-            break-before: page;
-          }
           @page {
-            margin: 0.8cm 1cm;
+            margin: 0.6cm 0.8cm;
             size: A4;
           }
-          /* Página 1: Plano alimentar - forçar quebra após */
+          
+          /* ========== PÁGINA 1: Resumo + Refeições ========== */
           .print-page-1 {
-            page-break-after: always;
+            page-break-after: always !important;
           }
-          /* Página 2: Suplementação e dicas */
+          
+          /* ========== PÁGINA 2: Suplementação + Dicas ========== */
           .print-page-2 {
-            page-break-before: always;
+            page-break-before: always !important;
           }
-          /* Cards de refeição mais compactos */
-          .grid {
-            gap: 0.4rem !important;
-          }
-          /* Forçar 3 colunas para opções na impressão */
-          [class*="grid-cols"] {
-            grid-template-columns: repeat(3, 1fr) !important;
-          }
-          /* Fontes menores para caber */
-          .text-xl {
-            font-size: 14px !important;
-          }
-          .text-lg {
-            font-size: 12px !important;
-          }
-          .text-base {
-            font-size: 11px !important;
-          }
-          .text-sm {
-            font-size: 9px !important;
-          }
-          .text-xs {
-            font-size: 8px !important;
-          }
-          .text-\\[10px\\], .text-\\[8px\\] {
-            font-size: 7px !important;
-          }
-          /* Padding compacto */
-          .p-4, .pt-6, .pt-4 {
-            padding: 0.4rem !important;
-          }
-          .p-3, .py-3 {
-            padding: 0.3rem !important;
-          }
-          .p-2, .py-2 {
-            padding: 0.2rem !important;
-          }
-          /* Espaçamento reduzido */
-          .space-y-4 > * + *, .space-y-3 > * + * {
-            margin-top: 0.3rem !important;
-          }
-          .space-y-8 > * + * {
-            margin-top: 0.6rem !important;
-          }
-          .space-y-2 > * + *, .space-y-1\\.5 > * + * {
-            margin-top: 0.15rem !important;
-          }
-          .gap-4, .gap-3 {
-            gap: 0.3rem !important;
-          }
-          .gap-2 {
-            gap: 0.2rem !important;
-          }
-          .mb-4, .mb-3 {
-            margin-bottom: 0.3rem !important;
-          }
-          /* Resumo diário compacto */
-          .grid-cols-4, .md\\:grid-cols-4 {
-            grid-template-columns: repeat(4, 1fr) !important;
-            gap: 0.25rem !important;
-          }
-          /* Cards de refeição */
-          .rounded-lg {
-            border-radius: 4px !important;
-          }
-          /* Badges menores */
-          .rounded-full {
-            padding: 0.1rem 0.3rem !important;
-          }
-          /* Ocultar elementos desnecessários na impressão */
-          .print\\:hidden, button, [role="button"] {
+          
+          /* Ocultar elementos interativos */
+          button, [role="button"], .print\\:hidden, 
+          [data-radix-collection-item], header, nav {
             display: none !important;
           }
-          /* Header da refeição */
-          .w-8.h-8 {
-            width: 1.25rem !important;
-            height: 1.25rem !important;
+          
+          /* Container principal */
+          main {
+            padding: 0 !important;
           }
-          .w-10.h-10 {
-            width: 1.5rem !important;
-            height: 1.5rem !important;
+          .container {
+            max-width: 100% !important;
+            padding: 0 !important;
           }
-          /* Collapsibles sempre abertos na impressão */
-          [data-state="closed"] {
-            display: block !important;
+          
+          /* Grid de opções: sempre 3 colunas */
+          .grid {
+            display: grid !important;
+            gap: 0.25rem !important;
           }
-          [data-state="closed"] > * {
-            display: block !important;
-            visibility: visible !important;
-            height: auto !important;
+          [class*="md\\:grid-cols-2"][class*="lg\\:grid-cols-3"],
+          [class*="grid-cols-1"][class*="md\\:grid-cols-2"] {
+            grid-template-columns: repeat(3, 1fr) !important;
+          }
+          .grid-cols-2, .md\\:grid-cols-2 {
+            grid-template-columns: repeat(2, 1fr) !important;
+          }
+          .grid-cols-4, .md\\:grid-cols-4 {
+            grid-template-columns: repeat(4, 1fr) !important;
+          }
+          
+          /* Tipografia compacta */
+          .text-2xl { font-size: 14px !important; }
+          .text-xl, .print\\:text-lg { font-size: 11px !important; }
+          .text-lg, .print\\:text-base { font-size: 10px !important; }
+          .text-base { font-size: 9px !important; }
+          .text-sm, .print\\:text-\\[9px\\] { font-size: 8px !important; }
+          .text-xs { font-size: 7px !important; }
+          .text-\\[10px\\], .text-\\[8px\\] { font-size: 6px !important; }
+          .font-bold { font-weight: 600 !important; }
+          
+          /* Espaçamentos mínimos */
+          .p-4, .p-3, .pt-6, .pt-4 { padding: 0.2rem !important; }
+          .p-2, .py-3, .py-2 { padding: 0.15rem !important; }
+          .space-y-8 > * + * { margin-top: 0.4rem !important; }
+          .space-y-4 > * + *, .space-y-3 > * + * { margin-top: 0.2rem !important; }
+          .space-y-2 > * + *, .space-y-1\\.5 > * + * { margin-top: 0.1rem !important; }
+          .gap-4, .gap-3 { gap: 0.2rem !important; }
+          .gap-2 { gap: 0.15rem !important; }
+          .mb-4, .mb-3, .mb-6 { margin-bottom: 0.2rem !important; }
+          .mt-4 { margin-top: 0.2rem !important; }
+          
+          /* Cards compactos */
+          .rounded-lg { border-radius: 3px !important; }
+          .border { border-width: 0.5px !important; }
+          
+          /* Ícones menores */
+          .w-5, .h-5 { width: 0.75rem !important; height: 0.75rem !important; }
+          .w-4, .h-4, .print\\:w-4, .print\\:h-4 { width: 0.6rem !important; height: 0.6rem !important; }
+          .w-8, .h-8 { width: 1rem !important; height: 1rem !important; }
+          .w-10, .h-10 { width: 1.25rem !important; height: 1.25rem !important; }
+          
+          /* Collapsibles abertos */
+          [data-state="closed"] > div { 
+            display: block !important; 
+            height: auto !important; 
+          }
+          
+          /* Header de impressão */
+          .print\\:block.print\\:mb-6 {
+            margin-bottom: 0.3rem !important;
+          }
+          .print\\:block.print\\:mb-6 .pb-4 {
+            padding-bottom: 0.2rem !important;
+          }
+          
+          /* Footer compacto */
+          .print\\:mt-8 {
+            margin-top: 0.3rem !important;
+          }
+          .print\\:pt-4 {
+            padding-top: 0.15rem !important;
           }
         }
       `}</style>
