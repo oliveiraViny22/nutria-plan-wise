@@ -67,7 +67,7 @@ export function MealReplacementCard({
                 </div>
                 <div>
                   <CardTitle className="text-base flex items-center gap-2">
-                    Substituição: {mealName}
+                    Alternativa: {mealName}
                     <TooltipProvider>
                       <Tooltip>
                         <TooltipTrigger asChild>
@@ -75,22 +75,23 @@ export function MealReplacementCard({
                         </TooltipTrigger>
                         <TooltipContent className="max-w-xs">
                           <p className="text-sm">
-                            Combinação de suplementos e alimentos que iguala os macros da refeição, 
-                            ideal para quando não conseguir consumir a refeição completa.
+                            <strong>⚠️ Substitui a refeição inteira.</strong> Use esta alternativa 
+                            EM VEZ da refeição planejada, não como complemento. 
+                            Os macros são equivalentes à refeição original.
                           </p>
                         </TooltipContent>
                       </Tooltip>
                     </TooltipProvider>
                   </CardTitle>
                   <div className="flex items-center gap-2 mt-1">
+                    <Badge variant="outline" className="text-[10px] bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30">
+                      Substitui 100%
+                    </Badge>
                     <Badge variant="outline" className="text-[10px] bg-purple-500/10">
                       {supplementCount} suplemento{supplementCount !== 1 ? 's' : ''}
                     </Badge>
                     <Badge variant="outline" className="text-[10px] bg-green-500/10">
                       {foodCount} alimento{foodCount !== 1 ? 's' : ''}
-                    </Badge>
-                    <Badge variant={calorieStatus.variant} className="text-[10px]">
-                      {replacement.accuracy.calories}% calorias
                     </Badge>
                   </div>
                 </div>
@@ -104,11 +105,20 @@ export function MealReplacementCard({
 
         <CollapsibleContent>
           <CardContent className="pt-0 space-y-4">
+            {/* Alerta de substituição */}
+            <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-start gap-2">
+              <AlertCircle className="w-4 h-4 text-amber-500 mt-0.5 shrink-0" />
+              <p className="text-xs text-muted-foreground">
+                <strong className="text-foreground">Esta é uma alternativa completa.</strong> Consuma EM VEZ 
+                de {mealName.toLowerCase()}, não junto. Os valores nutricionais são equivalentes.
+              </p>
+            </div>
+
             {/* Comparação de macros */}
             <div className="grid grid-cols-2 gap-4 p-4 rounded-lg bg-background/60 border border-border/50">
               <div>
-                <p className="text-xs text-muted-foreground mb-2 font-medium">Refeição Original</p>
-                <div className="space-y-1 text-sm">
+                <p className="text-xs text-muted-foreground mb-2 font-medium line-through opacity-60">❌ Refeição Original</p>
+                <div className="space-y-1 text-sm opacity-60">
                   <div className="flex items-center justify-between">
                     <span className="flex items-center gap-1"><Flame className="w-3 h-3 text-amber-500" /> Calorias</span>
                     <span className="font-medium">{mealMacros.calories} kcal</span>
@@ -129,7 +139,7 @@ export function MealReplacementCard({
               </div>
               
               <div>
-                <p className="text-xs text-muted-foreground mb-2 font-medium">Substituição</p>
+                <p className="text-xs text-muted-foreground mb-2 font-medium text-green-600 dark:text-green-400">✅ Alternativa</p>
                 <div className="space-y-1 text-sm">
                   <div className="flex items-center justify-between">
                     <span className="flex items-center gap-1"><Flame className="w-3 h-3 text-amber-500" /> Calorias</span>
@@ -271,7 +281,7 @@ export function MealReplacementSection({ meals, userGoal }: MealReplacementSecti
     <div className="space-y-4">
       <div className="flex items-center gap-2 mb-4">
         <Pill className="w-5 h-5 text-purple-500" />
-        <h3 className="text-lg font-semibold">Substituições de Refeição</h3>
+        <h3 className="text-lg font-semibold">Alternativas de Refeição</h3>
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
@@ -279,8 +289,8 @@ export function MealReplacementSection({ meals, userGoal }: MealReplacementSecti
             </TooltipTrigger>
             <TooltipContent className="max-w-xs">
               <p className="text-sm">
-                Combinações de suplementos + alimentos para substituir refeições inteiras, 
-                mantendo a composição nutricional equivalente.
+                <strong>Opções para substituir refeições inteiras</strong> quando você não conseguir 
+                consumir a refeição planejada. Use EM VEZ da refeição, não como complemento.
               </p>
             </TooltipContent>
           </Tooltip>
@@ -300,8 +310,8 @@ export function MealReplacementSection({ meals, userGoal }: MealReplacementSecti
       </div>
 
       <p className="text-xs text-muted-foreground italic mt-4">
-        ⚠️ As substituições são aproximações nutricionais. Consulte um nutricionista para 
-        personalizações específicas. Suplementos não substituem uma alimentação equilibrada.
+        ⚠️ <strong>Use estas alternativas EM VEZ da refeição planejada</strong>, não como complemento. 
+        São aproximações nutricionais. Consulte um nutricionista para personalizações específicas.
       </p>
     </div>
   );
