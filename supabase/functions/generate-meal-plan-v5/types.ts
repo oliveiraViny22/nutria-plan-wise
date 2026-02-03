@@ -125,10 +125,12 @@ export interface UserProfile {
   carbs_target: number | null;
   fat_target: number | null;
   meals_per_day: number | null;
+  evening_meal_preference: 'full_dinner' | 'light_dinner' | 'no_preference' | null;
   preferred_foods: string[] | null;
   avoided_foods: string[] | null;
   restrictions: string[] | null;
   onboarding_completed: boolean | null;
+  goal: string | null;
 }
 
 // =====================================================
