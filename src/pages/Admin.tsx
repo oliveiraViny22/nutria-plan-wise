@@ -64,6 +64,8 @@ import { MealAnchorFoodsManager } from '@/components/admin/MealAnchorFoodsManage
 import { MealTemplatesManager } from '@/components/admin/MealTemplatesManager';
 import { OptimizerSettingsManager } from '@/components/admin/OptimizerSettingsManager';
 import { FoodBlockRulesManager } from '@/components/admin/FoodBlockRulesManager';
+import { TemplateAnchorPreview } from '@/components/admin/TemplateAnchorPreview';
+import { QuickStartTemplates } from '@/components/admin/QuickStartTemplates';
 
 
 const CHART_COLORS = [
@@ -1327,8 +1329,14 @@ export default function Admin() {
               {/* Food Curation Section */}
               <FoodCuration />
 
+              {/* Quick Start Templates Section */}
+              <QuickStartTemplates />
+
               {/* Meal Templates Section */}
               <MealTemplatesManager />
+
+              {/* Template & Anchor Preview Section */}
+              <TemplateAnchorPreview />
 
               {/* Meal Anchor Foods Section */}
               <MealAnchorFoodsManager />
