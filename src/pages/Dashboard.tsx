@@ -40,6 +40,7 @@ import { UpgradeDialog } from '@/components/UpgradeDialog';
 import { AdherenceWidget } from '@/components/AdherenceWidget';
 import { OnboardingTutorial } from '@/components/OnboardingTutorial';
 import { DashboardSkeleton } from '@/components/DashboardSkeleton';
+import { SuccessAnimation } from '@/components/SuccessAnimation';
 import { useTutorial } from '@/hooks/useTutorial';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserRole } from '@/hooks/useUserRole';
@@ -76,6 +77,7 @@ export default function Dashboard() {
   const [upgradeFeature, setUpgradeFeature] = useState<string>('diet');
   const [upgradeLimit, setUpgradeLimit] = useState<number>(0);
   const [planReleased, setPlanReleased] = useState(false);
+  const [showSuccessAnimation, setShowSuccessAnimation] = useState(false);
 
   // Handle checkout success
   useEffect(() => {
@@ -160,6 +162,8 @@ export default function Dashboard() {
 
       if (response.error) throw response.error;
 
+      setShowSuccessAnimation(true);
+      setTimeout(() => setShowSuccessAnimation(false), 2500);
       toast.success('Seu plano foi criado! Confira as opções de cada refeição.');
       playSuccessSound();
       await fetchCurrentPlan();
@@ -211,6 +215,8 @@ export default function Dashboard() {
 
       if (response.error) throw response.error;
 
+      setShowSuccessAnimation(true);
+      setTimeout(() => setShowSuccessAnimation(false), 2500);
       toast.success('Plano criado com sucesso! Verifique suas refeições. ✨');
       playSuccessSound();
       await fetchCurrentPlan();
@@ -250,6 +256,13 @@ export default function Dashboard() {
           onSkip={closeTutorial} 
         />
       )}
+
+    {/* Success Animation Overlay */}
+    {showSuccessAnimation && (
+      <div className="fixed inset-0 z-[100] flex items-center justify-center bg-background/80 backdrop-blur-sm">
+        <SuccessAnimation show={showSuccessAnimation} message="Plano criado!" />
+      </div>
+    )}
 
     <div className="min-h-screen bg-background overflow-x-hidden">
       {/* Header - Mobile responsive with hamburger concept via scrollable icons */}
