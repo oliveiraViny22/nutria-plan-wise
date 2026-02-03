@@ -16,6 +16,7 @@ import {
   Beef,
   Wheat,
   Droplets,
+  AlertTriangle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -32,6 +33,14 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { MEAL_NAMES, MealType, Food, MealOption } from '@/lib/types';
+import { 
+  generateSupplementRecommendations, 
+  getPriorityBadge,
+  type UserGoal,
+  type SupplementPeriod,
+  type Supplement,
+  type NutritionalGaps,
+} from '@/lib/supplement-recommendations';
 
 interface MealData {
   id: string;
@@ -99,6 +108,111 @@ function formatQuantity(grams: number, displayQty?: number | null, displayUnit?:
     return `${displayQty} ${displayUnit}`;
   }
   return `${Math.round(grams)}g`;
+}
+
+// Componente de suplementação personalizada
+interface SupplementsContentProps {
+  goal: UserGoal;
+  planMacros: { calories: number; protein: number; carbs: number; fat: number };
+  profileTargets: {
+    daily_calories: number | null;
+    protein_target: number | null;
+    carbs_target: number | null;
+    fat_target: number | null;
+  };
+}
+
+function SupplementsContent({ goal, planMacros, profileTargets }: SupplementsContentProps) {
+  const recommendations = useMemo(() => 
+    generateSupplementRecommendations(goal, planMacros, profileTargets),
+    [goal, planMacros, profileTargets]
+  );
+
+  const goalLabels: Record<UserGoal, string> = {
+    lose_weight: 'Emagrecimento',
+    maintain: 'Manutenção',
+    gain_muscle: 'Ganho de Massa',
+  };
+
+  const hasGaps = recommendations.gapSupplements.length > 0;
+
+  return (
+    <div className="space-y-4">
+      {/* Gaps Alert */}
+      {hasGaps && (
+        <Card className="border-amber-500/30 bg-gradient-to-br from-amber-500/10 to-transparent">
+          <CardContent className="pt-4">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="w-5 h-5 text-amber-500 mt-0.5 shrink-0" />
+              <div>
+                <h4 className="font-medium text-sm mb-2">Gaps Nutricionais Detectados</h4>
+                <div className="space-y-2">
+                  {recommendations.gapSupplements.map((supp, idx) => (
+                    <div key={idx} className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">{supp.reason}</span>
+                      <Badge variant="outline" className="ml-2 shrink-0">
+                        {supp.name} ({supp.dosage})
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Main recommendations */}
+      <Card className="border-purple-500/20 bg-gradient-to-br from-purple-500/5 to-transparent">
+        <CardContent className="pt-6">
+          <div className="flex items-center justify-between mb-4">
+            <p className="text-sm text-muted-foreground">
+              Recomendações personalizadas para <strong>{goalLabels[goal]}</strong>
+            </p>
+            <Badge variant="secondary" className="text-xs">
+              {goal === 'lose_weight' ? '🔥' : goal === 'gain_muscle' ? '💪' : '⚖️'} {goalLabels[goal]}
+            </Badge>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-4">
+            {recommendations.periods.map((period, pIdx) => (
+              <div key={pIdx} className="p-4 rounded-lg bg-background/60 border border-border/50">
+                <h4 className="font-medium text-sm mb-3 flex items-center gap-2">
+                  {period.emoji} {period.period}
+                </h4>
+                <ul className="space-y-2">
+                  {period.supplements.map((supp, sIdx) => {
+                    const badge = getPriorityBadge(supp.priority);
+                    return (
+                      <li key={sIdx} className="text-sm">
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <span className="font-medium">{supp.name}</span>
+                            <span className="text-muted-foreground"> ({supp.dosage})</span>
+                          </div>
+                          <Badge variant={badge.variant} className="text-[10px] shrink-0">
+                            {badge.label}
+                          </Badge>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {supp.timing} • {supp.reason}
+                        </p>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            ))}
+          </div>
+
+          <p className="text-xs text-muted-foreground mt-4 italic">
+            ⚠️ Suplementos são opcionais e complementares à alimentação. 
+            Consulte um profissional de saúde antes de iniciar qualquer suplementação.
+          </p>
+        </CardContent>
+      </Card>
+    </div>
+  );
 }
 
 export default function MealPlanPage() {
@@ -456,68 +570,16 @@ export default function MealPlanPage() {
           </div>
 
           {supplementsEnabled ? (
-
-              <Card className="border-purple-500/20 bg-gradient-to-br from-purple-500/5 to-transparent">
-                <CardContent className="pt-6">
-                  <p className="text-sm text-muted-foreground mb-4">
-                    As sugestões de suplementação são personalizadas com base no seu objetivo e podem ser 
-                    visualizadas em cada refeição. Abaixo está um resumo geral:
-                  </p>
-
-                  <div className="grid md:grid-cols-2 gap-4">
-                    {/* Morning supplements */}
-                    <div className="p-4 rounded-lg bg-background/60 border border-border/50">
-                      <h4 className="font-medium text-sm mb-2 flex items-center gap-2">
-                        🌅 Manhã
-                      </h4>
-                      <ul className="space-y-1 text-sm text-muted-foreground">
-                        <li>• Whey Protein (30g) - pós café da manhã</li>
-                        <li>• Creatina Monohidratada (5g) - dose única</li>
-                        <li>• Multivitamínico (1 cápsula)</li>
-                      </ul>
-                    </div>
-
-                    {/* Afternoon supplements */}
-                    <div className="p-4 rounded-lg bg-background/60 border border-border/50">
-                      <h4 className="font-medium text-sm mb-2 flex items-center gap-2">
-                        ☀️ Tarde
-                      </h4>
-                      <ul className="space-y-1 text-sm text-muted-foreground">
-                        <li>• Whey Protein (30g) - lanche da tarde</li>
-                        <li>• BCAA (5g) - se treinar</li>
-                      </ul>
-                    </div>
-
-                    {/* Evening supplements */}
-                    <div className="p-4 rounded-lg bg-background/60 border border-border/50">
-                      <h4 className="font-medium text-sm mb-2 flex items-center gap-2">
-                        🌙 Noite
-                      </h4>
-                      <ul className="space-y-1 text-sm text-muted-foreground">
-                        <li>• Ômega-3 (1000mg) - com o jantar</li>
-                        <li>• Zinco (15mg) - antes de dormir</li>
-                        <li>• Magnésio (200mg) - antes de dormir</li>
-                      </ul>
-                    </div>
-
-                    {/* Before sleep */}
-                    <div className="p-4 rounded-lg bg-background/60 border border-border/50">
-                      <h4 className="font-medium text-sm mb-2 flex items-center gap-2">
-                        😴 Antes de Dormir
-                      </h4>
-                      <ul className="space-y-1 text-sm text-muted-foreground">
-                        <li>• Caseína (30g) - proteína de absorção lenta</li>
-                        <li>• ZMA - para recuperação noturna</li>
-                      </ul>
-                    </div>
-                  </div>
-
-                  <p className="text-xs text-muted-foreground mt-4 italic">
-                    ⚠️ Suplementos são opcionais e complementares à alimentação. 
-                    Consulte um profissional de saúde antes de iniciar qualquer suplementação.
-                  </p>
-                </CardContent>
-              </Card>
+              <SupplementsContent 
+                goal={(profile?.goal as UserGoal) || 'maintain'}
+                planMacros={planTotals}
+                profileTargets={{
+                  daily_calories: profile?.daily_calories ?? null,
+                  protein_target: profile?.protein_target ?? null,
+                  carbs_target: profile?.carbs_target ?? null,
+                  fat_target: profile?.fat_target ?? null,
+                }}
+              />
           ) : (
             <Card className="border-muted bg-muted/5">
               <CardContent className="py-8 text-center">
