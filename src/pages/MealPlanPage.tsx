@@ -164,12 +164,15 @@ function SupplementsContent({ goal, planMacros, profileTargets }: SupplementsCon
       )}
 
       {/* Main recommendations */}
-      <Card className="border-purple-500/20 bg-gradient-to-br from-purple-500/5 to-transparent">
+      <Card className="border-green-500/20 bg-gradient-to-br from-green-500/5 to-transparent">
         <CardContent className="pt-6">
           <div className="flex items-center justify-between mb-4">
-            <p className="text-sm text-muted-foreground">
-              Recomendações personalizadas para <strong>{goalLabels[goal]}</strong>
-            </p>
+            <div>
+              <p className="text-sm font-medium mb-1">Micronutrientes e Suporte</p>
+              <p className="text-xs text-muted-foreground">
+                Suplementos que <strong>não alteram</strong> calorias/macros do plano
+              </p>
+            </div>
             <Badge variant="secondary" className="text-xs">
               {goal === 'lose_weight' ? '🔥' : goal === 'gain_muscle' ? '💪' : '⚖️'} {goalLabels[goal]}
             </Badge>
@@ -572,19 +575,7 @@ export default function MealPlanPage() {
 
           {supplementsEnabled ? (
             <div className="space-y-8">
-              {/* Suplementos base por objetivo */}
-              <SupplementsContent 
-                goal={(profile?.goal as UserGoal) || 'maintain'}
-                planMacros={planTotals}
-                profileTargets={{
-                  daily_calories: profile?.daily_calories ?? null,
-                  protein_target: profile?.protein_target ?? null,
-                  carbs_target: profile?.carbs_target ?? null,
-                  fat_target: profile?.fat_target ?? null,
-                }}
-              />
-
-              {/* Substituições de refeições com suplementos + alimentos */}
+              {/* 1. Substituições de refeições (alternativas completas) - PRIMEIRO */}
               {meals.length > 0 && (
                 <MealReplacementSection
                   meals={meals.map(meal => {
@@ -602,6 +593,18 @@ export default function MealPlanPage() {
                   userGoal={(profile?.goal as 'lose_weight' | 'maintain' | 'gain_muscle') || 'maintain'}
                 />
               )}
+
+              {/* 2. Suplementos de micronutrientes (não alteram macros) - DEPOIS */}
+              <SupplementsContent 
+                goal={(profile?.goal as UserGoal) || 'maintain'}
+                planMacros={planTotals}
+                profileTargets={{
+                  daily_calories: profile?.daily_calories ?? null,
+                  protein_target: profile?.protein_target ?? null,
+                  carbs_target: profile?.carbs_target ?? null,
+                  fat_target: profile?.fat_target ?? null,
+                }}
+              />
             </div>
           ) : (
             <Card className="border-muted bg-muted/5">
