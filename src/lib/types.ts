@@ -43,6 +43,7 @@ export interface Profile {
   carbs_target: number | null;
   fat_target: number | null;
   meals_per_day: number | null;
+  include_supplements: boolean | null;
   onboarding_completed: boolean;
   created_at: string;
   updated_at: string;
