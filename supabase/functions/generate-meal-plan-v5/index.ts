@@ -30,7 +30,7 @@ import { GENERATOR_CONTRACT } from "../_shared/nutrition-contracts.ts";
 // Módulos internos
 import type { Food, MacroTargets, MealWithOptions, MealResult, UserProfile } from "./types.ts";
 import { MEAL_NAMES, MEAL_TYPES_MAP } from "./constants.ts";
-import { logInfo, logError } from "./logger.ts";
+import { logInfo, logError, logWarn } from "./logger.ts";
 import { filterEligibleFoods, validateFatShare, validateImplicitFat } from "./food-filter.ts";
 import { loadAnchorFoods } from "./anchor-selection.ts";
 import { loadTemplatesWithRoles } from "./template-loader.ts";
@@ -196,57 +196,49 @@ serve(async (req) => {
       fat: profile.fat_target || 65,
     };
 
-    // NOVO v5.1: Validar dominância de gordura por alimento
+    // =====================================================
+    // METADADOS NUTRICIONAIS (INFORMATIVOS, NÃO BLOQUEANTES)
+    // =====================================================
+    // Conforme especificação: Gerador NÃO reprova por macro.
+    // Essas validações geram metadados para o Rebalanceador.
+    // =====================================================
+    
     const allFoodsWithQuantity = meals.flatMap(m => 
       m.foods.map(f => ({ food: f.food, quantity_grams: f.quantity_grams }))
     );
     
+    // Fat Share: verifica dominância de gordura (informativo)
     const fatShareValidation = validateFatShare(allFoodsWithQuantity, targets.fat);
-    
     if (fatShareValidation.status === "FAIL") {
-      logError("Dominância de gordura detectada", fatShareValidation);
-      return createErrorResponse(
-        `Plano estruturalmente inválido: ${fatShareValidation.food} contribui ${fatShareValidation.fatShare}% da gordura diária`,
-        400,
-        corsHeaders,
-        { 
-          code: "FAT_DOMINANCE_DETECTED", 
-          details: fatShareValidation,
-          action: "Regenerar plano ou trocar alimento por opção mais magra"
-        }
-      );
+      logWarn("Fat Share alto detectado (rebalanceador ajustará)", {
+        food: fatShareValidation.food,
+        fatShare: fatShareValidation.fatShare,
+      });
     }
 
-    // REGRA G-10 PROGRESSIVA: Classificar gordura implícita
+    // G-10: classifica gordura implícita (informativo)
     const implicitFatValidation = validateImplicitFat(allFoodsWithQuantity, targets.fat);
     
-    // REGENERATE: Excesso severo (>120%) → erro e regenerar
-    if (implicitFatValidation.status === "REGENERATE") {
-      logError("G-10 HARD FAIL: Excesso severo de gordura implícita", implicitFatValidation);
-      return createErrorResponse(
-        `Gordura implícita (${implicitFatValidation.totalImplicitFat}g) excede 120% da meta (${targets.fat}g). Regenerando plano.`,
-        400,
-        corsHeaders,
-        { 
-          code: "IMPLICIT_FAT_EXCEEDED", 
-          details: implicitFatValidation,
-          action: "Regenerar plano com proteínas mais magras"
-        }
-      );
-    }
+    // Determinar status G-10 para metadados
+    // REGENERATE → ALLOW_REBALANCE (deixar rebalanceador decidir)
+    const g10Status = implicitFatValidation.status === "REGENERATE" 
+      ? "ALLOW_REBALANCE" 
+      : implicitFatValidation.status;
     
     // Metadata para passar ao rebalanceador
     const g10Metadata = {
-      g10Status: implicitFatValidation.status, // PASS | ALLOW_REBALANCE
+      g10Status,
       implicitFatRatio: implicitFatValidation.ratio,
       implicitFatWarning: implicitFatValidation.warning,
+      fatShareWarning: fatShareValidation.status === "FAIL" 
+        ? `${fatShareValidation.food} contribui ${fatShareValidation.fatShare}% da gordura` 
+        : undefined,
     };
     
-    logInfo("G-10 OK", { 
-      implicitFat: implicitFatValidation.totalImplicitFat,
-      maxAllowed: implicitFatValidation.maxAllowed,
-      ratio: `${(implicitFatValidation.ratio * 100).toFixed(0)}%`,
-      status: implicitFatValidation.status,
+    logInfo("Metadados nutricionais (para rebalanceador)", { 
+      g10Status,
+      implicitFatRatio: `${(implicitFatValidation.ratio * 100).toFixed(0)}%`,
+      fatShareStatus: fatShareValidation.status,
     });
 
     // Validar estrutura
