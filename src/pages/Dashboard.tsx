@@ -35,6 +35,7 @@ import {
 import { CalorieRing } from '@/components/CalorieRing';
 import { MacroChart } from '@/components/MacroChart';
 import { AIRebalancer } from '@/components/AIRebalancer';
+import { SupplementToggle } from '@/components/SupplementToggle';
 
 import { UpgradeDialog } from '@/components/UpgradeDialog';
 import { AdherenceWidget } from '@/components/AdherenceWidget';
@@ -472,6 +473,20 @@ export default function Dashboard() {
             transition={{ delay: 0.15 }}
           >
             <AdherenceWidget />
+          </motion.section>
+        )}
+
+        {/* Supplement Toggle - always visible for users with a plan */}
+        {currentDietPlan && !isLinkedStudent && (
+          <motion.section
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.18 }}
+          >
+            <SupplementToggle 
+              initialValue={(profile as any)?.include_supplements || false}
+              compact
+            />
           </motion.section>
         )}
 
