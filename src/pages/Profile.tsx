@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { 
   ArrowLeft, 
   User, 
@@ -21,7 +21,9 @@ import {
   TrendingDown,
   ArrowUpRight,
   ArrowDownRight,
-  Minus
+  Minus,
+  Moon,
+  Check
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -106,9 +108,34 @@ export default function Profile() {
     goal: '' as 'lose_weight' | 'maintain' | 'gain_muscle' | '',
     activity_level: '' as 'sedentary' | 'light' | 'moderate' | 'active' | 'very_active' | '',
     meals_per_day: 4,
+    evening_meal_preference: 'no_preference' as 'full_dinner' | 'light_dinner' | 'no_preference',
     preferences: [] as string[],
     restrictions: [] as string[],
   });
+
+  const [savingPreference, setSavingPreference] = useState(false);
+
+  // Opções de preferência noturna
+  const EVENING_MEAL_OPTIONS = [
+    { 
+      value: 'full_dinner' as const, 
+      label: 'Jantar completo + Ceia leve',
+      description: 'Jantar com 3-5 itens, ceia com 2-3 itens',
+      icon: '🍽️'
+    },
+    { 
+      value: 'light_dinner' as const, 
+      label: 'Jantar leve + Ceia substancial',
+      description: 'Jantar com 2-3 itens, ceia com 3-5 itens',
+      icon: '🌙'
+    },
+    { 
+      value: 'no_preference' as const, 
+      label: 'Sem preferência',
+      description: 'O sistema decide a melhor distribuição',
+      icon: '⚖️'
+    },
+  ];
 
   useEffect(() => {
     if (profile) {
@@ -125,6 +152,12 @@ export default function Profile() {
         if (dbGoal === 'maintain') return 'maintain';
         return '';
       };
+
+      const mapEveningPreference = (pref: string | null): 'full_dinner' | 'light_dinner' | 'no_preference' => {
+        if (pref === 'full_dinner') return 'full_dinner';
+        if (pref === 'light_dinner') return 'light_dinner';
+        return 'no_preference';
+      };
       
       setFormData({
         name: profile.name || '',
@@ -135,6 +168,7 @@ export default function Profile() {
         goal: mapGoal(profile.goal),
         activity_level: (profile.activity_level as any) || '',
         meals_per_day: (profile as any).meals_per_day || 4,
+        evening_meal_preference: mapEveningPreference((profile as any).evening_meal_preference),
         preferences: profile.preferences || [],
         restrictions: profile.restrictions || [],
       });
@@ -209,6 +243,34 @@ export default function Profile() {
     } finally {
       setDeleting(false);
       setDeleteConfirmText('');
+    }
+  };
+
+  const handleSaveEveningPreference = async (value: 'full_dinner' | 'light_dinner' | 'no_preference') => {
+    if (!user) return;
+    
+    setSavingPreference(true);
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ 
+          evening_meal_preference: value,
+          updated_at: new Date().toISOString()
+        })
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+
+      setFormData(prev => ({ ...prev, evening_meal_preference: value }));
+      toast.success('Preferência noturna atualizada!', {
+        description: 'A alteração será aplicada ao gerar um novo plano.'
+      });
+      await refreshProfile();
+    } catch (error: any) {
+      console.error('Error saving evening preference:', error);
+      toast.error(error.message || 'Erro ao salvar preferência');
+    } finally {
+      setSavingPreference(false);
     }
   };
 
@@ -690,6 +752,58 @@ export default function Profile() {
                       initialValue={(profile as any)?.include_supplements || false}
                     />
                   </div>
+
+                  {/* Evening Meal Preference - Only for 5+ meals */}
+                  {formData.meals_per_day >= 5 && (
+                    <div className="mb-6">
+                      <div className="flex items-center gap-2 mb-3">
+                        <Moon className="w-4 h-4 text-primary" />
+                        <p className="text-sm font-medium">Preferência de Refeições Noturnas</p>
+                        <TooltipProvider delayDuration={200}>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Info className="w-4 h-4 text-muted-foreground cursor-help" />
+                            </TooltipTrigger>
+                            <TooltipContent side="right" className="max-w-xs p-3">
+                              <p className="font-semibold mb-2">Como isso afeta seu plano?</p>
+                              <p className="text-sm">
+                                Esta escolha define como as calorias e itens são distribuídos 
+                                entre jantar e ceia. A alteração será aplicada ao gerar um novo plano.
+                              </p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </div>
+                      <div className="grid gap-2">
+                        {EVENING_MEAL_OPTIONS.map((option) => (
+                          <button
+                            key={option.value}
+                            type="button"
+                            disabled={savingPreference}
+                            onClick={() => handleSaveEveningPreference(option.value)}
+                            className={`p-3 rounded-xl border text-left transition-all flex items-center gap-3 ${
+                              formData.evening_meal_preference === option.value
+                                ? 'border-primary bg-primary/10'
+                                : 'border-border hover:border-primary/50'
+                            } ${savingPreference ? 'opacity-50 cursor-not-allowed' : ''}`}
+                          >
+                            <span className="text-xl">{option.icon}</span>
+                            <div className="flex-1">
+                              <span className="font-medium text-foreground text-sm block">
+                                {option.label}
+                              </span>
+                              <span className="text-xs text-muted-foreground">
+                                {option.description}
+                              </span>
+                            </div>
+                            {formData.evening_meal_preference === option.value && (
+                              <Check className="w-5 h-5 text-primary shrink-0" />
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Request Change Button - Only for paid users */}
                   <div className="pt-4 border-t">

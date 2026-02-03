@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, ArrowRight, Check, Loader2, Utensils, Heart, Ban, Moon } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, Loader2, Utensils, Heart, Ban, Moon, Info } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Logo } from '@/components/Logo';
 import { ThemeToggle } from '@/components/ThemeToggle';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useAuth } from '@/contexts/AuthContext';
 
 import { supabase } from '@/integrations/supabase/client';
@@ -66,17 +67,20 @@ export default function Onboarding() {
     { 
       value: 'full_dinner' as const, 
       label: 'Jantar completo + Ceia leve',
-      description: 'Jantar tradicional com proteína e acompanhamentos, ceia com mingau ou frutas'
+      description: 'Jantar tradicional com proteína e acompanhamentos, ceia com mingau ou frutas',
+      distribution: { dinner: '60-65%', supper: '35-40%' }
     },
     { 
       value: 'light_dinner' as const, 
       label: 'Jantar leve + Ceia substancial',
-      description: 'Jantar mais leve e ceia mais completa, ideal para quem janta tarde'
+      description: 'Jantar mais leve e ceia mais completa, ideal para quem janta tarde',
+      distribution: { dinner: '35-40%', supper: '60-65%' }
     },
     { 
       value: 'no_preference' as const, 
       label: 'Sem preferência',
-      description: 'O sistema decide a melhor distribuição'
+      description: 'O sistema decide a melhor distribuição',
+      distribution: { dinner: '50%', supper: '50%' }
     },
   ];
 
@@ -470,6 +474,27 @@ export default function Onboarding() {
                             <h4 className="font-medium text-sm sm:text-base">
                               Como você prefere suas refeições noturnas?
                             </h4>
+                            <TooltipProvider delayDuration={200}>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Info className="w-4 h-4 text-muted-foreground cursor-help" />
+                                </TooltipTrigger>
+                                <TooltipContent side="bottom" className="max-w-xs p-3">
+                                  <p className="font-semibold mb-2">Como isso afeta seu plano?</p>
+                                  <p className="text-sm mb-2">
+                                    Esta escolha define como as calorias serão distribuídas entre 
+                                    jantar e ceia:
+                                  </p>
+                                  <ul className="text-sm space-y-1">
+                                    <li>• <strong>Jantar completo:</strong> Jantar recebe 3-5 itens, ceia 2-3 itens</li>
+                                    <li>• <strong>Jantar leve:</strong> Jantar recebe 2-3 itens, ceia 3-5 itens</li>
+                                  </ul>
+                                  <p className="text-xs text-muted-foreground mt-2">
+                                    Você pode alterar isso depois no seu Perfil.
+                                  </p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
                           </div>
                           <div className="grid gap-2 sm:gap-3">
                             {EVENING_MEAL_OPTIONS.map((option) => (
@@ -485,9 +510,16 @@ export default function Onboarding() {
                                     : 'border-border hover:border-primary/50'
                                 }`}
                               >
-                                <span className="font-medium text-foreground text-sm sm:text-base block">
-                                  {option.label}
-                                </span>
+                                <div className="flex items-center justify-between">
+                                  <span className="font-medium text-foreground text-sm sm:text-base">
+                                    {option.label}
+                                  </span>
+                                  {option.value !== 'no_preference' && (
+                                    <span className="text-xs text-primary font-medium hidden sm:block">
+                                      Jantar {option.distribution.dinner} | Ceia {option.distribution.supper}
+                                    </span>
+                                  )}
+                                </div>
                                 <span className="text-xs sm:text-sm text-muted-foreground">
                                   {option.description}
                                 </span>
