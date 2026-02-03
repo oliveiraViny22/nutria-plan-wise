@@ -117,15 +117,15 @@ export const HIGH_FAT_PROTEIN_RULES = {
  * Critérios para laticínios limpos (preferidos para refeições).
  * Calibrado com dados reais do banco (2026-02-03):
  * - Permite: Cottage (4.3g), Minas Frescal (1.4g), Iogurte Grego Light (0g), Ricota (10g)
- * - Bloqueia: Queijo Prato (28g), Mussarela (22g), Requeijão Cremoso (23g)
+ * - Bloqueia: Queijo Prato (28g), Mussarela (22g), Requeijão Cremoso (23g), Cream Cheese Light (12g)
  */
 export const LEAN_DAIRY_RULES = {
-  MAX_FAT_PER_100G: 10,          // g máximo de gordura
+  MAX_FAT_PER_100G: 8,           // g máximo de gordura (reduzido de 10 para bloquear Cream Cheese Light)
   MAX_CALORIES_PER_100G: 150,    // kcal máximo
 };
 
 /** Laticínios com alta gordura - limitar porções drasticamente */
-export const HIGH_FAT_DAIRY_THRESHOLD = 15; // g gordura por 100g
+export const HIGH_FAT_DAIRY_THRESHOLD = 10; // g gordura por 100g (reduzido de 15)
 
 /** Porção máxima para laticínios gordos (queijos amarelos) */
 export const MAX_HIGH_FAT_DAIRY_PORTION = 30; // g (1 fatia)
@@ -135,3 +135,19 @@ export const MAX_FAT_SHARE_PER_FOOD = 0.6; // 60% da gordura diária
 
 /** Porção máxima para proteínas gordas (quando permitidas) */
 export const MAX_HIGH_FAT_PROTEIN_PORTION = 40; // g
+
+// =====================================================
+// CONTROLE DE CARBOIDRATOS GORDOS (v5.3)
+// =====================================================
+
+/**
+ * Critérios para carboidratos limpos (preferidos para refeições).
+ * Bloqueia: Granola (14g fat), Farofa Pronta (12g fat), etc.
+ * Permite: Arroz (0.3g), Batata (0.1g), Pão Integral (2.5g)
+ */
+export const LEAN_CARB_RULES = {
+  MAX_FAT_PER_100G: 5,           // g máximo de gordura para carbs
+};
+
+/** Carboidratos com alta gordura - bloquear como base */
+export const HIGH_FAT_CARB_THRESHOLD = 5; // g gordura por 100g
