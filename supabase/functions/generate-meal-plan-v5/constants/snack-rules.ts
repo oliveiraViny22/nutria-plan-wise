@@ -77,9 +77,11 @@ export const BLOCKED_FOODS_BY_MEAL: Record<string, string[]> = {
     "mingau",
     "mingau de aveia",
     "aveia em flocos",  // Quando usado para mingau
+    "pipoca",           // Mais adequada como lanche
   ],
   lunch: [
     "mingau",
     "mingau de aveia",
+    "pipoca",           // Mais adequada como lanche
   ],
 };
