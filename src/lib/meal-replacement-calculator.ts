@@ -358,26 +358,47 @@ export function calculateMealReplacement(
   userGoal: 'lose_weight' | 'maintain' | 'gain_muscle'
 ): MealReplacement {
   const items: ReplacementItem[] = [];
-  let remaining = { ...targetMacros };
+  let currentMacros = { calories: 0, protein: 0, carbs: 0, fat: 0 };
   
-  // Limites de calorias: mínimo 90%, máximo 100% do original
-  const minCalories = targetMacros.calories * 0.90;
-  const maxCalories = targetMacros.calories * 1.00;
-  let currentCalories = 0;
-  
-  // Função para calcular espaço restante de calorias
-  const caloriesRemaining = () => maxCalories - currentCalories;
-  
-  // Função para verificar se podemos adicionar um item
-  const canAddItem = (macros: MacroTarget, scale: number = 1): boolean => {
-    const scaledCalories = macros.calories * scale;
-    return (currentCalories + scaledCalories) <= maxCalories;
+  // Limites: 90-100% calorias, máx 120% proteína/carbos/gordura
+  const limits = {
+    calories: { min: targetMacros.calories * 0.90, max: targetMacros.calories * 1.00 },
+    protein: { min: targetMacros.protein * 0.85, max: targetMacros.protein * 1.20 },
+    carbs: { min: targetMacros.carbs * 0.70, max: targetMacros.carbs * 1.30 },
+    fat: { min: targetMacros.fat * 0.70, max: targetMacros.fat * 1.30 },
   };
   
-  // Função para calcular o scale ideal para não exceder calorias
+  // Funções para calcular espaço restante
+  const remaining = () => ({
+    calories: limits.calories.max - currentMacros.calories,
+    protein: limits.protein.max - currentMacros.protein,
+    carbs: limits.carbs.max - currentMacros.carbs,
+    fat: limits.fat.max - currentMacros.fat,
+  });
+  
+  // Função para verificar se podemos adicionar um item sem exceder limites
+  const canAddItem = (macros: MacroTarget, scale: number = 1): boolean => {
+    const r = remaining();
+    return (
+      macros.calories * scale <= r.calories + 10 && // margem de 10kcal
+      macros.protein * scale <= r.protein + 2 &&    // margem de 2g
+      macros.fat * scale <= r.fat + 3               // margem de 3g
+    );
+  };
+  
+  // Função para calcular o scale máximo respeitando TODOS os limites
   const calculateOptimalScale = (macros: MacroTarget, desiredScale: number, minScale: number = 0.5): number => {
-    const maxAllowedScale = caloriesRemaining() / macros.calories;
-    return Math.max(minScale, Math.min(desiredScale, maxAllowedScale));
+    const r = remaining();
+    
+    // Calcular scale máximo para cada macro
+    const maxByCalories = macros.calories > 0 ? r.calories / macros.calories : desiredScale;
+    const maxByProtein = macros.protein > 0 ? r.protein / macros.protein : desiredScale;
+    const maxByFat = macros.fat > 5 ? r.fat / macros.fat : desiredScale; // Só limita se item tem muita gordura
+    
+    // Usar o menor dos limites
+    const maxAllowed = Math.min(maxByCalories, maxByProtein, maxByFat, desiredScale);
+    
+    return Math.max(minScale, maxAllowed);
   };
   
   // Função para adicionar um item
@@ -385,12 +406,15 @@ export function calculateMealReplacement(
     const item = catalog[name];
     if (!item) return false;
     
-    // Ajustar scale para não exceder calorias
-    const adjustedScale = Math.min(scale, caloriesRemaining() / item.macros.calories);
-    if (adjustedScale < 0.3) return false; // Porção muito pequena
+    // Ajustar scale para respeitar todos os limites
+    const adjustedScale = calculateOptimalScale(item.macros, scale, 0.25);
+    if (adjustedScale < 0.25) return false; // Porção muito pequena
     
     const finalScale = Math.round(adjustedScale * 4) / 4; // Arredondar para 0.25
     if (finalScale <= 0) return false;
+    
+    // Verificar se ainda cabe
+    if (!canAddItem(item.macros, finalScale)) return false;
     
     const scaledMacros = scaleMacros(item.macros, finalScale);
     
@@ -402,51 +426,49 @@ export function calculateMealReplacement(
       notes: item.notes,
     });
     
-    remaining.protein -= scaledMacros.protein;
-    remaining.calories -= scaledMacros.calories;
-    remaining.carbs -= scaledMacros.carbs;
-    remaining.fat -= scaledMacros.fat;
-    currentCalories += scaledMacros.calories;
+    currentMacros.protein += scaledMacros.protein;
+    currentMacros.calories += scaledMacros.calories;
+    currentMacros.carbs += scaledMacros.carbs;
+    currentMacros.fat += scaledMacros.fat;
     
     return true;
   };
   
-  // 1. PROTEÍNA: Usar Whey como base se precisar de muita proteína
-  if (remaining.protein >= 15 && caloriesRemaining() >= 60) {
+  // 1. PROTEÍNA: Usar Whey SOMENTE se precisar de muita proteína
+  const proteinDeficit = targetMacros.protein - currentMacros.protein;
+  if (proteinDeficit >= 12 && remaining().calories >= 60) {
     const wheyType = userGoal === 'lose_weight' ? 'Whey Protein Isolado' : 'Whey Protein Concentrado';
     const whey = SUPPLEMENT_CATALOG[wheyType];
     
-    // Calcular scoops ideais baseado em proteína E calorias disponíveis
-    const scoopsByProtein = Math.min(2, Math.ceil(remaining.protein / whey.macros.protein));
-    const scoopsByCalories = caloriesRemaining() / whey.macros.calories;
-    const optimalScoops = Math.min(scoopsByProtein, scoopsByCalories);
+    // Calcular scoops baseado na proteína NECESSÁRIA (não mais que 1 scoop para refeições pequenas)
+    const idealScoops = Math.min(1.5, proteinDeficit / whey.macros.protein);
+    const optimalScale = calculateOptimalScale(whey.macros, idealScoops, 0.5);
     
     // Arredondar para 0.5
-    const finalScoops = Math.max(0.5, Math.round(optimalScoops * 2) / 2);
+    const finalScoops = Math.round(optimalScale * 2) / 2;
     
-    if (canAddItem(whey.macros, finalScoops)) {
+    if (finalScoops >= 0.5) {
       addItem(wheyType, SUPPLEMENT_CATALOG, 'supplement', finalScoops);
     }
   }
 
   // 2. CARBOIDRATOS: Adicionar fonte de carboidrato se necessário
-  if (remaining.carbs >= 10 && caloriesRemaining() >= 45) {
-    const bananaCalories = FOOD_CATALOG['Banana'].macros.calories;
+  if (remaining().carbs >= 10 && remaining().calories >= 45) {
     const bananaScale = calculateOptimalScale(FOOD_CATALOG['Banana'].macros, 1, 0.5);
     if (bananaScale >= 0.5) {
       addItem('Banana', FOOD_CATALOG, 'food', bananaScale);
     }
   }
   
-  if (remaining.carbs >= 15 && caloriesRemaining() >= 75) {
-    const oatsScale = calculateOptimalScale(FOOD_CATALOG['Aveia em Flocos'].macros, remaining.carbs >= 25 ? 1 : 0.5, 0.5);
+  if (remaining().carbs >= 15 && remaining().calories >= 75) {
+    const oatsScale = calculateOptimalScale(FOOD_CATALOG['Aveia em Flocos'].macros, remaining().carbs >= 25 ? 1 : 0.5, 0.5);
     if (oatsScale >= 0.5) {
       addItem('Aveia em Flocos', FOOD_CATALOG, 'food', oatsScale);
     }
   }
 
   // 3. GORDURA: Adicionar gordura saudável se necessário (variar entre opções)
-  if (remaining.fat >= 6 && caloriesRemaining() >= 80) {
+  if (remaining().fat >= 6 && remaining().calories >= 80) {
     const fatOptions = ['Pasta de Amendoim Integral', 'Castanha de Caju', 'Nozes', 'Amêndoas'];
     const shuffled = fatOptions.sort(() => Math.random() - 0.5);
     
@@ -460,14 +482,14 @@ export function calculateMealReplacement(
     }
   }
 
-  // 4. PROTEÍNA ADICIONAL: Se ainda precisar
-  if (remaining.protein >= 6 && caloriesRemaining() >= 50) {
+  // 4. PROTEÍNA ADICIONAL: Se ainda precisar (mas sem exceder limite)
+  if (remaining().protein >= 6 && remaining().calories >= 50) {
     const proteinOptions = ['Iogurte Grego Natural', 'Ovo Cozido', 'Queijo Cottage'];
     
     for (const option of proteinOptions) {
       const item = FOOD_CATALOG[option];
       if (option === 'Ovo Cozido') {
-        const numEggs = Math.min(3, Math.ceil(remaining.protein / item.macros.protein));
+        const numEggs = Math.min(2, Math.ceil(remaining().protein / item.macros.protein));
         const eggScale = calculateOptimalScale(item.macros, numEggs, 1);
         if (eggScale >= 1 && canAddItem(item.macros, eggScale)) {
           addItem(option, FOOD_CATALOG, 'food', Math.round(eggScale));
@@ -484,7 +506,7 @@ export function calculateMealReplacement(
   }
 
   // 5. LÍQUIDO: Base para shake (apenas se tiver suplemento)
-  if (items.some(i => i.type === 'supplement') && caloriesRemaining() >= 35) {
+  if (items.some(i => i.type === 'supplement') && remaining().calories >= 35) {
     const milkType = userGoal === 'lose_weight' ? 'Leite Desnatado' : 
                      userGoal === 'gain_muscle' ? 'Leite Integral' : 'Leite Desnatado';
     
@@ -495,11 +517,11 @@ export function calculateMealReplacement(
   }
 
   // 6. AJUSTE FINO: Preencher espaço restante se ainda abaixo de 90%
-  const currentAccuracy = (currentCalories / targetMacros.calories) * 100;
+  const currentAccuracy = (currentMacros.calories / targetMacros.calories) * 100;
   
-  if (currentAccuracy < 90 && caloriesRemaining() >= 30) {
+  if (currentAccuracy < 90 && remaining().calories >= 30) {
     // Adicionar mel para completar carboidratos/calorias
-    const melScale = Math.min(2, caloriesRemaining() / FOOD_CATALOG['Mel'].macros.calories);
+    const melScale = Math.min(2, remaining().calories / FOOD_CATALOG['Mel'].macros.calories);
     if (melScale >= 0.5) {
       addItem('Mel', FOOD_CATALOG, 'food', Math.round(melScale * 2) / 2);
     }
