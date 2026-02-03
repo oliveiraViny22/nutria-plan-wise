@@ -283,6 +283,34 @@ export function isHighFatNutOrSpread(food: Food): boolean {
     return true;
   }
   
+  // v5.6: SEMENTES GORDUROSAS (Linhaça, Chia, Gergelim, etc.)
+  // Estas têm 30-45g de gordura/100g e impedem normalização
+  const highFatSeedKeywords = [
+    "linhaça",
+    "chia",
+    "gergelim",
+    "semente de girassol",
+    "semente de abóbora",
+  ];
+  
+  if (highFatSeedKeywords.some(kw => nameLower.includes(kw)) && food.fat >= 30) {
+    logDebug("Bloqueando semente gordurosa como seleção primária", {
+      name: food.name,
+      fat: food.fat,
+      protein: food.protein,
+    });
+    return true;
+  }
+  
+  // Soja em grão também tem gordura alta quando cozida
+  if (nameLower.includes("soja") && nameLower.includes("grão") && food.fat >= 8) {
+    logDebug("Bloqueando soja em grão gordurosa", {
+      name: food.name,
+      fat: food.fat,
+    });
+    return true;
+  }
+  
   return false;
 }
 
