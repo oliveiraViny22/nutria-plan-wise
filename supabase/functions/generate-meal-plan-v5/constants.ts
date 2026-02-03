@@ -91,11 +91,16 @@ export const ROLE_ALIASES: Record<string, string[]> = {
 // CONTROLE DE PROTEÍNAS GORDAS (v5.1)
 // =====================================================
 
-/** Critérios para proteínas magras (elegíveis como base) */
+/** 
+ * Critérios para proteínas magras (elegíveis como base).
+ * Calibrado com dados reais do banco (2026-02-03):
+ * - 12g fat permite: Filé Mignon (8.8g), Patinho (7.3g), Coxão Mole (8.3g), Lombo (11g), Coxa (11g)
+ * - 220kcal permite: Patinho (219), Filé (219), Coxão (212), Coxa (209)
+ */
 export const LEAN_PROTEIN_RULES = {
   MIN_PROTEIN_PER_100G: 15,      // g mínimo de proteína
-  MAX_FAT_PER_100G: 10,          // g máximo de gordura
-  MAX_CALORIES_PER_100G: 200,    // kcal máximo
+  MAX_FAT_PER_100G: 12,          // g máximo de gordura (relaxado de 10)
+  MAX_CALORIES_PER_100G: 220,    // kcal máximo (relaxado de 200)
 };
 
 /** Critérios para proteínas gordas (bloqueadas como base) */
