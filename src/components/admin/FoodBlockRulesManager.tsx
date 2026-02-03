@@ -8,21 +8,23 @@ import {
   Wheat,
   Nut,
   Leaf,
-  AlertTriangle,
   CheckCircle2,
   XCircle,
   Filter,
   RefreshCw,
   Loader2,
+  Unlock,
+  Lock,
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Switch } from '@/components/ui/switch';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -89,46 +91,110 @@ interface BlockedFood extends Food {
   blockReason: string;
   blockRule: string;
   canSubstitute: boolean;
+  isUnblocked: boolean;
+}
+
+interface FoodBlockOverride {
+  id: string;
+  food_id: string;
+  is_unblocked: boolean;
+  reason: string | null;
 }
 
 type BlockCategory = 'proteins' | 'dairy' | 'carbs' | 'nuts' | 'seeds' | 'all';
 
 export function FoodBlockRulesManager() {
   const [foods, setFoods] = useState<Food[]>([]);
+  const [overrides, setOverrides] = useState<FoodBlockOverride[]>([]);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [activeCategory, setActiveCategory] = useState<BlockCategory>('all');
 
   useEffect(() => {
-    fetchFoods();
+    fetchData();
   }, []);
 
-  const fetchFoods = async () => {
+  const fetchData = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('foods')
-        .select('id, name, calories, protein, carbs, fat, category, is_active')
-        .eq('is_active', true)
-        .order('name');
+      const [foodsResult, overridesResult] = await Promise.all([
+        supabase
+          .from('foods')
+          .select('id, name, calories, protein, carbs, fat, category, is_active')
+          .eq('is_active', true)
+          .order('name'),
+        supabase
+          .from('food_block_overrides')
+          .select('*'),
+      ]);
 
-      if (error) throw error;
-      setFoods(data || []);
+      if (foodsResult.error) throw foodsResult.error;
+      if (overridesResult.error) throw overridesResult.error;
+
+      setFoods(foodsResult.data || []);
+      setOverrides(overridesResult.data || []);
     } catch (error) {
-      console.error('Error fetching foods:', error);
-      toast.error('Erro ao carregar alimentos');
+      console.error('Error fetching data:', error);
+      toast.error('Erro ao carregar dados');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const toggleFoodBlock = async (food: BlockedFood) => {
+    setSaving(food.id);
+    try {
+      const newUnblocked = !food.isUnblocked;
+      const existingOverride = overrides.find(o => o.food_id === food.id);
+
+      if (existingOverride) {
+        if (newUnblocked) {
+          // Atualizar para desbloqueado
+          const { error } = await supabase
+            .from('food_block_overrides')
+            .update({ is_unblocked: true, reason: 'Desbloqueado manualmente pelo admin' })
+            .eq('id', existingOverride.id);
+          if (error) throw error;
+        } else {
+          // Remover override (voltar ao bloqueio padrão)
+          const { error } = await supabase
+            .from('food_block_overrides')
+            .delete()
+            .eq('id', existingOverride.id);
+          if (error) throw error;
+        }
+      } else {
+        // Criar novo override
+        const { error } = await supabase
+          .from('food_block_overrides')
+          .insert({
+            food_id: food.id,
+            is_unblocked: newUnblocked,
+            reason: newUnblocked ? 'Desbloqueado manualmente pelo admin' : null,
+          });
+        if (error) throw error;
+      }
+
+      toast.success(newUnblocked ? `${food.name} liberado como âncora` : `${food.name} bloqueado novamente`);
+      await fetchData();
+    } catch (error) {
+      console.error('Error toggling food block:', error);
+      toast.error('Erro ao alterar bloqueio');
+    } finally {
+      setSaving(null);
     }
   };
 
   // Classifica alimentos bloqueados por regra
   const blockedFoods = useMemo(() => {
     const blocked: BlockedFood[] = [];
+    const overrideMap = new Map(overrides.map(o => [o.food_id, o]));
 
     foods.forEach((food) => {
       const category = (food.category || '').toLowerCase();
       const nameLower = food.name.toLowerCase();
+      const override = overrideMap.get(food.id);
 
       // v5.1: Proteínas gordas bloqueadas como base
       if (category === 'proteinas' && food.protein >= BLOCK_RULES.leanProtein.MIN_PROTEIN_PER_100G) {
@@ -142,6 +208,7 @@ export function FoodBlockRulesManager() {
             blockReason: `Gordura (${food.fat}g) ou calorias (${food.calories}kcal) altas demais para proteína base`,
             blockRule: 'v5.1 - Proteína Gorda',
             canSubstitute: true,
+            isUnblocked: override?.is_unblocked ?? false,
           });
           return;
         }
@@ -154,6 +221,7 @@ export function FoodBlockRulesManager() {
           blockReason: `Gordura (${food.fat}g/100g) ≥ ${BLOCK_RULES.highFatDairy.THRESHOLD}g`,
           blockRule: 'v5.2 - Laticínio Gordo',
           canSubstitute: true,
+          isUnblocked: override?.is_unblocked ?? false,
         });
         return;
       }
@@ -165,6 +233,7 @@ export function FoodBlockRulesManager() {
           blockReason: `Gordura (${food.fat}g/100g) ≥ ${BLOCK_RULES.leanCarb.MAX_FAT_PER_100G}g para carboidratos`,
           blockRule: 'v5.3 - Carboidrato Gordo',
           canSubstitute: true,
+          isUnblocked: override?.is_unblocked ?? false,
         });
         return;
       }
@@ -179,6 +248,7 @@ export function FoodBlockRulesManager() {
           blockReason: `Oleaginosa com gordura massiva (${food.fat}g/100g)`,
           blockRule: 'v5.5 - Oleaginosas',
           canSubstitute: true,
+          isUnblocked: override?.is_unblocked ?? false,
         });
         return;
       }
@@ -190,6 +260,7 @@ export function FoodBlockRulesManager() {
           blockReason: `Semente com alta gordura (${food.fat}g/100g)`,
           blockRule: 'v5.6 - Sementes Gordurosas',
           canSubstitute: true,
+          isUnblocked: override?.is_unblocked ?? false,
         });
         return;
       }
@@ -201,13 +272,14 @@ export function FoodBlockRulesManager() {
           blockReason: `Laticínio com gordura dominante (${food.fat}g/100g)`,
           blockRule: 'v5.7 - Laticínio Muito Gordo',
           canSubstitute: true,
+          isUnblocked: override?.is_unblocked ?? false,
         });
         return;
       }
     });
 
     return blocked;
-  }, [foods]);
+  }, [foods, overrides]);
 
   // Filtrar por categoria e busca
   const filteredBlocked = useMemo(() => {
@@ -244,6 +316,7 @@ export function FoodBlockRulesManager() {
 
   // Contadores por categoria
   const counts = useMemo(() => {
+    const unblockedCount = blockedFoods.filter(f => f.isUnblocked).length;
     return {
       proteins: blockedFoods.filter((f) => f.blockRule.includes('v5.1')).length,
       dairy: blockedFoods.filter((f) => f.blockRule.includes('v5.2') || f.blockRule.includes('v5.7')).length,
@@ -251,6 +324,7 @@ export function FoodBlockRulesManager() {
       nuts: blockedFoods.filter((f) => f.blockRule.includes('v5.5')).length,
       seeds: blockedFoods.filter((f) => f.blockRule.includes('v5.6')).length,
       all: blockedFoods.length,
+      unblocked: unblockedCount,
     };
   }, [blockedFoods]);
 
@@ -285,19 +359,23 @@ export function FoodBlockRulesManager() {
       {/* Header com explicação */}
       <Alert>
         <Info className="h-4 w-4" />
-        <AlertTitle>Como funciona o bloqueio de alimentos?</AlertTitle>
+        <AlertTitle>Controle Granular de Bloqueios</AlertTitle>
         <AlertDescription className="mt-2 space-y-2">
           <p>
             O sistema bloqueia automaticamente certos alimentos como <strong>seleções primárias/âncoras</strong>{' '}
-            para evitar planos com excesso de gordura implícita (estruturalmente inválidos).
+            para evitar planos com excesso de gordura implícita. Você pode <strong>liberar exceções</strong> específicas.
           </p>
           <div className="flex items-center gap-4 mt-3 text-sm">
             <div className="flex items-center gap-1.5">
-              <XCircle className="h-4 w-4 text-red-500" />
+              <Lock className="h-4 w-4 text-red-500" />
               <span>Bloqueado como âncora</span>
             </div>
             <div className="flex items-center gap-1.5">
-              <CheckCircle2 className="h-4 w-4 text-green-500" />
+              <Unlock className="h-4 w-4 text-green-500" />
+              <span>Liberado pelo admin ({counts.unblocked})</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <CheckCircle2 className="h-4 w-4 text-blue-500" />
               <span>Disponível para substituição</span>
             </div>
           </div>
@@ -314,10 +392,10 @@ export function FoodBlockRulesManager() {
                 Alimentos Bloqueados pelo Gerador
               </CardTitle>
               <CardDescription>
-                {counts.all} alimentos bloqueados como seleção primária
+                {counts.all} alimentos bloqueados como seleção primária • {counts.unblocked} exceções ativas
               </CardDescription>
             </div>
-            <Button variant="outline" size="sm" onClick={fetchFoods}>
+            <Button variant="outline" size="sm" onClick={fetchData}>
               <RefreshCw className="h-4 w-4 mr-2" />
               Atualizar
             </Button>
@@ -382,14 +460,26 @@ export function FoodBlockRulesManager() {
                   filteredBlocked.map((food) => (
                     <div
                       key={food.id}
-                      className="flex items-center justify-between p-3 rounded-lg border bg-card hover:bg-muted/50 transition-colors"
+                      className={`flex items-center justify-between p-3 rounded-lg border transition-colors ${
+                        food.isUnblocked 
+                          ? 'bg-green-500/5 border-green-500/20' 
+                          : 'bg-card hover:bg-muted/50'
+                      }`}
                     >
                       <div className="flex items-center gap-3">
                         <div className={`p-2 rounded-md ${getRuleBadgeColor(food.blockRule)}`}>
                           {getCategoryIcon(food.blockRule)}
                         </div>
                         <div>
-                          <div className="font-medium">{food.name}</div>
+                          <div className="font-medium flex items-center gap-2">
+                            {food.name}
+                            {food.isUnblocked && (
+                              <Badge variant="outline" className="bg-green-500/10 text-green-600 border-green-500/20 text-xs">
+                                <Unlock className="h-3 w-3 mr-1" />
+                                Liberado
+                              </Badge>
+                            )}
+                          </div>
                           <div className="text-sm text-muted-foreground flex items-center gap-2">
                             <span>{food.calories}kcal</span>
                             <span>•</span>
@@ -415,19 +505,26 @@ export function FoodBlockRulesManager() {
                             </TooltipContent>
                           </Tooltip>
                         </TooltipProvider>
+                        
                         <TooltipProvider>
                           <Tooltip>
-                            <TooltipTrigger>
-                              {food.canSubstitute ? (
-                                <CheckCircle2 className="h-5 w-5 text-green-500" />
-                              ) : (
-                                <XCircle className="h-5 w-5 text-red-500" />
-                              )}
+                            <TooltipTrigger asChild>
+                              <div className="flex items-center gap-2">
+                                {saving === food.id ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <Switch
+                                    checked={food.isUnblocked}
+                                    onCheckedChange={() => toggleFoodBlock(food)}
+                                    aria-label={`Liberar ${food.name}`}
+                                  />
+                                )}
+                              </div>
                             </TooltipTrigger>
                             <TooltipContent>
-                              {food.canSubstitute
-                                ? 'Disponível para substituição manual'
-                                : 'Bloqueado completamente'}
+                              {food.isUnblocked
+                                ? 'Clique para bloquear novamente como âncora'
+                                : 'Clique para liberar como âncora'}
                             </TooltipContent>
                           </Tooltip>
                         </TooltipProvider>

@@ -31,7 +31,7 @@ import { GENERATOR_CONTRACT } from "../_shared/nutrition-contracts.ts";
 import type { Food, MacroTargets, MealWithOptions, MealResult, UserProfile } from "./types.ts";
 import { MEAL_NAMES, MEAL_TYPES_MAP } from "./constants.ts";
 import { logInfo, logError, logWarn } from "./logger.ts";
-import { filterEligibleFoods, validateFatShare, validateImplicitFat } from "./food-filter.ts";
+import { filterEligibleFoods, validateFatShare, validateImplicitFat, loadBlockOverrides } from "./food-filter.ts";
 import { loadAnchorFoods } from "./anchor-selection.ts";
 import { loadTemplatesWithRoles } from "./template-loader.ts";
 import { buildMealWithAnchors } from "./meal-builder.ts";
@@ -97,10 +97,11 @@ serve(async (req) => {
 
     logInfo("Configuração", { mealsPerDay, mealTypes, mealOptionsLimit });
 
-    // Carregar templates e âncoras em paralelo
+    // Carregar templates, âncoras e overrides de bloqueio em paralelo
     const [templates, anchorFoods] = await Promise.all([
       loadTemplatesWithRoles(supabase),
       loadAnchorFoods(supabase),
+      loadBlockOverrides(supabase), // Carrega exceções de alimentos liberados pelo admin
     ]);
     logInfo("Templates carregados", { count: templates.size });
 

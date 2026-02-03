@@ -202,6 +202,44 @@ export type Database = {
           },
         ]
       }
+      food_block_overrides: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          food_id: string
+          id: string
+          is_unblocked: boolean
+          reason: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          food_id: string
+          id?: string
+          is_unblocked?: boolean
+          reason?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          food_id?: string
+          id?: string
+          is_unblocked?: boolean
+          reason?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "food_block_overrides_food_id_fkey"
+            columns: ["food_id"]
+            isOneToOne: true
+            referencedRelation: "foods"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       food_imports: {
         Row: {
           completed_at: string | null

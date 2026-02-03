@@ -18,12 +18,48 @@ import {
   HIGH_FAT_CARB_THRESHOLD,
   IMPLICIT_FAT_LIMITS,
 } from "./constants.ts";
-import { logDebug, logWarn } from "./logger.ts";
+import { logDebug, logWarn, logInfo } from "./logger.ts";
 import {
   isValidCategory,
   EXCLUDED_FROM_AUTO_PLAN,
   type FoodCategory,
 } from "../_shared/food-categories.ts";
+
+// =====================================================
+// OVERRIDE DE BLOQUEIOS (alimentos liberados pelo admin)
+// =====================================================
+
+let unblockedFoodIds: Set<string> = new Set();
+
+/**
+ * Carrega os overrides de bloqueio do banco de dados.
+ * Deve ser chamado uma vez no início do processo de geração.
+ */
+export async function loadBlockOverrides(supabase: any): Promise<void> {
+  try {
+    const { data, error } = await supabase
+      .from("food_block_overrides")
+      .select("food_id")
+      .eq("is_unblocked", true);
+    
+    if (error) {
+      logWarn("Erro ao carregar overrides de bloqueio", { error: error.message });
+      return;
+    }
+    
+    unblockedFoodIds = new Set((data || []).map((o: { food_id: string }) => o.food_id));
+    logInfo("Overrides de bloqueio carregados", { count: unblockedFoodIds.size });
+  } catch (e) {
+    logWarn("Falha ao carregar overrides", { error: String(e) });
+  }
+}
+
+/**
+ * Verifica se um alimento foi liberado manualmente pelo admin.
+ */
+export function isManuallyUnblocked(foodId: string): boolean {
+  return unblockedFoodIds.has(foodId);
+}
 
 export function isPureFat(foodName: string): boolean {
   const nameLower = foodName.toLowerCase();
@@ -378,7 +414,8 @@ export function selectFoodForRole(
     
     // v5.5: BLOQUEIO GLOBAL de oleaginosas e pastas de amendoim como seleções primárias
     // Estes alimentos têm gordura massiva (40-60g/100g) que impede normalização
-    if (isHighFatNutOrSpread(f)) {
+    // EXCETO se o admin liberou manualmente
+    if (isHighFatNutOrSpread(f) && !isManuallyUnblocked(f.id)) {
       logDebug("Bloqueando oleaginosa/pasta como seleção primária", {
         name: f.name,
         fat: f.fat,
@@ -388,7 +425,8 @@ export function selectFoodForRole(
     }
     
     // v5.1: Papéis de proteína base exigem proteínas magras
-    if (isProteinBaseRole && cat === "proteinas") {
+    // EXCETO se o admin liberou manualmente
+    if (isProteinBaseRole && cat === "proteinas" && !isManuallyUnblocked(f.id)) {
       // Bloquear proteínas com alta gordura
       if (isHighFatProtein(f)) {
         logDebug("Bloqueando proteína gorda como base", {
@@ -408,7 +446,8 @@ export function selectFoodForRole(
     }
     
     // v5.2: Papéis de laticínio bloqueiam laticínios muito gordos como primeira escolha
-    if (isLaticinioRole && cat === "laticinios") {
+    // EXCETO se o admin liberou manualmente
+    if (isLaticinioRole && cat === "laticinios" && !isManuallyUnblocked(f.id)) {
       // Bloquear laticínios muito gordos como primeira seleção
       if (isHighFatDairy(f)) {
         logDebug("Bloqueando laticínio gordo como primeira escolha", {
@@ -420,7 +459,8 @@ export function selectFoodForRole(
     }
     
     // v5.3: Papéis de carboidrato bloqueiam carboidratos gordos
-    if (isCarbBaseRole && cat === "carboidratos") {
+    // EXCETO se o admin liberou manualmente
+    if (isCarbBaseRole && cat === "carboidratos" && !isManuallyUnblocked(f.id)) {
       if (isHighFatCarb(f)) {
         logDebug("Bloqueando carboidrato gordo como base", {
           name: f.name,
