@@ -76,19 +76,17 @@ export function detectNutritionalGaps(
 /**
  * Suplementos base por objetivo
  */
+/**
+ * Suplementos base por objetivo - EXCLUINDO itens que impactam macros
+ * (Whey, BCAA, Caseína, Maltodextrina, Hipercalórico são excluídos pois
+ * as alternativas de refeição já contemplam suplementação proteica)
+ */
 const GOAL_SUPPLEMENTS: Record<UserGoal, SupplementPeriod[]> = {
   lose_weight: [
     {
       period: 'Manhã',
       emoji: '🌅',
       supplements: [
-        { 
-          name: 'Whey Protein Isolado', 
-          dosage: '25g', 
-          timing: 'Em jejum ou pós-treino',
-          priority: 'essential',
-          reason: 'Preserva massa magra durante déficit calórico'
-        },
         { 
           name: 'Cafeína', 
           dosage: '100-200mg', 
@@ -102,19 +100,6 @@ const GOAL_SUPPLEMENTS: Record<UserGoal, SupplementPeriod[]> = {
           timing: 'Com o café da manhã',
           priority: 'recommended',
           reason: 'Compensa restrição calórica'
-        },
-      ]
-    },
-    {
-      period: 'Tarde',
-      emoji: '☀️',
-      supplements: [
-        { 
-          name: 'L-Carnitina', 
-          dosage: '1-2g', 
-          timing: 'Antes do treino',
-          priority: 'optional',
-          reason: 'Auxilia na oxidação de gorduras'
         },
       ]
     },
@@ -196,38 +181,11 @@ const GOAL_SUPPLEMENTS: Record<UserGoal, SupplementPeriod[]> = {
           reason: 'Aumenta força e volume muscular'
         },
         { 
-          name: 'Whey Protein', 
-          dosage: '30g', 
-          timing: 'Pós café da manhã',
-          priority: 'essential',
-          reason: 'Síntese proteica muscular'
-        },
-        { 
           name: 'Multivitamínico', 
           dosage: '1 cápsula', 
           timing: 'Com o café da manhã',
           priority: 'recommended',
           reason: 'Suporte metabólico'
-        },
-      ]
-    },
-    {
-      period: 'Tarde',
-      emoji: '☀️',
-      supplements: [
-        { 
-          name: 'Whey Protein', 
-          dosage: '30g', 
-          timing: 'Pós-treino ou lanche',
-          priority: 'essential',
-          reason: 'Janela anabólica pós-treino'
-        },
-        { 
-          name: 'BCAA', 
-          dosage: '5-10g', 
-          timing: 'Intra ou pós-treino',
-          priority: 'optional',
-          reason: 'Recuperação muscular'
         },
       ]
     },
@@ -251,57 +209,20 @@ const GOAL_SUPPLEMENTS: Record<UserGoal, SupplementPeriod[]> = {
         },
       ]
     },
-    {
-      period: 'Antes de Dormir',
-      emoji: '😴',
-      supplements: [
-        { 
-          name: 'Caseína', 
-          dosage: '30g', 
-          timing: '30 min antes de dormir',
-          priority: 'recommended',
-          reason: 'Proteína de absorção lenta (8h)'
-        },
-      ]
-    },
   ],
 };
 
 /**
  * Suplementos adicionais para cobrir gaps nutricionais
+ * NOTA: Itens que impactam macros (Whey, Maltodextrina, Hipercalórico) 
+ * foram removidos pois as alternativas de refeição já cobrem esses gaps.
+ * Mantemos apenas alertas informativos sobre os gaps detectados.
  */
 function getGapSupplements(gaps: NutritionalGaps): Supplement[] {
   const supplements: Supplement[] = [];
 
-  if (gaps.lowProtein) {
-    supplements.push({
-      name: 'Whey Protein Extra',
-      dosage: '+20-30g',
-      timing: 'Entre refeições',
-      priority: 'essential',
-      reason: '⚠️ Proteína abaixo da meta - adicione mais 1 dose'
-    });
-  }
-
-  if (gaps.lowCarbs) {
-    supplements.push({
-      name: 'Maltodextrina ou Waxy Maize',
-      dosage: '30-50g',
-      timing: 'Pré ou pós-treino',
-      priority: 'recommended',
-      reason: '⚠️ Carboidratos baixos - energia para treino'
-    });
-  }
-
-  if (gaps.lowCalories) {
-    supplements.push({
-      name: 'Hipercalórico ou Pasta de Amendoim',
-      dosage: '1 porção',
-      timing: 'Lanche da tarde',
-      priority: 'recommended',
-      reason: '⚠️ Calorias abaixo da meta - adicione calorias densas'
-    });
-  }
+  // Apenas alertas informativos - suplementos de macro removidos
+  // Os gaps são tratados pelas alternativas de refeição (MealReplacementCard)
 
   return supplements;
 }
