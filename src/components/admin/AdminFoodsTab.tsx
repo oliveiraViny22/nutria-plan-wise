@@ -20,6 +20,7 @@ import {
   Save,
   Eye,
   AlertCircle,
+  FlaskConical,
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -28,6 +29,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Switch } from '@/components/ui/switch';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -371,7 +373,16 @@ export function AdminFoodsTab({
                     <TableBody>
                       {foods.map((food) => (
                         <TableRow key={food.id}>
-                          <TableCell className="font-medium truncate" title={food.name}>{food.name}</TableCell>
+                          <TableCell className="font-medium truncate" title={food.name}>
+                            <div className="flex items-center gap-1.5">
+                              {food.is_supplement_item && (
+                                <span title="Item de suplementação">
+                                  <FlaskConical className="h-3.5 w-3.5 text-primary flex-shrink-0" />
+                                </span>
+                              )}
+                              <span className="truncate">{food.name}</span>
+                            </div>
+                          </TableCell>
                           <TableCell>
                             <Badge variant="outline" className="text-xs truncate max-w-full">{food.category || '-'}</Badge>
                           </TableCell>
@@ -388,7 +399,7 @@ export function AdminFoodsTab({
                                 variant="ghost"
                                 size="icon"
                                 className="h-8 w-8"
-                                onClick={() => {
+                              onClick={() => {
                                   setEditingFood(food);
                                   setEditedFoodData({
                                     name: food.name,
@@ -399,6 +410,11 @@ export function AdminFoodsTab({
                                     category: food.category,
                                     processing_level: food.processing_level,
                                     serving_size: food.serving_size,
+                                    is_supplement_item: food.is_supplement_item || false,
+                                    supplement_portion: food.supplement_portion,
+                                    supplement_notes: food.supplement_notes,
+                                    supplement_min_portion: food.supplement_min_portion,
+                                    supplement_max_portion: food.supplement_max_portion,
                                   });
                                 }}
                               >
@@ -657,6 +673,75 @@ export function AdminFoodsTab({
                   onChange={(e) => setEditedFoodData(prev => ({ ...prev, serving_size: e.target.value }))}
                   placeholder="Ex: 100g"
                 />
+              </div>
+
+              {/* Seção de Suplementação */}
+              <div className="border-t pt-4 mt-4 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <FlaskConical className="h-4 w-4 text-primary" />
+                    <Label htmlFor="is_supplement_item" className="font-medium">
+                      Item de Suplementação
+                    </Label>
+                  </div>
+                  <Switch
+                    id="is_supplement_item"
+                    checked={editedFoodData.is_supplement_item || false}
+                    onCheckedChange={(checked) => setEditedFoodData(prev => ({ 
+                      ...prev, 
+                      is_supplement_item: checked,
+                      // Preencher valores padrão quando ativado
+                      supplement_portion: checked && !prev.supplement_portion ? (prev.serving_size || '100g') : prev.supplement_portion,
+                      supplement_min_portion: checked && prev.supplement_min_portion === undefined ? 0.5 : prev.supplement_min_portion,
+                      supplement_max_portion: checked && prev.supplement_max_portion === undefined ? 2 : prev.supplement_max_portion,
+                    }))}
+                  />
+                </div>
+
+                {editedFoodData.is_supplement_item && (
+                  <div className="space-y-4 pl-6 border-l-2 border-primary/20">
+                    <div className="space-y-2">
+                      <Label>Porção Padrão</Label>
+                      <Input
+                        value={editedFoodData.supplement_portion || ''}
+                        onChange={(e) => setEditedFoodData(prev => ({ ...prev, supplement_portion: e.target.value }))}
+                        placeholder="Ex: 30g, 1 scoop, 200ml"
+                      />
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>Porção Mínima (fator)</Label>
+                        <Input
+                          type="number"
+                          min={0.25}
+                          step={0.25}
+                          value={editedFoodData.supplement_min_portion || 0.5}
+                          onChange={(e) => setEditedFoodData(prev => ({ ...prev, supplement_min_portion: parseFloat(e.target.value) || 0.5 }))}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Porção Máxima (fator)</Label>
+                        <Input
+                          type="number"
+                          min={0.25}
+                          step={0.25}
+                          value={editedFoodData.supplement_max_portion || 2}
+                          onChange={(e) => setEditedFoodData(prev => ({ ...prev, supplement_max_portion: parseFloat(e.target.value) || 2 }))}
+                        />
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label>Notas de Suplementação</Label>
+                      <Input
+                        value={editedFoodData.supplement_notes || ''}
+                        onChange={(e) => setEditedFoodData(prev => ({ ...prev, supplement_notes: e.target.value }))}
+                        placeholder="Ex: Ideal para shakes pós-treino"
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="flex justify-end gap-2 pt-4">
