@@ -19,6 +19,7 @@ import { useUserRole } from '@/hooks/useUserRole';
 import { useAccountPermissions } from '@/hooks/useAccountPermissions';
 import { useSubscription } from '@/hooks/useSubscription';
 import { useSubstitution } from '@/hooks/useSubstitution';
+import { useUsageLimits } from '@/hooks/useUsageLimits';
 import { useAuth } from '@/contexts/AuthContext';
 import { Meal, Food, MEAL_NAMES, MealType, MealOption, MealOptionFood } from '@/lib/types';
 import { getCategoryLabel, getCategoryColor, isValidCategory } from '@/lib/food-categories';
@@ -90,12 +91,11 @@ export default function MealDetail() {
   
   const { plan_name, meal_options_limit, can_substitute } = useAccountPermissions();
   const { currentPlan, usage } = useSubscription();
+  const { isLimitReached, refresh: refreshUsageLimits } = useUsageLimits();
   const isPaidPlan = plan_name.toLowerCase() !== 'gratuito';
   
-  // Check if substitution limit is reached
-  const substitutionLimitReached = usage && currentPlan 
-    ? usage.substitutions_used >= currentPlan.substitution_limit 
-    : false;
+  // Check if substitution limit is reached (usa hook dedicado para precisão)
+  const substitutionLimitReached = isLimitReached('substitution');
   
   const canEdit = !isLinkedStudent || isProfessionalViewingStudent;
   const canShowSubstituteButton = canEdit && can_substitute && !substitutionLimitReached;
@@ -261,8 +261,12 @@ export default function MealDetail() {
 
   const confirmSubstitution = useCallback(async () => {
     if (!selectedMealOptionFood || !currentOptionId || !proposal) return;
-    await confirmSub(selectedMealOptionFood.id, currentOptionId);
-  }, [selectedMealOptionFood, currentOptionId, proposal, confirmSub]);
+    const success = await confirmSub(selectedMealOptionFood.id, currentOptionId);
+    if (success) {
+      // Atualizar limites de uso após substituição bem-sucedida
+      refreshUsageLimits();
+    }
+  }, [selectedMealOptionFood, currentOptionId, proposal, confirmSub, refreshUsageLimits]);
 
   const handleBackToCandidates = useCallback(() => {
     if (selectedMealOptionFood?.food && currentOptionId) {
@@ -363,13 +367,14 @@ export default function MealDetail() {
         { duration: 4000 }
       );
       
-      // Recarregar dados
+      // Recarregar dados e atualizar limites
       await fetchMealData();
+      refreshUsageLimits();
     } catch (err: any) {
       console.error('Error auto-substituting:', err);
       toast.info('Alimento adicionado aos evitados. Erro ao substituir automaticamente.');
     }
-  }, [addToAvoided, can_substitute, substitutionLimitReached, checkCanSubstitute, allFoods, fetchMealData, mealOptions]);
+  }, [addToAvoided, can_substitute, substitutionLimitReached, checkCanSubstitute, allFoods, fetchMealData, mealOptions, refreshUsageLimits]);
 
   const recalculateOptionTotals = async (optionId: string) => {
     const { data: foods } = await supabase
