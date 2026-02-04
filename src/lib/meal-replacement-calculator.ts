@@ -401,10 +401,10 @@ export function calculateMealReplacement(
   const items: ReplacementItem[] = [];
   let currentMacros = { calories: 0, protein: 0, carbs: 0, fat: 0 };
   
-  // Limites: 90-100% calorias, máx 120% proteína/carbos/gordura
+  // Limites: 90-100% calorias, 90-105% proteína (preciso), carbos/gordura flexíveis
   const limits = {
     calories: { min: targetMacros.calories * 0.90, max: targetMacros.calories * 1.00 },
-    protein: { min: targetMacros.protein * 0.85, max: targetMacros.protein * 1.20 },
+    protein: { min: targetMacros.protein * 0.90, max: targetMacros.protein * 1.05 }, // Proteína precisa
     carbs: { min: targetMacros.carbs * 0.70, max: targetMacros.carbs * 1.30 },
     fat: { min: targetMacros.fat * 0.70, max: targetMacros.fat * 1.30 },
   };
@@ -418,11 +418,11 @@ export function calculateMealReplacement(
   });
   
   // Função para verificar se podemos adicionar um item sem exceder limites
-  // PRIORIDADE: Calorias > Gordura > Proteína (proteína pode exceder para atingir calorias)
+  // PRIORIDADE: Proteína precisa (máx 105%) > Calorias (90-100%) > Gordura
   const canAddItem = (macros: MacroTarget, scale: number = 1): boolean => {
     const r = remaining();
-    // Permitir exceder proteína em até 40% se precisamos de calorias
-    const proteinTolerance = currentMacros.calories < limits.calories.min ? 0.40 : 0.20;
+    // Tolerância de proteína reduzida: máximo 5% de excesso
+    const proteinTolerance = 0.05;
     return (
       macros.calories * scale <= r.calories + 15 && // margem de 15kcal
       macros.protein * scale <= r.protein + (targetMacros.protein * proteinTolerance) &&
@@ -478,21 +478,25 @@ export function calculateMealReplacement(
     return true;
   };
   
-  // 1. PROTEÍNA: Usar Whey SOMENTE se precisar de muita proteína
+  // 1. PROTEÍNA: Usar Whey SOMENTE se precisar de proteína E não vai exceder muito
   const proteinDeficit = targetMacros.protein - currentMacros.protein;
-  if (proteinDeficit >= 12 && remaining().calories >= 60) {
+  const proteinAccuracy = () => (currentMacros.protein / targetMacros.protein) * 100;
+  
+  // Só adicionar whey se o deficit for significativo (>= 15g) e temos espaço
+  if (proteinDeficit >= 15 && remaining().calories >= 60) {
     const wheyType = userGoal === 'lose_weight' ? 'Whey Protein Isolado' : 'Whey Protein Concentrado';
     const whey = ACTIVE_SUPPLEMENTS[wheyType];
     
     if (whey) {
-      // Calcular scoops baseado na proteína NECESSÁRIA (não mais que 1 scoop para refeições pequenas)
-      const idealScoops = Math.min(1.5, proteinDeficit / whey.macros.protein);
+      // Calcular scoops para atingir ~95% da proteína (não 100%+)
+      const targetProteinScoops = (targetMacros.protein * 0.95 - currentMacros.protein) / whey.macros.protein;
+      const idealScoops = Math.min(1, Math.max(0.5, targetProteinScoops)); // Máx 1 scoop
       const optimalScale = calculateOptimalScale(whey.macros, idealScoops, 0.5);
       
       // Arredondar para 0.5
       const finalScoops = Math.round(optimalScale * 2) / 2;
       
-      if (finalScoops >= 0.5) {
+      if (finalScoops >= 0.5 && finalScoops <= 1) {
         addItem(wheyType, ACTIVE_SUPPLEMENTS, 'supplement', finalScoops);
       }
     }
@@ -560,29 +564,9 @@ export function calculateMealReplacement(
     }
   }
 
-  // 4. PROTEÍNA ADICIONAL: Se ainda precisar (mas sem exceder limite)
-  if (remaining().protein >= 6 && remaining().calories >= 50) {
-    const proteinOptions = ['Iogurte Grego Natural', 'Ovo Cozido', 'Queijo Cottage'];
-    
-    for (const option of proteinOptions) {
-      const item = ACTIVE_FOODS[option];
-      if (!item) continue;
-      if (option === 'Ovo Cozido') {
-        const numEggs = Math.min(2, Math.ceil(remaining().protein / item.macros.protein));
-        const eggScale = calculateOptimalScale(item.macros, numEggs, 1);
-        if (eggScale >= 1 && canAddItem(item.macros, eggScale)) {
-          addItem(option, ACTIVE_FOODS, 'food', Math.round(eggScale));
-          break;
-        }
-      } else {
-        const scale = calculateOptimalScale(item.macros, 1, 0.5);
-        if (scale >= 0.5 && canAddItem(item.macros, scale)) {
-          addItem(option, ACTIVE_FOODS, 'food', scale);
-          break;
-        }
-      }
-    }
-  }
+  // 4. PROTEÍNA ADICIONAL: REMOVIDO - priorizar precisão de proteína
+  // Não adicionar proteína extra (iogurte, ovos) para evitar exceder a meta
+  // O whey já deve cobrir a necessidade proteica
 
   // 5. LÍQUIDO: Base para shake (obrigatório se tiver suplemento em pó)
   const hasProteinPowder = items.some(i => 
