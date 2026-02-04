@@ -17,6 +17,7 @@ import {
   Shield,
   Moon,
   Sun,
+  Sparkles,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -34,6 +35,7 @@ import { useSubscription } from '@/hooks/useSubscription';
 import { useAccountPermissions } from '@/hooks/useAccountPermissions';
 import { useTheme } from '@/contexts/ThemeContext';
 import { cn } from '@/lib/utils';
+import { Badge } from '@/components/ui/badge';
 
 interface NavItem {
   label: string;
@@ -144,13 +146,18 @@ export function MobileNav() {
       <SheetContent side="left" className="w-[280px] p-0">
         <SheetHeader className="border-b p-4">
           <SheetTitle className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <Logo size="sm" />
-              {isAdmin && (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-primary/10 text-primary text-xs font-medium rounded-full border border-primary/20">
+              {isAdmin ? (
+                <Badge variant="outline" className="gap-1 bg-primary/10 text-primary border-primary/20">
                   <Shield className="w-3 h-3" />
                   Admin
-                </span>
+                </Badge>
+              ) : !isPaidUser && (
+                <Badge variant="outline" className="gap-1 bg-muted text-muted-foreground">
+                  <Sparkles className="w-3 h-3" />
+                  Gratuito
+                </Badge>
               )}
             </div>
             <SheetClose asChild>

@@ -433,18 +433,6 @@ export default function Profile() {
             </TabsTrigger>
           </TabsList>
 
-          {/* Info Banner - Displayed below tabs */}
-          <div className="bg-muted/50 rounded-lg p-4 flex items-start gap-3">
-            <Lock className="h-5 w-5 text-muted-foreground shrink-0 mt-0.5" />
-            <div className="text-sm text-muted-foreground">
-              <p className="font-medium text-foreground mb-1">Por que não posso alterar?</p>
-              <p>
-                Os dados do perfil são fixados para manter a consistência do seu plano 
-                alimentar e histórico de adesão. Para solicitar alterações específicas, 
-                acesse a aba correspondente e use o botão de solicitação.
-              </p>
-            </div>
-          </div>
 
           <TabsContent value="goals">
             <motion.div
@@ -851,13 +839,15 @@ export default function Profile() {
                     </div>
                   </div>
 
-                  {/* Supplement Toggle */}
-                  <div className="mb-6">
-                    <p className="text-sm font-medium mb-3">Suplementação</p>
-                    <SupplementToggle 
-                      initialValue={(profile as any)?.include_supplements || false}
-                    />
-                  </div>
+                  {/* Supplement Toggle - Only for paid users */}
+                  {isPaidUser && (
+                    <div className="mb-6">
+                      <p className="text-sm font-medium mb-3">Suplementação</p>
+                      <SupplementToggle 
+                        initialValue={(profile as any)?.include_supplements || false}
+                      />
+                    </div>
+                  )}
 
                   {/* Snack Preference Choice - For 4 meals: Morning OR Afternoon */}
                   {formData.meals_per_day === 4 && (
