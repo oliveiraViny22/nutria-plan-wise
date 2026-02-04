@@ -1,30 +1,21 @@
 // =====================================================
 // LIMITES DE QUANTIDADE POR CATEGORIA - FONTE ÚNICA
 // =====================================================
-// Este arquivo replica os limites de supabase/functions/_shared/category-limits.ts
-// para uso no frontend. Mantenha sincronizado com a fonte centralizada.
-// =====================================================
-// Utilizado por todos os motores de otimização:
-// - useBruteForceOptimizer
-// - useContractOptimizer
-// - useHybridOptimizer
-// - useComparisonOptimizer
+// Utilizado por:
+// - generate-meal-plan-v5 (gerador)
+// - ai-rebalance (rebalanceador)
+// - Frontend (optimizer-limits.ts - re-exporta)
 // =====================================================
 
 /**
  * Limites de quantidade em gramas por categoria de alimento.
  * Valores baseados em porções nutricionalmente realistas.
- * 
- * IMPORTANTE: Estes valores devem estar sincronizados com
- * supabase/functions/_shared/category-limits.ts
  */
 export const CATEGORY_LIMITS: Record<string, { min: number; max: number }> = {
   // ==========================================
   // PROTEÍNAS - fontes principais
   // ==========================================
   proteinas: { min: 60, max: 250 },
-  'proteína': { min: 60, max: 250 },
-  'proteínas': { min: 60, max: 250 },
   carnes: { min: 80, max: 250 },
   aves: { min: 80, max: 250 },
   peixes: { min: 80, max: 250 },
@@ -35,7 +26,6 @@ export const CATEGORY_LIMITS: Record<string, { min: number; max: number }> = {
   // CARBOIDRATOS - porções energéticas
   // ==========================================
   carboidratos: { min: 40, max: 300 },
-  carboidrato: { min: 40, max: 300 },
   'grãos': { min: 40, max: 250 },
   cereais: { min: 30, max: 200 },
   'pães': { min: 25, max: 150 },
@@ -61,7 +51,6 @@ export const CATEGORY_LIMITS: Record<string, { min: number; max: number }> = {
   // LATICÍNIOS
   // ==========================================
   laticinios: { min: 30, max: 300 },
-  'laticínios': { min: 30, max: 300 },
   queijos: { min: 20, max: 100 },
   leite: { min: 100, max: 400 },
   iogurtes: { min: 100, max: 300 },
@@ -86,42 +75,103 @@ export const CATEGORY_LIMITS: Record<string, { min: number; max: number }> = {
 /**
  * Limites padrão para categorias não mapeadas
  */
-export const DEFAULT_LIMITS = { min: 20, max: 400 };
+export const DEFAULT_CATEGORY_LIMITS = { min: 20, max: 400 };
+
+/**
+ * Limites específicos para lanches (porções menores)
+ */
+export const SNACK_CATEGORY_LIMITS: Record<string, { min: number; max: number }> = {
+  frutas: { min: 80, max: 150 },
+  proteinas: { min: 60, max: 150 },
+  laticinios: { min: 100, max: 200 },
+  gorduras: { min: 5, max: 15 },
+  oleaginosas: { min: 10, max: 25 },
+  carboidratos: { min: 80, max: 150 },
+};
+
+/**
+ * Limites de escala (para ajustes proporcionais)
+ */
+export const SCALE_CATEGORY_LIMITS: Record<string, { min: number; max: number }> = {
+  proteinas: { min: 50, max: 350 },
+  carboidratos: { min: 50, max: 400 },
+  leguminosas: { min: 40, max: 250 },
+  vegetais: { min: 30, max: 300 },
+  frutas: { min: 50, max: 300 },
+  laticinios: { min: 30, max: 250 },
+  gorduras: { min: 5, max: 30 },
+  oleaginosas: { min: 5, max: 40 },
+};
+
+export const DEFAULT_SCALE_LIMITS = { min: 20, max: 500 };
 
 /**
  * Obtém os limites de quantidade para uma categoria.
  * Tenta match exato, depois parcial, depois retorna default.
  */
-export function getCategoryLimits(category: string): { min: number; max: number } {
+export function getCategoryLimits(
+  category: string | null | undefined,
+  isSnack = false
+): { min: number; max: number } {
+  if (!category) return DEFAULT_CATEGORY_LIMITS;
+
   const normalized = category.toLowerCase().trim();
-  
+
+  // Se é lanche, priorizar limites de lanche
+  if (isSnack && SNACK_CATEGORY_LIMITS[normalized]) {
+    return SNACK_CATEGORY_LIMITS[normalized];
+  }
+
   // Match exato
   if (CATEGORY_LIMITS[normalized]) {
     return CATEGORY_LIMITS[normalized];
   }
-  
-  // Match parcial (ex: "proteína magra" -> "proteína")
+
+  // Match parcial (ex: "proteína magra" -> "proteina")
   for (const [key, limits] of Object.entries(CATEGORY_LIMITS)) {
     if (normalized.includes(key) || key.includes(normalized)) {
       return limits;
     }
   }
-  
-  return DEFAULT_LIMITS;
+
+  return DEFAULT_CATEGORY_LIMITS;
+}
+
+/**
+ * Obtém os limites de escala para uma categoria.
+ */
+export function getScaleLimits(category: string | null | undefined): { min: number; max: number } {
+  if (!category) return DEFAULT_SCALE_LIMITS;
+
+  const normalized = category.toLowerCase().trim();
+
+  if (SCALE_CATEGORY_LIMITS[normalized]) {
+    return SCALE_CATEGORY_LIMITS[normalized];
+  }
+
+  return DEFAULT_SCALE_LIMITS;
 }
 
 /**
  * Valida se uma quantidade está dentro dos limites da categoria.
  */
-export function isQuantityValid(category: string, grams: number): boolean {
-  const limits = getCategoryLimits(category);
+export function isQuantityValid(
+  category: string | null | undefined,
+  grams: number,
+  isSnack = false
+): boolean {
+  const limits = getCategoryLimits(category, isSnack);
   return grams >= limits.min && grams <= limits.max;
 }
 
 /**
  * Clamp uma quantidade aos limites da categoria.
  */
-export function clampToLimits(category: string, grams: number): number {
-  const limits = getCategoryLimits(category);
+export function clampToLimits(
+  category: string | null | undefined,
+  grams: number,
+  isSnack = false
+): number {
+  const limits = getCategoryLimits(category, isSnack);
   return Math.max(limits.min, Math.min(limits.max, Math.round(grams)));
 }

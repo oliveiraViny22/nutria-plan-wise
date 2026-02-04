@@ -435,25 +435,10 @@ function logFinalResult(objective: Objective, totals: MacroTargets, targets: Mac
 
 // ============================================
 // LIMITES DE QUANTIDADE POR CATEGORIA
+// Importado da fonte centralizada
 // ============================================
 
-const CATEGORY_LIMITS: Record<string, { min: number; max: number }> = {
-  proteinas: { min: 30, max: 350 },
-  carboidratos: { min: 40, max: 400 },
-  leguminosas: { min: 40, max: 200 },
-  vegetais: { min: 30, max: 250 },
-  frutas: { min: 30, max: 150 },
-  laticinios: { min: 30, max: 300 },
-  gorduras: { min: 5, max: 30 },
-  oleaginosas: { min: 10, max: 40 },
-  azeite: { min: 5, max: 20 },
-  figo: { min: 20, max: 80 },
-};
-
-function getCategoryLimits(category: string | null): { min: number; max: number } {
-  const cat = (category || "").toLowerCase();
-  return CATEGORY_LIMITS[cat] || { min: 20, max: 400 };
-}
+import { getCategoryLimits } from "../_shared/category-limits.ts";
 
 // ============================================
 // FUNÇÕES UTILITÁRIAS
