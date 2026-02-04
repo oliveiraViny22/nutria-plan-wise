@@ -613,6 +613,8 @@ export default function Dashboard() {
                     userGoal={profile?.goal as 'gain_muscle' | 'lose_weight' | 'maintain' | undefined}
                     onComplete={fetchCurrentPlan}
                     compact
+                    usageInfo={usage?.adjustments}
+                    isLimitReached={isLimitReached('adjustment')}
                   />
               ) : (
                 <div /> // Placeholder para manter grid quando otimizar não disponível
