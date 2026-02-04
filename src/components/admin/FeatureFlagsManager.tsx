@@ -44,18 +44,6 @@ const FLAG_METADATA: Record<string, {
   type: 'boolean' | 'percent';
   category: 'core' | 'ai' | 'experimental';
 }> = {
-  'rebalancer_v2_enabled': {
-    name: 'Rebalanceador v2',
-    description: 'Ativa nova versão do motor de rebalanceamento nutricional',
-    type: 'boolean',
-    category: 'core',
-  },
-  'supplements_v2_enabled': {
-    name: 'Suplementos v2',
-    description: 'Ativa novo sistema de substituição de suplementos',
-    type: 'boolean',
-    category: 'core',
-  },
   'shadow_mode_enabled': {
     name: 'Modo Shadow',
     description: 'Executa lógica nova em paralelo sem afetar usuários',

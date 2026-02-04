@@ -1508,17 +1508,6 @@ serve(async (req) => {
       });
     }
 
-    // ============================================
-    // FEATURE FLAG: Rebalancer V2
-    // ============================================
-    // Verifica se a nova versão está habilitada
-    // Por enquanto, apenas loga para preparar rollout seguro
-    const useV2 = await getFeatureFlag(supabase, FLAGS.REBALANCER_V2, false);
-    if (useV2) {
-      log.info("Rebalancer V2 flag is ENABLED - using enhanced algorithm");
-      // TODO: Implementar lógica V2 quando pronta
-      // Por enquanto, continua com V1 mas com logging extra
-    }
 
     // Carregar configurações do admin
     const settings = await loadOptimizerSettings(supabase);
@@ -1874,7 +1863,6 @@ serve(async (req) => {
       finalValidation: finalValidation.status,
       note: finalValidation.note,
       optionsCount: optionResults.length,
-      useV2, // Flag de versão
     });
 
     // Logar métricas de rebalanceamento para análise
