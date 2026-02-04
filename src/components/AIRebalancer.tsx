@@ -66,6 +66,13 @@ interface AIRebalanceResult {
   };
 }
 
+interface UsageLimitInfo {
+  used: number;
+  limit: number;
+  remaining: number;
+  isUnlimited: boolean;
+}
+
 interface AIRebalancerProps {
   planId: string;
   targets: MacroTargets;
@@ -73,6 +80,8 @@ interface AIRebalancerProps {
   userGoal?: 'gain_muscle' | 'lose_weight' | 'maintain';
   onComplete: () => void;
   compact?: boolean;
+  usageInfo?: UsageLimitInfo;
+  isLimitReached?: boolean;
 }
 
 function MacroComparisonCard({
@@ -236,6 +245,8 @@ export function AIRebalancer({
   userGoal,
   onComplete,
   compact = false,
+  usageInfo,
+  isLimitReached = false,
 }: AIRebalancerProps) {
   const { user } = useAuth();
   const { playSuccessSound, triggerStartFeedback } = useSuccessSound();
@@ -466,7 +477,7 @@ export function AIRebalancer({
         size={compact ? "default" : "default"}
         className={compact ? "w-full gap-2" : "w-full gap-2"}
         onClick={handleOptimize}
-        disabled={loading}
+        disabled={loading || isLimitReached}
       >
         {loading ? (
           <>
@@ -476,8 +487,12 @@ export function AIRebalancer({
         ) : (
           <>
             <Sparkles className="w-4 h-4" />
-            <span className="hidden sm:inline">Otimizar Plano</span>
-            <span className="sm:hidden">Otimizar</span>
+            <span className="hidden sm:inline">
+              Otimizar Plano {usageInfo && !usageInfo.isUnlimited && `(${usageInfo.remaining}/${usageInfo.limit})`}
+            </span>
+            <span className="sm:hidden">
+              Otimizar {usageInfo && !usageInfo.isUnlimited && `(${usageInfo.remaining})`}
+            </span>
           </>
         )}
       </Button>
