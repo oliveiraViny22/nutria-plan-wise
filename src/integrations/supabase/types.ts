@@ -296,12 +296,17 @@ export type Database = {
           id: string
           is_active: boolean | null
           is_optional: boolean | null
+          is_supplement_item: boolean | null
           name: string
           origin: string | null
           processing_level: string | null
           protein: number
           review_status: string | null
           serving_size: string | null
+          supplement_max_portion: number | null
+          supplement_min_portion: number | null
+          supplement_notes: string | null
+          supplement_portion: string | null
           type: string | null
           unit_enabled: boolean | null
           unit_increment: number | null
@@ -321,12 +326,17 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           is_optional?: boolean | null
+          is_supplement_item?: boolean | null
           name: string
           origin?: string | null
           processing_level?: string | null
           protein: number
           review_status?: string | null
           serving_size?: string | null
+          supplement_max_portion?: number | null
+          supplement_min_portion?: number | null
+          supplement_notes?: string | null
+          supplement_portion?: string | null
           type?: string | null
           unit_enabled?: boolean | null
           unit_increment?: number | null
@@ -346,12 +356,17 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           is_optional?: boolean | null
+          is_supplement_item?: boolean | null
           name?: string
           origin?: string | null
           processing_level?: string | null
           protein?: number
           review_status?: string | null
           serving_size?: string | null
+          supplement_max_portion?: number | null
+          supplement_min_portion?: number | null
+          supplement_notes?: string | null
+          supplement_portion?: string | null
           type?: string | null
           unit_enabled?: boolean | null
           unit_increment?: number | null
@@ -1279,12 +1294,17 @@ export type Database = {
           id: string
           is_active: boolean | null
           is_optional: boolean | null
+          is_supplement_item: boolean | null
           name: string
           origin: string | null
           processing_level: string | null
           protein: number
           review_status: string | null
           serving_size: string | null
+          supplement_max_portion: number | null
+          supplement_min_portion: number | null
+          supplement_notes: string | null
+          supplement_portion: string | null
           type: string | null
           unit_enabled: boolean | null
           unit_increment: number | null

@@ -3,7 +3,14 @@
  * 
  * Combina suplementos + alimentos para igualar os macros de uma refeição
  * que o usuário não consegue consumir.
+ * 
+ * ARQUITETURA:
+ * - Usa catálogo dinâmico do banco de dados quando disponível
+ * - Fallback para catálogo hardcoded se a busca falhar
+ * - Garante zero downtime na migração
  */
+
+import { getPrefetchedCatalog, type SupplementCatalogItem } from '@/hooks/useSupplementCatalog';
 
 export interface MacroTarget {
   calories: number;
@@ -32,6 +39,7 @@ export interface MealReplacement {
     fat: number;
   };
   tips: string[];
+  usedDynamicCatalog?: boolean; // Indica se usou catálogo do DB
 }
 
 interface CatalogItem {
@@ -248,6 +256,65 @@ const FOOD_CATALOG: Record<string, CatalogItem> = {
   },
 };
 
+// =====================================================
+// CATÁLOGO DINÂMICO COM FALLBACK
+// =====================================================
+
+/**
+ * Converte item do catálogo dinâmico (DB) para o formato CatalogItem
+ */
+function convertDynamicItem(item: SupplementCatalogItem): CatalogItem {
+  return {
+    portion: item.portion,
+    macros: item.macros,
+    notes: item.notes,
+    scalable: item.scalable,
+    minPortion: item.minPortion,
+    maxPortion: item.maxPortion,
+  };
+}
+
+/**
+ * Obtém os catálogos ativos (dinâmico ou fallback)
+ * Retorna { supplements, foods, usedDynamic }
+ */
+function getActiveCatalogs(): {
+  supplements: Record<string, CatalogItem>;
+  foods: Record<string, CatalogItem>;
+  usedDynamic: boolean;
+} {
+  const prefetched = getPrefetchedCatalog();
+  
+  // Se temos catálogo dinâmico, converter e usar
+  if (prefetched.supplements && Object.keys(prefetched.supplements).length > 0) {
+    const dynamicSupplements: Record<string, CatalogItem> = {};
+    const dynamicFoods: Record<string, CatalogItem> = {};
+    
+    for (const [name, item] of Object.entries(prefetched.supplements)) {
+      dynamicSupplements[name] = convertDynamicItem(item);
+    }
+    
+    if (prefetched.foods) {
+      for (const [name, item] of Object.entries(prefetched.foods)) {
+        dynamicFoods[name] = convertDynamicItem(item);
+      }
+    }
+    
+    return {
+      supplements: dynamicSupplements,
+      foods: dynamicFoods,
+      usedDynamic: true,
+    };
+  }
+  
+  // Fallback para catálogos hardcoded
+  return {
+    supplements: SUPPLEMENT_CATALOG,
+    foods: FOOD_CATALOG,
+    usedDynamic: false,
+  };
+}
+
 /**
  * Calcula os macros escalados para uma porção
  */
@@ -352,6 +419,9 @@ export function calculateMealReplacement(
   targetMacros: MacroTarget,
   userGoal: 'lose_weight' | 'maintain' | 'gain_muscle'
 ): MealReplacement {
+  // Obter catálogos ativos (dinâmico ou fallback)
+  const { supplements: ACTIVE_SUPPLEMENTS, foods: ACTIVE_FOODS, usedDynamic } = getActiveCatalogs();
+  
   const items: ReplacementItem[] = [];
   let currentMacros = { calories: 0, protein: 0, carbs: 0, fat: 0 };
   
@@ -436,17 +506,19 @@ export function calculateMealReplacement(
   const proteinDeficit = targetMacros.protein - currentMacros.protein;
   if (proteinDeficit >= 12 && remaining().calories >= 60) {
     const wheyType = userGoal === 'lose_weight' ? 'Whey Protein Isolado' : 'Whey Protein Concentrado';
-    const whey = SUPPLEMENT_CATALOG[wheyType];
+    const whey = ACTIVE_SUPPLEMENTS[wheyType];
     
-    // Calcular scoops baseado na proteína NECESSÁRIA (não mais que 1 scoop para refeições pequenas)
-    const idealScoops = Math.min(1.5, proteinDeficit / whey.macros.protein);
-    const optimalScale = calculateOptimalScale(whey.macros, idealScoops, 0.5);
-    
-    // Arredondar para 0.5
-    const finalScoops = Math.round(optimalScale * 2) / 2;
-    
-    if (finalScoops >= 0.5) {
-      addItem(wheyType, SUPPLEMENT_CATALOG, 'supplement', finalScoops);
+    if (whey) {
+      // Calcular scoops baseado na proteína NECESSÁRIA (não mais que 1 scoop para refeições pequenas)
+      const idealScoops = Math.min(1.5, proteinDeficit / whey.macros.protein);
+      const optimalScale = calculateOptimalScale(whey.macros, idealScoops, 0.5);
+      
+      // Arredondar para 0.5
+      const finalScoops = Math.round(optimalScale * 2) / 2;
+      
+      if (finalScoops >= 0.5) {
+        addItem(wheyType, ACTIVE_SUPPLEMENTS, 'supplement', finalScoops);
+      }
     }
   }
 
@@ -457,21 +529,23 @@ export function calculateMealReplacement(
   const isHighCarbMeal = targetMacros.carbs >= 40; // Ajustado de 60 para 40g
   
   // Aveia PRIMEIRO (carboidrato complexo e nutritivo)
-  if (remaining().carbs >= 15 && remaining().calories >= 75) {
+  const oatsItem = ACTIVE_FOODS['Aveia em Flocos'];
+  if (oatsItem && remaining().carbs >= 15 && remaining().calories >= 75) {
     const oatsDesiredScale = carbDeficit() >= 40 ? 1.5 : (carbDeficit() >= 25 ? 1 : 0.75);
-    const oatsScale = calculateOptimalScale(FOOD_CATALOG['Aveia em Flocos'].macros, oatsDesiredScale, 0.5);
+    const oatsScale = calculateOptimalScale(oatsItem.macros, oatsDesiredScale, 0.5);
     if (oatsScale >= 0.5) {
-      addItem('Aveia em Flocos', FOOD_CATALOG, 'food', oatsScale);
+      addItem('Aveia em Flocos', ACTIVE_FOODS, 'food', oatsScale);
     }
   }
   
   // Banana (carboidrato rápido + potássio)
-  if (remaining().carbs >= 10 && remaining().calories >= 45) {
+  const bananaItem = ACTIVE_FOODS['Banana'];
+  if (bananaItem && remaining().carbs >= 10 && remaining().calories >= 45) {
     // Para refeições com muitos carbos, usar mais banana
     const bananaDesiredScale = carbDeficit() > 30 ? 1.5 : 1;
-    const bananaScale = calculateOptimalScale(FOOD_CATALOG['Banana'].macros, bananaDesiredScale, 0.5);
+    const bananaScale = calculateOptimalScale(bananaItem.macros, bananaDesiredScale, 0.5);
     if (bananaScale >= 0.5) {
-      addItem('Banana', FOOD_CATALOG, 'food', bananaScale);
+      addItem('Banana', ACTIVE_FOODS, 'food', bananaScale);
     }
   }
   
@@ -479,18 +553,18 @@ export function calculateMealReplacement(
   // Para déficit de carboidratos em suplementação, usar mais Aveia ou Banana
   
   // Aveia extra se ainda precisar de carboidratos
-  if (carbDeficit() >= 20 && remaining().calories >= 75 && caloriePercent() < 85) {
-    const extraOatsScale = calculateOptimalScale(FOOD_CATALOG['Aveia em Flocos'].macros, 0.75, 0.5);
+  if (oatsItem && carbDeficit() >= 20 && remaining().calories >= 75 && caloriePercent() < 85) {
+    const extraOatsScale = calculateOptimalScale(oatsItem.macros, 0.75, 0.5);
     if (extraOatsScale >= 0.5 && !items.some(i => i.name === 'Aveia em Flocos')) {
-      addItem('Aveia em Flocos', FOOD_CATALOG, 'food', extraOatsScale);
+      addItem('Aveia em Flocos', ACTIVE_FOODS, 'food', extraOatsScale);
     }
   }
   
   // Banana extra se ainda precisar de calorias
-  if (caloriePercent() < 85 && remaining().carbs >= 10 && !items.some(i => i.name === 'Banana')) {
-    const extraBananaScale = calculateOptimalScale(FOOD_CATALOG['Banana'].macros, 1, 0.5);
+  if (bananaItem && caloriePercent() < 85 && remaining().carbs >= 10 && !items.some(i => i.name === 'Banana')) {
+    const extraBananaScale = calculateOptimalScale(bananaItem.macros, 1, 0.5);
     if (extraBananaScale >= 0.5) {
-      addItem('Banana', FOOD_CATALOG, 'food', extraBananaScale);
+      addItem('Banana', ACTIVE_FOODS, 'food', extraBananaScale);
     }
   }
 
@@ -500,10 +574,11 @@ export function calculateMealReplacement(
     const shuffled = fatOptions.sort(() => Math.random() - 0.5);
     
     for (const option of shuffled) {
-      const item = FOOD_CATALOG[option];
+      const item = ACTIVE_FOODS[option];
+      if (!item) continue;
       const scale = calculateOptimalScale(item.macros, 1, 0.5);
       if (scale >= 0.5 && canAddItem(item.macros, scale)) {
-        addItem(option, FOOD_CATALOG, 'food', scale);
+        addItem(option, ACTIVE_FOODS, 'food', scale);
         break;
       }
     }
@@ -514,18 +589,19 @@ export function calculateMealReplacement(
     const proteinOptions = ['Iogurte Grego Natural', 'Ovo Cozido', 'Queijo Cottage'];
     
     for (const option of proteinOptions) {
-      const item = FOOD_CATALOG[option];
+      const item = ACTIVE_FOODS[option];
+      if (!item) continue;
       if (option === 'Ovo Cozido') {
         const numEggs = Math.min(2, Math.ceil(remaining().protein / item.macros.protein));
         const eggScale = calculateOptimalScale(item.macros, numEggs, 1);
         if (eggScale >= 1 && canAddItem(item.macros, eggScale)) {
-          addItem(option, FOOD_CATALOG, 'food', Math.round(eggScale));
+          addItem(option, ACTIVE_FOODS, 'food', Math.round(eggScale));
           break;
         }
       } else {
         const scale = calculateOptimalScale(item.macros, 1, 0.5);
         if (scale >= 0.5 && canAddItem(item.macros, scale)) {
-          addItem(option, FOOD_CATALOG, 'food', scale);
+          addItem(option, ACTIVE_FOODS, 'food', scale);
           break;
         }
       }
@@ -574,7 +650,7 @@ export function calculateMealReplacement(
         : '⚖️ Escolhido para equilibrar calorias e proteína';
     }
     
-    const liquidItem = FOOD_CATALOG[liquidChoice];
+    const liquidItem = ACTIVE_FOODS[liquidChoice];
     
     if (liquidChoice === 'Água') {
       items.push({
@@ -613,25 +689,26 @@ export function calculateMealReplacement(
   const currentAccuracyPreFill = (currentMacros.calories / targetMacros.calories) * 100;
   
   // Adicionar mel incrementalmente até atingir 90%
-  if (currentAccuracyPreFill < 90 && remaining().calories >= 30) {
+  const melItem = ACTIVE_FOODS['Mel'];
+  if (melItem && currentAccuracyPreFill < 90 && remaining().calories >= 30) {
     // Calcular quantas porções de mel precisamos para atingir ~90%
     const caloriesNeeded = (targetMacros.calories * 0.90) - currentMacros.calories;
-    const melPortionCalories = FOOD_CATALOG['Mel'].macros.calories;
+    const melPortionCalories = melItem.macros.calories;
     const melScaleNeeded = Math.min(3, caloriesNeeded / melPortionCalories); // Máx 3 porções
     
     if (melScaleNeeded >= 0.5) {
       // Arredondar para 0.5 para porções práticas
       const melScale = Math.round(melScaleNeeded * 2) / 2;
-      addItem('Mel', FOOD_CATALOG, 'food', melScale);
+      addItem('Mel', ACTIVE_FOODS, 'food', melScale);
     }
   }
   
   // Se ainda abaixo de 90% após mel, adicionar mais banana
   const currentAccuracyPostMel = (currentMacros.calories / targetMacros.calories) * 100;
-  if (currentAccuracyPostMel < 88 && remaining().calories >= 45) {
-    const bananaScale = calculateOptimalScale(FOOD_CATALOG['Banana'].macros, 1, 0.5);
+  if (bananaItem && currentAccuracyPostMel < 88 && remaining().calories >= 45) {
+    const bananaScale = calculateOptimalScale(bananaItem.macros, 1, 0.5);
     if (bananaScale >= 0.5 && !items.some(i => i.name === 'Banana')) {
-      addItem('Banana', FOOD_CATALOG, 'food', bananaScale);
+      addItem('Banana', ACTIVE_FOODS, 'food', bananaScale);
     }
   }
 
@@ -693,6 +770,7 @@ export function calculateMealReplacement(
     totalMacros,
     accuracy,
     tips,
+    usedDynamicCatalog: usedDynamic,
   };
 }
 
