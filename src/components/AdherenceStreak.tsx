@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { 
   Flame, 
@@ -208,102 +209,107 @@ export function AdherenceStreak() {
   const daysToNextMilestone = nextMilestone ? nextMilestone.days - streak.currentStreak : 0;
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-    >
-      <Card className="card-elevated overflow-hidden">
-        <CardContent className="py-4">
-          <div className="flex items-center gap-4">
-            {/* Streak Fire Icon */}
-            <motion.div
-              initial={{ scale: 0.8 }}
-              animate={{ scale: 1 }}
-              className={`
-                relative w-14 h-14 rounded-full flex items-center justify-center
-                ${streak.currentStreak > 0 
-                  ? 'bg-gradient-to-br from-orange-400 to-red-500' 
-                  : 'bg-muted'
-                }
-              `}
-            >
-              <Flame 
-                className={`w-7 h-7 ${streak.currentStreak > 0 ? 'text-white' : 'text-muted-foreground'}`} 
-              />
-              {streak.currentStreak > 0 && (
-                <motion.div
-                  initial={{ scale: 0 }}
-                  animate={{ scale: 1 }}
-                  transition={{ delay: 0.2, type: 'spring' }}
-                  className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-background border-2 border-orange-500 flex items-center justify-center"
-                >
-                  <span className="text-xs font-bold text-orange-500">
-                    {streak.currentStreak}
-                  </span>
-                </motion.div>
-              )}
-            </motion.div>
-
-            {/* Streak Info */}
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1">
-                <h3 className="font-semibold text-foreground">
-                  {streak.currentStreak === 0 
-                    ? 'Comece sua sequência!' 
-                    : `${streak.currentStreak} ${streak.currentStreak === 1 ? 'dia' : 'dias'} seguidos`
+    <Link to="/progress">
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        whileHover={{ scale: 1.01 }}
+        whileTap={{ scale: 0.99 }}
+        className="cursor-pointer"
+      >
+        <Card className="card-elevated overflow-hidden h-full hover:border-primary/30 transition-colors">
+          <CardContent className="py-4">
+            <div className="flex items-center gap-4">
+              {/* Streak Fire Icon */}
+              <motion.div
+                initial={{ scale: 0.8 }}
+                animate={{ scale: 1 }}
+                className={`
+                  relative w-14 h-14 rounded-full flex items-center justify-center flex-shrink-0
+                  ${streak.currentStreak > 0 
+                    ? 'bg-gradient-to-br from-orange-400 to-red-500' 
+                    : 'bg-muted'
                   }
-                </h3>
-                {currentMilestone && (
-                  <Badge 
-                    variant="secondary" 
-                    className={`text-xs ${currentMilestone.color} bg-background/50`}
+                `}
+              >
+                <Flame 
+                  className={`w-7 h-7 ${streak.currentStreak > 0 ? 'text-white' : 'text-muted-foreground'}`} 
+                />
+                {streak.currentStreak > 0 && (
+                  <motion.div
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    transition={{ delay: 0.2, type: 'spring' }}
+                    className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-background border-2 border-orange-500 flex items-center justify-center"
                   >
-                    <currentMilestone.icon className="w-3 h-3 mr-1" />
-                    {currentMilestone.label}
-                  </Badge>
+                    <span className="text-xs font-bold text-orange-500">
+                      {streak.currentStreak}
+                    </span>
+                  </motion.div>
+                )}
+              </motion.div>
+
+              {/* Streak Info */}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1 flex-wrap">
+                  <h3 className="font-semibold text-foreground text-sm">
+                    {streak.currentStreak === 0 
+                      ? 'Comece sua sequência!' 
+                      : `${streak.currentStreak} ${streak.currentStreak === 1 ? 'dia' : 'dias'} seguidos`
+                    }
+                  </h3>
+                  {currentMilestone && (
+                    <Badge 
+                      variant="secondary" 
+                      className={`text-xs ${currentMilestone.color} bg-background/50`}
+                    >
+                      <currentMilestone.icon className="w-3 h-3 mr-1" />
+                      {currentMilestone.label}
+                    </Badge>
+                  )}
+                </div>
+
+                {streak.currentStreak === 0 ? (
+                  <p className="text-xs text-muted-foreground">
+                    Registre suas refeições hoje para iniciar!
+                  </p>
+                ) : (
+                  <div className="space-y-1">
+                    {nextMilestone && (
+                      <p className="text-xs text-muted-foreground">
+                        Mais {daysToNextMilestone} {daysToNextMilestone === 1 ? 'dia' : 'dias'} para "{nextMilestone.label}"
+                      </p>
+                    )}
+                    {streak.bestStreak > streak.currentStreak && (
+                      <p className="text-xs text-muted-foreground">
+                        Recorde: {streak.bestStreak} dias
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {/* Today's status indicator */}
+                {streak.currentStreak > 0 && (
+                  <div className="flex items-center gap-1 mt-2">
+                    <div 
+                      className={`
+                        w-2 h-2 rounded-full 
+                        ${streak.isActiveToday ? 'bg-green-500 animate-pulse' : 'bg-amber-500'}
+                      `} 
+                    />
+                    <span className="text-xs text-muted-foreground">
+                      {streak.isActiveToday 
+                        ? 'Ativo hoje!' 
+                        : 'Registre hoje para manter a sequência'
+                      }
+                    </span>
+                  </div>
                 )}
               </div>
-
-              {streak.currentStreak === 0 ? (
-                <p className="text-xs text-muted-foreground">
-                  Registre suas refeições hoje para iniciar!
-                </p>
-              ) : (
-                <div className="space-y-1">
-                  {nextMilestone && (
-                    <p className="text-xs text-muted-foreground">
-                      Mais {daysToNextMilestone} {daysToNextMilestone === 1 ? 'dia' : 'dias'} para "{nextMilestone.label}"
-                    </p>
-                  )}
-                  {streak.bestStreak > streak.currentStreak && (
-                    <p className="text-xs text-muted-foreground">
-                      Recorde: {streak.bestStreak} dias
-                    </p>
-                  )}
-                </div>
-              )}
-
-              {/* Today's status indicator */}
-              {streak.currentStreak > 0 && (
-                <div className="flex items-center gap-1 mt-2">
-                  <div 
-                    className={`
-                      w-2 h-2 rounded-full 
-                      ${streak.isActiveToday ? 'bg-green-500 animate-pulse' : 'bg-amber-500'}
-                    `} 
-                  />
-                  <span className="text-xs text-muted-foreground">
-                    {streak.isActiveToday 
-                      ? 'Ativo hoje!' 
-                      : 'Registre hoje para manter a sequência'
-                    }
-                  </span>
-                </div>
-              )}
             </div>
-          </div>
-        </CardContent>
-      </Card>
-    </motion.div>
+          </CardContent>
+        </Card>
+      </motion.div>
+    </Link>
   );
 }

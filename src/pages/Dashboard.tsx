@@ -539,15 +539,14 @@ export default function Dashboard() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.15 }}
-            className="space-y-3"
           >
             {subscriptionPlan.type === 'gratuito' ? (
               <GamificationPreview isLocked={true} />
             ) : (
-              <>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
                 <AdherenceStreak />
                 <WeeklyAdherenceChart />
-              </>
+              </div>
             )}
           </motion.section>
         )}
