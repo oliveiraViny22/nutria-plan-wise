@@ -548,15 +548,26 @@ export default function MealDetail() {
                                     <Button 
                                       variant="ghost" 
                                       size="sm" 
-                                      className="text-xs text-muted-foreground" 
-                                      onClick={() => handleDislike(optionFood, option.id)}
+                                      className={`text-xs ${substitutionLimitReached ? 'text-muted-foreground/50' : 'text-muted-foreground'}`}
+                                      onClick={() => {
+                                        if (substitutionLimitReached) {
+                                          toast.error('Limite de substituições atingido. Faça upgrade do seu plano.');
+                                          setShowUpgradeDialog(true);
+                                          return;
+                                        }
+                                        handleDislike(optionFood, option.id);
+                                      }}
                                       disabled={addingToAvoided}
                                     >
                                       <ThumbsDown className="w-3 h-3 mr-1" />Não gosto
                                     </Button>
                                   </TooltipTrigger>
                                   <TooltipContent>
-                                    <p className="text-xs">Adicionar aos evitados e substituir automaticamente</p>
+                                    <p className="text-xs">
+                                      {substitutionLimitReached 
+                                        ? 'Limite de substituições atingido' 
+                                        : 'Adicionar aos evitados e substituir automaticamente'}
+                                    </p>
                                   </TooltipContent>
                                 </Tooltip>
                               </TooltipProvider>
