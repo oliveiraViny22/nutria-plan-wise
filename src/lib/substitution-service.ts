@@ -13,6 +13,7 @@ import {
   SUBSTITUTABLE_PROCESSING_LEVELS,
   ProcessingLevel 
 } from './food-categories';
+import { getCategoryLimitsSync, clampToLimitsSync } from './category-limits-cache';
 
 // =====================================================
 // TIPOS
@@ -249,6 +250,7 @@ function parseServingGrams(servingSize: string): number {
 
 /**
  * Calcula quantidade ajustada para manter calorias similares
+ * Usa limites por categoria sincronizados do backend
  */
 export function calculateAdjustedPortion(
   sourceFood: Food,
@@ -271,8 +273,9 @@ export function calculateAdjustedPortion(
   // Arredondar para grama mais próximo
   targetGrams = Math.round(targetGrams);
   
-  // Limitar a faixa razoável (10g - 500g)
-  return Math.min(500, Math.max(10, targetGrams));
+  // Aplicar limites da categoria do alimento alvo
+  // Usa clampToLimitsSync que busca do cache sincronizado com backend
+  return clampToLimitsSync(targetFood.category, targetGrams, false);
 }
 
 /**
