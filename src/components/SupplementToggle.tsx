@@ -74,7 +74,7 @@ export function SupplementToggle({ initialValue = false, onToggle, compact = fal
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Link to="/pricing" className="inline-flex group">
-                    <Badge variant="outline" className="gap-1 text-[10px] px-1.5 py-0 bg-amber-500/10 text-amber-600 border-amber-500/30 hover:bg-amber-500/20 cursor-pointer transition-all duration-300 hover:scale-105 hover:shadow-sm hover:shadow-amber-500/20">
+                    <Badge variant="outline" className="shimmer-badge-subtle gap-1 text-[10px] px-1.5 py-0 bg-amber-500/10 text-amber-600 border-amber-500/30 hover:bg-amber-500/20 cursor-pointer transition-all duration-300 hover:scale-105 hover:shadow-sm hover:shadow-amber-500/20">
                       <Crown className="h-3 w-3 group-hover:animate-pulse" />
                       Pro
                     </Badge>
