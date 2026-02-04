@@ -110,6 +110,32 @@ export function useUsageLimits(): UsageLimitsResult {
     fetchUsage();
   }, [fetchUsage]);
 
+  // Realtime subscription para atualizar limites quando user_usage mudar
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const channel = supabase
+      .channel('user-usage-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'user_usage',
+          filter: `user_id=eq.${user.id}`,
+        },
+        () => {
+          // Refetch quando houver mudança
+          fetchUsage();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id, fetchUsage]);
+
   const canUse = useCallback(
     (feature: 'diet' | 'substitution' | 'adjustment' | 'chat') => {
       if (!usage) return false;
