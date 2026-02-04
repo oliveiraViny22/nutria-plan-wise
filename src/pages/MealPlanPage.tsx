@@ -17,6 +17,7 @@ import {
   Wheat,
   Droplets,
   AlertTriangle,
+  Lock,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -31,6 +32,7 @@ import { ThemeToggle } from '@/components/ThemeToggle';
 import { Logo } from '@/components/Logo';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useCachedUserData } from '@/hooks/useCachedUserData';
 import { toast } from 'sonner';
 import { MEAL_NAMES, MealType, Food, MealOption } from '@/lib/types';
 import { 
@@ -42,6 +44,7 @@ import {
   type NutritionalGaps,
 } from '@/lib/supplement-recommendations';
 import { MealReplacementSection } from '@/components/MealReplacementCard';
+import { ProFeatureBadge } from '@/components/FeatureBadge';
 
 interface MealData {
   id: string;
@@ -222,12 +225,16 @@ function SupplementsContent({ goal, planMacros, profileTargets }: SupplementsCon
 export default function MealPlanPage() {
   const navigate = useNavigate();
   const { profile, user, refreshProfile } = useAuth();
+  const { planInfo } = useCachedUserData();
   const [loading, setLoading] = useState(true);
   const [meals, setMeals] = useState<MealData[]>([]);
   const [planTotals, setPlanTotals] = useState({ calories: 0, protein: 0, carbs: 0, fat: 0 });
   const [expandedMeals, setExpandedMeals] = useState<Record<string, boolean>>({});
   const [supplementsEnabled, setSupplementsEnabled] = useState(profile?.include_supplements ?? false);
   const [togglingSupplements, setTogglingSupplements] = useState(false);
+  
+  // Check if user is on free plan - supplements feature is locked
+  const isFreePlan = planInfo?.plan_type === 'gratuito';
 
   // Sync local state with profile
   useEffect(() => {
@@ -551,21 +558,47 @@ export default function MealPlanPage() {
             <div className="flex items-center gap-2">
               <Pill className="w-5 h-5 text-purple-500 print:w-4 print:h-4" />
               <h2 className="text-xl font-semibold print:text-lg">Suplementação Recomendada</h2>
+              {isFreePlan && <ProFeatureBadge />}
             </div>
             <div className="flex items-center gap-2 print:hidden">
-              <Label htmlFor="supplements-toggle" className="text-sm text-muted-foreground cursor-pointer">
-                {supplementsEnabled ? 'Ativado' : 'Desativado'}
-              </Label>
-              <Switch
-                id="supplements-toggle"
-                checked={supplementsEnabled}
-                onCheckedChange={handleToggleSupplements}
-                disabled={togglingSupplements}
-              />
+              {isFreePlan ? (
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <Lock className="w-4 h-4" />
+                  <span className="text-sm">Recurso Pro</span>
+                </div>
+              ) : (
+                <>
+                  <Label htmlFor="supplements-toggle" className="text-sm text-muted-foreground cursor-pointer">
+                    {supplementsEnabled ? 'Ativado' : 'Desativado'}
+                  </Label>
+                  <Switch
+                    id="supplements-toggle"
+                    checked={supplementsEnabled}
+                    onCheckedChange={handleToggleSupplements}
+                    disabled={togglingSupplements}
+                  />
+                </>
+              )}
             </div>
           </div>
 
-          {supplementsEnabled ? (
+          {isFreePlan ? (
+            <Card className="border-muted bg-muted/5">
+              <CardContent className="py-8 text-center">
+                <Lock className="w-10 h-10 mx-auto mb-3 text-muted-foreground/50" />
+                <p className="text-muted-foreground mb-2">
+                  Suplementação personalizada é um recurso exclusivo dos planos pagos.
+                </p>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => navigate('/pricing')}
+                >
+                  Ver planos
+                </Button>
+              </CardContent>
+            </Card>
+          ) : supplementsEnabled ? (
             <div className="space-y-8">
               {/* 1. Substituições de refeições - OCULTAS NA IMPRESSÃO (muito extensas) */}
               {meals.length > 0 && (
