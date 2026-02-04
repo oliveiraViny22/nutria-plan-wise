@@ -1,8 +1,11 @@
 // =====================================================
-// LIMITES DE QUANTIDADE POR CATEGORIA - FONTE ÚNICA
+// LIMITES DE QUANTIDADE POR CATEGORIA - FALLBACK LOCAL
 // =====================================================
-// Este arquivo replica os limites de supabase/functions/_shared/category-limits.ts
-// para uso no frontend. Mantenha sincronizado com a fonte centralizada.
+// NOTA: Estes são valores de fallback. A fonte da verdade é:
+// supabase/functions/_shared/category-limits.ts
+// 
+// Para limites sincronizados, use o hook useCategoryLimits().
+// O hook busca do backend com cache de 1h e fallback para estes valores.
 // =====================================================
 // Utilizado por todos os motores de otimização:
 // - useBruteForceOptimizer
