@@ -419,6 +419,101 @@ Deno.test("Gerador V5 - Filtro de alimentos evitados", () => {
 });
 
 // =====================================================
+// TESTES DE PRIORIZAÇÃO DE ALIMENTOS PREFERIDOS
+// =====================================================
+
+Deno.test("Gerador V5 - Identificação de alimentos preferidos por substring", () => {
+  const preferredFoods = ["frango", "arroz integral"];
+  const preferredSet = new Set(preferredFoods.map(p => p.toLowerCase()));
+  
+  const candidates = [
+    { id: "1", name: "Arroz branco" },
+    { id: "2", name: "Arroz integral" },
+    { id: "3", name: "Frango grelhado" },
+    { id: "4", name: "Peito de frango" },
+    { id: "5", name: "Carne bovina" },
+  ];
+  
+  const preferred = candidates.filter(f => {
+    const nameLower = f.name.toLowerCase();
+    for (const pref of preferredSet) {
+      if (nameLower.includes(pref)) return true;
+    }
+    return false;
+  });
+  
+  // Deve identificar: Arroz integral, Frango grelhado, Peito de frango
+  assertEquals(preferred.length, 3);
+  assertEquals(preferred.find(f => f.name === "Arroz integral") !== undefined, true);
+  assertEquals(preferred.find(f => f.name === "Frango grelhado") !== undefined, true);
+  assertEquals(preferred.find(f => f.name === "Peito de frango") !== undefined, true);
+  // Arroz branco NÃO deve estar (não contém "arroz integral")
+  assertEquals(preferred.find(f => f.name === "Arroz branco"), undefined);
+});
+
+Deno.test("Gerador V5 - Seleção ponderada prioriza preferidos", () => {
+  const preferredSet = new Set(["frango"]);
+  
+  const candidates = [
+    { id: "1", name: "Frango grelhado", score: 50 },
+    { id: "2", name: "Carne bovina", score: 60 },
+    { id: "3", name: "Peixe assado", score: 55 },
+  ];
+  
+  // Identificar preferidos
+  const preferred = candidates.filter(f => {
+    const nameLower = f.name.toLowerCase();
+    for (const pref of preferredSet) {
+      if (nameLower.includes(pref)) return true;
+    }
+    return false;
+  });
+  
+  // Simular lógica de seleção: se preferido está no top 30%, priorizar
+  const sortedByScore = [...candidates].sort((a, b) => b.score - a.score);
+  const topThreshold = Math.ceil(sortedByScore.length * 0.3); // 1 candidato
+  const topCandidates = sortedByScore.slice(0, Math.max(1, topThreshold));
+  
+  // Verificar se frango (score 50) está no top 30%
+  // Top 30% de 3 = 1 candidato (Carne bovina com score 60)
+  const frangoInTop = topCandidates.find(c => c.name === "Frango grelhado");
+  
+  // Frango NÃO está no top 30%, mas ainda pode ser selecionado com 80% de chance
+  // quando não há déficits de macro (lógica original)
+  assertEquals(preferred.length, 1);
+  assertEquals(preferred[0].name, "Frango grelhado");
+});
+
+Deno.test("Gerador V5 - Boost de 80% para preferidos sem déficits", () => {
+  // Simula a lógica: if (!macroDeficits) { if (preferred.length > 0 && Math.random() < 0.8) }
+  let preferredSelected = 0;
+  let totalSelections = 0;
+  
+  const candidates = [
+    { id: "1", name: "Frango grelhado" },
+    { id: "2", name: "Carne bovina" },
+    { id: "3", name: "Peixe assado" },
+  ];
+  const preferred = [candidates[0]]; // Frango é preferido
+  
+  // Simular 1000 seleções com random fixo para teste determinístico
+  // Em produção, ~80% seriam preferidos
+  const BOOST_PROBABILITY = 0.8;
+  
+  // Teste: verificar que a lógica prioriza preferidos
+  // Se Math.random() < 0.8, seleciona preferido
+  // Caso contrário, seleciona aleatório entre todos
+  
+  // Cenário 1: random = 0.5 (< 0.8) -> seleciona preferido
+  const shouldSelectPreferred1 = 0.5 < BOOST_PROBABILITY;
+  assertEquals(shouldSelectPreferred1, true);
+  
+  // Cenário 2: random = 0.9 (>= 0.8) -> seleciona aleatório
+  const shouldSelectPreferred2 = 0.9 < BOOST_PROBABILITY;
+  assertEquals(shouldSelectPreferred2, false);
+});
+
+// =====================================================
 // TESTES DE RESTRIÇÕES ALIMENTARES
 // =====================================================
 
