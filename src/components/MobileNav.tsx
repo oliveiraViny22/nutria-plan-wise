@@ -42,6 +42,7 @@ import { useAccountPermissions } from '@/hooks/useAccountPermissions';
 import { useTheme } from '@/contexts/ThemeContext';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
+import { FreePlanBadge } from '@/components/PremiumBadge';
 
 interface NavItem {
   label: string;
@@ -160,28 +161,10 @@ export function MobileNav() {
                   Admin
                 </Badge>
               ) : !isPaidUser && (
-                <TooltipProvider delayDuration={200}>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Link
-                        to="/pricing"
-                        onClick={() => setOpen(false)}
-                        className="inline-flex"
-                      >
-                        <Badge variant="outline" className="shimmer-badge-subtle gap-1 bg-muted text-muted-foreground hover:bg-muted/80 cursor-pointer overflow-hidden">
-                          <Sparkles className="w-3 h-3" />
-                          Gratuito
-                        </Badge>
-                      </Link>
-                    </TooltipTrigger>
-                    <TooltipContent side="bottom" className="max-w-[200px] p-3">
-                      <p className="text-xs font-medium mb-1">Plano Gratuito</p>
-                      <p className="text-xs text-muted-foreground">
-                        1 dieta/mês, 3 substituições, 1 ajuste. Toque para ver planos.
-                      </p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
+                <FreePlanBadge 
+                  size="sm"
+                  onClick={() => setOpen(false)}
+                />
               )}
             </div>
             <SheetClose asChild>

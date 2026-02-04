@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Pill, Info, Sparkles, Lock, Crown } from 'lucide-react';
+import { Pill, Info, Lock, Sparkles } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
@@ -13,7 +13,7 @@ import {
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
-import { Link } from 'react-router-dom';
+import { ProFeatureBadge } from '@/components/PremiumBadge';
 
 interface SupplementToggleProps {
   initialValue?: boolean;
@@ -65,30 +65,15 @@ export function SupplementToggle({ initialValue = false, onToggle, compact = fal
 
   if (compact) {
     return (
-      <div className={`flex items-center justify-between gap-3 p-3 rounded-lg ${locked ? 'bg-muted/50 border border-border' : 'bg-purple-500/5 border border-purple-500/20'}`}>
+      <div className={`flex items-center justify-between gap-3 p-3 rounded-lg ${locked ? 'bg-muted/50 border border-border' : 'bg-primary/5 border border-primary/20'}`}>
         <div className="flex items-center gap-2">
-          <Pill className={`h-4 w-4 ${locked ? 'text-muted-foreground' : 'text-purple-500'}`} />
+          <Pill className={`h-4 w-4 ${locked ? 'text-muted-foreground' : 'text-primary'}`} />
           <span className={`text-sm font-medium ${locked ? 'text-muted-foreground' : ''}`}>Suplementação</span>
           {locked ? (
-            <TooltipProvider delayDuration={200}>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Link to="/pricing" className="inline-flex group">
-                    <Badge variant="outline" className="shimmer-badge-subtle gap-1 text-[10px] px-1.5 py-0 bg-amber-500/10 text-amber-600 border-amber-500/30 hover:bg-amber-500/20 cursor-pointer transition-all duration-300 hover:scale-105 hover:shadow-sm hover:shadow-amber-500/20">
-                      <Crown className="h-3 w-3 group-hover:animate-pulse" />
-                      Pro
-                    </Badge>
-                  </Link>
-                </TooltipTrigger>
-                <TooltipContent side="bottom" className="max-w-xs p-3">
-                  <p className="text-sm font-medium mb-1">Recurso Premium</p>
-                  <p className="text-sm text-muted-foreground">
-                    Sugestões de suplementação estão disponíveis nos planos pagos. 
-                    Toque para ver opções de upgrade.
-                  </p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+            <ProFeatureBadge 
+              tooltipTitle="Recurso Premium"
+              tooltipDescription="Sugestões de suplementação estão disponíveis nos planos pagos. Toque para ver opções de upgrade."
+            />
           ) : (
             <TooltipProvider delayDuration={200}>
               <Tooltip>
@@ -122,12 +107,12 @@ export function SupplementToggle({ initialValue = false, onToggle, compact = fal
   }
 
   return (
-    <Card className="border-purple-500/30 bg-gradient-to-br from-purple-500/5 to-purple-500/10">
+    <Card className="border-primary/30 bg-gradient-to-br from-primary/5 to-primary/10">
       <CardContent className="p-4">
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-purple-500/20 flex items-center justify-center">
-              <Pill className="h-5 w-5 text-purple-500" />
+            <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
+              <Pill className="h-5 w-5 text-primary" />
             </div>
             <div className="flex-1">
               <div className="flex items-center gap-2 flex-wrap">
@@ -174,9 +159,9 @@ export function SupplementToggle({ initialValue = false, onToggle, compact = fal
         </div>
 
         {/* Explanatory Note */}
-        <div className="mt-3 pt-3 border-t border-purple-500/20">
+        <div className="mt-3 pt-3 border-t border-primary/20">
           <p className="text-xs text-muted-foreground flex items-start gap-2">
-            <Info className="h-3.5 w-3.5 shrink-0 mt-0.5 text-purple-400" />
+            <Info className="h-3.5 w-3.5 shrink-0 mt-0.5 text-primary/70" />
             <span>
               <strong className="text-foreground">Importante:</strong> Suplementos são sugestões complementares 
               geradas por IA e não substituem orientação profissional. Eles não afetam as metas 

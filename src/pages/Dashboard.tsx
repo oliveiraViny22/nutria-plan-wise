@@ -59,6 +59,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { DietPlan, Meal, GOALS, MEAL_NAMES, MealType } from '@/lib/types';
 import { toast } from 'sonner';
 import { UsageLimitsBadge } from '@/components/UsageLimitsBadge';
+import { FreePlanBadge } from '@/components/PremiumBadge';
 
 export default function Dashboard() {
   const { profile, signOut } = useAuth();
@@ -310,10 +311,7 @@ export default function Dashboard() {
             )}
             {/* Badge Plano Gratuito - exibido para usuários gratuitos não-admin */}
             {!isAdmin && subscriptionPlan?.type === 'gratuito' && (
-              <Link to="/pricing" className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 shimmer-badge-subtle bg-muted text-muted-foreground text-xs font-medium rounded-full border border-border hover:bg-muted/80 transition-colors overflow-hidden">
-                <Sparkles className="w-3 h-3" />
-                Plano Gratuito
-              </Link>
+              <FreePlanBadge label="Plano Gratuito" className="hidden sm:inline-flex" />
             )}
           </div>
           {/* Desktop navigation - hidden on mobile */}
