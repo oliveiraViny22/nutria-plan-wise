@@ -13,6 +13,8 @@ export {
   ITEM_COUNTS,
   ITEM_COUNTS_LIGHT_DINNER,
   MEAL_TYPES_MAP,
+  MEAL_TYPES_MAP_SUPPER,
+  getMealTypesForProfile,
 } from "./meal-config.ts";
 
 // Limites de quantidade

@@ -56,13 +56,14 @@ export default function Onboarding() {
     activity_level: '' as 'sedentary' | 'light' | 'moderate' | 'active' | 'very_active' | '',
     meals_per_day: 4,
     evening_meal_preference: 'no_preference' as 'full_dinner' | 'light_dinner' | 'no_preference',
+    last_evening_meal: 'dinner' as 'dinner' | 'supper', // Escolha para 3-5 refeições
     preferences: [] as string[],
     restrictions: [] as string[],
     preferred_foods: [] as string[], // Alimentos preferidos específicos
     avoided_foods: [] as string[],   // Alimentos evitados específicos
   });
 
-  // Opções de preferência de refeição noturna
+  // Opções de preferência de refeição noturna (para 6 refeições - jantar + ceia)
   const EVENING_MEAL_OPTIONS = [
     { 
       value: 'full_dinner' as const, 
@@ -81,6 +82,22 @@ export default function Onboarding() {
       label: 'Sem preferência',
       description: 'O sistema decide a melhor distribuição',
       distribution: { dinner: '50%', supper: '50%' }
+    },
+  ];
+
+  // Opções de tipo de refeição noturna única (para 3-5 refeições)
+  const LAST_EVENING_MEAL_OPTIONS = [
+    { 
+      value: 'dinner' as const, 
+      label: '🍽️ Jantar',
+      description: 'Refeição quente e completa: proteína, carboidrato, vegetais e salada',
+      examples: 'Ex: Frango grelhado, arroz, feijão e salada'
+    },
+    { 
+      value: 'supper' as const, 
+      label: '🌙 Ceia',
+      description: 'Refeição leve e prática: ideal para quem prefere algo mais leve à noite',
+      examples: 'Ex: Sanduíche natural, iogurte com frutas, omelete'
     },
   ];
 
@@ -150,7 +167,8 @@ export default function Onboarding() {
           goal: formData.goal || null,
           activity_level: formData.activity_level || null,
           meals_per_day: formData.meals_per_day,
-          evening_meal_preference: formData.meals_per_day >= 5 ? formData.evening_meal_preference : 'no_preference',
+          last_evening_meal: formData.meals_per_day >= 3 && formData.meals_per_day <= 5 ? formData.last_evening_meal : 'dinner',
+          evening_meal_preference: formData.meals_per_day === 6 ? formData.evening_meal_preference : 'no_preference',
           preferences: formData.preferences,
           restrictions: formData.restrictions,
           preferred_foods: formData.preferred_foods,
@@ -459,9 +477,73 @@ export default function Onboarding() {
                     ))}
                   </div>
 
-                  {/* Pergunta condicional para 5+ refeições */}
+                  {/* Pergunta condicional para 3-5 refeições: Jantar OU Ceia */}
                   <AnimatePresence>
-                    {formData.meals_per_day >= 5 && (
+                    {formData.meals_per_day >= 3 && formData.meals_per_day <= 5 && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="overflow-hidden"
+                      >
+                        <div className="pt-4 sm:pt-6 border-t border-border">
+                          <div className="flex items-center gap-2 mb-3 sm:mb-4">
+                            <Moon className="w-5 h-5 text-primary" />
+                            <h4 className="font-medium text-sm sm:text-base">
+                              Qual tipo de refeição noturna você prefere?
+                            </h4>
+                            <TooltipProvider delayDuration={200}>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Info className="w-4 h-4 text-muted-foreground cursor-help" />
+                                </TooltipTrigger>
+                                <TooltipContent side="bottom" className="max-w-xs p-3">
+                                  <p className="font-semibold mb-2">Jantar vs Ceia</p>
+                                  <ul className="text-sm space-y-2">
+                                    <li><strong>🍽️ Jantar:</strong> Refeição quente e completa com proteína, carboidrato e vegetais.</li>
+                                    <li><strong>🌙 Ceia:</strong> Refeição leve e prática, ideal para quem prefere algo mais leve à noite.</li>
+                                  </ul>
+                                  <p className="text-xs text-muted-foreground mt-2">
+                                    Você pode alterar isso depois no seu Perfil.
+                                  </p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          </div>
+                          <div className="grid gap-2 sm:gap-3">
+                            {LAST_EVENING_MEAL_OPTIONS.map((option) => (
+                              <button
+                                key={option.value}
+                                type="button"
+                                onClick={() =>
+                                  setFormData({ ...formData, last_evening_meal: option.value })
+                                }
+                                className={`p-3 sm:p-4 rounded-lg sm:rounded-xl border text-left transition-all ${
+                                  formData.last_evening_meal === option.value
+                                    ? 'border-primary bg-primary/10'
+                                    : 'border-border hover:border-primary/50'
+                                }`}
+                              >
+                                <span className="font-medium text-foreground text-sm sm:text-base block">
+                                  {option.label}
+                                </span>
+                                <span className="text-xs sm:text-sm text-muted-foreground block">
+                                  {option.description}
+                                </span>
+                                <span className="text-xs text-primary/80 mt-1 block">
+                                  {option.examples}
+                                </span>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
+                  {/* Pergunta condicional para 6 refeições: distribuição jantar + ceia */}
+                  <AnimatePresence>
+                    {formData.meals_per_day === 6 && (
                       <motion.div
                         initial={{ opacity: 0, height: 0 }}
                         animate={{ opacity: 1, height: 'auto' }}
