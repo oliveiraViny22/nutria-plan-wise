@@ -1,5 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { 
+  fetchAndCacheLimits,
+  getCategoryLimitsSync,
+  isLimitsCacheSynced,
+  refreshLimitsCache,
+} from '@/lib/category-limits-cache';
 import { 
   CATEGORY_LIMITS as FALLBACK_CATEGORY_LIMITS,
   DEFAULT_LIMITS as FALLBACK_DEFAULT_LIMITS,
@@ -8,31 +13,13 @@ import {
 // =====================================================
 // HOOK: useCategoryLimits
 // =====================================================
-// Busca limites de categoria do backend com cache local.
-// Usa fallback do frontend se a requisição falhar.
+// Wrapper reativo sobre o cache singleton.
+// Usa o cache centralizado em category-limits-cache.ts.
 // =====================================================
-
-const CACHE_KEY = 'nutriaplan_category_limits';
-const CACHE_DURATION_MS = 60 * 60 * 1000; // 1 hora
 
 interface CategoryLimit {
   min: number;
   max: number;
-}
-
-interface CachedLimits {
-  version: string;
-  timestamp: string;
-  fetchedAt: number;
-  limits: {
-    category: Record<string, CategoryLimit>;
-    snack: Record<string, CategoryLimit>;
-    scale: Record<string, CategoryLimit>;
-  };
-  defaults: {
-    category: CategoryLimit;
-    scale: CategoryLimit;
-  };
 }
 
 interface UseCategoryLimitsResult {
@@ -48,65 +35,21 @@ interface UseCategoryLimitsResult {
   getCategoryLimit: (category: string, isSnack?: boolean) => CategoryLimit;
 }
 
-function getFromCache(): CachedLimits | null {
-  try {
-    const cached = localStorage.getItem(CACHE_KEY);
-    if (!cached) return null;
-    
-    const parsed: CachedLimits = JSON.parse(cached);
-    const isExpired = Date.now() - parsed.fetchedAt > CACHE_DURATION_MS;
-    
-    return isExpired ? null : parsed;
-  } catch {
-    return null;
-  }
-}
-
-function saveToCache(data: CachedLimits): void {
-  try {
-    localStorage.setItem(CACHE_KEY, JSON.stringify(data));
-  } catch (e) {
-    console.warn('Failed to cache category limits:', e);
-  }
-}
-
 export function useCategoryLimits(): UseCategoryLimitsResult {
-  const [data, setData] = useState<CachedLimits | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!isLimitsCacheSynced());
   const [error, setError] = useState<string | null>(null);
-  const [isSynced, setIsSynced] = useState(false);
+  const [isSynced, setIsSynced] = useState(isLimitsCacheSynced());
+  const [, forceUpdate] = useState(0);
 
   const fetchLimits = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-
-      // Tentar cache primeiro
-      const cached = getFromCache();
-      if (cached) {
-        setData(cached);
-        setIsSynced(true);
-        setLoading(false);
-        return;
-      }
-
-      // Buscar do backend
-      const { data: response, error: fetchError } = await supabase.functions.invoke(
-        'get-category-limits'
-      );
-
-      if (fetchError) throw fetchError;
-
-      const limitsData: CachedLimits = {
-        ...response,
-        fetchedAt: Date.now(),
-      };
-
-      saveToCache(limitsData);
-      setData(limitsData);
-      setIsSynced(true);
+      await fetchAndCacheLimits();
+      setIsSynced(isLimitsCacheSynced());
+      forceUpdate(n => n + 1);
     } catch (err) {
-      console.warn('Failed to fetch category limits, using fallback:', err);
+      console.warn('Failed to fetch category limits:', err);
       setError('Usando limites locais (sincronização pendente)');
       setIsSynced(false);
     } finally {
@@ -114,53 +57,45 @@ export function useCategoryLimits(): UseCategoryLimitsResult {
     }
   }, []);
 
+  const refresh = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      await refreshLimitsCache();
+      setIsSynced(isLimitsCacheSynced());
+      forceUpdate(n => n + 1);
+    } catch (err) {
+      console.warn('Failed to refresh category limits:', err);
+      setError('Falha ao atualizar limites');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
-    fetchLimits();
+    if (!isLimitsCacheSynced()) {
+      fetchLimits();
+    }
   }, [fetchLimits]);
 
-  // Limites ativos (do backend ou fallback)
-  const categoryLimits = data?.limits.category ?? FALLBACK_CATEGORY_LIMITS;
-  const snackLimits = data?.limits.snack ?? {};
-  const scaleLimits = data?.limits.scale ?? {};
-  const defaultCategoryLimit = data?.defaults.category ?? FALLBACK_DEFAULT_LIMITS;
-  const defaultScaleLimit = data?.defaults.scale ?? { min: 20, max: 500 };
-
+  // Wrapper reativo que usa o cache singleton
   const getCategoryLimit = useCallback(
     (category: string, isSnack = false): CategoryLimit => {
-      const normalized = category.toLowerCase().trim();
-
-      // Priorizar limites de lanche se aplicável
-      if (isSnack && snackLimits[normalized]) {
-        return snackLimits[normalized];
-      }
-
-      // Match exato
-      if (categoryLimits[normalized]) {
-        return categoryLimits[normalized];
-      }
-
-      // Match parcial
-      for (const [key, limits] of Object.entries(categoryLimits)) {
-        if (normalized.includes(key) || key.includes(normalized)) {
-          return limits;
-        }
-      }
-
-      return defaultCategoryLimit;
+      return getCategoryLimitsSync(category, isSnack);
     },
-    [categoryLimits, snackLimits, defaultCategoryLimit]
+    []
   );
 
   return {
-    categoryLimits,
-    snackLimits,
-    scaleLimits,
-    defaultCategoryLimit,
-    defaultScaleLimit,
+    categoryLimits: FALLBACK_CATEGORY_LIMITS,
+    snackLimits: {},
+    scaleLimits: {},
+    defaultCategoryLimit: FALLBACK_DEFAULT_LIMITS,
+    defaultScaleLimit: { min: 20, max: 500 },
     loading,
     error,
     isSynced,
-    refresh: fetchLimits,
+    refresh,
     getCategoryLimit,
   };
 }
