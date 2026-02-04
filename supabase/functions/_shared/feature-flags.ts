@@ -134,8 +134,6 @@ function hashCode(str: string): number {
 
 // Constantes exportadas
 export const FLAGS = {
-  REBALANCER_V2: 'rebalancer_v2_enabled',
-  SUPPLEMENTS_V2: 'supplements_v2_enabled',
   SHADOW_MODE: 'shadow_mode_enabled',
   OPENAI_CIRCUIT_BREAKER: 'openai_circuit_breaker_enabled',
   DETAILED_METRICS: 'detailed_metrics_enabled',
