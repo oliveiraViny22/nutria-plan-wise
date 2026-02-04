@@ -72,22 +72,32 @@ export const ALLOWED_SNACK_CARBS = [
  * Alimentos bloqueados para refeições específicas por adequação cultural.
  * Ex: Mingau de Aveia é mais adequado para ceia do que jantar.
  */
+/** Variantes de pipoca bloqueadas em refeições principais */
+const BLOCKED_POPCORN_VARIANTS = [
+  "pipoca",
+  "pipoca com água",
+  "pipoca com manteiga",
+  "pipoca com óleo",
+  "pipoca doce",
+  "pipoca de microondas",
+];
+
 export const BLOCKED_FOODS_BY_MEAL: Record<string, string[]> = {
   breakfast: [
-    "pipoca",           // Mais adequada como lanche da tarde
+    ...BLOCKED_POPCORN_VARIANTS,  // Pipoca só é adequada como lanche da tarde
+  ],
+  lunch: [
+    "mingau",
+    "mingau de aveia",
+    ...BLOCKED_POPCORN_VARIANTS,
   ],
   dinner: [
     "mingau",
     "mingau de aveia",
     "aveia em flocos",  // Quando usado para mingau
-    "pipoca",           // Mais adequada como lanche da tarde
-  ],
-  lunch: [
-    "mingau",
-    "mingau de aveia",
-    "pipoca",           // Mais adequada como lanche da tarde
+    ...BLOCKED_POPCORN_VARIANTS,
   ],
   supper: [
-    "pipoca",           // Mais adequada como lanche da tarde
+    ...BLOCKED_POPCORN_VARIANTS,
   ],
 };
