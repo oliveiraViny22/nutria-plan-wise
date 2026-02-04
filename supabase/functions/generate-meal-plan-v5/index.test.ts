@@ -544,26 +544,283 @@ Deno.test("Gerador V5 - Restrição vegetariana", () => {
   const restrictions = ["Vegetariano"];
   
   const foods = [
-    { id: "1", name: "Frango", category: "proteinas" },
-    { id: "2", name: "Ovo cozido", category: "proteinas" },
-    { id: "3", name: "Carne bovina", category: "proteinas" },
-    { id: "4", name: "Tofu", category: "proteinas" },
+    { id: "1", name: "Frango", category: "proteinas", isAnimal: true, isEgg: false },
+    { id: "2", name: "Ovo cozido", category: "proteinas", isAnimal: true, isEgg: true },
+    { id: "3", name: "Carne bovina", category: "proteinas", isAnimal: true, isEgg: false },
+    { id: "4", name: "Tofu", category: "proteinas", isAnimal: false, isEgg: false },
   ];
   
   const filtered = foods.filter(f => {
     for (const rest of restrictions) {
-      if (rest.toLowerCase().includes("vegetariano") && f.category === "proteinas") {
-        // Vegetariano permite ovos
-        if (!f.name.toLowerCase().includes("ovo")) return false;
+      if (rest.toLowerCase().includes("vegetariano")) {
+        // Vegetariano permite ovos e laticínios, bloqueia carnes
+        if (f.isAnimal && !f.isEgg) return false;
       }
     }
     return true;
   });
   
-  // Só ovo deve passar (tofu não tem "ovo" no nome neste teste simplificado)
+  assertEquals(filtered.length, 2);
+  assertEquals(filtered.find(f => f.name === "Ovo cozido") !== undefined, true);
+  assertEquals(filtered.find(f => f.name === "Tofu") !== undefined, true);
   assertEquals(filtered.find(f => f.name === "Frango"), undefined);
   assertEquals(filtered.find(f => f.name === "Carne bovina"), undefined);
+});
+
+// =====================================================
+// TESTES DE DIETAS ESPECÍFICAS
+// =====================================================
+
+Deno.test("Gerador V5 - Dieta Vegana bloqueia todos produtos animais", () => {
+  const restrictions = ["Vegano"];
+  
+  const foods = [
+    { id: "1", name: "Frango grelhado", category: "proteinas", isAnimal: true },
+    { id: "2", name: "Ovo cozido", category: "proteinas", isAnimal: true },
+    { id: "3", name: "Leite integral", category: "laticinios", isAnimal: true },
+    { id: "4", name: "Queijo minas", category: "laticinios", isAnimal: true },
+    { id: "5", name: "Mel", category: "adocantes", isAnimal: true },
+    { id: "6", name: "Tofu", category: "proteinas", isAnimal: false },
+    { id: "7", name: "Grão de bico", category: "leguminosas", isAnimal: false },
+    { id: "8", name: "Arroz integral", category: "carboidratos", isAnimal: false },
+  ];
+  
+  const filtered = foods.filter(f => {
+    for (const rest of restrictions) {
+      if (rest.toLowerCase() === "vegano") {
+        // Vegano bloqueia TODOS os produtos de origem animal
+        if (f.isAnimal) return false;
+      }
+    }
+    return true;
+  });
+  
+  assertEquals(filtered.length, 3);
+  assertEquals(filtered.find(f => f.name === "Tofu") !== undefined, true);
+  assertEquals(filtered.find(f => f.name === "Grão de bico") !== undefined, true);
+  assertEquals(filtered.find(f => f.name === "Arroz integral") !== undefined, true);
+  // Todos animais bloqueados
+  assertEquals(filtered.find(f => f.isAnimal), undefined);
+});
+
+Deno.test("Gerador V5 - Dieta Pescetariana permite peixes e frutos do mar", () => {
+  const restrictions = ["Pescetariano"];
+  
+  const foods = [
+    { id: "1", name: "Frango grelhado", category: "proteinas", type: "ave" },
+    { id: "2", name: "Carne bovina", category: "proteinas", type: "carne_vermelha" },
+    { id: "3", name: "Salmão grelhado", category: "proteinas", type: "peixe" },
+    { id: "4", name: "Camarão", category: "proteinas", type: "frutos_do_mar" },
+    { id: "5", name: "Ovo cozido", category: "proteinas", type: "ovo" },
+    { id: "6", name: "Tofu", category: "proteinas", type: "vegetal" },
+    { id: "7", name: "Leite", category: "laticinios", type: "laticinio" },
+  ];
+  
+  const PESCETARIAN_ALLOWED_TYPES = ["peixe", "frutos_do_mar", "ovo", "vegetal", "laticinio"];
+  
+  const filtered = foods.filter(f => {
+    for (const rest of restrictions) {
+      if (rest.toLowerCase() === "pescetariano") {
+        // Pescetariano: permite peixes, frutos do mar, ovos, laticínios, vegetais
+        // Bloqueia: aves, carnes vermelhas, suínos
+        if (!PESCETARIAN_ALLOWED_TYPES.includes(f.type)) return false;
+      }
+    }
+    return true;
+  });
+  
+  assertEquals(filtered.length, 5);
+  assertEquals(filtered.find(f => f.name === "Salmão grelhado") !== undefined, true);
+  assertEquals(filtered.find(f => f.name === "Camarão") !== undefined, true);
   assertEquals(filtered.find(f => f.name === "Ovo cozido") !== undefined, true);
+  assertEquals(filtered.find(f => f.name === "Tofu") !== undefined, true);
+  assertEquals(filtered.find(f => f.name === "Leite") !== undefined, true);
+  // Bloqueados
+  assertEquals(filtered.find(f => f.name === "Frango grelhado"), undefined);
+  assertEquals(filtered.find(f => f.name === "Carne bovina"), undefined);
+});
+
+Deno.test("Gerador V5 - Dieta Low Carb limita carboidratos", () => {
+  const restrictions = ["Low Carb"];
+  const LOW_CARB_LIMIT_PER_100G = 15; // máximo 15g carbs por 100g
+  
+  const foods = [
+    { id: "1", name: "Arroz branco", category: "carboidratos", carbs_per_100g: 28 },
+    { id: "2", name: "Batata doce", category: "carboidratos", carbs_per_100g: 20 },
+    { id: "3", name: "Brócolis", category: "vegetais", carbs_per_100g: 7 },
+    { id: "4", name: "Frango grelhado", category: "proteinas", carbs_per_100g: 0 },
+    { id: "5", name: "Abacate", category: "frutas", carbs_per_100g: 9 },
+    { id: "6", name: "Banana", category: "frutas", carbs_per_100g: 23 },
+    { id: "7", name: "Couve-flor", category: "vegetais", carbs_per_100g: 5 },
+  ];
+  
+  const filtered = foods.filter(f => {
+    for (const rest of restrictions) {
+      if (rest.toLowerCase() === "low carb") {
+        // Low carb: bloqueia alimentos com > 15g carbs por 100g
+        if (f.carbs_per_100g > LOW_CARB_LIMIT_PER_100G) return false;
+      }
+    }
+    return true;
+  });
+  
+  assertEquals(filtered.length, 4);
+  assertEquals(filtered.find(f => f.name === "Brócolis") !== undefined, true);
+  assertEquals(filtered.find(f => f.name === "Frango grelhado") !== undefined, true);
+  assertEquals(filtered.find(f => f.name === "Abacate") !== undefined, true);
+  assertEquals(filtered.find(f => f.name === "Couve-flor") !== undefined, true);
+  // Bloqueados por alto carb
+  assertEquals(filtered.find(f => f.name === "Arroz branco"), undefined);
+  assertEquals(filtered.find(f => f.name === "Batata doce"), undefined);
+  assertEquals(filtered.find(f => f.name === "Banana"), undefined);
+});
+
+// =====================================================
+// TESTES DE VALIDAÇÃO CRUZADA DE RESTRIÇÕES
+// =====================================================
+
+interface RestrictionRule {
+  name: string;
+  blocksCategories?: string[];
+  blocksTypes?: string[];
+  allowsEggs?: boolean;
+  allowsDairy?: boolean;
+  maxCarbsPer100g?: number;
+}
+
+const RESTRICTION_RULES: Record<string, RestrictionRule> = {
+  "vegano": {
+    name: "Vegano",
+    blocksCategories: ["proteinas", "laticinios"],
+    blocksTypes: ["carne", "ave", "peixe", "frutos_do_mar", "ovo", "laticinio"],
+    allowsEggs: false,
+    allowsDairy: false,
+  },
+  "vegetariano": {
+    name: "Vegetariano",
+    blocksTypes: ["carne", "ave", "peixe", "frutos_do_mar"],
+    allowsEggs: true,
+    allowsDairy: true,
+  },
+  "pescetariano": {
+    name: "Pescetariano",
+    blocksTypes: ["carne", "ave"],
+    allowsEggs: true,
+    allowsDairy: true,
+  },
+  "intolerancia_lactose": {
+    name: "Intolerância à lactose",
+    blocksCategories: ["laticinios"],
+    allowsDairy: false,
+  },
+  "low_carb": {
+    name: "Low Carb",
+    maxCarbsPer100g: 15,
+  },
+};
+
+function validateCrossRestrictions(restrictions: string[]): { valid: boolean; conflicts: string[] } {
+  const conflicts: string[] = [];
+  // Normaliza: lowercase, remove acentos, substitui espaços por _
+  const normalized = restrictions.map(r => 
+    r.toLowerCase()
+      .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // Remove acentos
+      .replace(/\s+/g, "_")
+  );
+  
+  // Vegano + qualquer coisa que permite ovos/laticínios = conflito
+  if (normalized.includes("vegano")) {
+    // Vegano já é a mais restritiva, outras restrições são redundantes
+    if (normalized.includes("vegetariano")) {
+      conflicts.push("Vegano já inclui restrições vegetarianas - redundante");
+    }
+    if (normalized.includes("pescetariano")) {
+      conflicts.push("Vegano já exclui todos os peixes - pescetariano é incompatível");
+    }
+    if (normalized.includes("intolerancia_a_lactose") || normalized.includes("intolerancia_lactose")) {
+      conflicts.push("Vegano já exclui laticínios - intolerância à lactose é redundante");
+    }
+  }
+  
+  // Vegetariano + Pescetariano = conflito lógico
+  if (normalized.includes("vegetariano") && normalized.includes("pescetariano")) {
+    conflicts.push("Vegetariano não permite peixes - pescetariano é incompatível");
+  }
+  
+  return {
+    valid: conflicts.length === 0,
+    conflicts,
+  };
+}
+
+Deno.test("Gerador V5 - Validação cruzada: Vegano + Lactose é redundante", () => {
+  const restrictions = ["Vegano", "Intolerância à lactose"];
+  const result = validateCrossRestrictions(restrictions);
+  
+  assertEquals(result.valid, false);
+  assertEquals(result.conflicts.length, 1);
+  assertEquals(result.conflicts[0].includes("redundante"), true);
+});
+
+Deno.test("Gerador V5 - Validação cruzada: Vegano + Vegetariano é redundante", () => {
+  const restrictions = ["Vegano", "Vegetariano"];
+  const result = validateCrossRestrictions(restrictions);
+  
+  assertEquals(result.valid, false);
+  assertEquals(result.conflicts.length, 1);
+  assertEquals(result.conflicts[0].includes("vegetarianas"), true);
+});
+
+Deno.test("Gerador V5 - Validação cruzada: Vegano + Pescetariano é incompatível", () => {
+  const restrictions = ["Vegano", "Pescetariano"];
+  const result = validateCrossRestrictions(restrictions);
+  
+  assertEquals(result.valid, false);
+  assertEquals(result.conflicts.length, 1);
+  assertEquals(result.conflicts[0].includes("incompatível"), true);
+});
+
+Deno.test("Gerador V5 - Validação cruzada: Vegetariano + Pescetariano é incompatível", () => {
+  const restrictions = ["Vegetariano", "Pescetariano"];
+  const result = validateCrossRestrictions(restrictions);
+  
+  assertEquals(result.valid, false);
+  assertEquals(result.conflicts.length, 1);
+  assertEquals(result.conflicts[0].includes("incompatível"), true);
+});
+
+Deno.test("Gerador V5 - Validação cruzada: Vegetariano + Lactose é válido", () => {
+  const restrictions = ["Vegetariano", "Intolerância à lactose"];
+  const result = validateCrossRestrictions(restrictions);
+  
+  assertEquals(result.valid, true);
+  assertEquals(result.conflicts.length, 0);
+});
+
+Deno.test("Gerador V5 - Validação cruzada: Low Carb + Vegetariano é válido", () => {
+  const restrictions = ["Low Carb", "Vegetariano"];
+  const result = validateCrossRestrictions(restrictions);
+  
+  assertEquals(result.valid, true);
+  assertEquals(result.conflicts.length, 0);
+});
+
+Deno.test("Gerador V5 - Validação cruzada: Pescetariano + Lactose é válido", () => {
+  const restrictions = ["Pescetariano", "Intolerância à lactose"];
+  const result = validateCrossRestrictions(restrictions);
+  
+  assertEquals(result.valid, true);
+  assertEquals(result.conflicts.length, 0);
+});
+
+Deno.test("Gerador V5 - Validação cruzada: Restrição única sempre é válida", () => {
+  const singleRestrictions = ["Vegano", "Vegetariano", "Pescetariano", "Low Carb", "Intolerância à lactose"];
+  
+  for (const rest of singleRestrictions) {
+    const result = validateCrossRestrictions([rest]);
+    assertEquals(result.valid, true, `${rest} deveria ser válido sozinho`);
+    assertEquals(result.conflicts.length, 0);
+  }
 });
 
 // =====================================================
