@@ -90,7 +90,7 @@ export default function MealDetail() {
   
   const { plan_name, meal_options_limit, can_substitute } = useAccountPermissions();
   const { currentPlan, usage } = useSubscription();
-  const isPaidPlan = plan_name !== 'gratuito';
+  const isPaidPlan = plan_name.toLowerCase() !== 'gratuito';
   
   // Check if substitution limit is reached
   const substitutionLimitReached = usage && currentPlan 

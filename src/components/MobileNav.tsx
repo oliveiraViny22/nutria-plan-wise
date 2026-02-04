@@ -28,6 +28,12 @@ import {
   SheetTrigger,
   SheetClose,
 } from '@/components/ui/sheet';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { Logo } from '@/components/Logo';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserRole } from '@/hooks/useUserRole';
@@ -52,7 +58,7 @@ export function MobileNav() {
   const { isProfessional, isAdmin, loading: roleLoading } = useUserRole();
   const { accountType, isSubscribed } = useSubscription();
   const permissions = useAccountPermissions();
-  const isPaidUser = permissions.plan_name !== 'gratuito';
+  const isPaidUser = permissions.plan_name.toLowerCase() !== 'gratuito';
 
   const showProfessionalLinks = 
     (isSubscribed && accountType === 'professional') || 
@@ -154,10 +160,28 @@ export function MobileNav() {
                   Admin
                 </Badge>
               ) : !isPaidUser && (
-                <Badge variant="outline" className="gap-1 bg-muted text-muted-foreground">
-                  <Sparkles className="w-3 h-3" />
-                  Gratuito
-                </Badge>
+                <TooltipProvider delayDuration={200}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Link
+                        to="/pricing"
+                        onClick={() => setOpen(false)}
+                        className="inline-flex"
+                      >
+                        <Badge variant="outline" className="gap-1 bg-muted text-muted-foreground hover:bg-muted/80 cursor-pointer">
+                          <Sparkles className="w-3 h-3" />
+                          Gratuito
+                        </Badge>
+                      </Link>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" className="max-w-[200px] p-3">
+                      <p className="text-xs font-medium mb-1">Plano Gratuito</p>
+                      <p className="text-xs text-muted-foreground">
+                        1 dieta/mês, 3 substituições, 1 ajuste. Toque para ver planos.
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               )}
             </div>
             <SheetClose asChild>
