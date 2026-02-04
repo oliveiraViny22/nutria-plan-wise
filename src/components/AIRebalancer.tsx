@@ -428,13 +428,8 @@ export function AIRebalancer({
         })
         .eq('id', planId);
 
-      // Incrementar uso
-      if (user?.id) {
-        await supabase.rpc('increment_usage', {
-          _user_id: user.id,
-          _feature: 'adjustment',
-        });
-      }
+      // NOTA: O incremento de uso é feito no backend (ai-rebalance)
+      // para evitar duplicação de contagem
 
       setShowDialog(false);
       setResult(null);
