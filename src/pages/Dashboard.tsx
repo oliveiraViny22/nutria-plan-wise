@@ -361,8 +361,8 @@ export default function Dashboard() {
                     </>
                   ) : null}
                   
-                  {/* Assinatura - Profissional não vê (já gerencia no painel), Aluno vinculado não vê (gerenciado pelo profissional) */}
-                  {!isProfessional && !isLinkedStudent && (
+                  {/* Assinatura - Profissional não vê (já gerencia no painel), Aluno vinculado não vê (gerenciado pelo profissional), Gratuito não vê (já tem badge clicável) */}
+                  {!isProfessional && !isLinkedStudent && subscriptionPlan?.type !== 'gratuito' && (
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <Link to="/subscription">
@@ -547,7 +547,7 @@ export default function Dashboard() {
           </motion.section>
         )}
 
-        {/* Supplement Toggle - always visible for users with a plan */}
+        {/* Supplement Toggle - visible for users with a plan, locked for free users */}
         {currentDietPlan && !isLinkedStudent && (
           <motion.section
             initial={{ opacity: 0, y: 20 }}
@@ -557,6 +557,7 @@ export default function Dashboard() {
             <SupplementToggle 
               initialValue={(profile as any)?.include_supplements || false}
               compact
+              locked={subscriptionPlan?.type === 'gratuito'}
             />
           </motion.section>
         )}

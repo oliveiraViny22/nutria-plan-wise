@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Pill, Info, Sparkles } from 'lucide-react';
+import { Pill, Info, Sparkles, Lock, Crown } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
@@ -13,14 +13,16 @@ import {
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
+import { Link } from 'react-router-dom';
 
 interface SupplementToggleProps {
   initialValue?: boolean;
   onToggle?: (value: boolean) => void;
   compact?: boolean;
+  locked?: boolean;
 }
 
-export function SupplementToggle({ initialValue = false, onToggle, compact = false }: SupplementToggleProps) {
+export function SupplementToggle({ initialValue = false, onToggle, compact = false, locked = false }: SupplementToggleProps) {
   const { user, refreshProfile, profile } = useAuth();
   const [enabled, setEnabled] = useState(initialValue);
   const [saving, setSaving] = useState(false);
@@ -33,7 +35,7 @@ export function SupplementToggle({ initialValue = false, onToggle, compact = fal
   }, [profile]);
 
   const handleToggle = async (checked: boolean) => {
-    if (!user) return;
+    if (!user || locked) return;
     
     setSaving(true);
     try {
@@ -63,32 +65,58 @@ export function SupplementToggle({ initialValue = false, onToggle, compact = fal
 
   if (compact) {
     return (
-      <div className="flex items-center justify-between gap-3 p-3 rounded-lg bg-purple-500/5 border border-purple-500/20">
+      <div className={`flex items-center justify-between gap-3 p-3 rounded-lg ${locked ? 'bg-muted/50 border border-border' : 'bg-purple-500/5 border border-purple-500/20'}`}>
         <div className="flex items-center gap-2">
-          <Pill className="h-4 w-4 text-purple-500" />
-          <span className="text-sm font-medium">Suplementação</span>
-          <TooltipProvider delayDuration={200}>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
-              </TooltipTrigger>
-              <TooltipContent side="bottom" className="max-w-xs p-3">
-                <p className="text-sm font-medium mb-1">Como funciona?</p>
-                <p className="text-sm text-muted-foreground">
-                  A IA sugere suplementos personalizados baseados no seu objetivo. 
-                  <strong className="text-foreground"> Suplementos são complementares</strong> e 
-                  não alteram os macros do seu plano alimentar principal.
-                </p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+          <Pill className={`h-4 w-4 ${locked ? 'text-muted-foreground' : 'text-purple-500'}`} />
+          <span className={`text-sm font-medium ${locked ? 'text-muted-foreground' : ''}`}>Suplementação</span>
+          {locked ? (
+            <TooltipProvider delayDuration={200}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Link to="/pricing" className="inline-flex">
+                    <Badge variant="outline" className="gap-1 text-[10px] px-1.5 py-0 bg-amber-500/10 text-amber-600 border-amber-500/30 hover:bg-amber-500/20 cursor-pointer">
+                      <Crown className="h-3 w-3" />
+                      Pro
+                    </Badge>
+                  </Link>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="max-w-xs p-3">
+                  <p className="text-sm font-medium mb-1">Recurso Premium</p>
+                  <p className="text-sm text-muted-foreground">
+                    Sugestões de suplementação estão disponíveis nos planos pagos. 
+                    Toque para ver opções de upgrade.
+                  </p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          ) : (
+            <TooltipProvider delayDuration={200}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="max-w-xs p-3">
+                  <p className="text-sm font-medium mb-1">Como funciona?</p>
+                  <p className="text-sm text-muted-foreground">
+                    A IA sugere suplementos personalizados baseados no seu objetivo. 
+                    <strong className="text-foreground"> Suplementos são complementares</strong> e 
+                    não alteram os macros do seu plano alimentar principal.
+                  </p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
         </div>
-        <Switch
-          id="supplements-toggle-compact"
-          checked={enabled}
-          onCheckedChange={handleToggle}
-          disabled={saving}
-        />
+        {locked ? (
+          <Lock className="h-4 w-4 text-muted-foreground" />
+        ) : (
+          <Switch
+            id="supplements-toggle-compact"
+            checked={enabled}
+            onCheckedChange={handleToggle}
+            disabled={saving}
+          />
+        )}
       </div>
     );
   }

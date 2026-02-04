@@ -128,7 +128,7 @@ export function MobileNav() {
       label: 'Assinatura',
       href: '/subscription',
       icon: <CreditCard className="h-5 w-5" />,
-      show: !isProfessional,
+      show: !isProfessional && isPaidUser, // Gratuito já tem badge clicável para preços
     },
   ];
 
