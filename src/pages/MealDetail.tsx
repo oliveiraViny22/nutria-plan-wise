@@ -91,11 +91,15 @@ export default function MealDetail() {
   
   const { plan_name, meal_options_limit, can_substitute } = useAccountPermissions();
   const { currentPlan, usage } = useSubscription();
-  const { isLimitReached, refresh: refreshUsageLimits } = useUsageLimits();
+  const { usage: usageLimits, isLimitReached, refresh: refreshUsageLimits } = useUsageLimits();
   const isPaidPlan = plan_name.toLowerCase() !== 'gratuito';
   
   // Check if substitution limit is reached (usa hook dedicado para precisão)
   const substitutionLimitReached = isLimitReached('substitution');
+  
+  // Check if substitution limit is near (1-2 remaining)
+  const substitutionsRemaining = usageLimits?.substitutions?.remaining ?? 0;
+  const substitutionLimitNear = !substitutionLimitReached && substitutionsRemaining > 0 && substitutionsRemaining <= 2;
   
   const canEdit = !isLinkedStudent || isProfessionalViewingStudent;
   const canShowSubstituteButton = canEdit && can_substitute && !substitutionLimitReached;
@@ -467,6 +471,29 @@ export default function MealDetail() {
       </header>
 
       <main className="container mx-auto px-3 sm:px-4 py-4 sm:py-6 space-y-4 pb-safe">
+        {/* Warning de limite próximo de substituições */}
+        {substitutionLimitNear && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="flex items-center gap-2 p-3 rounded-lg border border-warning/30 bg-warning/10"
+          >
+            <AlertTriangle className="w-4 h-4 text-warning flex-shrink-0" />
+            <p className="text-xs text-warning">
+              {substitutionsRemaining === 1 
+                ? 'Você tem apenas 1 substituição restante este mês.'
+                : `Você tem apenas ${substitutionsRemaining} substituições restantes este mês.`}
+              {' '}
+              <button 
+                onClick={() => setShowUpgradeDialog(true)}
+                className="underline font-medium hover:no-underline"
+              >
+                Fazer upgrade
+              </button>
+            </p>
+          </motion.div>
+        )}
+
         {visibleMealOptions.length > 0 ? (
           <Tabs value={selectedOption} onValueChange={setSelectedOption} className="w-full">
             <TabsList className="grid w-full" style={{ gridTemplateColumns: `repeat(${visibleMealOptions.length}, 1fr)` }}>
