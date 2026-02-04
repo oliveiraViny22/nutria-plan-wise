@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Crown, Sparkles, Lock, LucideIcon } from 'lucide-react';
+import { Crown, Sparkles, Lock, Star, LucideIcon } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import {
   Tooltip,
@@ -9,9 +9,16 @@ import {
 } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 
-export type BadgeVariant = 'free' | 'pro' | 'locked';
+/**
+ * Badge variants:
+ * - free: Plano gratuito (usuários não pagantes)
+ * - pro: Recursos dos planos pagos pessoais (Plano Pessoal)
+ * - student: Recursos exclusivos para alunos vinculados a profissionais
+ * - locked: Recursos bloqueados (genérico)
+ */
+export type BadgeVariant = 'free' | 'pro' | 'student' | 'locked';
 
-interface PremiumBadgeProps {
+interface FeatureBadgeProps {
   variant: BadgeVariant;
   /** Link destination (defaults to /pricing) */
   href?: string;
@@ -44,9 +51,16 @@ const variantConfig = {
   pro: {
     icon: Crown,
     label: 'Pro',
-    tooltipTitle: 'Recurso Premium',
+    tooltipTitle: 'Recurso Pro',
     tooltipDescription: 'Este recurso está disponível nos planos pagos. Toque para ver opções de upgrade.',
     className: 'bg-warning/10 text-warning border-warning/30 hover:bg-warning/20',
+  },
+  student: {
+    icon: Star,
+    label: 'Aluno',
+    tooltipTitle: 'Recurso Exclusivo',
+    tooltipDescription: 'Disponível para alunos vinculados a um profissional.',
+    className: 'bg-primary/10 text-primary border-primary/30 hover:bg-primary/20',
   },
   locked: {
     icon: Lock,
@@ -57,7 +71,12 @@ const variantConfig = {
   },
 };
 
-export function PremiumBadge({
+/** @deprecated Use FeatureBadge instead */
+export function PremiumBadge(props: FeatureBadgeProps) {
+  return <FeatureBadge {...props} />;
+}
+
+export function FeatureBadge({
   variant,
   href = '/pricing',
   label,
@@ -68,7 +87,7 @@ export function PremiumBadge({
   className,
   size = 'default',
   onClick,
-}: PremiumBadgeProps) {
+}: FeatureBadgeProps) {
   const config = variantConfig[variant];
   const Icon = icon || config.icon;
   const displayLabel = label || config.label;
@@ -131,9 +150,9 @@ export function FreePlanBadge({
   className, 
   onClick,
   ...props 
-}: Omit<PremiumBadgeProps, 'variant'>) {
+}: Omit<FeatureBadgeProps, 'variant'>) {
   return (
-    <PremiumBadge 
+    <FeatureBadge 
       variant="free" 
       className={className}
       onClick={onClick}
@@ -142,15 +161,32 @@ export function FreePlanBadge({
   );
 }
 
-/** Convenience component for Pro Feature badge */
+/** Convenience component for Pro Feature badge (paid personal plans) */
 export function ProFeatureBadge({ 
   className,
   onClick,
   ...props 
-}: Omit<PremiumBadgeProps, 'variant'>) {
+}: Omit<FeatureBadgeProps, 'variant'>) {
   return (
-    <PremiumBadge 
+    <FeatureBadge 
       variant="pro" 
+      size="sm"
+      className={className}
+      onClick={onClick}
+      {...props}
+    />
+  );
+}
+
+/** Convenience component for Student-linked feature badge */
+export function StudentFeatureBadge({ 
+  className,
+  onClick,
+  ...props 
+}: Omit<FeatureBadgeProps, 'variant'>) {
+  return (
+    <FeatureBadge 
+      variant="student" 
       size="sm"
       className={className}
       onClick={onClick}
