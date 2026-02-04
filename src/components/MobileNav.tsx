@@ -168,7 +168,7 @@ export function MobileNav() {
                         onClick={() => setOpen(false)}
                         className="inline-flex"
                       >
-                        <Badge variant="outline" className="gap-1 bg-muted text-muted-foreground hover:bg-muted/80 cursor-pointer">
+                        <Badge variant="outline" className="shimmer-badge-subtle gap-1 bg-muted text-muted-foreground hover:bg-muted/80 cursor-pointer overflow-hidden">
                           <Sparkles className="w-3 h-3" />
                           Gratuito
                         </Badge>
