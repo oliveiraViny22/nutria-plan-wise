@@ -181,15 +181,18 @@ const FOOD_CATALOG: Record<string, CatalogItem> = {
     macros: { calories: 130, protein: 5, carbs: 24, fat: 2 },
     notes: 'Carboidrato complexo + fibras',
     scalable: true,
-    minPortion: 0.5,
-    maxPortion: 2,
+    minPortion: 1, // Mínimo 2 fatias (não faz sentido 0.5 = 1 fatia sozinha)
+    maxPortion: 2, // Máximo 4 fatias
   },
-  'Batata Doce': {
-    portion: '150g (1 unidade média)',
-    macros: { calories: 130, protein: 2, carbs: 30, fat: 0 },
-    notes: 'Carboidrato de baixo índice glicêmico',
+  // REMOVIDO: Batata Doce - não é prático para substituição rápida (requer preparo)
+  
+  // Opções práticas adicionais
+  'Tapioca': {
+    portion: '30g (2 colheres)',
+    macros: { calories: 100, protein: 0, carbs: 26, fat: 0 },
+    notes: 'Carboidrato de rápido preparo',
     scalable: true,
-    minPortion: 0.5,
+    minPortion: 1,
     maxPortion: 2,
   },
   
@@ -489,18 +492,20 @@ export function calculateMealReplacement(
     }
   }
   
-  // Batata Doce (para refeições com alto déficit de carboidratos - antes de verificar calorias)
+  // REMOVIDO: Batata Doce - substituída por Tapioca (mais prática para preparo rápido)
+  // Tapioca (para refeições com alto déficit de carboidratos)
   if (isHighCarbMeal && carbDeficit() >= 20 && remaining().calories >= 80 && caloriePercent() < 85) {
-    const sweetPotatoScale = calculateOptimalScale(FOOD_CATALOG['Batata Doce'].macros, 1, 0.5);
-    if (sweetPotatoScale >= 0.5) {
-      addItem('Batata Doce', FOOD_CATALOG, 'food', sweetPotatoScale);
+    const tapiocaScale = calculateOptimalScale(FOOD_CATALOG['Tapioca'].macros, 1, 1);
+    if (tapiocaScale >= 1) {
+      addItem('Tapioca', FOOD_CATALOG, 'food', tapiocaScale);
     }
   }
   
   // Pão Integral (backup para carboidratos se ainda abaixo de 80% das calorias)
+  // NOTA: minPortion=1 garante que nunca teremos "0.5 fatias"
   if (caloriePercent() < 80 && remaining().carbs >= 15 && remaining().calories >= 65) {
-    const breadScale = calculateOptimalScale(FOOD_CATALOG['Pão Integral'].macros, 1, 0.5);
-    if (breadScale >= 0.5) {
+    const breadScale = calculateOptimalScale(FOOD_CATALOG['Pão Integral'].macros, 1, 1);
+    if (breadScale >= 1) {
       addItem('Pão Integral', FOOD_CATALOG, 'food', breadScale);
     }
   }
