@@ -269,8 +269,27 @@ export default function Profile() {
 
     setDeleting(true);
     try {
+      // Refresh session before critical operation to ensure valid token
+      const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+      
+      if (refreshError || !refreshData.session) {
+        // If refresh fails, try getting current session as fallback
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+          toast.error('Sua sessão expirou. Faça login novamente.');
+          await signOut();
+          navigate('/login');
+          return;
+        }
+      }
+
+      // Get the fresh session after refresh
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error('Sessão inválida');
+      if (!session) {
+        toast.error('Sessão inválida. Faça login novamente.');
+        navigate('/login');
+        return;
+      }
 
       const response = await supabase.functions.invoke('delete-account', {
         headers: {
