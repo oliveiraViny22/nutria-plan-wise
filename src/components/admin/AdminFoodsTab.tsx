@@ -87,10 +87,16 @@ export function AdminFoodsTab({
   
   const [foodSearch, setFoodSearch] = useState('');
   const [foodPage, setFoodPage] = useState(0);
+  const [showOnlySupplements, setShowOnlySupplements] = useState(false);
   const [editingFood, setEditingFood] = useState<Food | null>(null);
   const [editedFoodData, setEditedFoodData] = useState<Partial<Food>>({});
   const [deletingFoodId, setDeletingFoodId] = useState<string | null>(null);
   const [normalizingNames, setNormalizingNames] = useState(false);
+
+  // Filtra alimentos localmente por is_supplement_item
+  const filteredFoods = showOnlySupplements 
+    ? foods.filter(f => f.is_supplement_item) 
+    : foods;
   
   const [importFile, setImportFile] = useState<File | null>(null);
   const [importPreview, setImportPreview] = useState<{ rows: Record<string, unknown>[]; validation: FoodValidationResult | null }>({ rows: [], validation: null });
@@ -342,6 +348,24 @@ export function AdminFoodsTab({
                 )}
                 Normalizar Nomes
               </Button>
+              
+              {/* Filtro de suplementos */}
+              <div className="flex items-center gap-2 ml-auto">
+                <FlaskConical className="h-4 w-4 text-muted-foreground" />
+                <Label htmlFor="filter-supplements" className="text-sm text-muted-foreground cursor-pointer">
+                  Apenas suplementos
+                </Label>
+                <Switch
+                  id="filter-supplements"
+                  checked={showOnlySupplements}
+                  onCheckedChange={setShowOnlySupplements}
+                />
+                {showOnlySupplements && (
+                  <Badge variant="secondary" className="text-xs">
+                    {filteredFoods.length}
+                  </Badge>
+                )}
+              </div>
             </div>
 
             {/* Foods Table */}
@@ -349,10 +373,14 @@ export function AdminFoodsTab({
               <div className="flex items-center justify-center py-12">
                 <Loader2 className="h-8 w-8 animate-spin" />
               </div>
-            ) : foods.length === 0 ? (
+            ) : filteredFoods.length === 0 ? (
               <div className="py-12 text-center text-muted-foreground">
                 <Database className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <p>Nenhum alimento encontrado. Use o botão "Buscar" para carregar os alimentos.</p>
+                <p>
+                  {showOnlySupplements 
+                    ? 'Nenhum item de suplementação encontrado na busca atual.' 
+                    : 'Nenhum alimento encontrado. Use o botão "Buscar" para carregar os alimentos.'}
+                </p>
               </div>
             ) : (
               <>
@@ -371,7 +399,7 @@ export function AdminFoodsTab({
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {foods.map((food) => (
+                      {filteredFoods.map((food) => (
                         <TableRow key={food.id}>
                           <TableCell className="font-medium truncate" title={food.name}>
                             <div className="flex items-center gap-1.5">
