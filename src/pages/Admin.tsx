@@ -14,6 +14,7 @@ import {
   Database,
   Users,
   BarChart3,
+  TrendingUp,
   RefreshCw,
   BookOpen,
   CreditCard,
@@ -42,6 +43,7 @@ import { AdminSettingsTab, SystemSetting } from '@/components/admin/AdminSetting
 import { AdminPlansTab } from '@/components/admin/AdminPlansTab';
 import { AdminDocsTab } from '@/components/admin/AdminDocsTab';
 import { AdminPoliciesTab } from '@/components/admin/AdminPoliciesTab';
+import { AdminConversionTab } from '@/components/admin/AdminConversionTab';
 
 export default function Admin() {
   const navigate = useNavigate();
@@ -427,6 +429,10 @@ export default function Admin() {
               <Sparkles className="h-4 w-4" />
               Feature Flags
             </TabsTrigger>
+            <TabsTrigger value="conversion" className="flex items-center gap-2">
+              <TrendingUp className="h-4 w-4" />
+              Conversão
+            </TabsTrigger>
           </TabsList>
 
           {/* Metrics Tab */}
@@ -534,6 +540,11 @@ export default function Admin() {
               <FeatureFlagsManager />
               <RateLimitsManager />
             </div>
+          </TabsContent>
+
+          {/* Conversion Tab */}
+          <TabsContent value="conversion">
+            <AdminConversionTab />
           </TabsContent>
         </Tabs>
       </main>
