@@ -123,6 +123,7 @@ export function GamificationPreview({ isLocked }: GamificationPreviewProps) {
     <div className="space-y-3">
       <LockedFeaturePreview
         featureName="Sequência de Adesão"
+        featureKey="gamification_streak"
         description="Acompanhe sua consistência e ganhe conquistas"
       >
         <MockAdherenceStreak />
@@ -130,6 +131,7 @@ export function GamificationPreview({ isLocked }: GamificationPreviewProps) {
       
       <LockedFeaturePreview
         featureName="Gráfico Semanal"
+        featureKey="gamification_weekly_chart"
         description="Visualize seu progresso ao longo da semana"
       >
         <MockWeeklyChart />

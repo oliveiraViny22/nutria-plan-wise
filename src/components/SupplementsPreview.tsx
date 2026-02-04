@@ -125,6 +125,7 @@ export function SupplementsPreview({ isLocked }: SupplementsPreviewProps) {
   return (
     <LockedFeaturePreview
       featureName="Suplementação Personalizada"
+      featureKey="supplementation"
       description="Recomendações baseadas no seu objetivo e lacunas nutricionais"
     >
       <MockSupplementsContent />
