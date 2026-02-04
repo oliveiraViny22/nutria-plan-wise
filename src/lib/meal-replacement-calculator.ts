@@ -386,12 +386,15 @@ export function calculateMealReplacement(
   });
   
   // Função para verificar se podemos adicionar um item sem exceder limites
+  // PRIORIDADE: Calorias > Gordura > Proteína (proteína pode exceder para atingir calorias)
   const canAddItem = (macros: MacroTarget, scale: number = 1): boolean => {
     const r = remaining();
+    // Permitir exceder proteína em até 40% se precisamos de calorias
+    const proteinTolerance = currentMacros.calories < limits.calories.min ? 0.40 : 0.20;
     return (
-      macros.calories * scale <= r.calories + 10 && // margem de 10kcal
-      macros.protein * scale <= r.protein + 2 &&    // margem de 2g
-      macros.fat * scale <= r.fat + 3               // margem de 3g
+      macros.calories * scale <= r.calories + 15 && // margem de 15kcal
+      macros.protein * scale <= r.protein + (targetMacros.protein * proteinTolerance) &&
+      macros.fat * scale <= r.fat + 5               // margem de 5g
     );
   };
   
