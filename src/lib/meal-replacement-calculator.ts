@@ -221,35 +221,11 @@ const FOOD_CATALOG: Record<string, CatalogItem> = {
     maxPortion: 1.5,
   },
   
-  // Líquidos
-  'Leite Desnatado': {
-    portion: '200ml',
-    macros: { calories: 70, protein: 7, carbs: 10, fat: 0 },
-    notes: 'Base líquida para shakes',
-    scalable: true,
-    minPortion: 0.75, // Mínimo 150ml para shake bebível
-    maxPortion: 2,
-  },
-  'Leite Integral': {
-    portion: '200ml',
-    macros: { calories: 120, protein: 6, carbs: 9, fat: 6 },
-    notes: 'Mais calórico, ideal para ganho de massa',
-    scalable: true,
-    minPortion: 0.75, // Mínimo 150ml para shake bebível
-    maxPortion: 2,
-  },
-  'Leite de Amêndoas': {
-    portion: '200ml',
-    macros: { calories: 30, protein: 1, carbs: 1, fat: 2.5 },
-    notes: 'Baixo em calorias, alternativa vegana',
-    scalable: true,
-    minPortion: 1, // Mínimo 200ml
-    maxPortion: 2,
-  },
+  // Líquidos - apenas água como base para shakes
   'Água': {
     portion: '200ml',
     macros: { calories: 0, protein: 0, carbs: 0, fat: 0 },
-    notes: 'Opção zero-caloria para diluir o shake',
+    notes: 'Base preferencial para shakes - zero calorias',
     scalable: true,
     minPortion: 0.75, // Mínimo 150ml
     maxPortion: 2,
@@ -615,65 +591,17 @@ export function calculateMealReplacement(
   );
   
   if (hasProteinPowder) {
-    // Para emagrecimento: SEMPRE usar água para maximizar eficiência calórica
-    // Para outros objetivos: decidir baseado no espaço calórico disponível
-    
-    let liquidChoice: 'Água' | 'Leite de Amêndoas' | 'Leite Desnatado' | 'Leite Integral';
-    let liquidReason: string;
-    
-    if (userGoal === 'lose_weight') {
-      // Emagrecimento: sempre água para não adicionar calorias desnecessárias
-      liquidChoice = 'Água';
-      liquidReason = '💧 Água para maximizar a eficiência calórica (objetivo: emagrecimento)';
-    } else if (remaining().calories < 40) {
-      // Sem espaço calórico → água
-      liquidChoice = 'Água';
-      liquidReason = '💧 Escolhida por não adicionar calorias (limite atingido)';
-    } else if (remaining().calories < 80) {
-      // Pouco espaço → leite de amêndoas
-      liquidChoice = 'Leite de Amêndoas';
-      liquidReason = '🥛 Escolhido por ter apenas 30kcal (calorias limitadas)';
-    } else {
-      // Espaço suficiente → baseado no objetivo
-      liquidChoice = userGoal === 'gain_muscle' ? 'Leite Integral' : 'Leite Desnatado';
-      liquidReason = userGoal === 'gain_muscle'
-        ? '💪 Escolhido por fornecer calorias extras (ideal para ganho de massa)'
-        : '⚖️ Escolhido para equilibrar calorias e proteína';
-    }
-    
-    const liquidItem = ACTIVE_FOODS[liquidChoice];
-    
-    if (liquidChoice === 'Água') {
-      items.push({
-        name: 'Água',
-        quantity: '150-200ml',
-        macros: { calories: 0, protein: 0, carbs: 0, fat: 0 },
-        type: 'food',
-        notes: 'Necessário para diluir o shake',
-        reason: liquidReason,
-      });
-    } else {
-      // Mínimo 150ml (0.75 scale) para shake bebível
-      const minScale = 0.75;
-      const optimalScale = calculateOptimalScale(liquidItem.macros, 1, minScale);
-      const finalScale = Math.round(Math.max(minScale, optimalScale) * 4) / 4;
-      
-      const scaledMacros = scaleMacros(liquidItem.macros, finalScale);
-      
-      items.push({
-        name: liquidChoice,
-        quantity: `${Math.round(200 * finalScale)}ml`,
-        macros: scaledMacros,
-        type: 'food',
-        notes: liquidItem.notes,
-        reason: liquidReason,
-      });
-      
-      currentMacros.protein += scaledMacros.protein;
-      currentMacros.calories += scaledMacros.calories;
-      currentMacros.carbs += scaledMacros.carbs;
-      currentMacros.fat += scaledMacros.fat;
-    }
+    // ÁGUA é sempre a base preferencial para shakes
+    // Isso garante que o shake não impacte negativamente no plano alimentar,
+    // mantendo hidratação e controle preciso de calorias
+    items.push({
+      name: 'Água',
+      quantity: '150-200ml',
+      macros: { calories: 0, protein: 0, carbs: 0, fat: 0 },
+      type: 'food',
+      notes: 'Base preferencial para shakes - mantém controle calórico',
+      reason: '💧 Água para não impactar o plano alimentar e garantir hidratação',
+    });
   }
 
   // 6. AJUSTE FINO: Preencher espaço restante se ainda abaixo de 90%
