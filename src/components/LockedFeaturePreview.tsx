@@ -1,12 +1,15 @@
-import { ReactNode } from 'react';
+import { ReactNode, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { Lock, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface LockedFeaturePreviewProps {
   children: ReactNode;
   featureName: string;
+  featureKey: string;
   description?: string;
   className?: string;
 }
@@ -14,10 +17,29 @@ interface LockedFeaturePreviewProps {
 export function LockedFeaturePreview({
   children,
   featureName,
+  featureKey,
   description,
   className = '',
 }: LockedFeaturePreviewProps) {
   const navigate = useNavigate();
+  const { user } = useAuth();
+
+  const trackAndNavigate = useCallback(async () => {
+    // Track the conversion event
+    if (user) {
+      try {
+        await supabase.from('conversion_events').insert({
+          user_id: user.id,
+          event_type: 'unlock_cta_click',
+          feature_key: featureKey,
+          metadata: { feature_name: featureName },
+        });
+      } catch (error) {
+        console.error('Failed to track conversion event:', error);
+      }
+    }
+    navigate('/pricing');
+  }, [user, featureKey, featureName, navigate]);
 
   return (
     <motion.div
@@ -53,7 +75,7 @@ export function LockedFeaturePreview({
           </div>
           <Button
             size="sm"
-            onClick={() => navigate('/pricing')}
+            onClick={trackAndNavigate}
             className="gap-2 bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 shimmer-badge-subtle"
           >
             <Sparkles className="w-3.5 h-3.5" />
