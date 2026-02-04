@@ -914,6 +914,7 @@ export type Database = {
           protein_target: number | null
           restrictions: string[] | null
           sex: string | null
+          snack_preference: string | null
           updated_at: string
           user_id: string
           weight: number | null
@@ -941,6 +942,7 @@ export type Database = {
           protein_target?: number | null
           restrictions?: string[] | null
           sex?: string | null
+          snack_preference?: string | null
           updated_at?: string
           user_id: string
           weight?: number | null
@@ -968,6 +970,7 @@ export type Database = {
           protein_target?: number | null
           restrictions?: string[] | null
           sex?: string | null
+          snack_preference?: string | null
           updated_at?: string
           user_id?: string
           weight?: number | null

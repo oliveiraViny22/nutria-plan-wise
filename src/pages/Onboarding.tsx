@@ -33,9 +33,25 @@ const steps = [
 const MEALS_OPTIONS = [
   { value: 2, label: '2 refeições', description: 'Jejum intermitente' },
   { value: 3, label: '3 refeições', description: 'Tradicional' },
-  { value: 4, label: '4 refeições', description: 'Com lanche da tarde' },
+  { value: 4, label: '4 refeições', description: 'Com lanche' },
   { value: 5, label: '5 refeições', description: 'Com lanches' },
   { value: 6, label: '6 refeições', description: 'Atletas e hipertrofia' },
+];
+
+// Opções de lanche para 4 refeições
+const SNACK_PREFERENCE_OPTIONS = [
+  { 
+    value: 'morning_snack' as const, 
+    label: '☀️ Lanche da Manhã',
+    description: 'Lanche entre café da manhã e almoço, ideal para quem acorda cedo',
+    examples: 'Ex: Frutas, iogurte, castanhas'
+  },
+  { 
+    value: 'afternoon_snack' as const, 
+    label: '🌅 Lanche da Tarde',
+    description: 'Lanche entre almoço e jantar, ideal para manter a energia',
+    examples: 'Ex: Sanduíche, smoothie, mix de frutas'
+  },
 ];
 
 export default function Onboarding() {
@@ -55,6 +71,7 @@ export default function Onboarding() {
     goal: '' as 'lose_weight' | 'maintain' | 'gain_muscle' | '',
     activity_level: '' as 'sedentary' | 'light' | 'moderate' | 'active' | 'very_active' | '',
     meals_per_day: 4,
+    snack_preference: 'afternoon_snack' as 'morning_snack' | 'afternoon_snack', // Escolha para 4 refeições
     evening_meal_preference: 'no_preference' as 'full_dinner' | 'light_dinner' | 'no_preference',
     last_evening_meal: 'dinner' as 'dinner' | 'supper', // Escolha para 3-5 refeições
     preferences: [] as string[],
@@ -167,6 +184,7 @@ export default function Onboarding() {
           goal: formData.goal || null,
           activity_level: formData.activity_level || null,
           meals_per_day: formData.meals_per_day,
+          snack_preference: formData.meals_per_day === 4 ? formData.snack_preference : 'afternoon_snack',
           last_evening_meal: formData.meals_per_day >= 3 && formData.meals_per_day <= 5 ? formData.last_evening_meal : 'dinner',
           evening_meal_preference: formData.meals_per_day === 6 ? formData.evening_meal_preference : 'no_preference',
           preferences: formData.preferences,
@@ -476,6 +494,70 @@ export default function Onboarding() {
                       </button>
                     ))}
                   </div>
+
+                  {/* Pergunta condicional para 4 refeições: Lanche da Manhã OU Tarde */}
+                  <AnimatePresence>
+                    {formData.meals_per_day === 4 && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="overflow-hidden"
+                      >
+                        <div className="pt-4 sm:pt-6 border-t border-border">
+                          <div className="flex items-center gap-2 mb-3 sm:mb-4">
+                            <Utensils className="w-5 h-5 text-primary" />
+                            <h4 className="font-medium text-sm sm:text-base">
+                              Quando você prefere fazer seu lanche?
+                            </h4>
+                            <TooltipProvider delayDuration={200}>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Info className="w-4 h-4 text-muted-foreground cursor-help" />
+                                </TooltipTrigger>
+                                <TooltipContent side="bottom" className="max-w-xs p-3">
+                                  <p className="font-semibold mb-2">Lanche da Manhã vs Tarde</p>
+                                  <ul className="text-sm space-y-2">
+                                    <li><strong>☀️ Manhã:</strong> Entre café da manhã e almoço, ideal para quem acorda cedo.</li>
+                                    <li><strong>🌅 Tarde:</strong> Entre almoço e jantar, ideal para manter a energia à tarde.</li>
+                                  </ul>
+                                  <p className="text-xs text-muted-foreground mt-2">
+                                    Você pode alterar isso depois no seu Perfil.
+                                  </p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          </div>
+                          <div className="grid gap-2 sm:gap-3">
+                            {SNACK_PREFERENCE_OPTIONS.map((option) => (
+                              <button
+                                key={option.value}
+                                type="button"
+                                onClick={() =>
+                                  setFormData({ ...formData, snack_preference: option.value })
+                                }
+                                className={`p-3 sm:p-4 rounded-lg sm:rounded-xl border text-left transition-all ${
+                                  formData.snack_preference === option.value
+                                    ? 'border-primary bg-primary/10'
+                                    : 'border-border hover:border-primary/50'
+                                }`}
+                              >
+                                <span className="font-medium text-foreground text-sm sm:text-base block">
+                                  {option.label}
+                                </span>
+                                <span className="text-xs sm:text-sm text-muted-foreground block">
+                                  {option.description}
+                                </span>
+                                <span className="text-xs text-primary/80 mt-1 block">
+                                  {option.examples}
+                                </span>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
 
                   {/* Pergunta condicional para 3-5 refeições: Jantar OU Ceia */}
                   <AnimatePresence>

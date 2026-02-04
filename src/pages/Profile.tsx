@@ -108,6 +108,7 @@ export default function Profile() {
     goal: '' as 'lose_weight' | 'maintain' | 'gain_muscle' | '',
     activity_level: '' as 'sedentary' | 'light' | 'moderate' | 'active' | 'very_active' | '',
     meals_per_day: 4,
+    snack_preference: 'afternoon_snack' as 'morning_snack' | 'afternoon_snack', // Para 4 refeições
     last_evening_meal: 'dinner' as 'dinner' | 'supper', // Para 3-5 refeições
     evening_meal_preference: 'no_preference' as 'full_dinner' | 'light_dinner' | 'no_preference',
     preferences: [] as string[],
@@ -154,6 +155,22 @@ export default function Profile() {
     },
   ];
 
+  // Opções de preferência de lanche (para 4 refeições)
+  const SNACK_PREFERENCE_OPTIONS = [
+    { 
+      value: 'morning_snack' as const, 
+      label: '☀️ Lanche da Manhã',
+      description: 'Entre café da manhã e almoço, ideal para quem acorda cedo',
+      examples: 'Ex: Frutas, iogurte, castanhas'
+    },
+    { 
+      value: 'afternoon_snack' as const, 
+      label: '🌅 Lanche da Tarde',
+      description: 'Entre almoço e jantar, ideal para manter a energia',
+      examples: 'Ex: Sanduíche, smoothie, mix de frutas'
+    },
+  ];
+
   useEffect(() => {
     if (profile) {
       const mapSex = (dbSex: string | null): 'male' | 'female' | 'other' | '' => {
@@ -180,6 +197,11 @@ export default function Profile() {
         if (meal === 'supper') return 'supper';
         return 'dinner';
       };
+
+      const mapSnackPreference = (pref: string | null): 'morning_snack' | 'afternoon_snack' => {
+        if (pref === 'morning_snack') return 'morning_snack';
+        return 'afternoon_snack';
+      };
       
       setFormData({
         name: profile.name || '',
@@ -190,6 +212,7 @@ export default function Profile() {
         goal: mapGoal(profile.goal),
         activity_level: (profile.activity_level as any) || '',
         meals_per_day: (profile as any).meals_per_day || 4,
+        snack_preference: mapSnackPreference((profile as any).snack_preference),
         last_evening_meal: mapLastEveningMeal((profile as any).last_evening_meal),
         evening_meal_preference: mapEveningPreference((profile as any).evening_meal_preference),
         preferences: profile.preferences || [],
@@ -321,6 +344,36 @@ export default function Profile() {
       await refreshProfile();
     } catch (error: any) {
       console.error('Error saving last evening meal:', error);
+      toast.error(error.message || 'Erro ao salvar preferência');
+    } finally {
+      setSavingPreference(false);
+    }
+  };
+
+  const handleSaveSnackPreference = async (value: 'morning_snack' | 'afternoon_snack') => {
+    if (!user) return;
+    
+    setSavingPreference(true);
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ 
+          snack_preference: value,
+          updated_at: new Date().toISOString()
+        })
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+
+      setFormData(prev => ({ ...prev, snack_preference: value }));
+      toast.success('Preferência de lanche atualizada!', {
+        description: value === 'morning_snack' 
+          ? 'Seu lanche será no meio da manhã.' 
+          : 'Seu lanche será no meio da tarde.'
+      });
+      await refreshProfile();
+    } catch (error: any) {
+      console.error('Error saving snack preference:', error);
       toast.error(error.message || 'Erro ao salvar preferência');
     } finally {
       setSavingPreference(false);
@@ -805,6 +858,61 @@ export default function Profile() {
                       initialValue={(profile as any)?.include_supplements || false}
                     />
                   </div>
+
+                  {/* Snack Preference Choice - For 4 meals: Morning OR Afternoon */}
+                  {formData.meals_per_day === 4 && (
+                    <div className="mb-6">
+                      <div className="flex items-center gap-2 mb-3">
+                        <Utensils className="w-4 h-4 text-primary" />
+                        <p className="text-sm font-medium">Horário do Lanche</p>
+                        <TooltipProvider delayDuration={200}>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Info className="w-4 h-4 text-muted-foreground cursor-help" />
+                            </TooltipTrigger>
+                            <TooltipContent side="right" className="max-w-xs p-3">
+                              <p className="font-semibold mb-2">Lanche da Manhã vs Tarde</p>
+                              <ul className="text-sm space-y-2">
+                                <li><strong>☀️ Manhã:</strong> Entre café da manhã e almoço, ideal para quem acorda cedo.</li>
+                                <li><strong>🌅 Tarde:</strong> Entre almoço e jantar, ideal para manter a energia à tarde.</li>
+                              </ul>
+                              <p className="text-xs text-muted-foreground mt-2">
+                                A alteração será aplicada ao gerar um novo plano.
+                              </p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </div>
+                      <div className="grid gap-2">
+                        {SNACK_PREFERENCE_OPTIONS.map((option) => (
+                          <button
+                            key={option.value}
+                            type="button"
+                            disabled={savingPreference}
+                            onClick={() => handleSaveSnackPreference(option.value)}
+                            className={`p-3 rounded-xl border text-left transition-all relative ${
+                              formData.snack_preference === option.value
+                                ? 'border-primary bg-primary/10'
+                                : 'border-border hover:border-primary/50'
+                            } ${savingPreference ? 'opacity-50 cursor-not-allowed' : ''}`}
+                          >
+                            <span className="font-medium text-foreground text-sm block">
+                              {option.label}
+                            </span>
+                            <span className="text-xs text-muted-foreground block">
+                              {option.description}
+                            </span>
+                            <span className="text-xs text-primary/80 mt-1 block">
+                              {option.examples}
+                            </span>
+                            {formData.snack_preference === option.value && (
+                              <Check className="w-5 h-5 text-primary absolute top-3 right-3" />
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Last Evening Meal Choice - For 3-5 meals: Jantar OR Ceia */}
                   {formData.meals_per_day >= 3 && formData.meals_per_day <= 5 && (

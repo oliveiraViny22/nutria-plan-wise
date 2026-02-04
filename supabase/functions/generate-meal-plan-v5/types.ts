@@ -127,6 +127,7 @@ export interface UserProfile {
   meals_per_day: number | null;
   last_evening_meal: 'dinner' | 'supper' | null; // v5.10: Escolha jantar/ceia para 3-5 refeições
   evening_meal_preference: 'full_dinner' | 'light_dinner' | 'no_preference' | null;
+  snack_preference: 'morning_snack' | 'afternoon_snack' | null; // v5.11: Escolha lanche manhã/tarde para 4 refeições
   preferred_foods: string[] | null;
   avoided_foods: string[] | null;
   restrictions: string[] | null;

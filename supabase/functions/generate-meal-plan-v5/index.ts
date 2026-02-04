@@ -106,10 +106,11 @@ serve(async (req) => {
     const mealOptionsLimit = planData?.meal_options_limit ?? 1;
     logInfo("Limite de opções do plano", { mealOptionsLimit, planName: planData?.plan_name });
 
-    // Determinar refeições baseado na quantidade e preferência noturna
+    // Determinar refeições baseado na quantidade e preferências
     const mealsPerDay = profile.meals_per_day || 4;
     const lastEveningMeal = (profile.last_evening_meal as 'dinner' | 'supper') || 'dinner';
-    const mealTypes = getMealTypesForProfile(mealsPerDay, lastEveningMeal);
+    const snackPreference = (profile.snack_preference as 'morning_snack' | 'afternoon_snack') || 'afternoon_snack';
+    const mealTypes = getMealTypesForProfile(mealsPerDay, lastEveningMeal, snackPreference);
     
     // v5.9: Preferência de refeição noturna (distribuição jantar/ceia para 6 refeições)
     const eveningMealPreference = profile.evening_meal_preference || 'no_preference';
@@ -120,6 +121,7 @@ serve(async (req) => {
     logInfo("Configuração", { 
       mealsPerDay,
       lastEveningMeal,
+      snackPreference,
       mealTypes, 
       mealOptionsLimit,
       eveningMealPreference,
