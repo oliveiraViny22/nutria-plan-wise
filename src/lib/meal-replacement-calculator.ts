@@ -462,33 +462,43 @@ export function calculateMealReplacement(
   }
 
   // 2. CARBOIDRATOS: Adicionar fontes de carboidrato proporcionalmente ao déficit
-  const carbDeficit = targetMacros.carbs - currentMacros.carbs;
-  const isHighCarbMeal = targetMacros.carbs >= 60; // Refeições com muitos carboidratos
+  // Priorizar atingir pelo menos 90% das calorias com carboidratos de qualidade
+  const carbDeficit = () => targetMacros.carbs - currentMacros.carbs;
+  const caloriePercent = () => (currentMacros.calories / targetMacros.calories) * 100;
+  const isHighCarbMeal = targetMacros.carbs >= 40; // Ajustado de 60 para 40g
   
-  // Banana (sempre que possível - carboidrato rápido)
-  if (remaining().carbs >= 10 && remaining().calories >= 45) {
-    // Para refeições com muitos carbos, usar mais banana
-    const bananaDesiredScale = isHighCarbMeal && carbDeficit > 40 ? 1.5 : 1;
-    const bananaScale = calculateOptimalScale(FOOD_CATALOG['Banana'].macros, bananaDesiredScale, 0.5);
-    if (bananaScale >= 0.5) {
-      addItem('Banana', FOOD_CATALOG, 'food', bananaScale);
-    }
-  }
-  
-  // Aveia (carboidrato complexo)
+  // Aveia PRIMEIRO (carboidrato complexo e nutritivo)
   if (remaining().carbs >= 15 && remaining().calories >= 75) {
-    const oatsDesiredScale = isHighCarbMeal && remaining().carbs >= 40 ? 1.5 : (remaining().carbs >= 25 ? 1 : 0.5);
+    const oatsDesiredScale = carbDeficit() >= 40 ? 1.5 : (carbDeficit() >= 25 ? 1 : 0.75);
     const oatsScale = calculateOptimalScale(FOOD_CATALOG['Aveia em Flocos'].macros, oatsDesiredScale, 0.5);
     if (oatsScale >= 0.5) {
       addItem('Aveia em Flocos', FOOD_CATALOG, 'food', oatsScale);
     }
   }
   
-  // Batata Doce (para refeições com alto déficit de carboidratos)
-  if (isHighCarbMeal && remaining().carbs >= 25 && remaining().calories >= 100) {
+  // Banana (carboidrato rápido + potássio)
+  if (remaining().carbs >= 10 && remaining().calories >= 45) {
+    // Para refeições com muitos carbos, usar mais banana
+    const bananaDesiredScale = carbDeficit() > 30 ? 1.5 : 1;
+    const bananaScale = calculateOptimalScale(FOOD_CATALOG['Banana'].macros, bananaDesiredScale, 0.5);
+    if (bananaScale >= 0.5) {
+      addItem('Banana', FOOD_CATALOG, 'food', bananaScale);
+    }
+  }
+  
+  // Batata Doce (para refeições com alto déficit de carboidratos - antes de verificar calorias)
+  if (isHighCarbMeal && carbDeficit() >= 20 && remaining().calories >= 80 && caloriePercent() < 85) {
     const sweetPotatoScale = calculateOptimalScale(FOOD_CATALOG['Batata Doce'].macros, 1, 0.5);
     if (sweetPotatoScale >= 0.5) {
       addItem('Batata Doce', FOOD_CATALOG, 'food', sweetPotatoScale);
+    }
+  }
+  
+  // Pão Integral (backup para carboidratos se ainda abaixo de 80% das calorias)
+  if (caloriePercent() < 80 && remaining().carbs >= 15 && remaining().calories >= 65) {
+    const breadScale = calculateOptimalScale(FOOD_CATALOG['Pão Integral'].macros, 1, 0.5);
+    if (breadScale >= 0.5) {
+      addItem('Pão Integral', FOOD_CATALOG, 'food', breadScale);
     }
   }
 
@@ -608,13 +618,28 @@ export function calculateMealReplacement(
   }
 
   // 6. AJUSTE FINO: Preencher espaço restante se ainda abaixo de 90%
-  const currentAccuracy = (currentMacros.calories / targetMacros.calories) * 100;
+  const currentAccuracyPreFill = (currentMacros.calories / targetMacros.calories) * 100;
   
-  if (currentAccuracy < 90 && remaining().calories >= 30) {
-    // Adicionar mel para completar carboidratos/calorias
-    const melScale = Math.min(2, remaining().calories / FOOD_CATALOG['Mel'].macros.calories);
-    if (melScale >= 0.5) {
-      addItem('Mel', FOOD_CATALOG, 'food', Math.round(melScale * 2) / 2);
+  // Adicionar mel incrementalmente até atingir 90%
+  if (currentAccuracyPreFill < 90 && remaining().calories >= 30) {
+    // Calcular quantas porções de mel precisamos para atingir ~90%
+    const caloriesNeeded = (targetMacros.calories * 0.90) - currentMacros.calories;
+    const melPortionCalories = FOOD_CATALOG['Mel'].macros.calories;
+    const melScaleNeeded = Math.min(3, caloriesNeeded / melPortionCalories); // Máx 3 porções
+    
+    if (melScaleNeeded >= 0.5) {
+      // Arredondar para 0.5 para porções práticas
+      const melScale = Math.round(melScaleNeeded * 2) / 2;
+      addItem('Mel', FOOD_CATALOG, 'food', melScale);
+    }
+  }
+  
+  // Se ainda abaixo de 90% após mel, adicionar mais banana
+  const currentAccuracyPostMel = (currentMacros.calories / targetMacros.calories) * 100;
+  if (currentAccuracyPostMel < 88 && remaining().calories >= 45) {
+    const bananaScale = calculateOptimalScale(FOOD_CATALOG['Banana'].macros, 1, 0.5);
+    if (bananaScale >= 0.5 && !items.some(i => i.name === 'Banana')) {
+      addItem('Banana', FOOD_CATALOG, 'food', bananaScale);
     }
   }
 
