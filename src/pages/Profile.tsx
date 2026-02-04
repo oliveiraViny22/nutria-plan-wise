@@ -108,6 +108,7 @@ export default function Profile() {
     goal: '' as 'lose_weight' | 'maintain' | 'gain_muscle' | '',
     activity_level: '' as 'sedentary' | 'light' | 'moderate' | 'active' | 'very_active' | '',
     meals_per_day: 4,
+    last_evening_meal: 'dinner' as 'dinner' | 'supper', // Para 3-5 refeições
     evening_meal_preference: 'no_preference' as 'full_dinner' | 'light_dinner' | 'no_preference',
     preferences: [] as string[],
     restrictions: [] as string[],
@@ -115,7 +116,7 @@ export default function Profile() {
 
   const [savingPreference, setSavingPreference] = useState(false);
 
-  // Opções de preferência noturna
+  // Opções de preferência noturna (para 6 refeições - distribuição)
   const EVENING_MEAL_OPTIONS = [
     { 
       value: 'full_dinner' as const, 
@@ -134,6 +135,22 @@ export default function Profile() {
       label: 'Sem preferência',
       description: 'O sistema decide a melhor distribuição',
       icon: '⚖️'
+    },
+  ];
+
+  // Opções de tipo de refeição noturna única (para 3-5 refeições)
+  const LAST_EVENING_MEAL_OPTIONS = [
+    { 
+      value: 'dinner' as const, 
+      label: '🍽️ Jantar',
+      description: 'Refeição quente e completa com proteína, carboidrato e vegetais',
+      examples: 'Ex: Frango grelhado, arroz, feijão e salada'
+    },
+    { 
+      value: 'supper' as const, 
+      label: '🌙 Ceia',
+      description: 'Refeição leve e prática, ideal para quem prefere algo mais leve à noite',
+      examples: 'Ex: Sanduíche natural, iogurte com frutas, omelete'
     },
   ];
 
@@ -158,6 +175,11 @@ export default function Profile() {
         if (pref === 'light_dinner') return 'light_dinner';
         return 'no_preference';
       };
+
+      const mapLastEveningMeal = (meal: string | null): 'dinner' | 'supper' => {
+        if (meal === 'supper') return 'supper';
+        return 'dinner';
+      };
       
       setFormData({
         name: profile.name || '',
@@ -168,6 +190,7 @@ export default function Profile() {
         goal: mapGoal(profile.goal),
         activity_level: (profile.activity_level as any) || '',
         meals_per_day: (profile as any).meals_per_day || 4,
+        last_evening_meal: mapLastEveningMeal((profile as any).last_evening_meal),
         evening_meal_preference: mapEveningPreference((profile as any).evening_meal_preference),
         preferences: profile.preferences || [],
         restrictions: profile.restrictions || [],
@@ -268,6 +291,36 @@ export default function Profile() {
       await refreshProfile();
     } catch (error: any) {
       console.error('Error saving evening preference:', error);
+      toast.error(error.message || 'Erro ao salvar preferência');
+    } finally {
+      setSavingPreference(false);
+    }
+  };
+
+  const handleSaveLastEveningMeal = async (value: 'dinner' | 'supper') => {
+    if (!user) return;
+    
+    setSavingPreference(true);
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ 
+          last_evening_meal: value,
+          updated_at: new Date().toISOString()
+        })
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+
+      setFormData(prev => ({ ...prev, last_evening_meal: value }));
+      toast.success('Tipo de refeição noturna atualizado!', {
+        description: value === 'dinner' 
+          ? 'Seu plano terá Jantar como refeição noturna.' 
+          : 'Seu plano terá Ceia como refeição noturna.'
+      });
+      await refreshProfile();
+    } catch (error: any) {
+      console.error('Error saving last evening meal:', error);
       toast.error(error.message || 'Erro ao salvar preferência');
     } finally {
       setSavingPreference(false);
@@ -753,12 +806,67 @@ export default function Profile() {
                     />
                   </div>
 
-                  {/* Evening Meal Preference - Only for 5+ meals */}
-                  {formData.meals_per_day >= 5 && (
+                  {/* Last Evening Meal Choice - For 3-5 meals: Jantar OR Ceia */}
+                  {formData.meals_per_day >= 3 && formData.meals_per_day <= 5 && (
                     <div className="mb-6">
                       <div className="flex items-center gap-2 mb-3">
                         <Moon className="w-4 h-4 text-primary" />
-                        <p className="text-sm font-medium">Preferência de Refeições Noturnas</p>
+                        <p className="text-sm font-medium">Tipo de Refeição Noturna</p>
+                        <TooltipProvider delayDuration={200}>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Info className="w-4 h-4 text-muted-foreground cursor-help" />
+                            </TooltipTrigger>
+                            <TooltipContent side="right" className="max-w-xs p-3">
+                              <p className="font-semibold mb-2">Jantar vs Ceia</p>
+                              <ul className="text-sm space-y-2">
+                                <li><strong>🍽️ Jantar:</strong> Refeição quente e completa com proteína, carboidrato e vegetais.</li>
+                                <li><strong>🌙 Ceia:</strong> Refeição leve e prática, ideal para quem prefere algo mais leve à noite.</li>
+                              </ul>
+                              <p className="text-xs text-muted-foreground mt-2">
+                                A alteração será aplicada ao gerar um novo plano.
+                              </p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </div>
+                      <div className="grid gap-2">
+                        {LAST_EVENING_MEAL_OPTIONS.map((option) => (
+                          <button
+                            key={option.value}
+                            type="button"
+                            disabled={savingPreference}
+                            onClick={() => handleSaveLastEveningMeal(option.value)}
+                            className={`p-3 rounded-xl border text-left transition-all ${
+                              formData.last_evening_meal === option.value
+                                ? 'border-primary bg-primary/10'
+                                : 'border-border hover:border-primary/50'
+                            } ${savingPreference ? 'opacity-50 cursor-not-allowed' : ''}`}
+                          >
+                            <span className="font-medium text-foreground text-sm block">
+                              {option.label}
+                            </span>
+                            <span className="text-xs text-muted-foreground block">
+                              {option.description}
+                            </span>
+                            <span className="text-xs text-primary/80 mt-1 block">
+                              {option.examples}
+                            </span>
+                            {formData.last_evening_meal === option.value && (
+                              <Check className="w-5 h-5 text-primary absolute top-3 right-3" />
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Evening Meal Preference - Only for 6 meals: distribution between dinner + supper */}
+                  {formData.meals_per_day === 6 && (
+                    <div className="mb-6">
+                      <div className="flex items-center gap-2 mb-3">
+                        <Moon className="w-4 h-4 text-primary" />
+                        <p className="text-sm font-medium">Distribuição Noturna</p>
                         <TooltipProvider delayDuration={200}>
                           <Tooltip>
                             <TooltipTrigger asChild>
@@ -767,8 +875,8 @@ export default function Profile() {
                             <TooltipContent side="right" className="max-w-xs p-3">
                               <p className="font-semibold mb-2">Como isso afeta seu plano?</p>
                               <p className="text-sm">
-                                Esta escolha define como as calorias e itens são distribuídos 
-                                entre jantar e ceia. A alteração será aplicada ao gerar um novo plano.
+                                Com 6 refeições você tem jantar E ceia. Esta escolha define 
+                                como as calorias e itens são distribuídos entre eles.
                               </p>
                             </TooltipContent>
                           </Tooltip>
