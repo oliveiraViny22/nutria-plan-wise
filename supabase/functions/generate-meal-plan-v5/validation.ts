@@ -78,73 +78,97 @@ export function validateNutritionalContracts(
   mealsWithOptions: MealWithOptions[],
   targets: MacroTargets
 ): NutritionalValidation {
-  // Validar primeira opção (principal)
-  const meals = mealsWithOptions.map(m => m.options[0]);
-  
-  let totalCals = 0, totalProt = 0, totalCarbs = 0, totalFat = 0;
-  const mealProteinValues: number[] = [];
-  const mainMealIndices: number[] = [];
-
-  for (let i = 0; i < meals.length; i++) {
-    const meal = meals[i];
-    totalCals += meal.totals.calories;
-    totalProt += meal.totals.protein;
-    totalCarbs += meal.totals.carbs;
-    totalFat += meal.totals.fat;
-    mealProteinValues.push(meal.totals.protein);
-
-    if (MAIN_MEALS.includes(meal.meal_type)) {
-      mainMealIndices.push(i);
-    }
-  }
-
-  const totals = {
-    calories: totalCals,
-    protein: totalProt,
-    carbs: totalCarbs,
-    fat: totalFat,
-  };
-
-  const contractValidation = validateGeneratedPlan(
-    totals,
-    targets,
-    mealProteinValues,
-    mainMealIndices
-  );
-
   const errors: string[] = [];
   const warnings: string[] = [];
+  let primaryMetrics = null;
 
-  for (const error of contractValidation.errors) {
-    // Erros de proteína por refeição são warnings
-    if (error.includes('[G1]') && error.includes('Refeição')) {
-      warnings.push(error);
-    } else {
-      warnings.push(error);
-    }
-  }
+  // Descobrir quantas opções existem (máximo entre todas as refeições)
+  const maxOptions = Math.max(...mealsWithOptions.map(m => m.options.length));
 
-  // MELHORIA: Validar opções alternativas também
-  for (const mealData of mealsWithOptions) {
-    for (let optIdx = 1; optIdx < mealData.options.length; optIdx++) {
-      const option = mealData.options[optIdx];
+  // Validar CADA opção separadamente
+  for (let optionIdx = 0; optionIdx < maxOptions; optionIdx++) {
+    let totalCals = 0, totalProt = 0, totalCarbs = 0, totalFat = 0;
+    const mealProteinValues: number[] = [];
+    const mainMealIndices: number[] = [];
+    let optionHasData = false;
+
+    for (let mealIdx = 0; mealIdx < mealsWithOptions.length; mealIdx++) {
+      const mealData = mealsWithOptions[mealIdx];
+      const option = mealData.options[optionIdx];
+      
+      if (!option) continue; // Esta refeição não tem esta opção
+      
+      optionHasData = true;
+      totalCals += option.totals.calories;
+      totalProt += option.totals.protein;
+      totalCarbs += option.totals.carbs;
+      totalFat += option.totals.fat;
+      mealProteinValues.push(option.totals.protein);
+
+      if (MAIN_MEALS.includes(mealData.mealType)) {
+        mainMealIndices.push(mealIdx);
+      }
+
+      // Validar proteína mínima por refeição
       const isMainMeal = MAIN_MEALS.includes(mealData.mealType);
       const minProtein = isMainMeal 
         ? GENERATOR_CONTRACT.MIN_PROTEIN_MAIN_MEAL_GRAMS 
         : GENERATOR_CONTRACT.MIN_PROTEIN_SNACK_GRAMS;
       
       if (option.totals.protein < minProtein) {
+        const optLabel = optionIdx === 0 ? '' : ` opção ${optionIdx + 1}`;
         warnings.push(
-          `[G1-OPT${optIdx + 1}] ${option.meal_name} opção ${optIdx + 1}: proteína baixa (${option.totals.protein.toFixed(1)}g)`
+          `[G1-OPT${optionIdx + 1}] ${option.meal_name}${optLabel}: proteína baixa (${option.totals.protein.toFixed(1)}g < ${minProtein}g)`
         );
       }
     }
+
+    // Pular se não há dados para esta opção
+    if (!optionHasData) continue;
+
+    const totals = {
+      calories: totalCals,
+      protein: totalProt,
+      carbs: totalCarbs,
+      fat: totalFat,
+    };
+
+    // Validar contratos gerais para esta opção
+    const contractValidation = validateGeneratedPlan(
+      totals,
+      targets,
+      mealProteinValues,
+      mainMealIndices
+    );
+
+    // Guardar métricas da opção 1 como referência principal
+    if (optionIdx === 0) {
+      primaryMetrics = contractValidation.metrics;
+    }
+
+    // Adicionar erros/warnings com identificador de opção
+    for (const error of contractValidation.errors) {
+      const optLabel = optionIdx === 0 ? '' : ` [Opção ${optionIdx + 1}]`;
+      warnings.push(`${error}${optLabel}`);
+    }
+
+    // Log de validação por opção
+    logDebug(`Opção ${optionIdx + 1}: Cal=${totals.calories.toFixed(0)}, Prot=${totals.protein.toFixed(1)}g, Carbs=${totals.carbs.toFixed(1)}g, Fat=${totals.fat.toFixed(1)}g`);
   }
 
   return {
     valid: true, // Gerador sempre passa - rebalanceador corrige
     errors,
     warnings,
-    metrics: contractValidation.metrics,
+    metrics: primaryMetrics || {
+      totalCalories: 0,
+      totalProtein: 0,
+      totalCarbs: 0,
+      totalFat: 0,
+      caloriePercent: 0,
+      proteinPercent: 0,
+      carbsPercent: 0,
+      fatPercentOfCals: 0,
+    },
   };
 }
