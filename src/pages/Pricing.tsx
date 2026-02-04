@@ -285,25 +285,6 @@ export default function Pricing() {
             );
           })}
         </div>
-
-        {/* FAQ or Features Section */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.5 }}
-          className="mt-12 sm:mt-16 text-center px-2"
-        >
-          <h3 className="text-xl sm:text-2xl font-bold mb-3 sm:mb-4">Dúvidas?</h3>
-          <p className="text-sm sm:text-base text-muted-foreground mb-4 sm:mb-6">
-            Todos os planos incluem suporte e atualizações. Cancele quando quiser.
-          </p>
-          <div className="flex justify-center gap-3 sm:gap-4">
-            <Button variant="outline" size="sm" className="text-xs sm:text-sm h-9 sm:h-10" onClick={() => navigate('/chat')}>
-              <MessageCircle className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-              Falar com Suporte
-            </Button>
-          </div>
-        </motion.div>
       </main>
     </div>
   );
