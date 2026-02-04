@@ -21,6 +21,7 @@ import {
   Layers,
   ClipboardCheck,
   FileText,
+  Sparkles,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Logo } from '@/components/Logo';
@@ -307,6 +308,13 @@ export default function Dashboard() {
                 Admin
               </span>
             )}
+            {/* Badge Plano Gratuito - exibido para usuários gratuitos não-admin */}
+            {!isAdmin && subscriptionPlan?.type === 'gratuito' && (
+              <Link to="/pricing" className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 bg-muted text-muted-foreground text-xs font-medium rounded-full border border-border hover:bg-muted/80 transition-colors">
+                <Sparkles className="w-3 h-3" />
+                Plano Gratuito
+              </Link>
+            )}
           </div>
           {/* Desktop navigation - hidden on mobile */}
           <TooltipProvider delayDuration={300}>
@@ -560,13 +568,13 @@ export default function Dashboard() {
             transition={{ delay: 0.2 }}
           >
             <div className="grid grid-cols-2 gap-2">
-              {/* Botão Gerar Plano Alimentar */}
+              {/* Botão Gerar Plano Alimentar com limite inline */}
               <Button
                 variant="default"
                 size="default"
                 className="w-full bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70"
                 onClick={generateMealPlanV5}
-                disabled={generating || generatingV5}
+                disabled={generating || generatingV5 || isLimitReached('diet')}
               >
                 {generatingV5 ? (
                   <>
@@ -576,8 +584,12 @@ export default function Dashboard() {
                 ) : (
                   <>
                     <UtensilsCrossed className="w-4 h-4" />
-                    <span className="hidden sm:inline">Gerar Plano</span>
-                    <span className="sm:hidden">Gerar</span>
+                    <span className="hidden sm:inline">
+                      Gerar Plano {usage && !usage.diets.isUnlimited && `(${usage.diets.remaining}/${usage.diets.limit})`}
+                    </span>
+                    <span className="sm:hidden">
+                      Gerar {usage && !usage.diets.isUnlimited && `(${usage.diets.remaining})`}
+                    </span>
                   </>
                 )}
               </Button>
