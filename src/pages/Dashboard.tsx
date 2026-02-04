@@ -59,7 +59,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { DietPlan, Meal, GOALS, MEAL_NAMES, MealType } from '@/lib/types';
 import { toast } from 'sonner';
 import { UsageLimitsBadge } from '@/components/UsageLimitsBadge';
-import { FreePlanBadge } from '@/components/PremiumBadge';
+import { FreePlanBadge } from '@/components/FeatureBadge';
 
 export default function Dashboard() {
   const { profile, signOut } = useAuth();

@@ -42,7 +42,7 @@ import { useAccountPermissions } from '@/hooks/useAccountPermissions';
 import { useTheme } from '@/contexts/ThemeContext';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
-import { FreePlanBadge } from '@/components/PremiumBadge';
+import { FreePlanBadge } from '@/components/FeatureBadge';
 
 interface NavItem {
   label: string;
