@@ -45,6 +45,7 @@ import { DailyLogCTA } from '@/components/DailyLogCTA';
 import { EmptyPlanState } from '@/components/EmptyPlanState';
 import { AdherenceStreak } from '@/components/AdherenceStreak';
 import { OnboardingTutorial } from '@/components/OnboardingTutorial';
+import { GamificationPreview } from '@/components/GamificationPreview';
 import { DashboardSkeleton } from '@/components/DashboardSkeleton';
 import { SuccessAnimation } from '@/components/SuccessAnimation';
 import { useTutorial } from '@/hooks/useTutorial';
@@ -532,16 +533,22 @@ export default function Dashboard() {
           </motion.section>
         )}
 
-        {/* Weekly Adherence Chart - only for paid users with a plan */}
-        {currentDietPlan && subscriptionPlan && subscriptionPlan.type !== 'gratuito' && (
+        {/* Gamification Section - show preview for free users, full for paid */}
+        {currentDietPlan && subscriptionPlan && (
           <motion.section
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.15 }}
             className="space-y-3"
           >
-            <AdherenceStreak />
-            <WeeklyAdherenceChart />
+            {subscriptionPlan.type === 'gratuito' ? (
+              <GamificationPreview isLocked={true} />
+            ) : (
+              <>
+                <AdherenceStreak />
+                <WeeklyAdherenceChart />
+              </>
+            )}
           </motion.section>
         )}
 

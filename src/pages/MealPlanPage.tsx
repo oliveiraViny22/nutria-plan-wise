@@ -45,6 +45,7 @@ import {
 } from '@/lib/supplement-recommendations';
 import { MealReplacementSection } from '@/components/MealReplacementCard';
 import { ProFeatureBadge } from '@/components/FeatureBadge';
+import { SupplementsPreview } from '@/components/SupplementsPreview';
 
 interface MealData {
   id: string;
@@ -583,21 +584,7 @@ export default function MealPlanPage() {
           </div>
 
           {isFreePlan ? (
-            <Card className="border-muted bg-muted/5">
-              <CardContent className="py-8 text-center">
-                <Lock className="w-10 h-10 mx-auto mb-3 text-muted-foreground/50" />
-                <p className="text-muted-foreground mb-2">
-                  Suplementação personalizada é um recurso exclusivo dos planos pagos.
-                </p>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={() => navigate('/pricing')}
-                >
-                  Ver planos
-                </Button>
-              </CardContent>
-            </Card>
+            <SupplementsPreview isLocked={true} />
           ) : supplementsEnabled ? (
             <div className="space-y-8">
               {/* 1. Substituições de refeições - OCULTAS NA IMPRESSÃO (muito extensas) */}
