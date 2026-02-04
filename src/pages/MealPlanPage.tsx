@@ -101,7 +101,7 @@ const NUTRITION_TIPS: Record<string, { title: string; tips: string[] }> = {
       '⏱️ Consuma proteína nas 2 horas pós-treino',
       '🥜 Gorduras saudáveis ajudam na produção hormonal',
       '💤 Sono de qualidade é essencial para recuperação',
-      '📈 Aumente calorias gradualmente (+200-300 kcal/semana)',
+      '📈 Mantenha o superávit calórico conforme seu plano',
     ]
   },
 };
