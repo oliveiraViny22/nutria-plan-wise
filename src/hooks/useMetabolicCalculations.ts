@@ -46,28 +46,44 @@ export function useMetabolicCalculations(profile: ProfileData | null): Metabolic
     const calorieAdjustment = normalizedGoal ? GOALS[normalizedGoal as keyof typeof GOALS]?.calorieAdjustment || 0 : 0;
     const calories = Math.round(tdee + calorieAdjustment);
 
-    // Macro ratios based on goal
-    let proteinRatio = 0.3;
-    let carbsRatio = 0.4;
-    let fatRatio = 0.3;
-
+    // =====================================================
+    // CÁLCULO DE PROTEÍNA BASEADO EM g/kg DE PESO CORPORAL
+    // =====================================================
+    // Referência científica: 1.6-2.2g/kg para hipertrofia
+    // - lose_weight: 2.0g/kg (preservar massa magra em déficit)
+    // - gain_muscle: 2.0g/kg (suporte à hipertrofia)
+    // - maintain: 1.8g/kg (manutenção)
+    // =====================================================
+    let proteinPerKg = 1.8; // default
+    let fatRatio = 0.25; // 25% das calorias para gordura
+    
     if (normalizedGoal === 'gain_muscle') {
-      proteinRatio = 0.35;
-      carbsRatio = 0.45;
-      fatRatio = 0.2;
+      proteinPerKg = 2.0;
+      fatRatio = 0.20; // menos gordura, mais carbs para energia
     } else if (normalizedGoal === 'lose_weight') {
-      proteinRatio = 0.35;
-      carbsRatio = 0.35;
-      fatRatio = 0.3;
+      proteinPerKg = 2.0; // maior proteína para preservar massa magra
+      fatRatio = 0.30; // mais gordura para saciedade
     }
+
+    // Proteína em gramas baseada no peso corporal
+    const protein = Math.round(Number(weight) * proteinPerKg);
+    const proteinCalories = protein * 4;
+    
+    // Gordura baseada em percentual das calorias
+    const fat = Math.round((calories * fatRatio) / 9);
+    const fatCalories = fat * 9;
+    
+    // Carboidratos preenchem o restante das calorias
+    const remainingCalories = calories - proteinCalories - fatCalories;
+    const carbs = Math.max(0, Math.round(remainingCalories / 4));
 
     return {
       bmr: Math.round(bmr),
       tdee: Math.round(tdee),
       calories,
-      protein: Math.round((calories * proteinRatio) / 4),
-      carbs: Math.round((calories * carbsRatio) / 4),
-      fat: Math.round((calories * fatRatio) / 9),
+      protein,
+      carbs,
+      fat,
     };
   }, [profile]);
 }
