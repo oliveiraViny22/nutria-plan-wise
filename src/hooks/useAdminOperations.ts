@@ -140,6 +140,12 @@ export interface Food {
   unit_increment: number | null;
   unit_enabled: boolean;
   created_at: string;
+  // Campos de suplementação
+  is_supplement_item: boolean;
+  supplement_portion: string | null;
+  supplement_notes: string | null;
+  supplement_min_portion: number | null;
+  supplement_max_portion: number | null;
 }
 
 export function useAdminOperations() {
