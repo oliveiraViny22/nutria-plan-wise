@@ -176,25 +176,8 @@ const FOOD_CATALOG: Record<string, CatalogItem> = {
     minPortion: 0.5,
     maxPortion: 2,
   },
-  'Pão Integral': {
-    portion: '2 fatias (50g)',
-    macros: { calories: 130, protein: 5, carbs: 24, fat: 2 },
-    notes: 'Carboidrato complexo + fibras',
-    scalable: true,
-    minPortion: 1, // Mínimo 2 fatias (não faz sentido 0.5 = 1 fatia sozinha)
-    maxPortion: 2, // Máximo 4 fatias
-  },
-  // REMOVIDO: Batata Doce - não é prático para substituição rápida (requer preparo)
-  
-  // Opções práticas adicionais
-  'Tapioca': {
-    portion: '30g (2 colheres)',
-    macros: { calories: 100, protein: 0, carbs: 26, fat: 0 },
-    notes: 'Carboidrato de rápido preparo',
-    scalable: true,
-    minPortion: 1,
-    maxPortion: 2,
-  },
+  // REMOVIDOS: Pão Integral, Tapioca, Batata Doce - são alimentos de plano, não de suplementação
+  // A suplementação foca em itens práticos para shakes: whey, aveia, banana, mel, oleaginosas
   
   // Proteínas
   'Iogurte Grego Natural': {
@@ -492,21 +475,22 @@ export function calculateMealReplacement(
     }
   }
   
-  // REMOVIDO: Batata Doce - substituída por Tapioca (mais prática para preparo rápido)
-  // Tapioca (para refeições com alto déficit de carboidratos)
-  if (isHighCarbMeal && carbDeficit() >= 20 && remaining().calories >= 80 && caloriePercent() < 85) {
-    const tapiocaScale = calculateOptimalScale(FOOD_CATALOG['Tapioca'].macros, 1, 1);
-    if (tapiocaScale >= 1) {
-      addItem('Tapioca', FOOD_CATALOG, 'food', tapiocaScale);
+  // REMOVIDOS: Tapioca e Pão Integral - são alimentos de plano, não de suplementação
+  // Para déficit de carboidratos em suplementação, usar mais Aveia ou Banana
+  
+  // Aveia extra se ainda precisar de carboidratos
+  if (carbDeficit() >= 20 && remaining().calories >= 75 && caloriePercent() < 85) {
+    const extraOatsScale = calculateOptimalScale(FOOD_CATALOG['Aveia em Flocos'].macros, 0.75, 0.5);
+    if (extraOatsScale >= 0.5 && !items.some(i => i.name === 'Aveia em Flocos')) {
+      addItem('Aveia em Flocos', FOOD_CATALOG, 'food', extraOatsScale);
     }
   }
   
-  // Pão Integral (backup para carboidratos se ainda abaixo de 80% das calorias)
-  // NOTA: minPortion=1 garante que nunca teremos "0.5 fatias"
-  if (caloriePercent() < 80 && remaining().carbs >= 15 && remaining().calories >= 65) {
-    const breadScale = calculateOptimalScale(FOOD_CATALOG['Pão Integral'].macros, 1, 1);
-    if (breadScale >= 1) {
-      addItem('Pão Integral', FOOD_CATALOG, 'food', breadScale);
+  // Banana extra se ainda precisar de calorias
+  if (caloriePercent() < 85 && remaining().carbs >= 10 && !items.some(i => i.name === 'Banana')) {
+    const extraBananaScale = calculateOptimalScale(FOOD_CATALOG['Banana'].macros, 1, 0.5);
+    if (extraBananaScale >= 0.5) {
+      addItem('Banana', FOOD_CATALOG, 'food', extraBananaScale);
     }
   }
 
