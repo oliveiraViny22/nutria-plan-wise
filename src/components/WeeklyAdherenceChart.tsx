@@ -235,103 +235,104 @@ export function WeeklyAdherenceChart() {
   }
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-    >
-      <Card className="card-elevated overflow-hidden">
-        <CardContent className="py-4 space-y-4">
-          {/* Header */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <TrendingUp className="h-4 w-4 text-primary" />
-              <span className="text-sm font-semibold">Adesão Semanal</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className={`text-2xl font-bold ${getAdherenceColor(stats.adherenceRate)}`}>
-                {stats.adherenceRate.toFixed(0)}%
-              </span>
-              <Badge 
-                variant="secondary" 
-                className={`text-xs ${getAdherenceColor(stats.adherenceRate)}`}
-              >
-                {getAdherenceLabel(stats.adherenceRate)}
-              </Badge>
-            </div>
-          </div>
-
-          {/* Week Days Chart */}
-          <TooltipProvider delayDuration={100}>
-            <div className="flex items-end justify-between gap-1.5 h-20">
-              {stats.days.map((day, index) => {
-                const height = day.status === 'future' 
-                  ? 20 
-                  : day.totalMeals > 0 
-                    ? Math.max(20, ((day.mealsConfirmed + day.mealsSkipped + day.mealsOutOfPlan) / day.totalMeals) * 100)
-                    : 20;
-                
-                return (
-                  <Tooltip key={day.dateStr}>
-                    <TooltipTrigger asChild>
-                      <motion.div
-                        initial={{ height: 0 }}
-                        animate={{ height: `${height}%` }}
-                        transition={{ delay: index * 0.05, duration: 0.3 }}
-                        className={`
-                          flex-1 rounded-t-md cursor-pointer transition-all
-                          ${getDayBgColor(day)}
-                          ${isToday(day.date) ? 'ring-2 ring-primary ring-offset-2 ring-offset-background' : ''}
-                          hover:opacity-80
-                        `}
-                      />
-                    </TooltipTrigger>
-                    <TooltipContent side="top" className="text-center">
-                      <p className="font-medium">
-                        {format(day.date, "EEEE, d 'de' MMMM", { locale: ptBR })}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {getDayLabel(day)}
-                      </p>
-                    </TooltipContent>
-                  </Tooltip>
-                );
-              })}
-            </div>
-          </TooltipProvider>
-
-          {/* Day Labels */}
-          <div className="flex justify-between text-xs text-muted-foreground">
-            {stats.days.map((day) => (
-              <span 
-                key={day.dateStr} 
-                className={`
-                  flex-1 text-center
-                  ${isToday(day.date) ? 'text-primary font-semibold' : ''}
-                `}
-              >
-                {format(day.date, 'EEE', { locale: ptBR }).slice(0, 3)}
-              </span>
-            ))}
-          </div>
-
-          {/* Stats Summary */}
-          <div className="flex items-center justify-between text-xs pt-2 border-t">
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-1 text-green-600 dark:text-green-400">
-                <CheckCircle2 className="h-3.5 w-3.5" />
-                <span>{stats.totalConfirmed} confirmadas</span>
+    <Link to="/daily-log" className="block">
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        whileHover={{ scale: 1.01 }}
+        whileTap={{ scale: 0.99 }}
+        className="cursor-pointer"
+      >
+        <Card className="card-elevated overflow-hidden h-full hover:border-primary/30 transition-colors">
+          <CardContent className="py-4 space-y-4">
+            {/* Header */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <TrendingUp className="h-4 w-4 text-primary" />
+                <span className="text-sm font-semibold">Adesão Semanal</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className={`text-2xl font-bold ${getAdherenceColor(stats.adherenceRate)}`}>
+                  {stats.adherenceRate.toFixed(0)}%
+                </span>
+                <Badge 
+                  variant="secondary" 
+                  className={`text-xs ${getAdherenceColor(stats.adherenceRate)}`}
+                >
+                  {getAdherenceLabel(stats.adherenceRate)}
+                </Badge>
               </div>
             </div>
-            <Link 
-              to="/daily-log" 
-              className="flex items-center gap-1 text-primary hover:underline"
-            >
-              <span>Ver detalhes</span>
-              <ChevronRight className="h-4 w-4" />
-            </Link>
-          </div>
-        </CardContent>
-      </Card>
-    </motion.div>
+
+            {/* Week Days Chart */}
+            <TooltipProvider delayDuration={100}>
+              <div className="flex items-end justify-between gap-1.5 h-20">
+                {stats.days.map((day, index) => {
+                  const height = day.status === 'future' 
+                    ? 20 
+                    : day.totalMeals > 0 
+                      ? Math.max(20, ((day.mealsConfirmed + day.mealsSkipped + day.mealsOutOfPlan) / day.totalMeals) * 100)
+                      : 20;
+                  
+                  return (
+                    <Tooltip key={day.dateStr}>
+                      <TooltipTrigger asChild>
+                        <motion.div
+                          initial={{ height: 0 }}
+                          animate={{ height: `${height}%` }}
+                          transition={{ delay: index * 0.05, duration: 0.3 }}
+                          className={`
+                            flex-1 rounded-t-md transition-all
+                            ${getDayBgColor(day)}
+                            ${isToday(day.date) ? 'ring-2 ring-primary ring-offset-2 ring-offset-background' : ''}
+                          `}
+                        />
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="text-center">
+                        <p className="font-medium">
+                          {format(day.date, "EEEE, d 'de' MMMM", { locale: ptBR })}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {getDayLabel(day)}
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
+                  );
+                })}
+              </div>
+            </TooltipProvider>
+
+            {/* Day Labels */}
+            <div className="flex justify-between text-xs text-muted-foreground">
+              {stats.days.map((day) => (
+                <span 
+                  key={day.dateStr} 
+                  className={`
+                    flex-1 text-center
+                    ${isToday(day.date) ? 'text-primary font-semibold' : ''}
+                  `}
+                >
+                  {format(day.date, 'EEE', { locale: ptBR }).slice(0, 3)}
+                </span>
+              ))}
+            </div>
+
+            {/* Stats Summary */}
+            <div className="flex items-center justify-between text-xs pt-2 border-t">
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-1 text-green-600 dark:text-green-400">
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                  <span>{stats.totalConfirmed} confirmadas</span>
+                </div>
+              </div>
+              <div className="flex items-center gap-1 text-primary">
+                <span>Ver detalhes</span>
+                <ChevronRight className="h-4 w-4" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </motion.div>
+    </Link>
   );
 }
