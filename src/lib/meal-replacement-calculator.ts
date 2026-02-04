@@ -615,22 +615,16 @@ export function calculateMealReplacement(
   );
   
   if (hasProteinPowder) {
-    // Calcular se estamos em deficit calórico significativo
-    const currentCaloriePercent = (currentMacros.calories / targetMacros.calories) * 100;
-    const inSignificantDeficit = currentCaloriePercent < 75; // Menos de 75% das calorias atingidas
-    const hasLargeCarboDeficit = remaining().carbs > 30; // Ainda precisa de muitos carboidratos
-    
-    // Decisão inteligente de líquido:
-    // - Se em deficit significativo E grande deficit de carbos → usar água/leite amêndoas para deixar espaço para alimentos sólidos
-    // - Senão → seguir a lógica baseada no objetivo
+    // Para emagrecimento: SEMPRE usar água para maximizar eficiência calórica
+    // Para outros objetivos: decidir baseado no espaço calórico disponível
     
     let liquidChoice: 'Água' | 'Leite de Amêndoas' | 'Leite Desnatado' | 'Leite Integral';
     let liquidReason: string;
     
-    if (inSignificantDeficit && hasLargeCarboDeficit) {
-      // Quando há grande deficit, água é melhor para maximizar espaço para carboidratos sólidos
+    if (userGoal === 'lose_weight') {
+      // Emagrecimento: sempre água para não adicionar calorias desnecessárias
       liquidChoice = 'Água';
-      liquidReason = '💧 Escolhida para maximizar espaço calórico para alimentos sólidos (deficit de carboidratos detectado)';
+      liquidReason = '💧 Água para maximizar a eficiência calórica (objetivo: emagrecimento)';
     } else if (remaining().calories < 40) {
       // Sem espaço calórico → água
       liquidChoice = 'Água';
@@ -641,11 +635,8 @@ export function calculateMealReplacement(
       liquidReason = '🥛 Escolhido por ter apenas 30kcal (calorias limitadas)';
     } else {
       // Espaço suficiente → baseado no objetivo
-      liquidChoice = userGoal === 'lose_weight' ? 'Leite Desnatado' : 
-                     userGoal === 'gain_muscle' ? 'Leite Integral' : 'Leite Desnatado';
-      liquidReason = userGoal === 'lose_weight' 
-        ? '🎯 Escolhido por ser baixo em calorias (ideal para emagrecimento)'
-        : userGoal === 'gain_muscle'
+      liquidChoice = userGoal === 'gain_muscle' ? 'Leite Integral' : 'Leite Desnatado';
+      liquidReason = userGoal === 'gain_muscle'
         ? '💪 Escolhido por fornecer calorias extras (ideal para ganho de massa)'
         : '⚖️ Escolhido para equilibrar calorias e proteína';
     }
