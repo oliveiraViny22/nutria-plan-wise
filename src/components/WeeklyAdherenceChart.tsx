@@ -14,6 +14,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { ProgressRing } from '@/components/ui-kit';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { 
@@ -234,6 +235,13 @@ export function WeeklyAdherenceChart() {
     return null;
   }
 
+  const getProgressRingColor = (rate: number): 'success' | 'warning' | 'destructive' | 'primary' => {
+    if (rate >= 80) return 'success';
+    if (rate >= 60) return 'warning';
+    if (rate > 0) return 'destructive';
+    return 'primary';
+  };
+
   return (
     <Link to="/daily-log" className="block">
       <motion.div
@@ -245,22 +253,29 @@ export function WeeklyAdherenceChart() {
       >
         <Card className="card-elevated overflow-hidden h-full hover:border-primary/30 transition-colors">
           <CardContent className="py-4 space-y-4">
-            {/* Header */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <TrendingUp className="h-4 w-4 text-primary" />
-                <span className="text-sm font-semibold">Adesão Semanal</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className={`text-2xl font-bold ${getAdherenceColor(stats.adherenceRate)}`}>
-                  {stats.adherenceRate.toFixed(0)}%
-                </span>
-                <Badge 
-                  variant="secondary" 
-                  className={`text-xs ${getAdherenceColor(stats.adherenceRate)}`}
-                >
-                  {getAdherenceLabel(stats.adherenceRate)}
-                </Badge>
+            {/* Header with ProgressRing */}
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <ProgressRing
+                  value={stats.adherenceRate}
+                  max={100}
+                  size="md"
+                  color={getProgressRingColor(stats.adherenceRate)}
+                  showLabel
+                  label={`${stats.adherenceRate.toFixed(0)}%`}
+                />
+                <div>
+                  <div className="flex items-center gap-2">
+                    <TrendingUp className="h-4 w-4 text-primary" />
+                    <span className="text-sm font-semibold">Adesão Semanal</span>
+                  </div>
+                  <Badge 
+                    variant="secondary" 
+                    className={`text-xs mt-1 ${getAdherenceColor(stats.adherenceRate)}`}
+                  >
+                    {getAdherenceLabel(stats.adherenceRate)}
+                  </Badge>
+                </div>
               </div>
             </div>
 
