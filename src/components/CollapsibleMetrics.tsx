@@ -49,24 +49,29 @@ export function CollapsibleMetrics({
   return (
     <div className={cn("space-y-2", className)}>
       {/* Header with toggle */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <h3 className="text-sm font-medium text-muted-foreground">
-            Metabolismo Base
-          </h3>
-          <TooltipProvider delayDuration={200}>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Info className="w-3.5 h-3.5 text-muted-foreground/60 cursor-help" />
-              </TooltipTrigger>
-              <TooltipContent side="right" className="max-w-[250px]">
-                <p className="text-xs">
-                  Valores calculados com base no seu perfil usando a fórmula Mifflin-St Jeor.
-                </p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        </div>
+      <div className={cn(
+        "flex items-center",
+        isCollapsed ? "justify-center" : "justify-between"
+      )}>
+        {!isCollapsed && (
+          <div className="flex items-center gap-2">
+            <h3 className="text-sm font-medium text-muted-foreground">
+              Metabolismo Base
+            </h3>
+            <TooltipProvider delayDuration={200}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Info className="w-3.5 h-3.5 text-muted-foreground/60 cursor-help" />
+                </TooltipTrigger>
+                <TooltipContent side="right" className="max-w-[250px]">
+                  <p className="text-xs">
+                    Valores calculados com base no seu perfil usando a fórmula Mifflin-St Jeor.
+                  </p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
+        )}
         <Button
           variant="ghost"
           size="sm"
@@ -75,7 +80,8 @@ export function CollapsibleMetrics({
         >
           {isCollapsed ? (
             <>
-              <span className="hidden sm:inline mr-1">Expandir</span>
+              <span className="hidden sm:inline mr-1">Ver detalhes metabólicos</span>
+              <span className="sm:hidden mr-1">Ver mais</span>
               <ChevronDown className="h-4 w-4" />
             </>
           ) : (
@@ -87,7 +93,7 @@ export function CollapsibleMetrics({
         </Button>
       </div>
 
-      {/* Collapsed summary */}
+      {/* Collapsed summary - centered */}
       <AnimatePresence mode="wait">
         {isCollapsed ? (
           <motion.div
@@ -96,20 +102,22 @@ export function CollapsibleMetrics({
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
             transition={{ duration: 0.2 }}
-            className="flex items-center gap-4 px-3 py-2 bg-muted/30 rounded-lg text-sm"
+            className="flex items-center justify-center gap-4 px-3 py-2 bg-muted/30 rounded-lg text-sm"
           >
             <div className="flex items-center gap-1.5">
               <Flame className="h-3.5 w-3.5 text-calories" />
-              <span className="text-muted-foreground">TMB:</span>
-              <span className="font-medium">{metabolicData.bmr} kcal</span>
+              <span className="font-medium">{metabolicData.bmr}</span>
+              <span className="text-muted-foreground text-xs">kcal</span>
             </div>
-            <div className="hidden sm:flex items-center gap-1.5">
-              <Target className="h-3.5 w-3.5 text-success" />
-              <span className="text-muted-foreground">TDEE:</span>
-              <span className="font-medium">{metabolicData.tdee} kcal</span>
-            </div>
+            <div className="w-px h-4 bg-border" />
             <div className="flex items-center gap-1.5">
-              <span className="text-muted-foreground">💧</span>
+              <Target className="h-3.5 w-3.5 text-success" />
+              <span className="font-medium">{metabolicData.tdee}</span>
+              <span className="text-muted-foreground text-xs">kcal</span>
+            </div>
+            <div className="w-px h-4 bg-border" />
+            <div className="flex items-center gap-1.5">
+              <span>💧</span>
               <span className="font-medium">{((weight || 70) * 0.04).toFixed(1)}L</span>
             </div>
           </motion.div>
