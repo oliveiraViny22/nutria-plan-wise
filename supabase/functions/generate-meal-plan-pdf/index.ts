@@ -87,7 +87,7 @@ function generateExecutivePdf(
   const goalLabel = GOAL_LABELS[profile.goal || "maintain"] || "Manutenção";
   const tips = TIPS[profile.goal || "maintain"] || TIPS.maintain;
 
-  // Calculate density for auto-scaling
+  // Calculate density for font sizing
   const mealCount = meals.length;
   const optionCount = meals.reduce((acc, m) => acc + (m.options?.length || 0), 0);
   const foodRowCount = meals.reduce(
@@ -95,23 +95,32 @@ function generateExecutivePdf(
     0
   );
 
-  // Aggressive scaling based on content density
-  const densityScore = foodRowCount + optionCount * 3 + mealCount * 6;
+  // Adaptive font size based on content density
+  const densityScore = foodRowCount + optionCount * 2 + mealCount * 4;
   
-  let pageScale = 1;
-  if (densityScore > 130) pageScale = 0.58;
-  else if (densityScore > 110) pageScale = 0.64;
-  else if (densityScore > 95) pageScale = 0.70;
-  else if (densityScore > 80) pageScale = 0.76;
-  else if (densityScore > 65) pageScale = 0.82;
-  else if (densityScore > 50) pageScale = 0.88;
-  else if (densityScore > 35) pageScale = 0.94;
+  let baseFontPt = 8;
+  let tableFontPt = 7;
+  let mealGapPx = 8;
+  let cellPadPx = 3;
+  
+  if (densityScore > 100) {
+    baseFontPt = 6.5;
+    tableFontPt = 6;
+    mealGapPx = 4;
+    cellPadPx = 2;
+  } else if (densityScore > 80) {
+    baseFontPt = 7;
+    tableFontPt = 6.5;
+    mealGapPx = 5;
+    cellPadPx = 2;
+  } else if (densityScore > 60) {
+    baseFontPt = 7.5;
+    tableFontPt = 6.5;
+    mealGapPx = 6;
+    cellPadPx = 3;
+  }
 
-  // Content width compensates for scale
-  const printableWidthMm = 194;
-  const contentWidthMm = Math.round(printableWidthMm / pageScale);
-
-  // Generate meals HTML - ultra compact
+  // Generate meals HTML
   const mealsHtml = meals
     .sort((a, b) => a.sort_order - b.sort_order)
     .map((meal) => {
@@ -148,60 +157,197 @@ function generateExecutivePdf(
 <head>
   <meta charset="UTF-8">
   <style>
-    @page { size: A4; margin: 5mm 8mm; }
+    @page { 
+      size: 210mm 297mm; 
+      margin: 0; 
+    }
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    html, body { height: 100%; }
+    html, body { 
+      width: 210mm; 
+      height: 297mm; 
+      margin: 0; 
+      padding: 0;
+    }
     body { 
       font-family: 'Segoe UI', -apple-system, sans-serif;
-      font-size: 7pt;
-      line-height: 1.2;
+      font-size: ${baseFontPt}pt;
+      line-height: 1.25;
       color: #1f2937;
       background: #fff;
+      display: flex;
+      justify-content: center;
+      align-items: stretch;
     }
     .page {
-      width: ${contentWidthMm}mm;
-      transform: scale(${pageScale});
-      transform-origin: top left;
-      overflow: hidden;
+      width: 190mm;
+      height: 287mm;
+      margin: 5mm auto;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
     }
-    .header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 4px; margin-bottom: 5px; border-bottom: 2px solid #3b82f6; }
-    .header h1 { font-size: 14pt; font-weight: 700; }
-    .header .meta { text-align: right; font-size: 7pt; color: #6b7280; }
+    .header { 
+      display: flex; 
+      justify-content: space-between; 
+      align-items: center; 
+      padding-bottom: 6px; 
+      margin-bottom: 8px; 
+      border-bottom: 2px solid #3b82f6;
+      flex-shrink: 0;
+    }
+    .header h1 { font-size: 16pt; font-weight: 700; }
+    .header .meta { text-align: right; font-size: ${baseFontPt}pt; color: #6b7280; }
     .header .brand { font-weight: 600; color: #3b82f6; }
-    .profile { display: flex; gap: 5px; margin-bottom: 5px; }
-    .profile-card { flex: 1; background: #f8fafc; border-radius: 4px; padding: 5px 6px; border: 1px solid #e2e8f0; }
-    .profile-label { font-size: 6pt; color: #6b7280; text-transform: uppercase; letter-spacing: 0.03em; font-weight: 600; margin-bottom: 2px; }
-    .profile-content { font-size: 7pt; display: flex; flex-wrap: wrap; gap: 3px; align-items: center; }
-    .profile-content .name { font-weight: 700; font-size: 8pt; }
+    
+    .profile { 
+      display: flex; 
+      gap: 8px; 
+      margin-bottom: 10px;
+      flex-shrink: 0;
+    }
+    .profile-card { 
+      flex: 1; 
+      background: #f8fafc; 
+      border-radius: 6px; 
+      padding: 8px 10px; 
+      border: 1px solid #e2e8f0; 
+    }
+    .profile-label { 
+      font-size: ${baseFontPt - 1}pt; 
+      color: #6b7280; 
+      text-transform: uppercase; 
+      letter-spacing: 0.03em; 
+      font-weight: 600; 
+      margin-bottom: 4px; 
+    }
+    .profile-content { 
+      font-size: ${baseFontPt}pt; 
+      display: flex; 
+      flex-wrap: wrap; 
+      gap: 4px; 
+      align-items: center; 
+    }
+    .profile-content .name { font-weight: 700; font-size: ${baseFontPt + 1}pt; }
     .profile-content .sep { color: #cbd5e1; }
-    .goal-badge { background: #3b82f6; color: #fff; padding: 2px 6px; border-radius: 10px; font-size: 6.5pt; font-weight: 600; margin-top: 3px; display: inline-block; }
-    .macro-value { font-size: 16pt; font-weight: 800; color: #f59e0b; }
-    .macro-unit { font-size: 8pt; color: #6b7280; }
-    .macros { display: flex; gap: 8px; font-size: 7pt; margin-top: 2px; }
+    .goal-badge { 
+      background: #3b82f6; 
+      color: #fff; 
+      padding: 3px 8px; 
+      border-radius: 12px; 
+      font-size: ${baseFontPt - 0.5}pt; 
+      font-weight: 600; 
+      margin-top: 4px; 
+      display: inline-block; 
+    }
+    .macro-value { font-size: 20pt; font-weight: 800; color: #f59e0b; }
+    .macro-unit { font-size: ${baseFontPt + 1}pt; color: #6b7280; }
+    .macros { display: flex; gap: 10px; font-size: ${baseFontPt}pt; margin-top: 4px; }
     .macros span { font-weight: 700; }
     .macros .p { color: #3b82f6; }
     .macros .c { color: #eab308; }
     .macros .g { color: #f97316; }
-    .meals-title { font-size: 9pt; font-weight: 700; margin: 0 0 4px 0; padding-bottom: 2px; border-bottom: 1px solid #e2e8f0; }
-    .meals-grid { display: flex; flex-direction: column; gap: 4px; }
-    .meal { border-radius: 4px; overflow: hidden; border: 1px solid #e2e8f0; }
-    .meal-hdr { display: flex; justify-content: space-between; align-items: center; background: linear-gradient(135deg, #3b82f6, #2563eb); color: #fff; padding: 4px 6px; font-size: 8pt; font-weight: 700; }
-    .meal-hdr .kcal { font-size: 7pt; background: rgba(255,255,255,0.2); padding: 1px 5px; border-radius: 8px; font-weight: 600; }
-    .meal-body { padding: 4px 5px; background: #fff; }
-    .opt { margin-bottom: 3px; }
+    
+    .meals-section {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      overflow: hidden;
+    }
+    .meals-title { 
+      font-size: ${baseFontPt + 2}pt; 
+      font-weight: 700; 
+      margin: 0 0 6px 0; 
+      padding-bottom: 4px; 
+      border-bottom: 1px solid #e2e8f0;
+      flex-shrink: 0;
+    }
+    .meals-grid { 
+      flex: 1;
+      display: flex; 
+      flex-direction: column; 
+      gap: ${mealGapPx}px;
+      justify-content: space-between;
+    }
+    .meal { 
+      border-radius: 6px; 
+      overflow: hidden; 
+      border: 1px solid #e2e8f0;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+    .meal-hdr { 
+      display: flex; 
+      justify-content: space-between; 
+      align-items: center; 
+      background: linear-gradient(135deg, #3b82f6, #2563eb); 
+      color: #fff; 
+      padding: 5px 10px; 
+      font-size: ${baseFontPt + 1}pt; 
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+    .meal-hdr .kcal { 
+      font-size: ${baseFontPt}pt; 
+      background: rgba(255,255,255,0.2); 
+      padding: 2px 8px; 
+      border-radius: 10px; 
+      font-weight: 600; 
+    }
+    .meal-body { 
+      padding: 6px 8px; 
+      background: #fff;
+      flex: 1;
+    }
+    .opt { margin-bottom: 4px; }
     .opt:last-child { margin-bottom: 0; }
-    .opt-label { font-size: 6.5pt; color: #6b7280; font-weight: 600; margin-bottom: 2px; }
-    .foods { width: 100%; border-collapse: collapse; font-size: 6.5pt; table-layout: fixed; }
+    .opt-label { font-size: ${tableFontPt}pt; color: #6b7280; font-weight: 600; margin-bottom: 3px; }
+    
+    .foods { 
+      width: 100%; 
+      border-collapse: collapse; 
+      font-size: ${tableFontPt}pt; 
+      table-layout: fixed; 
+    }
     .foods thead tr { background: #f1f5f9; }
-    .foods th { padding: 2px 4px; text-align: left; font-weight: 600; font-size: 6pt; text-transform: uppercase; }
-    .foods td { padding: 2px 4px; border-bottom: 1px solid #f1f5f9; }
+    .foods th { 
+      padding: ${cellPadPx}px 4px; 
+      text-align: left; 
+      font-weight: 600; 
+      font-size: ${tableFontPt - 0.5}pt; 
+      text-transform: uppercase; 
+    }
+    .foods td { 
+      padding: ${cellPadPx}px 4px; 
+      border-bottom: 1px solid #f1f5f9; 
+    }
     .tc { text-align: center; }
     .tr { text-align: right; }
-    .tips { background: #fffbeb; border-radius: 4px; padding: 4px 6px; border-left: 2px solid #f59e0b; margin: 5px 0; }
-    .tips-title { font-weight: 700; color: #92400e; font-size: 7pt; margin-bottom: 2px; }
-    .tips-content { font-size: 6.5pt; color: #78350f; line-height: 1.3; }
-    .footer { text-align: center; padding-top: 4px; border-top: 1px solid #e2e8f0; font-size: 6pt; color: #9ca3af; }
+    
+    .tips { 
+      background: #fffbeb; 
+      border-radius: 6px; 
+      padding: 6px 10px; 
+      border-left: 3px solid #f59e0b; 
+      margin-top: 10px;
+      flex-shrink: 0;
+    }
+    .tips-title { font-weight: 700; color: #92400e; font-size: ${baseFontPt}pt; margin-bottom: 3px; }
+    .tips-content { font-size: ${baseFontPt - 0.5}pt; color: #78350f; line-height: 1.4; }
+    
+    .footer { 
+      text-align: center; 
+      padding-top: 8px; 
+      margin-top: 10px;
+      border-top: 1px solid #e2e8f0; 
+      font-size: ${baseFontPt - 1}pt; 
+      color: #9ca3af;
+      flex-shrink: 0;
+    }
+    
     @media print {
+      html, body { width: 210mm; height: 297mm; }
       body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     }
   </style>
@@ -219,11 +365,11 @@ function generateExecutivePdf(
         <div class="profile-content">
           <span class="name">${profile.name || "—"}</span>
           <span class="sep">•</span>
-          <span>${profile.age ? `${profile.age}a` : "—"}</span>
+          <span>${profile.age ? `${profile.age} anos` : "—"}</span>
           <span class="sep">•</span>
-          <span>${profile.weight ? `${profile.weight}kg` : "—"}</span>
+          <span>${profile.weight ? `${profile.weight} kg` : "—"}</span>
           <span class="sep">•</span>
-          <span>${profile.height ? `${profile.height}cm` : "—"}</span>
+          <span>${profile.height ? `${profile.height} cm` : "—"}</span>
         </div>
         <span class="goal-badge">${goalLabel}</span>
       </div>
@@ -239,15 +385,17 @@ function generateExecutivePdf(
       </div>
     </div>
     
-    <div class="meals-title">🍽️ Refeições</div>
-    <div class="meals-grid">${mealsHtml}</div>
+    <div class="meals-section">
+      <div class="meals-title">🍽️ Refeições</div>
+      <div class="meals-grid">${mealsHtml}</div>
+    </div>
     
     <div class="tips">
       <div class="tips-title">💡 Dicas</div>
       <div class="tips-content">${tipsHtml}</div>
     </div>
     
-    <div class="footer"><strong>NutriAI</strong> • nutria-plan-wise.lovable.app • Consulte sempre um nutricionista</div>
+    <div class="footer"><strong>NutriAI</strong> · nutria-plan-wise.lovable.app · Consulte sempre um nutricionista</div>
   </div>
 </body>
 </html>`;
