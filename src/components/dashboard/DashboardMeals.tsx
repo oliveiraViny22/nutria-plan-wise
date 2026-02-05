@@ -4,6 +4,7 @@ import { Lock, Coffee, Sun, Apple, Moon, Utensils, Cookie } from 'lucide-react';
 import { MealCard } from '@/components/ui-kit';
 import { SavePlanButton } from '@/components/SavePlanButton';
 import { EmptyPlanState } from '@/components/EmptyPlanState';
+import { SupplementToggle } from '@/components/SupplementToggle';
 import { MEAL_NAMES, MealType, Meal } from '@/lib/types';
 
 // Map meal types to icons
@@ -31,6 +32,7 @@ interface DashboardMealsProps {
   planReleased: boolean;
   mealOptionsLimit: number;
   generating: boolean;
+  includeSupplements?: boolean;
   onGeneratePlan: () => void;
   onPlanSaved: () => void;
 }
@@ -45,6 +47,7 @@ export function DashboardMeals({
   planReleased,
   mealOptionsLimit,
   generating,
+  includeSupplements = false,
   onGeneratePlan,
   onPlanSaved,
 }: DashboardMealsProps) {
@@ -103,6 +106,15 @@ export function DashboardMeals({
           Suas Refeições
         </h2>
       </div>
+
+      {/* Supplement Toggle - below title, above meals */}
+      {!isLinkedStudent && (
+        <SupplementToggle 
+          initialValue={includeSupplements}
+          compact
+          locked={isPaidUser ? false : true}
+        />
+      )}
       
       {/* Save Plan CTA */}
       {!isPlanSaved && !isLinkedStudent && planId && (
