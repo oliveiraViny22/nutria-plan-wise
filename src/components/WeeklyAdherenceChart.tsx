@@ -264,7 +264,7 @@ export function WeeklyAdherenceChart() {
               </div>
             </div>
 
-            {/* Week Days Chart */}
+            {/* Week Days Chart with growth animation */}
             <TooltipProvider delayDuration={100}>
               <div className="flex items-end justify-between gap-1.5 h-20">
                 {stats.days.map((day, index) => {
@@ -278,13 +278,23 @@ export function WeeklyAdherenceChart() {
                     <Tooltip key={day.dateStr}>
                       <TooltipTrigger asChild>
                         <motion.div
-                          initial={{ height: 0 }}
-                          animate={{ height: `${height}%` }}
-                          transition={{ delay: index * 0.05, duration: 0.3 }}
+                          initial={{ scaleY: 0, opacity: 0 }}
+                          animate={{ scaleY: 1, opacity: 1 }}
+                          transition={{ 
+                            delay: index * 0.08, 
+                            duration: 0.5,
+                            type: 'spring',
+                            stiffness: 100,
+                            damping: 12
+                          }}
+                          style={{ 
+                            height: `${height}%`,
+                            transformOrigin: 'bottom'
+                          }}
                           className={`
                             flex-1 rounded-t-md transition-all
                             ${getDayBgColor(day)}
-                            ${isToday(day.date) ? 'ring-2 ring-primary ring-offset-2 ring-offset-background' : ''}
+                            ${isToday(day.date) ? 'ring-2 ring-primary ring-offset-2 ring-offset-background animate-pulse-success' : ''}
                           `}
                         />
                       </TooltipTrigger>
@@ -320,9 +330,9 @@ export function WeeklyAdherenceChart() {
             {/* Stats Summary */}
             <div className="flex items-center justify-between text-xs pt-2 border-t">
               <div className="flex items-center gap-4">
-                <div className="flex items-center gap-1 text-green-600 dark:text-green-400">
+                <div className="flex items-center gap-1 text-success">
                   <CheckCircle2 className="h-3.5 w-3.5" />
-                  <span>{stats.totalConfirmed} confirmadas</span>
+                  <span className="counter-value">{stats.totalConfirmed} confirmadas</span>
                 </div>
               </div>
               <div className="flex items-center gap-1 text-primary">
