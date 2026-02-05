@@ -3,7 +3,7 @@
 // =====================================================
 
 import type { Food, FoodSelection, MealResult, MealWithOptions, MacroTotals, MacroTargets, ScaleResult } from "./types.ts";
-import { CATEGORY_SCALE_LIMITS, DEFAULT_SCALE_LIMITS, MAIN_MEALS, SNACK_MEALS } from "./constants/index.ts";
+import { CATEGORY_SCALE_LIMITS, DEFAULT_SCALE_LIMITS, MAIN_MEALS, SNACK_MEALS } from "./constants.ts";
 import { applyUnitConversion } from "./unit-conversion.ts";
 import { logInfo, logDebug } from "./logger.ts";
 import { GENERATOR_CONTRACT } from "../_shared/nutrition-contracts.ts";
