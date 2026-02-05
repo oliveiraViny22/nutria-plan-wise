@@ -45,6 +45,7 @@ import { MealReplacementSection } from '@/components/MealReplacementCard';
 import { ProFeatureBadge } from '@/components/FeatureBadge';
 import { SupplementsPreview } from '@/components/SupplementsPreview';
  import { MealPlanPdf } from '@/components/MealPlanPdf';
+import { MetricCard, MacroBadge, FadeInView, AnimatedCounter } from '@/components/ui-kit';
 
 interface MealData {
   id: string;
@@ -398,39 +399,49 @@ export default function MealPlanPage() {
       </div>
 
       <main className="container mx-auto px-4 py-6 space-y-8 print:py-2">
-        {/* Summary Card */}
-        <Card className="bg-gradient-to-br from-primary/5 to-transparent border-primary/20">
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <Target className="w-5 h-5 text-primary" />
-              Resumo Diário
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="text-center p-3 rounded-lg bg-background/60">
-                <Flame className="w-5 h-5 mx-auto mb-1 text-amber-500" />
-                <p className="text-2xl font-bold">{planTotals.calories}</p>
-                <p className="text-xs text-muted-foreground">Calorias</p>
+        {/* Summary Card - Using UI Kit */}
+        <FadeInView direction="up">
+          <Card className="bg-gradient-to-br from-primary/5 to-transparent border-primary/20">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <Target className="w-5 h-5 text-primary" />
+                Resumo Diário
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <MetricCard
+                  label="Calorias"
+                  value={planTotals.calories}
+                  unit="kcal"
+                  icon={<Flame className="h-4 w-4" />}
+                  color="calories"
+                />
+                <MetricCard
+                  label="Proteína"
+                  value={planTotals.protein}
+                  unit="g"
+                  icon={<Beef className="h-4 w-4" />}
+                  color="protein"
+                />
+                <MetricCard
+                  label="Carboidratos"
+                  value={planTotals.carbs}
+                  unit="g"
+                  icon={<Wheat className="h-4 w-4" />}
+                  color="carbs"
+                />
+                <MetricCard
+                  label="Gordura"
+                  value={planTotals.fat}
+                  unit="g"
+                  icon={<Droplets className="h-4 w-4" />}
+                  color="fat"
+                />
               </div>
-              <div className="text-center p-3 rounded-lg bg-background/60">
-                <Beef className="w-5 h-5 mx-auto mb-1 text-blue-500" />
-                <p className="text-2xl font-bold">{planTotals.protein}g</p>
-                <p className="text-xs text-muted-foreground">Proteína</p>
-              </div>
-              <div className="text-center p-3 rounded-lg bg-background/60">
-                <Wheat className="w-5 h-5 mx-auto mb-1 text-yellow-500" />
-                <p className="text-2xl font-bold">{planTotals.carbs}g</p>
-                <p className="text-xs text-muted-foreground">Carboidratos</p>
-              </div>
-              <div className="text-center p-3 rounded-lg bg-background/60">
-                <Droplets className="w-5 h-5 mx-auto mb-1 text-orange-500" />
-                <p className="text-2xl font-bold">{planTotals.fat}g</p>
-                <p className="text-xs text-muted-foreground">Gordura</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </FadeInView>
 
         {/* Meals Section - Página 1 do PDF */}
         <section className="print-page-1">
@@ -487,17 +498,11 @@ export default function MealPlanPage() {
                               </Badge>
                             </div>
                             
-                            {/* Macros summary */}
-                            <div className="flex flex-wrap gap-2 mb-3 text-xs">
-                              <Badge variant="outline" className="bg-blue-500/10 text-[10px]">
-                                P: {option.total_protein || 0}g
-                              </Badge>
-                              <Badge variant="outline" className="bg-yellow-500/10 text-[10px]">
-                                C: {option.total_carbs || 0}g
-                              </Badge>
-                              <Badge variant="outline" className="bg-orange-500/10 text-[10px]">
-                                G: {option.total_fat || 0}g
-                              </Badge>
+                            {/* Macros summary - Using MacroBadge from UI Kit */}
+                            <div className="flex flex-wrap gap-1.5 mb-3">
+                              <MacroBadge macro="protein" value={option.total_protein || 0} size="sm" variant="pill" />
+                              <MacroBadge macro="carbs" value={option.total_carbs || 0} size="sm" variant="pill" />
+                              <MacroBadge macro="fat" value={option.total_fat || 0} size="sm" variant="pill" />
                             </div>
 
                             {/* Foods list */}
