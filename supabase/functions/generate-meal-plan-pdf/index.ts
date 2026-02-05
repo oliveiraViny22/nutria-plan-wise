@@ -361,7 +361,7 @@ function generateExecutivePdf(
     
     <div class="profile">
       <div class="profile-card">
-        <div class="profile-label">👤 Paciente</div>
+        <div class="profile-label">👤 Nome</div>
         <div class="profile-content">
           <span class="name">${profile.name || "—"}</span>
           <span class="sep">•</span>
