@@ -591,7 +591,7 @@ export default function Dashboard() {
             {subscriptionPlan.type === 'gratuito' ? (
               <GamificationPreview isLocked={true} />
             ) : (
-              <div className="flex flex-col gap-3 sm:gap-4 md:grid md:grid-cols-2">
+              <div className="flex flex-col gap-3 sm:gap-4 lg:grid lg:grid-cols-2"> 
                 <AdherenceStreak />
                 <WeeklyAdherenceChart />
               </div>
