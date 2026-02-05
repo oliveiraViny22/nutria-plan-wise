@@ -1,7 +1,7 @@
 import { motion } from 'framer-motion';
 import { Target, Flame } from 'lucide-react';
-import { CalorieRing } from '@/components/CalorieRing';
-import { MacroChart } from '@/components/MacroChart';
+import { EnhancedCalorieRing } from './EnhancedCalorieRing';
+import { InteractiveMacroCard } from './InteractiveMacroCard';
 import { NutritionCard } from '@/components/ui-kit';
 
 interface DashboardStatsProps {
@@ -13,6 +13,9 @@ interface DashboardStatsProps {
   targetProtein: number;
   targetCarbs: number;
   targetFat: number;
+  tmb?: number;
+  tdee?: number;
+  goal?: string;
 }
 
 export function DashboardStats({
@@ -24,6 +27,9 @@ export function DashboardStats({
   targetProtein,
   targetCarbs,
   targetFat,
+  tmb,
+  tdee,
+  goal,
 }: DashboardStatsProps) {
   return (
     <motion.section
@@ -33,26 +39,30 @@ export function DashboardStats({
       className="space-y-3 sm:space-y-4"
     >
       <div className="grid gap-4 sm:gap-5 grid-cols-1 sm:grid-cols-2">
-        {/* Calorie Card */}
+        {/* Calorie Card - Enhanced */}
         <NutritionCard
           variant="metric"
           title="Calorias"
           icon={<Flame className="w-4 h-4 sm:w-5 sm:h-5" />}
           className="flex flex-col items-center"
         >
-          <CalorieRing
+          <EnhancedCalorieRing
             current={currentCalories}
             target={targetCalories}
+            tmb={tmb}
+            tdee={tdee}
+            goal={goal}
+            size={160}
           />
         </NutritionCard>
 
-        {/* Macros Card */}
+        {/* Macros Card - Enhanced */}
         <NutritionCard
           variant="metric"
           title="Macronutrientes"
           icon={<Target className="w-4 h-4 sm:w-5 sm:h-5" />}
         >
-          <MacroChart
+          <InteractiveMacroCard
             protein={currentProtein}
             carbs={currentCarbs}
             fat={currentFat}

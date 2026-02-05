@@ -12,13 +12,13 @@ import {
   DashboardActions,
   DashboardMeals,
   DashboardFooter,
+  EnhancedQuickActions,
 } from '@/components/dashboard';
 
 import { UpgradeDialog } from '@/components/UpgradeDialog';
 import { OnboardingTutorial } from '@/components/OnboardingTutorial';
 import { DashboardSkeleton } from '@/components/DashboardSkeleton';
 import { SuccessAnimation } from '@/components/SuccessAnimation';
-import { QuickActionsBar } from '@/components/QuickActionsBar';
 import { CollapsibleMetrics } from '@/components/CollapsibleMetrics';
 import { NutritionalValidationAlert } from '@/components/NutritionalValidationAlert';
 
@@ -272,16 +272,18 @@ export default function Dashboard() {
               isLinkedStudent={isLinkedStudent}
             />
 
-            {/* Quick Actions Bar */}
-            {currentDietPlan && (
-              <QuickActionsBar
-                hasPlan={!!currentDietPlan}
-                isPlanSaved={currentDietPlan.is_saved}
-                pendingMeals={meals.length - todayMealsLogged}
-                totalMeals={meals.length}
-                isPaidUser={subscriptionPlan?.type !== 'gratuito'}
-              />
-            )}
+            {/* Quick Actions Bar - Enhanced */}
+            <EnhancedQuickActions
+              hasPlan={!!currentDietPlan}
+              isPlanSaved={currentDietPlan?.is_saved || false}
+              pendingMeals={meals.length - todayMealsLogged}
+              totalMeals={meals.length}
+              isPaidUser={subscriptionPlan?.type !== 'gratuito'}
+              canGeneratePlan={permissions.can_create_plan && !isLimitReached('diet')}
+              canOptimize={permissions.can_adjust && !isLimitReached('adjustment')}
+              isGenerating={generatingV5}
+              onGeneratePlan={generateMealPlanV5}
+            />
 
             {/* Metabolic Base + Hydration - Collapsible */}
             {metabolicData && (
@@ -314,6 +316,9 @@ export default function Dashboard() {
               targetProtein={profile?.protein_target || 150}
               targetCarbs={profile?.carbs_target || 250}
               targetFat={profile?.fat_target || 65}
+              tmb={metabolicData?.bmr}
+              tdee={metabolicData?.tdee}
+              goal={profile?.goal || undefined}
             />
 
             <DashboardGamification
