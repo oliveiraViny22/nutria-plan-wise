@@ -468,21 +468,48 @@ export default function Dashboard() {
           </p>
         </motion.section>
 
-        {/* Usage Limits Summary - only show for non-admin, non-linked users */}
-        {!isAdmin && !isLinkedStudent && currentDietPlan && (
+        {/* Metabolic Base - Compact inline display */}
+        {metabolicData && (
           <motion.section
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.05 }}
           >
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <UsageLimitsBadge feature="diet" />
-              <UsageLimitsBadge feature="substitution" />
-              <UsageLimitsBadge feature="adjustment" />
-              {subscriptionPlan?.has_chat && (
-                <UsageLimitsBadge feature="chat" />
-              )}
-            </div>
+            <TooltipProvider delayDuration={200}>
+              <div className="flex items-center justify-center gap-4 sm:gap-6 p-3 sm:p-4 rounded-xl bg-gradient-to-r from-amber-500/10 via-orange-500/5 to-amber-500/10 border border-amber-500/20">
+                <div className="flex items-center gap-2">
+                  <Flame className="h-4 w-4 text-amber-500" />
+                  <span className="text-xs text-muted-foreground">Metabolismo:</span>
+                </div>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="flex items-center gap-1.5 cursor-help">
+                      <span className="text-sm font-bold tabular-nums text-amber-600 dark:text-amber-400">{metabolicData.bmr}</span>
+                      <span className="text-xs text-muted-foreground">TMB</span>
+                      <Info className="h-3 w-3 text-muted-foreground" />
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="max-w-xs p-3">
+                    <p className="font-semibold mb-1">Taxa Metabólica Basal</p>
+                    <p className="text-sm">Calorias que seu corpo queima em repouso para manter funções vitais.</p>
+                  </TooltipContent>
+                </Tooltip>
+                <span className="text-muted-foreground">•</span>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="flex items-center gap-1.5 cursor-help">
+                      <span className="text-sm font-bold tabular-nums text-orange-600 dark:text-orange-400">{metabolicData.tdee}</span>
+                      <span className="text-xs text-muted-foreground">TDEE</span>
+                      <Info className="h-3 w-3 text-muted-foreground" />
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="max-w-xs p-3">
+                    <p className="font-semibold mb-1">Gasto Energético Total</p>
+                    <p className="text-sm">Total de calorias que você gasta por dia, incluindo atividades físicas.</p>
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+            </TooltipProvider>
           </motion.section>
         )}
 
@@ -529,73 +556,16 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Metabolic Base Card - TMB & TDEE */}
-          {metabolicData && (
-            <TooltipProvider delayDuration={200}>
-              <Card className="border-amber-500/30 bg-gradient-to-br from-amber-500/5 to-orange-500/10">
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <Flame className="h-5 w-5 text-amber-500" />
-                    Metabolismo Base
-                  </CardTitle>
-                  <CardDescription className="text-xs">
-                    Calculado pela fórmula de Mifflin-St Jeor
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-2 gap-4">
-                    {/* TMB with Tooltip */}
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <div className="bg-background/60 rounded-xl p-4 text-center cursor-help hover:bg-background/80 transition-colors">
-                          <div className="w-8 h-8 mx-auto mb-2 rounded-full bg-amber-500/20 flex items-center justify-center relative">
-                            <Flame className="h-4 w-4 text-amber-500" />
-                            <Info className="h-3 w-3 text-muted-foreground absolute -top-1 -right-1" />
-                          </div>
-                          <p className="text-2xl font-bold tabular-nums text-amber-600 dark:text-amber-400">{metabolicData.bmr}</p>
-                          <p className="text-xs text-muted-foreground">TMB (kcal/dia)</p>
-                        </div>
-                      </TooltipTrigger>
-                      <TooltipContent side="bottom" className="max-w-xs p-3">
-                        <p className="font-semibold mb-1">O que é TMB?</p>
-                        <p className="text-sm">
-                          A Taxa Metabólica Basal é a quantidade de calorias que seu corpo queima 
-                          <strong> apenas para manter as funções vitais</strong> (respiração, batimentos 
-                          cardíacos, temperatura corporal) enquanto você está em repouso absoluto.
-                        </p>
-                      </TooltipContent>
-                    </Tooltip>
-                    
-                    {/* TDEE with Tooltip */}
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <div className="bg-background/60 rounded-xl p-4 text-center cursor-help hover:bg-background/80 transition-colors">
-                          <div className="w-8 h-8 mx-auto mb-2 rounded-full bg-orange-500/20 flex items-center justify-center relative">
-                            <TrendingUp className="h-4 w-4 text-orange-500" />
-                            <Info className="h-3 w-3 text-muted-foreground absolute -top-1 -right-1" />
-                          </div>
-                          <p className="text-2xl font-bold tabular-nums text-orange-600 dark:text-orange-400">{metabolicData.tdee}</p>
-                          <p className="text-xs text-muted-foreground">TDEE (kcal/dia)</p>
-                        </div>
-                      </TooltipTrigger>
-                      <TooltipContent side="bottom" className="max-w-xs p-3">
-                        <p className="font-semibold mb-1">O que é TDEE?</p>
-                        <p className="text-sm">
-                          O Gasto Energético Total Diário inclui a TMB mais todas as calorias 
-                          que você queima com <strong>atividades físicas e digestão</strong>. 
-                          É o total que você gasta em um dia normal.
-                        </p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </div>
-                  
-                  <p className="text-xs text-muted-foreground text-center mt-3">
-                    Seu corpo queima aproximadamente <span className="font-semibold text-foreground">{metabolicData.bmr}</span> em repouso 
-                    e <span className="font-semibold text-foreground">{metabolicData.tdee} kcal</span> com sua atividade física.
-                  </p>
-                </CardContent>
-              </Card>
-            </TooltipProvider>
+          {/* Usage Limits - Compact inline display for non-admin, non-linked users */}
+          {!isAdmin && !isLinkedStudent && currentDietPlan && (
+            <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-3">
+              <UsageLimitsBadge feature="diet" compact />
+              <UsageLimitsBadge feature="substitution" compact />
+              <UsageLimitsBadge feature="adjustment" compact />
+              {subscriptionPlan?.has_chat && (
+                <UsageLimitsBadge feature="chat" compact />
+              )}
+            </div>
           )}
 
         </motion.section>
