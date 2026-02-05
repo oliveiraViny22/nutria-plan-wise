@@ -123,7 +123,7 @@ export function MobileNav() {
       label: 'Chat IA',
       href: '/chat',
       icon: <MessageCircle className="h-5 w-5" />,
-      show: true,
+      show: isPaidUser,
     },
     {
       label: 'Assinatura',
