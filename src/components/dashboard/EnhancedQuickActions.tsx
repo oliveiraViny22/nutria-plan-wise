@@ -4,6 +4,7 @@ import {
   ClipboardCheck, 
   FileText, 
   Utensils,
+  AlertCircle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -16,7 +17,7 @@ interface QuickActionItem {
   icon: React.ReactNode;
   href?: string;
   onClick?: () => void;
-  variant: 'primary' | 'secondary' | 'ghost' | 'success';
+  variant: 'primary' | 'secondary' | 'ghost' | 'success' | 'warning';
   badge?: string | number;
   tooltip?: string;
   show: boolean;
@@ -48,9 +49,18 @@ export function EnhancedQuickActions({
 }: EnhancedQuickActionsProps) {
   const allMealsLogged = pendingMeals === 0 && totalMeals > 0;
   const hasRefeicoesPendentes = pendingMeals > 0;
+  const hasPlanNotSaved = hasPlan && !isPlanSaved;
 
-  // Removed generate button - now only in DashboardActions
   const actions: QuickActionItem[] = [
+    {
+      id: 'unsaved-warning',
+      label: 'Plano não salvo',
+      shortLabel: 'Não salvo',
+      icon: <AlertCircle className="h-4 w-4" />,
+      variant: 'warning',
+      tooltip: 'Salve seu plano para acessar todas as funcionalidades',
+      show: hasPlanNotSaved,
+    },
     {
       id: 'register',
       label: 'Registrar refeição',
@@ -88,6 +98,7 @@ export function EnhancedQuickActions({
       case 'primary': return 'default';
       case 'secondary': return 'outline';
       case 'success': return 'outline';
+      case 'warning': return 'outline';
       case 'ghost': return 'ghost';
       default: return 'outline';
     }
@@ -107,6 +118,7 @@ export function EnhancedQuickActions({
             "gap-2 transition-all duration-200",
             action.variant === 'primary' && "bg-primary hover:bg-primary/90 shadow-sm",
             action.variant === 'success' && "bg-success/10 text-success border-success/20 hover:bg-success/20",
+            action.variant === 'warning' && "bg-warning/10 text-warning border-warning/30 hover:bg-warning/20 animate-pulse",
             "hover:scale-[1.02] active:scale-[0.98]"
           )}
           onClick={action.onClick}
