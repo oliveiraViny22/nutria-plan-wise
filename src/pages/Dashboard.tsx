@@ -467,7 +467,7 @@ export default function Dashboard() {
           </p>
         </motion.section>
 
-        {/* Metabolic Base - Compact inline display with formula explanation */}
+        {/* Metabolic Base - Responsive display with formula explanation */}
         {metabolicData && (
           <motion.section
             initial={{ opacity: 0, y: 20 }}
@@ -476,41 +476,45 @@ export default function Dashboard() {
           >
             <TooltipProvider delayDuration={200}>
               <div className="flex flex-col items-center gap-2 p-3 sm:p-4 rounded-xl bg-gradient-to-r from-amber-500/10 via-orange-500/5 to-amber-500/10 border border-amber-500/20">
-                <div className="flex items-center justify-center gap-4 sm:gap-6">
-                  <div className="flex items-center gap-2">
-                    <Flame className="h-4 w-4 text-amber-500" />
-                    <span className="text-xs text-muted-foreground">Metabolismo:</span>
+                {/* Values row - responsive wrap for very small screens */}
+                <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-6">
+                  <div className="flex items-center gap-1.5">
+                    <Flame className="h-4 w-4 text-amber-500 shrink-0" />
+                    <span className="text-xs text-muted-foreground whitespace-nowrap">Metabolismo:</span>
                   </div>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <div className="flex items-center gap-1.5 cursor-help">
-                        <span className="text-sm font-bold tabular-nums text-amber-600 dark:text-amber-400">{metabolicData.bmr}</span>
-                        <span className="text-xs text-muted-foreground">TMB</span>
-                        <Info className="h-3 w-3 text-muted-foreground" />
-                      </div>
-                    </TooltipTrigger>
-                    <TooltipContent side="bottom" className="max-w-xs p-3">
-                      <p className="font-semibold mb-1">Taxa Metabólica Basal</p>
-                      <p className="text-sm">Calorias que seu corpo queima em repouso para manter funções vitais.</p>
-                    </TooltipContent>
-                  </Tooltip>
-                  <span className="text-muted-foreground">•</span>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <div className="flex items-center gap-1.5 cursor-help">
-                        <span className="text-sm font-bold tabular-nums text-orange-600 dark:text-orange-400">{metabolicData.tdee}</span>
-                        <span className="text-xs text-muted-foreground">TDEE</span>
-                        <Info className="h-3 w-3 text-muted-foreground" />
-                      </div>
-                    </TooltipTrigger>
-                    <TooltipContent side="bottom" className="max-w-xs p-3">
-                      <p className="font-semibold mb-1">Gasto Energético Total</p>
-                      <p className="text-sm">Total de calorias que você gasta por dia, incluindo atividades físicas.</p>
-                    </TooltipContent>
-                  </Tooltip>
+                  <div className="flex items-center gap-3 sm:gap-4">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className="flex items-center gap-1 cursor-help">
+                          <span className="text-sm sm:text-base font-bold tabular-nums text-amber-600 dark:text-amber-400">{metabolicData.bmr}</span>
+                          <span className="text-[10px] sm:text-xs text-muted-foreground">TMB</span>
+                          <Info className="h-3 w-3 text-muted-foreground shrink-0" />
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom" className="max-w-[280px] p-3">
+                        <p className="font-semibold mb-1">Taxa Metabólica Basal</p>
+                        <p className="text-sm">Calorias que seu corpo queima em repouso para manter funções vitais.</p>
+                      </TooltipContent>
+                    </Tooltip>
+                    <span className="text-muted-foreground/50">•</span>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className="flex items-center gap-1 cursor-help">
+                          <span className="text-sm sm:text-base font-bold tabular-nums text-orange-600 dark:text-orange-400">{metabolicData.tdee}</span>
+                          <span className="text-[10px] sm:text-xs text-muted-foreground">TDEE</span>
+                          <Info className="h-3 w-3 text-muted-foreground shrink-0" />
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom" className="max-w-[280px] p-3">
+                        <p className="font-semibold mb-1">Gasto Energético Total</p>
+                        <p className="text-sm">Total de calorias que você gasta por dia, incluindo atividades físicas.</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
                 </div>
-                <p className="text-[10px] sm:text-xs text-muted-foreground text-center">
-                  Calculado com a fórmula de Mifflin-St Jeor, baseado em idade, sexo, altura, peso e nível de atividade.
+                {/* Explanation text - responsive sizing */}
+                <p className="text-[10px] sm:text-xs text-muted-foreground text-center leading-relaxed max-w-md">
+                  Baseado na fórmula de Mifflin-St Jeor (idade, sexo, altura, peso e atividade)
                 </p>
               </div>
             </TooltipProvider>
