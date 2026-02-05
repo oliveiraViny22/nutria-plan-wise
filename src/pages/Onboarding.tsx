@@ -147,7 +147,10 @@ export default function Onboarding() {
     // - lose_weight: 2.0g/kg (preservar massa magra em déficit)
     // - gain_muscle: 2.0g/kg (suporte à hipertrofia)
     // - maintain: 1.8g/kg (manutenção)
+    // LIMITE DE SEGURANÇA: Máximo 3.0g/kg (evitar sobrecarga renal)
     // =====================================================
+    const MAX_PROTEIN_PER_KG = 3.0; // Limite máximo de segurança
+    
     let proteinPerKg = 1.8; // default
     let fatRatio = 0.25; // 25% das calorias para gordura
     
@@ -159,8 +162,10 @@ export default function Onboarding() {
       fatRatio = 0.30; // mais gordura para saciedade
     }
 
-    // Proteína em gramas baseada no peso corporal
-    const protein = Math.round(weightNum * proteinPerKg);
+    // Proteína em gramas baseada no peso corporal (com limite de segurança)
+    const rawProtein = weightNum * proteinPerKg;
+    const maxProtein = weightNum * MAX_PROTEIN_PER_KG;
+    const protein = Math.round(Math.min(rawProtein, maxProtein));
     const proteinCalories = protein * 4;
     
     // Gordura baseada em percentual das calorias
