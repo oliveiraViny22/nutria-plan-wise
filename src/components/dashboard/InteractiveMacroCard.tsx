@@ -27,6 +27,8 @@ interface MacroData {
   ringColor: string;
   icon: React.ReactNode;
   description: string;
+  gradientId: string;
+  gradientColors: [string, string];
 }
 
 interface InteractiveMacroCardProps {
@@ -56,11 +58,13 @@ export function InteractiveMacroCard({
       target: proteinTarget,
       unit: 'g',
       colorClass: 'bg-protein',
-      bgClass: 'bg-protein/10',
+      bgClass: 'bg-protein/5',
       textClass: 'text-protein',
       ringColor: 'stroke-protein',
       icon: <Beef className="w-4 h-4" />,
       description: 'Essencial para construção muscular e recuperação',
+      gradientId: 'proteinGradient',
+      gradientColors: ['hsl(217, 91%, 60%)', 'hsl(199, 89%, 48%)'],
     },
     {
       name: 'Carboidrato',
@@ -69,11 +73,13 @@ export function InteractiveMacroCard({
       target: carbsTarget,
       unit: 'g',
       colorClass: 'bg-carbs',
-      bgClass: 'bg-carbs/10',
+      bgClass: 'bg-carbs/5',
       textClass: 'text-carbs',
       ringColor: 'stroke-carbs',
       icon: <Wheat className="w-4 h-4" />,
       description: 'Principal fonte de energia para atividades',
+      gradientId: 'carbsGradient',
+      gradientColors: ['hsl(38, 92%, 50%)', 'hsl(45, 93%, 47%)'],
     },
     {
       name: 'Gordura',
@@ -82,11 +88,13 @@ export function InteractiveMacroCard({
       target: fatTarget,
       unit: 'g',
       colorClass: 'bg-fat',
-      bgClass: 'bg-fat/10',
+      bgClass: 'bg-fat/5',
       textClass: 'text-fat',
       ringColor: 'stroke-fat',
       icon: <Droplets className="w-4 h-4" />,
       description: 'Importante para hormônios e absorção de vitaminas',
+      gradientId: 'fatGradient',
+      gradientColors: ['hsl(346, 77%, 50%)', 'hsl(330, 81%, 60%)'],
     },
   ];
 
@@ -130,12 +138,18 @@ export function InteractiveMacroCard({
               transition={{ delay: index * 0.1 }}
               className={cn(
                 "relative rounded-xl cursor-pointer transition-all duration-300",
-                "border border-border/50 hover:border-border active:scale-[0.98]",
-                macro.bgClass,
-                "hover:shadow-lg hover:shadow-primary/5",
+                // Glassmorphism effect
+                "backdrop-blur-sm bg-background/60 dark:bg-background/40",
+                "border border-white/20 dark:border-white/10",
+                "shadow-lg shadow-black/5 dark:shadow-black/20",
+                // Hover states
+                "hover:bg-background/80 dark:hover:bg-background/60",
+                "hover:border-white/30 dark:hover:border-white/20",
+                "hover:shadow-xl hover:shadow-black/10",
+                "active:scale-[0.98]",
                 isExpanded && "ring-2 ring-primary/20",
                 // Mobile: horizontal layout, Desktop: vertical
-                "flex items-center gap-3 p-3 sm:flex-col sm:p-3"
+                "flex items-center gap-3 p-3 sm:flex-col sm:p-4"
               )}
               onClick={() => setExpandedMacro(isExpanded ? null : macro.name)}
               whileHover={{ scale: 1.01 }}
@@ -146,11 +160,17 @@ export function InteractiveMacroCard({
                 {/* Mobile ring */}
                 <div className="block sm:hidden relative" style={{ width: mobileSize, height: mobileSize }}>
                   <svg width={mobileSize} height={mobileSize} className="-rotate-90">
+                    <defs>
+                      <linearGradient id={`${macro.gradientId}-mobile`} x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stopColor={macro.gradientColors[0]} />
+                        <stop offset="100%" stopColor={macro.gradientColors[1]} />
+                      </linearGradient>
+                    </defs>
                     <circle
                       cx={mobileSize / 2}
                       cy={mobileSize / 2}
                       r={(mobileSize - strokeWidth) / 2}
-                      className="stroke-muted"
+                      className="stroke-muted/30"
                       strokeWidth={strokeWidth}
                       fill="none"
                     />
@@ -158,7 +178,7 @@ export function InteractiveMacroCard({
                       cx={mobileSize / 2}
                       cy={mobileSize / 2}
                       r={(mobileSize - strokeWidth) / 2}
-                      className={macro.ringColor}
+                      stroke={`url(#${macro.gradientId}-mobile)`}
                       strokeWidth={strokeWidth}
                       fill="none"
                       strokeLinecap="round"
@@ -180,11 +200,17 @@ export function InteractiveMacroCard({
                 {/* Desktop ring */}
                 <div className="hidden sm:block relative" style={{ width: desktopSize, height: desktopSize }}>
                   <svg width={desktopSize} height={desktopSize} className="-rotate-90">
+                    <defs>
+                      <linearGradient id={`${macro.gradientId}-desktop`} x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stopColor={macro.gradientColors[0]} />
+                        <stop offset="100%" stopColor={macro.gradientColors[1]} />
+                      </linearGradient>
+                    </defs>
                     <circle
                       cx={desktopSize / 2}
                       cy={desktopSize / 2}
                       r={(desktopSize - strokeWidth) / 2}
-                      className="stroke-muted"
+                      className="stroke-muted/30"
                       strokeWidth={strokeWidth}
                       fill="none"
                     />
@@ -192,7 +218,7 @@ export function InteractiveMacroCard({
                       cx={desktopSize / 2}
                       cy={desktopSize / 2}
                       r={(desktopSize - strokeWidth) / 2}
-                      className={macro.ringColor}
+                      stroke={`url(#${macro.gradientId}-desktop)`}
                       strokeWidth={strokeWidth}
                       fill="none"
                       strokeLinecap="round"
@@ -203,7 +229,7 @@ export function InteractiveMacroCard({
                     />
                   </svg>
                   <div className="absolute inset-0 flex flex-col items-center justify-center">
-                    <AnimatedCounter 
+                    <AnimatedCounter
                       value={Math.round(macro.current)} 
                       duration={800 + index * 150} 
                       className={cn("text-base font-bold tabular-nums", macro.textClass)}
