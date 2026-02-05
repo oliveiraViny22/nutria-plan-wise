@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { motion, useScroll, useTransform } from 'framer-motion';
 import { ArrowRight, Leaf, Target, RefreshCw, MessageCircle, UserPlus, ClipboardList, Utensils, TrendingUp, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Logo } from '@/components/Logo';
@@ -11,8 +11,67 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import heroImage from '@/assets/hero-nutrition.png';
+import { useRef } from 'react';
+
+// Animation variants for staggered children
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.15,
+      delayChildren: 0.1,
+    },
+  },
+};
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 30 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: {
+      type: "spring" as const,
+      stiffness: 100,
+      damping: 12,
+    },
+  },
+};
+
+const fadeInUp = {
+  hidden: { opacity: 0, y: 40 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: {
+      duration: 0.6,
+      ease: [0.22, 1, 0.36, 1],
+    },
+  },
+};
+
+const scaleIn = {
+  hidden: { opacity: 0, scale: 0.8 },
+  visible: {
+    opacity: 1,
+    scale: 1,
+    transition: {
+      type: "spring" as const,
+      stiffness: 100,
+      damping: 15,
+    },
+  },
+};
 
 export default function Index() {
+  const heroRef = useRef<HTMLElement>(null);
+  const { scrollYProgress } = useScroll({
+    target: heroRef,
+    offset: ["start start", "end start"],
+  });
+  
+  const heroY = useTransform(scrollYProgress, [0, 1], [0, 150]);
+  const heroOpacity = useTransform(scrollYProgress, [0, 0.8], [1, 0]);
   const features = [
     { icon: Target, title: 'Metas Personalizadas', description: 'Calcule suas necessidades calóricas e de macros automaticamente' },
     { icon: RefreshCw, title: 'Substituição Inteligente', description: 'Troque alimentos e veja o impacto nutricional em tempo real' },
@@ -90,32 +149,53 @@ export default function Index() {
         </div>
       </header>
 
-      {/* Hero Section with Gradient */}
-      <section className="relative overflow-hidden">
+      {/* Hero Section with Gradient and Parallax */}
+      <section ref={heroRef} className="relative overflow-hidden">
         {/* Background Gradient */}
         <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-primary/10 to-accent/5 dark:from-primary/10 dark:via-primary/5 dark:to-background" />
-        <div className="absolute top-20 left-10 w-72 h-72 bg-primary/20 rounded-full blur-3xl opacity-60" />
-        <div className="absolute bottom-10 right-10 w-96 h-96 bg-accent/30 rounded-full blur-3xl opacity-40" />
+        <motion.div 
+          style={{ y: heroY }}
+          className="absolute top-20 left-10 w-72 h-72 bg-primary/20 rounded-full blur-3xl opacity-60" 
+        />
+        <motion.div 
+          style={{ y: heroY }}
+          className="absolute bottom-10 right-10 w-96 h-96 bg-accent/30 rounded-full blur-3xl opacity-40" 
+        />
         
-        <main className="container mx-auto px-4 py-8 sm:py-12 lg:py-16 relative z-10">
+        <motion.main 
+          style={{ opacity: heroOpacity }}
+          className="container mx-auto px-4 py-8 sm:py-12 lg:py-16 relative z-10"
+        >
           <div className="grid lg:grid-cols-2 gap-8 lg:gap-12 items-center">
             {/* Text Content */}
             <motion.div 
-              initial={{ opacity: 0, y: 30 }} 
-              animate={{ opacity: 1, y: 0 }} 
-              transition={{ duration: 0.6 }}
+              variants={containerVariants}
+              initial="hidden"
+              animate="visible"
               className="text-center lg:text-left"
             >
-              <div className="inline-flex items-center gap-2 px-3 sm:px-4 py-2 bg-primary/10 rounded-full text-primary text-xs sm:text-sm font-medium mb-4 sm:mb-6">
+              <motion.div 
+                variants={itemVariants}
+                className="inline-flex items-center gap-2 px-3 sm:px-4 py-2 bg-primary/10 rounded-full text-primary text-xs sm:text-sm font-medium mb-4 sm:mb-6"
+              >
                 <Leaf className="w-3 h-3 sm:w-4 sm:h-4" /> Planejamento alimentar com IA
-              </div>
-              <h1 className="text-2xl sm:text-4xl lg:text-5xl xl:text-6xl font-bold text-foreground mb-4 sm:mb-6 leading-tight">
+              </motion.div>
+              <motion.h1 
+                variants={itemVariants}
+                className="text-2xl sm:text-4xl lg:text-5xl xl:text-6xl font-bold text-foreground mb-4 sm:mb-6 leading-tight"
+              >
                 Nutrição inteligente para seus <span className="text-primary">objetivos</span>
-              </h1>
-              <p className="text-sm sm:text-lg text-muted-foreground max-w-xl mx-auto lg:mx-0 mb-6 sm:mb-8">
+              </motion.h1>
+              <motion.p 
+                variants={itemVariants}
+                className="text-sm sm:text-lg text-muted-foreground max-w-xl mx-auto lg:mx-0 mb-6 sm:mb-8"
+              >
                 Crie planos alimentares personalizados, substitua alimentos e entenda o impacto de cada escolha na sua saúde.
-              </p>
-              <div className="flex flex-col sm:flex-row gap-3 justify-center lg:justify-start">
+              </motion.p>
+              <motion.div 
+                variants={itemVariants}
+                className="flex flex-col sm:flex-row gap-3 justify-center lg:justify-start"
+              >
                 <Link to="/signup">
                   <Button variant="hero" size="lg" className="text-sm sm:text-base w-full sm:w-auto">
                     Começar agora <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 ml-2" />
@@ -126,49 +206,89 @@ export default function Index() {
                     Como funciona <ChevronDown className="w-4 h-4 ml-2" />
                   </Button>
                 </a>
-              </div>
+              </motion.div>
             </motion.div>
             
-            {/* Hero Image */}
+            {/* Hero Image - Now visible on all devices */}
             <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.6, delay: 0.2 }}
-              className="relative hidden lg:block"
+              variants={scaleIn}
+              initial="hidden"
+              animate="visible"
+              className="relative order-first lg:order-last"
             >
-              <div className="relative">
+              <motion.div 
+                className="relative"
+                whileHover={{ scale: 1.02 }}
+                transition={{ type: "spring", stiffness: 300 }}
+              >
                 <img 
                   src={heroImage} 
                   alt="NutriPlan - Planejamento alimentar inteligente" 
-                  className="w-full h-auto max-w-lg mx-auto drop-shadow-2xl"
+                  className="w-full h-auto max-w-xs sm:max-w-sm lg:max-w-lg mx-auto drop-shadow-2xl"
                 />
-              </div>
+                {/* Floating elements for depth */}
+                <motion.div
+                  animate={{ 
+                    y: [0, -10, 0],
+                    rotate: [0, 2, 0]
+                  }}
+                  transition={{ 
+                    duration: 4, 
+                    repeat: Infinity,
+                    ease: "easeInOut"
+                  }}
+                  className="absolute -top-4 -right-4 w-16 h-16 sm:w-20 sm:h-20 bg-gradient-to-br from-accent to-accent/60 rounded-2xl shadow-lg flex items-center justify-center"
+                >
+                  <Target className="w-8 h-8 sm:w-10 sm:h-10 text-accent-foreground" />
+                </motion.div>
+                <motion.div
+                  animate={{ 
+                    y: [0, 10, 0],
+                    rotate: [0, -2, 0]
+                  }}
+                  transition={{ 
+                    duration: 5, 
+                    repeat: Infinity,
+                    ease: "easeInOut",
+                    delay: 1
+                  }}
+                  className="absolute -bottom-4 -left-4 w-14 h-14 sm:w-16 sm:h-16 bg-gradient-to-br from-primary to-primary/60 rounded-xl shadow-lg flex items-center justify-center"
+                >
+                  <Leaf className="w-6 h-6 sm:w-8 sm:h-8 text-primary-foreground" />
+                </motion.div>
+              </motion.div>
             </motion.div>
           </div>
-        </main>
+        </motion.main>
       </section>
 
       {/* Features Grid */}
       <section className="container mx-auto px-4 py-12 sm:py-16">
         <motion.div 
-          initial={{ opacity: 0 }} 
-          whileInView={{ opacity: 1 }}
-          viewport={{ once: true }}
-          transition={{ delay: 0.1 }} 
+          variants={containerVariants}
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, margin: "-100px" }}
           className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 max-w-4xl mx-auto"
         >
-          {features.map((f, i) => (
+          {features.map((f) => (
             <motion.div 
               key={f.title} 
-              initial={{ opacity: 0, y: 20 }} 
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: 0.1 + i * 0.1 }} 
-              className="card-elevated rounded-2xl p-4 sm:p-6 text-left"
+              variants={itemVariants}
+              whileHover={{ 
+                y: -8, 
+                scale: 1.02,
+                transition: { type: "spring", stiffness: 300 }
+              }}
+              className="card-elevated rounded-2xl p-4 sm:p-6 text-left cursor-pointer"
             >
-              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-primary/10 flex items-center justify-center mb-3 sm:mb-4">
+              <motion.div 
+                whileHover={{ rotate: [0, -10, 10, 0] }}
+                transition={{ duration: 0.5 }}
+                className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-primary/10 flex items-center justify-center mb-3 sm:mb-4"
+              >
                 <f.icon className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
-              </div>
+              </motion.div>
               <h3 className="font-semibold text-foreground mb-1 sm:mb-2 text-sm sm:text-base">{f.title}</h3>
               <p className="text-xs sm:text-sm text-muted-foreground">{f.description}</p>
             </motion.div>
