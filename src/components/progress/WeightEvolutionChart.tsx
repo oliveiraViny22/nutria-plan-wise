@@ -1,8 +1,9 @@
 import { useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { TrendingUp, TrendingDown, Minus, Scale } from 'lucide-react';
+import { TrendingUp, TrendingDown, Minus, Scale, Info } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { 
   LineChart, 
   Line, 
@@ -203,9 +204,16 @@ export function WeightEvolutionChart({ logs, targetWeight, goal }: WeightEvoluti
               </ResponsiveContainer>
             </div>
           ) : (
-            <div className="text-center py-8">
-              <p className="text-muted-foreground text-sm">
-                Registre mais medições para ver o gráfico de evolução
+            <div className="text-center py-8 space-y-4">
+              <Alert className="bg-primary/5 border-primary/20 text-left">
+                <Info className="h-4 w-4 text-primary" />
+                <AlertDescription className="text-sm">
+                  <strong>Quase lá!</strong> Você tem <strong>1 registro</strong> de peso. 
+                  Para visualizar o gráfico de evolução, registre seu peso em pelo menos <strong>mais uma data diferente</strong>.
+                </AlertDescription>
+              </Alert>
+              <p className="text-muted-foreground text-xs">
+                O acompanhamento regular do peso ajuda a visualizar seu progresso ao longo do tempo.
               </p>
             </div>
           )}
