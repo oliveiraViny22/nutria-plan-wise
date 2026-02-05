@@ -217,176 +217,173 @@ export function WeightProgressCard({
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
+      initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      className="space-y-6"
+      className="space-y-4"
     >
-      {/* Hero Card - Centralized */}
-      <Card className="backdrop-blur-md bg-gradient-to-br from-card via-card to-primary/5 border-border/40 shadow-xl overflow-hidden">
-        <CardContent className="p-6 sm:p-8">
-          {/* Main Stats - Centered */}
-          <div className="flex flex-col items-center text-center space-y-6">
-            {/* Current Weight - Hero */}
-            <div className="space-y-2">
-              <div className="w-20 h-20 mx-auto rounded-full bg-primary/10 flex items-center justify-center ring-4 ring-primary/20">
-                <Scale className="h-10 w-10 text-primary" />
+      {/* Hero Card - Compact */}
+      <Card className="backdrop-blur-md bg-gradient-to-br from-card via-card to-primary/5 border-border/40 shadow-lg overflow-hidden">
+        <CardContent className="p-4 sm:p-5">
+          {/* Main Stats - Horizontal Layout */}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+            {/* Current Weight */}
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center ring-2 ring-primary/20">
+                <Scale className="h-6 w-6 text-primary" />
               </div>
-              <motion.p 
-                key={currentWeight}
-                initial={{ scale: 0.8, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                className="text-5xl sm:text-6xl font-bold tabular-nums tracking-tight"
-              >
-                {currentWeight.toFixed(1)}
-                <span className="text-2xl font-normal text-muted-foreground ml-1">kg</span>
-              </motion.p>
-              <p className="text-sm text-muted-foreground">Peso Atual</p>
+              <div>
+                <motion.p 
+                  key={currentWeight}
+                  initial={{ scale: 0.9, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  className="text-3xl font-bold tabular-nums tracking-tight leading-none"
+                >
+                  {currentWeight.toFixed(1)}
+                  <span className="text-lg font-normal text-muted-foreground ml-0.5">kg</span>
+                </motion.p>
+                <p className="text-xs text-muted-foreground">Peso Atual</p>
+              </div>
             </div>
 
-            {/* Stats Row */}
-            <div className="flex items-center justify-center gap-6 sm:gap-10">
-              {/* Target */}
+            {/* Stats Row - Inline */}
+            <div className="flex items-center gap-4 sm:gap-6">
               {goal && (
                 <div className="text-center">
-                  <div className="flex items-center justify-center gap-1 mb-1">
-                    <Target className="h-4 w-4 text-accent" />
+                  <div className="flex items-center justify-center gap-1">
+                    <Target className="h-3.5 w-3.5 text-accent" />
+                    <p className="text-lg font-semibold tabular-nums">{targetWeight.toFixed(1)}</p>
                   </div>
-                  <p className="text-2xl font-semibold tabular-nums">{targetWeight.toFixed(1)}</p>
-                  <p className="text-xs text-muted-foreground">Meta (kg)</p>
+                  <p className="text-[10px] text-muted-foreground">Meta</p>
                 </div>
               )}
 
-              {/* Difference */}
-              {goal && (
+              {goal && logs.length >= 2 && (
                 <div className="text-center">
-                  <div className="flex items-center justify-center gap-1 mb-1">
+                  <div className="flex items-center justify-center gap-1">
                     {getTrendIcon()}
+                    <p className={cn("text-lg font-semibold tabular-nums", getTrendColor())}>
+                      {totalChange > 0 ? '+' : ''}{totalChange.toFixed(1)}
+                    </p>
                   </div>
-                  <p className={cn("text-2xl font-semibold tabular-nums", getTrendColor())}>
-                    {totalChange > 0 ? '+' : ''}{totalChange.toFixed(1)}
-                  </p>
-                  <p className="text-xs text-muted-foreground">Variação (kg)</p>
+                  <p className="text-[10px] text-muted-foreground">Variação</p>
                 </div>
               )}
 
-              {/* Days Tracked */}
               <div className="text-center">
-                <div className="flex items-center justify-center gap-1 mb-1">
-                  <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+                <div className="flex items-center justify-center gap-1">
+                  <CalendarIcon className="h-3.5 w-3.5 text-muted-foreground" />
+                  <p className="text-lg font-semibold tabular-nums">{logs.length}</p>
                 </div>
-                <p className="text-2xl font-semibold tabular-nums">{logs.length}</p>
-                <p className="text-xs text-muted-foreground">Registros</p>
+                <p className="text-[10px] text-muted-foreground">Registros</p>
               </div>
             </div>
 
-            {/* Register Button / Form */}
+            {/* Register Button */}
             <AnimatePresence mode="wait">
               {!isFormOpen ? (
                 <motion.div
                   key="button"
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.9 }}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
                 >
                   <Button
-                    size="lg"
+                    size="sm"
                     onClick={() => {
                       setWeight(currentWeight?.toFixed(1) || '');
                       setSelectedDate(new Date());
                       setIsFormOpen(true);
                     }}
-                    className="gap-2 shadow-lg"
+                    className="gap-1.5"
                   >
-                    <Plus className="w-5 h-5" />
-                    Registrar Peso
+                    <Plus className="w-4 h-4" />
+                    Registrar
                   </Button>
                 </motion.div>
               ) : (
                 <motion.div
                   key="form"
-                  initial={{ opacity: 0, scale: 0.95, y: 10 }}
-                  animate={{ opacity: 1, scale: 1, y: 0 }}
-                  exit={{ opacity: 0, scale: 0.95, y: 10 }}
-                  className="w-full max-w-sm"
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="w-full mt-3"
                 >
-                  <Card className="border-primary/30 shadow-lg bg-card/95">
-                    <CardContent className="p-4 space-y-3">
-                      {/* Date Picker */}
-                      <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
-                        <PopoverTrigger asChild>
-                          <Button
-                            variant="outline"
-                            className={cn(
-                              "w-full justify-start text-left font-normal",
-                              !selectedDate && "text-muted-foreground"
-                            )}
-                          >
-                            <CalendarIcon className="mr-2 h-4 w-4" />
-                            {selectedDate ? (
-                              format(selectedDate, "dd 'de' MMMM, yyyy", { locale: ptBR })
-                            ) : (
-                              <span>Selecione a data</span>
-                            )}
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="center">
-                          <Calendar
-                            mode="single"
-                            selected={selectedDate}
-                            onSelect={(date) => {
-                              if (date) {
-                                setSelectedDate(date);
-                                setCalendarOpen(false);
-                              }
-                            }}
-                            disabled={(date) => date > new Date()}
-                            initialFocus
-                            locale={ptBR}
-                          />
-                        </PopoverContent>
-                      </Popover>
-
-                      {/* Weight Input */}
-                      <div className="flex items-center gap-3">
-                        <Scale className="w-5 h-5 text-primary flex-shrink-0" />
-                        <Input
-                          type="text"
-                          inputMode="decimal"
-                          placeholder="Peso"
-                          value={weight}
-                          onChange={handleWeightChange}
-                          className="flex-1 text-center text-lg font-semibold"
-                          autoFocus
-                        />
-                        <span className="text-sm text-muted-foreground font-medium">kg</span>
-                      </div>
-
-                      {/* Actions */}
-                      <div className="flex gap-2">
+                  <div className="flex flex-col sm:flex-row gap-2 p-3 rounded-lg bg-muted/30 border border-border/50">
+                    {/* Date Picker */}
+                    <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+                      <PopoverTrigger asChild>
                         <Button
                           variant="outline"
-                          className="flex-1"
-                          onClick={() => setIsFormOpen(false)}
-                          disabled={loading}
-                        >
-                          <X className="w-4 h-4 mr-2" />
-                          Cancelar
-                        </Button>
-                        <Button
-                          className="flex-1"
-                          onClick={handleSubmit}
-                          disabled={loading || !weight}
-                        >
-                          {loading ? (
-                            <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                          ) : (
-                            <Check className="w-4 h-4 mr-2" />
+                          size="sm"
+                          className={cn(
+                            "justify-start text-left font-normal flex-1 sm:max-w-[180px]",
+                            !selectedDate && "text-muted-foreground"
                           )}
-                          Salvar
+                        >
+                          <CalendarIcon className="mr-1.5 h-3.5 w-3.5" />
+                          {selectedDate ? (
+                            format(selectedDate, "dd/MM/yyyy", { locale: ptBR })
+                          ) : (
+                            <span>Data</span>
+                          )}
                         </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={selectedDate}
+                          onSelect={(date) => {
+                            if (date) {
+                              setSelectedDate(date);
+                              setCalendarOpen(false);
+                            }
+                          }}
+                          disabled={(date) => date > new Date()}
+                          initialFocus
+                          locale={ptBR}
+                        />
+                      </PopoverContent>
+                    </Popover>
+
+                    {/* Weight Input */}
+                    <div className="flex items-center gap-2 flex-1">
+                      <Input
+                        type="text"
+                        inputMode="decimal"
+                        placeholder="Peso"
+                        value={weight}
+                        onChange={handleWeightChange}
+                        className="w-20 h-8 text-center text-sm font-semibold"
+                        autoFocus
+                      />
+                      <span className="text-xs text-muted-foreground">kg</span>
+                    </div>
+
+                    {/* Actions */}
+                    <div className="flex gap-1.5">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => setIsFormOpen(false)}
+                        disabled={loading}
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={handleSubmit}
+                        disabled={loading || !weight}
+                      >
+                        {loading ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Check className="w-4 h-4" />
+                        )}
+                      </Button>
+                    </div>
+                  </div>
                 </motion.div>
               )}
             </AnimatePresence>
@@ -397,32 +394,26 @@ export function WeightProgressCard({
       {/* Chart with Timeline */}
       {logs.length > 0 && (
         <Card className="backdrop-blur-md bg-card/80 border-border/40 shadow-lg overflow-hidden">
-          <CardContent className="p-4 sm:p-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
-              <div>
-                <h3 className="text-base font-semibold flex items-center gap-2">
-                  <TrendingUp className="h-5 w-5 text-primary" />
-                  Evolução do Peso
-                </h3>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  {chartInterval === 'weekly' 
-                    ? 'Visualização semanal • Registre semanalmente para melhor acompanhamento'
-                    : chartInterval === 'monthly'
-                    ? 'Visualização mensal'
-                    : 'Desde o primeiro registro'}
-                </p>
-              </div>
+          <CardContent className="p-3 sm:p-4">
+            <div className="flex items-center justify-between gap-2 mb-3">
+              <h3 className="text-sm font-semibold flex items-center gap-1.5">
+                <TrendingUp className="h-4 w-4 text-primary" />
+                Evolução
+                <span className="text-[10px] font-normal text-muted-foreground ml-1">
+                  {chartInterval === 'weekly' ? '(semanal)' : chartInterval === 'monthly' ? '(mensal)' : ''}
+                </span>
+              </h3>
               {logs.length >= 2 && (
-                <Badge variant="outline" className={cn("text-xs self-start sm:self-auto", getTrendColor())}>
-                  {totalChange > 0 ? '+' : ''}{totalChange.toFixed(1)} kg desde o início
+                <Badge variant="outline" className={cn("text-[10px] px-1.5 py-0", getTrendColor())}>
+                  {totalChange > 0 ? '+' : ''}{totalChange.toFixed(1)} kg
                 </Badge>
               )}
             </div>
 
             {logs.length >= 2 ? (
-              <div className="h-64 sm:h-72">
+              <div className="h-44 sm:h-52">
                 <ResponsiveContainer width="100%" height="100%">
-                  <ComposedChart data={chartData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                  <ComposedChart data={chartData} margin={{ top: 5, right: 5, left: -15, bottom: 0 }}>
                     <defs>
                       <linearGradient id="weightGradient" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3}/>
@@ -432,55 +423,36 @@ export function WeightProgressCard({
                     <XAxis 
                       dataKey="dateLabel" 
                       stroke="hsl(var(--muted-foreground))"
-                      fontSize={11}
+                      fontSize={10}
                       tickLine={false}
                       axisLine={false}
                     />
                     <YAxis 
                       stroke="hsl(var(--muted-foreground))"
-                      fontSize={11}
+                      fontSize={10}
                       tickLine={false}
                       axisLine={false}
-                      domain={['dataMin - 2', 'dataMax + 2']}
-                      width={40}
+                      domain={['dataMin - 1', 'dataMax + 1']}
+                      width={35}
                       tickFormatter={(value) => `${value}`}
                     />
                     <Tooltip
                       contentStyle={{
                         backgroundColor: 'hsl(var(--card))',
                         border: '1px solid hsl(var(--border))',
-                        borderRadius: '8px',
-                        boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                        borderRadius: '6px',
+                        fontSize: '12px',
+                        padding: '6px 10px',
                       }}
                       formatter={(value: number) => [`${value.toFixed(1)} kg`, 'Peso']}
                       labelFormatter={(label, payload) => payload[0]?.payload?.fullDate || label}
                     />
-                    {/* Start weight reference line */}
-                    {firstLog && (
-                      <ReferenceLine 
-                        y={firstLog.weight_kg} 
-                        stroke="hsl(var(--muted-foreground))" 
-                        strokeDasharray="3 3"
-                        strokeOpacity={0.5}
-                        label={{ 
-                          value: 'Início', 
-                          position: 'left',
-                          fill: 'hsl(var(--muted-foreground))',
-                          fontSize: 10
-                        }}
-                      />
-                    )}
                     {goal && (
                       <ReferenceLine 
                         y={targetWeight} 
                         stroke="hsl(var(--accent))" 
-                        strokeDasharray="5 5"
-                        label={{ 
-                          value: 'Meta', 
-                          position: 'right',
-                          fill: 'hsl(var(--accent))',
-                          fontSize: 11
-                        }}
+                        strokeDasharray="4 4"
+                        strokeOpacity={0.7}
                       />
                     )}
                     <Area
@@ -494,89 +466,70 @@ export function WeightProgressCard({
                       type="monotone"
                       dataKey="weight"
                       stroke="hsl(var(--primary))"
-                      strokeWidth={3}
-                      dot={{ fill: 'hsl(var(--primary))', strokeWidth: 2, r: 5 }}
-                      activeDot={{ r: 7, strokeWidth: 0 }}
+                      strokeWidth={2}
+                      dot={{ fill: 'hsl(var(--primary))', strokeWidth: 0, r: 3 }}
+                      activeDot={{ r: 5, strokeWidth: 0 }}
                       connectNulls
                     />
                   </ComposedChart>
                 </ResponsiveContainer>
               </div>
             ) : (
-              <div className="h-32 flex flex-col items-center justify-center text-center px-4">
-                <Scale className="h-8 w-8 text-muted-foreground mb-2" />
-                <p className="text-sm text-muted-foreground">
-                  Registre seu peso semanalmente para acompanhar sua evolução
-                </p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  O gráfico aparecerá após o segundo registro
+              <div className="h-20 flex flex-col items-center justify-center text-center">
+                <p className="text-xs text-muted-foreground">
+                  Registre mais pesos para ver o gráfico
                 </p>
               </div>
             )}
 
-            {/* Timeline */}
-            <div className="mt-6 pt-4 border-t border-border/40">
-              <h4 className="text-sm font-medium text-muted-foreground mb-3">Histórico</h4>
-              <div className="space-y-2">
-                {displayedLogs.map((log, index) => {
+            {/* Compact Timeline */}
+            <div className="mt-3 pt-3 border-t border-border/40">
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="text-xs font-medium text-muted-foreground">Histórico</h4>
+                {timelineLogs.length > 3 && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 px-2 text-[10px]"
+                    onClick={() => setShowAllLogs(!showAllLogs)}
+                  >
+                    {showAllLogs ? 'Menos' : `+${timelineLogs.length - 3}`}
+                  </Button>
+                )}
+              </div>
+              <div className="space-y-1">
+                {(showAllLogs ? timelineLogs : timelineLogs.slice(0, 3)).map((log, index) => {
                   const prevLog = timelineLogs[index + 1];
                   const diff = prevLog ? log.weight_kg - prevLog.weight_kg : 0;
                   
                   return (
-                    <motion.div
+                    <div
                       key={log.id}
-                      initial={{ opacity: 0, x: -10 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: index * 0.05 }}
-                      className="flex items-center justify-between py-2 px-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors"
+                      className="flex items-center justify-between py-1.5 px-2 rounded bg-muted/20 hover:bg-muted/40 transition-colors"
                     >
-                      <div className="flex items-center gap-3">
-                        <div className="w-2 h-2 rounded-full bg-primary" />
-                        <span className="text-sm font-medium">
-                          {format(new Date(log.log_date), "dd 'de' MMM", { locale: ptBR })}
+                      <div className="flex items-center gap-2">
+                        <div className="w-1.5 h-1.5 rounded-full bg-primary" />
+                        <span className="text-xs">
+                          {format(new Date(log.log_date), "dd/MM", { locale: ptBR })}
                         </span>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-semibold tabular-nums">
-                          {log.weight_kg.toFixed(1)} kg
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs font-semibold tabular-nums">
+                          {log.weight_kg.toFixed(1)}
                         </span>
                         {diff !== 0 && (
-                          <Badge 
-                            variant="outline" 
-                            className={cn(
-                              "text-xs tabular-nums",
-                              diff > 0 ? 'text-success border-success/30' : 'text-destructive border-destructive/30'
-                            )}
-                          >
+                          <span className={cn(
+                            "text-[10px] tabular-nums",
+                            diff > 0 ? 'text-destructive' : 'text-success'
+                          )}>
                             {diff > 0 ? '+' : ''}{diff.toFixed(1)}
-                          </Badge>
+                          </span>
                         )}
                       </div>
-                    </motion.div>
+                    </div>
                   );
                 })}
               </div>
-              
-              {timelineLogs.length > 5 && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="w-full mt-2"
-                  onClick={() => setShowAllLogs(!showAllLogs)}
-                >
-                  {showAllLogs ? (
-                    <>
-                      <ChevronUp className="h-4 w-4 mr-1" />
-                      Ver menos
-                    </>
-                  ) : (
-                    <>
-                      <ChevronDown className="h-4 w-4 mr-1" />
-                      Ver todos ({timelineLogs.length})
-                    </>
-                  )}
-                </Button>
-              )}
             </div>
           </CardContent>
         </Card>
