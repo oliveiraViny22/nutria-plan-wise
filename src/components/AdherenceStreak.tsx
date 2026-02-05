@@ -220,14 +220,15 @@ export function AdherenceStreak() {
         <Card className="card-elevated overflow-hidden h-full hover:border-primary/30 transition-colors">
           <CardContent className="py-4">
             <div className="flex items-center gap-4">
-              {/* Streak Fire Icon */}
+              {/* Streak Fire Icon with bloom animation */}
               <motion.div
-                initial={{ scale: 0.8 }}
-                animate={{ scale: 1 }}
+                initial={{ scale: 0.8, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ type: 'spring', stiffness: 200, damping: 15 }}
                 className={`
                   relative w-14 h-14 rounded-full flex items-center justify-center flex-shrink-0
                   ${streak.currentStreak > 0 
-                    ? 'bg-gradient-to-br from-orange-400 to-red-500' 
+                    ? 'bg-gradient-to-br from-primary to-primary/70 ring-celebrate' 
                     : 'bg-muted'
                   }
                 `}
@@ -237,12 +238,12 @@ export function AdherenceStreak() {
                 />
                 {streak.currentStreak > 0 && (
                   <motion.div
-                    initial={{ scale: 0 }}
-                    animate={{ scale: 1 }}
-                    transition={{ delay: 0.2, type: 'spring' }}
-                    className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-background border-2 border-orange-500 flex items-center justify-center"
+                    initial={{ scale: 0, rotate: -10 }}
+                    animate={{ scale: 1, rotate: 0 }}
+                    transition={{ delay: 0.3, type: 'spring', stiffness: 300 }}
+                    className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-background border-2 border-primary flex items-center justify-center shadow-md"
                   >
-                    <span className="text-xs font-bold text-orange-500">
+                    <span className="text-xs font-bold text-primary counter-value">
                       {streak.currentStreak}
                     </span>
                   </motion.div>

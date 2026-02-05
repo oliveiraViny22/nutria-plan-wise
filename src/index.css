@@ -497,4 +497,139 @@
   .progress-nature {
     @apply bg-gradient-to-r from-primary to-success;
   }
+
+  /* ========================== */
+  /* PROFILE VARIANTS           */
+  /* ========================== */
+
+  /* Patient interface - warm, welcoming, simplified */
+  .theme-patient {
+    --primary: 152 55% 42%;
+    --accent: 48 85% 55%;
+  }
+
+  /* Professional interface - technical, data-dense, cooler tones */
+  .theme-professional {
+    --primary: 180 45% 38%;
+    --accent: 200 60% 50%;
+  }
+
+  /* Professional card - more technical, data-focused */
+  .card-professional {
+    box-shadow: var(--shadow-sm);
+    @apply bg-card border border-border/60 transition-all duration-200;
+  }
+
+  .card-professional:hover {
+    box-shadow: var(--shadow-md);
+    @apply border-primary/25;
+  }
+
+  /* Professional stats - compact data display */
+  .stats-professional {
+    @apply font-mono text-sm tracking-tight;
+  }
+
+  /* ========================== */
+  /* MICRO-INTERACTIONS         */
+  /* ========================== */
+
+  /* Growth animation for progress elements */
+  @keyframes grow {
+    0% {
+      transform: scaleY(0);
+      opacity: 0;
+    }
+    60% {
+      transform: scaleY(1.05);
+    }
+    100% {
+      transform: scaleY(1);
+      opacity: 1;
+    }
+  }
+
+  @keyframes bloom {
+    0% {
+      transform: scale(0.8);
+      opacity: 0;
+    }
+    50% {
+      transform: scale(1.1);
+    }
+    100% {
+      transform: scale(1);
+      opacity: 1;
+    }
+  }
+
+  @keyframes pulse-success {
+    0%, 100% {
+      box-shadow: 0 0 0 0 hsl(152 55% 42% / 0.4);
+    }
+    50% {
+      box-shadow: 0 0 0 8px hsl(152 55% 42% / 0);
+    }
+  }
+
+  @keyframes count-up {
+    0% {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    100% {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .animate-grow {
+    animation: grow 0.5s ease-out forwards;
+    transform-origin: bottom;
+  }
+
+  .animate-bloom {
+    animation: bloom 0.4s ease-out forwards;
+  }
+
+  .animate-pulse-success {
+    animation: pulse-success 2s ease-in-out infinite;
+  }
+
+  .animate-count-up {
+    animation: count-up 0.5s ease-out forwards;
+  }
+
+  /* Stagger children animations */
+  .stagger-children > * {
+    opacity: 0;
+    animation: slideUp 0.4s ease-out forwards;
+  }
+
+  .stagger-children > *:nth-child(1) { animation-delay: 0.05s; }
+  .stagger-children > *:nth-child(2) { animation-delay: 0.1s; }
+  .stagger-children > *:nth-child(3) { animation-delay: 0.15s; }
+  .stagger-children > *:nth-child(4) { animation-delay: 0.2s; }
+  .stagger-children > *:nth-child(5) { animation-delay: 0.25s; }
+  .stagger-children > *:nth-child(6) { animation-delay: 0.3s; }
+  .stagger-children > *:nth-child(7) { animation-delay: 0.35s; }
+
+  /* Progress bar with growth effect */
+  .progress-grow {
+    @apply bg-primary rounded-full;
+    animation: grow 0.6s ease-out forwards;
+    transform-origin: left;
+  }
+
+  /* Success celebration ring */
+  .ring-celebrate {
+    @apply ring-2 ring-primary/30;
+    animation: pulse-success 1.5s ease-in-out 2;
+  }
+
+  /* Number counter effect */
+  .counter-value {
+    @apply tabular-nums;
+    animation: count-up 0.5s ease-out forwards;
+  }
 }

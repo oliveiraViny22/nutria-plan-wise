@@ -136,7 +136,7 @@ export default function ProfessionalDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background theme-professional">
       {/* Header */}
       <header className="sticky top-0 z-50 glass border-b pt-safe">
         <div className="container mx-auto px-3 sm:px-4 py-2.5 sm:py-3 flex items-center justify-between gap-2">
@@ -189,11 +189,11 @@ export default function ProfessionalDashboard() {
             <Card>
               <CardContent className="pt-4 sm:pt-6 px-3 sm:px-6">
                 <div className="flex items-center gap-2 sm:gap-3">
-                  <div className="p-1.5 sm:p-2 rounded-lg bg-green-500/10">
-                    <Utensils className="h-4 w-4 sm:h-5 sm:w-5 text-green-500" />
+                  <div className="p-1.5 sm:p-2 rounded-lg bg-success/10">
+                    <Utensils className="h-4 w-4 sm:h-5 sm:w-5 text-success" />
                   </div>
                   <div>
-                    <p className="text-xl sm:text-2xl font-bold">{metrics.totalDiets}</p>
+                    <p className="text-xl sm:text-2xl font-bold counter-value">{metrics.totalDiets}</p>
                     <p className="text-[10px] sm:text-sm text-muted-foreground">Total de Dietas</p>
                   </div>
                 </div>
@@ -209,11 +209,11 @@ export default function ProfessionalDashboard() {
             <Card>
               <CardContent className="pt-4 sm:pt-6 px-3 sm:px-6">
                 <div className="flex items-center gap-2 sm:gap-3">
-                  <div className="p-1.5 sm:p-2 rounded-lg bg-blue-500/10">
-                    <Calendar className="h-4 w-4 sm:h-5 sm:w-5 text-blue-500" />
+                  <div className="p-1.5 sm:p-2 rounded-lg bg-primary/10">
+                    <Calendar className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
                   </div>
                   <div>
-                    <p className="text-xl sm:text-2xl font-bold">{metrics.dietsThisMonth}</p>
+                    <p className="text-xl sm:text-2xl font-bold counter-value">{metrics.dietsThisMonth}</p>
                     <p className="text-[10px] sm:text-sm text-muted-foreground">Dietas este Mês</p>
                   </div>
                 </div>
@@ -229,11 +229,11 @@ export default function ProfessionalDashboard() {
             <Card>
               <CardContent className="pt-4 sm:pt-6 px-3 sm:px-6">
                 <div className="flex items-center gap-2 sm:gap-3">
-                  <div className="p-1.5 sm:p-2 rounded-lg bg-orange-500/10">
-                    <CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5 text-orange-500" />
+                  <div className="p-1.5 sm:p-2 rounded-lg bg-accent/10">
+                    <CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5 text-accent" />
                   </div>
                   <div>
-                    <p className="text-xl sm:text-2xl font-bold">{metrics.studentsWithActiveDiets}</p>
+                    <p className="text-xl sm:text-2xl font-bold counter-value">{metrics.studentsWithActiveDiets}</p>
                     <p className="text-[10px] sm:text-sm text-muted-foreground">Planos Ativos</p>
                   </div>
                 </div>
