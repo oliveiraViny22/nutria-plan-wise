@@ -1,28 +1,15 @@
-// Delete account edge function - v2
+// Delete account edge function - v3
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.2";
 
 const ADMIN_EMAIL = "admin@nutriaplan.com";
 
-const getCorsHeaders = (req: Request): Record<string, string> => {
-  const origin = req.headers.get("origin") || "";
-  const allowedOrigins = [
-    "https://nutria-plan-wise.lovable.app",
-    "https://id-preview--0d4648d3-1fe4-49fc-9711-596d3211140b.lovable.app",
-    "http://localhost:5173",
-    "http://localhost:3000",
-  ];
-  const allowedOrigin = allowedOrigins.includes(origin) ? origin : allowedOrigins[0];
-  
-  return {
-    "Access-Control-Allow-Origin": allowedOrigin,
-    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-  };
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
 };
 
 Deno.serve(async (req) => {
-  const corsHeaders = getCorsHeaders(req);
-  
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
