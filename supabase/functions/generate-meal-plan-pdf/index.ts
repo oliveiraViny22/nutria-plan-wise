@@ -207,35 +207,37 @@
  <body>
 <div class="container">
   <!-- Header -->
-  <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #3b82f6; padding-bottom: 6px; margin-bottom: 8px;">
-    <h1 style="font-size: 16pt; font-weight: 700; color: #1f2937; margin: 0;">
-      🥗 Plano Alimentar
-    </h1>
-    <div style="text-align: right; font-size: 8pt; color: #6b7280;">
-      ${generatedAt} · NutriAI
-     </div>
-   </div>
+  <div style="max-width: 600px; margin: 0 auto 8px auto;">
+    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #3b82f6; padding-bottom: 6px;">
+      <h1 style="font-size: 16pt; font-weight: 700; color: #1f2937; margin: 0;">
+        🥗 Plano Alimentar
+      </h1>
+      <div style="text-align: right; font-size: 8pt; color: #6b7280;">
+        ${generatedAt} · NutriAI
+      </div>
+    </div>
+  </div>
  
   <!-- Dados do Perfil - Horizontal Compacto -->
-  <div style="display: flex; gap: 10px; margin-bottom: 10px; font-size: 9pt;">
-    <div style="flex: 1; background: #f8fafc; border-radius: 8px; padding: 8px 12px; border: 1px solid #e2e8f0;">
+  <div style="max-width: 600px; margin: 0 auto 10px auto; display: flex; flex-direction: column; gap: 8px; font-size: 9pt;">
+    <div style="background: #f8fafc; border-radius: 8px; padding: 8px 12px; border: 1px solid #e2e8f0;">
       <div style="font-size: 7pt; color: #6b7280; margin-bottom: 3px; text-transform: uppercase; letter-spacing: 0.04em; font-weight: 600;">👤 Perfil</div>
       <div style="display: flex; flex-wrap: wrap; gap: 6px; align-items: center;">
-         <span><strong>${profile.name || "—"}</strong></span>
+        <span><strong>${profile.name || "—"}</strong></span>
         <span style="color: #cbd5e1;">|</span>
-         <span>${profile.age ? `${profile.age} anos` : "—"}</span>
+        <span>${profile.age ? `${profile.age} anos` : "—"}</span>
         <span style="color: #cbd5e1;">|</span>
-         <span>${profile.weight ? `${profile.weight}kg` : "—"}</span>
+        <span>${profile.weight ? `${profile.weight}kg` : "—"}</span>
         <span style="color: #cbd5e1;">|</span>
-         <span>${profile.height ? `${profile.height}cm` : "—"}</span>
+        <span>${profile.height ? `${profile.height}cm` : "—"}</span>
         <span style="color: #cbd5e1;">|</span>
-         <span style="color: #3b82f6; font-weight: 600;">${goalLabel}</span>
-       </div>
-     </div>
+        <span style="color: #3b82f6; font-weight: 600;">${goalLabel}</span>
+      </div>
+    </div>
  
     <div style="background: #f8fafc; border-radius: 8px; padding: 8px 12px; border: 1px solid #e2e8f0;">
       <div style="font-size: 7pt; color: #6b7280; margin-bottom: 3px; text-transform: uppercase; letter-spacing: 0.04em; font-weight: 600;">🎯 Metas</div>
-      <div style="display: flex; gap: 8px; align-items: center;">
+      <div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center;">
         <span style="font-size: 14pt; font-weight: 700; color: #f59e0b;">${plan.total_calories} <span style="font-size: 8pt; font-weight: 400;">kcal</span></span>
         <span style="color: #cbd5e1;">|</span>
         <span style="color: #3b82f6; font-weight: 600;">${plan.total_protein}g <span style="font-weight: 400;">P</span></span>
@@ -243,29 +245,33 @@
         <span style="color: #f97316; font-weight: 600;">${plan.total_fat}g <span style="font-weight: 400;">G</span></span>
         <span style="color: #cbd5e1;">|</span>
         <span style="font-size: 8pt; color: ${caloricDiff > 50 ? '#22c55e' : caloricDiff < -50 ? '#ef4444' : '#6b7280'}; font-weight: 500;">${caloricStatus}</span>
-       </div>
-     </div>
-   </div>
+      </div>
+    </div>
+  </div>
  
-  <!-- Refeições - Grid de 2 colunas ocupando toda largura -->
+  <!-- Refeições - Coluna única centralizada -->
   <div style="margin-bottom: 8px;">
-    <h2 style="font-size: 10pt; font-weight: 700; color: #1f2937; margin: 0 0 6px 0; padding-bottom: 3px; border-bottom: 1px solid #e2e8f0;">
-       🍽️ Refeições do Dia
-     </h2>
+    <div style="max-width: 600px; margin: 0 auto;">
+      <h2 style="font-size: 10pt; font-weight: 700; color: #1f2937; margin: 0 0 6px 0; padding-bottom: 3px; border-bottom: 1px solid #e2e8f0;">
+        🍽️ Refeições do Dia
+      </h2>
+    </div>
     <div class="meals-grid">
-       ${mealsHtml}
-     </div>
-   </div>
+      ${mealsHtml}
+    </div>
+  </div>
  
   <!-- Dicas - Compacto -->
-  <div style="background: #fffbeb; border-radius: 8px; padding: 6px 10px; border-left: 3px solid #f59e0b; font-size: 8pt; color: #78350f;">
-    <strong style="margin-right: 4px;">💡 Dicas:</strong>${tipsHtml}
-   </div>
+  <div style="max-width: 600px; margin: 0 auto;">
+    <div style="background: #fffbeb; border-radius: 8px; padding: 6px 10px; border-left: 3px solid #f59e0b; font-size: 8pt; color: #78350f;">
+      <strong style="margin-right: 4px;">💡 Dicas:</strong>${tipsHtml}
+    </div>
+  </div>
  
   <!-- Footer compacto -->
   <div style="margin-top: 6px; padding-top: 4px; border-top: 1px solid #e2e8f0; font-size: 7pt; color: #9ca3af; text-align: center;">
-     NutriAI • nutria-plan-wise.lovable.app • Consulte um nutricionista para orientação personalizada
-   </div>
+    NutriAI • nutria-plan-wise.lovable.app • Consulte um nutricionista para orientação personalizada
+  </div>
 </div>
  </body>
  </html>
