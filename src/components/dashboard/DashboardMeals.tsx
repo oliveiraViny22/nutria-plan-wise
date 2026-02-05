@@ -98,9 +98,9 @@ export function DashboardMeals({
       transition={{ delay: 0.3 }}
       className="space-y-4"
     >
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-center">
         <h2 className="text-lg sm:text-xl font-sans font-semibold text-foreground tracking-tight">
-          Plano de Hoje
+          Suas Refeições
         </h2>
       </div>
       
