@@ -72,9 +72,9 @@ export function SavePlanButton({ planId, isSaved, onSave, compact = false }: Sav
         size={compact ? 'default' : 'lg'}
         className={`
           w-full gap-2 relative overflow-hidden
-          gradient-gold
+          gradient-primary
           text-primary-foreground font-semibold tracking-wide
-          shadow-gold
+          glow-success
           ${compact ? 'h-10' : 'h-12'}
         `}
       >

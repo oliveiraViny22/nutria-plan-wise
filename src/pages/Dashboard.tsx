@@ -312,7 +312,7 @@ export default function Dashboard() {
             <MobileNav />
             <Logo />
             {isAdmin && (
-              <span className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1 gradient-gold text-primary-foreground text-xs font-medium rounded-full shadow-sm">
+              <span className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1 gradient-primary text-primary-foreground text-xs font-medium rounded-full shadow-sm">
                 <Shield className="w-3 h-3" />
                 Admin
               </span>
@@ -457,7 +457,7 @@ export default function Dashboard() {
           animate={{ opacity: 1, y: 0 }}
           className="space-y-2"
         >
-          <h1 className="text-2xl sm:text-3xl font-display font-bold text-foreground tracking-tight">
+          <h1 className="text-2xl sm:text-3xl font-sans font-bold text-foreground tracking-tight">
             Olá, {profile?.name?.split(' ')[0] || 'Usuário'}! 👋
           </h1>
           <p className="text-sm sm:text-base text-muted-foreground font-light">
@@ -537,7 +537,7 @@ export default function Dashboard() {
                 <div className="p-2 rounded-lg bg-accent/10">
                   <Flame className="w-4 h-4 sm:w-5 sm:h-5 text-accent" />
                 </div>
-                <h3 className="font-display font-semibold text-foreground text-base sm:text-lg tracking-tight">Calorias</h3>
+                <h3 className="font-sans font-semibold text-foreground text-base sm:text-lg tracking-tight">Calorias</h3>
               </div>
               <CalorieRing
                 current={currentCalories}
@@ -551,7 +551,7 @@ export default function Dashboard() {
                 <div className="p-2 rounded-lg bg-primary/10">
                   <Target className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
                 </div>
-                <h3 className="font-display font-semibold text-foreground text-base sm:text-lg tracking-tight">Macronutrientes</h3>
+                <h3 className="font-sans font-semibold text-foreground text-base sm:text-lg tracking-tight">Macronutrientes</h3>
               </div>
               <MacroChart
                 protein={currentProtein}
@@ -718,7 +718,7 @@ export default function Dashboard() {
             className="space-y-4"
           >
             <div className="flex items-center justify-between">
-              <h2 className="text-lg sm:text-xl font-display font-semibold text-foreground tracking-tight">
+              <h2 className="text-lg sm:text-xl font-sans font-semibold text-foreground tracking-tight">
                 Plano de Hoje
               </h2>
               <div className="flex items-center gap-2">

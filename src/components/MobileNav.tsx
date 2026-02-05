@@ -156,7 +156,7 @@ export function MobileNav() {
             <div className="flex items-center gap-2 flex-wrap">
               <Logo size="sm" />
               {isAdmin ? (
-                <Badge variant="outline" className="gap-1 gradient-gold text-primary-foreground border-0 shadow-sm">
+                <Badge variant="outline" className="gap-1 gradient-primary text-primary-foreground border-0 shadow-sm">
                   <Shield className="w-3 h-3" />
                   Admin
                 </Badge>
