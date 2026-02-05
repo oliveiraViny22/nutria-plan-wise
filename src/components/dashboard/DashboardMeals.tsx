@@ -100,22 +100,36 @@ export function DashboardMeals({
         </div>
       )}
 
-      <div className="space-y-2">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
         {meals.map((meal, index) => (
           <motion.div
             key={meal.id}
-            initial={{ opacity: 0, x: -10 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.3 + index * 0.05 }}
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 0.2 + index * 0.03 }}
           >
-            <MealCard
-              mealName={MEAL_NAMES[meal.name as MealType] || meal.name}
-              calories={isPlanSaved ? meal.total_calories || 0 : undefined}
-              status="pending"
-              optionsCount={mealOptionsLimit > 1 ? mealOptionsLimit : undefined}
+            <div
+              className={`
+                flex flex-col items-center justify-center p-3 rounded-lg border
+                bg-card hover:bg-muted/30 transition-all cursor-pointer
+                border-l-4 border-l-muted-foreground/30 border-t-0 border-r-border/50 border-b-border/50
+                hover:shadow-sm hover:scale-[1.02] active:scale-[0.98]
+                min-h-[72px]
+              `}
               onClick={isPlanSaved ? () => navigate(`/meal/${meal.id}`) : undefined}
-              compact={true}
-            />
+            >
+              <span className="font-medium text-foreground text-xs sm:text-sm text-center line-clamp-1">
+                {MEAL_NAMES[meal.name as MealType] || meal.name}
+              </span>
+              {isPlanSaved && meal.total_calories !== undefined && (
+                <span className="text-sm sm:text-base font-semibold text-foreground tabular-nums mt-1">
+                  {meal.total_calories} <span className="text-[10px] text-muted-foreground">kcal</span>
+                </span>
+              )}
+              {!isPlanSaved && (
+                <Lock className="w-3 h-3 text-muted-foreground mt-1" />
+              )}
+            </div>
           </motion.div>
         ))}
       </div>
