@@ -22,7 +22,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { StatusBadge } from '@/components/ui-kit';
+import { StatusBadge, SuccessCheckmark, ConfettiBurst } from '@/components/ui-kit';
 import { Logo } from '@/components/Logo';
 import { MobileNav } from '@/components/MobileNav';
 import { ThemeToggle } from '@/components/ThemeToggle';
@@ -131,6 +131,9 @@ export default function DailyLog() {
   const [exceptionMeal, setExceptionMeal] = useState<MealWithOptions | null>(null);
   const [exceptionStatus, setExceptionStatus] = useState<ExceptionStatus>('PULADA');
   const [exceptionNotes, setExceptionNotes] = useState('');
+  
+  // Success animation state
+  const [showSuccessAnim, setShowSuccessAnim] = useState(false);
   
   const isLateConfirmation = isBefore(startOfDay(selectedDate), startOfDay(new Date()));
   const dateKey = format(selectedDate, 'yyyy-MM-dd');
@@ -302,6 +305,10 @@ export default function DailyLog() {
 
       if (error) throw error;
 
+      // Show success animation
+      setShowSuccessAnim(true);
+      setTimeout(() => setShowSuccessAnim(false), 1500);
+
       toast({
         title: isLateConfirmation ? 'Refeição confirmada (atrasada)' : 'Refeição confirmada!',
         description: isLateConfirmation 
@@ -401,6 +408,24 @@ export default function DailyLog() {
   const progress = meals.length > 0 ? (completedMeals / meals.length) * 100 : 0;
 
   return (
+    <>
+      {/* Success Animation Overlay */}
+      <AnimatePresence>
+        {showSuccessAnim && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-background/60 backdrop-blur-sm"
+          >
+            <div className="relative">
+              <SuccessCheckmark show={showSuccessAnim} size="lg" />
+              <ConfettiBurst show={showSuccessAnim} count={16} />
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      
     <div className="min-h-screen bg-background theme-patient">
       {/* Header */}
       <header className="sticky top-0 z-50 glass border-b pt-safe">
@@ -836,5 +861,6 @@ export default function DailyLog() {
         </AlertDialogContent>
       </AlertDialog>
     </div>
+    </>
   );
 }
