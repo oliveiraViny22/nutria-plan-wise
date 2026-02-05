@@ -87,6 +87,30 @@
  ): string {
    const goalLabel = GOAL_LABELS[profile.goal || "maintain"] || "Manutenção";
    const tips = TIPS[profile.goal || "maintain"] || TIPS.maintain;
+
+    // Heuristic to keep the whole document within a single A4 page.
+    // We scale the whole content down slightly when the plan is dense (many items/options).
+    const mealCount = meals.length;
+    const optionCount = meals.reduce((acc, m) => acc + (m.options?.length || 0), 0);
+    const foodRowCount = meals.reduce(
+      (acc, m) =>
+        acc +
+        (m.options || []).reduce((acc2, opt) => acc2 + (opt.foods?.length || 0), 0),
+      0
+    );
+
+    const densityScore = foodRowCount + optionCount * 2 + mealCount * 4;
+
+    let pageScale = 1;
+    if (densityScore > 150) pageScale = 0.78;
+    else if (densityScore > 130) pageScale = 0.82;
+    else if (densityScore > 115) pageScale = 0.86;
+    else if (densityScore > 100) pageScale = 0.9;
+    else if (densityScore > 88) pageScale = 0.94;
+
+    // Render content slightly wider pre-scale, so the scaled output still uses the full printable width.
+    const baseWidthMm = 190;
+    const contentWidthMm = Math.round((baseWidthMm / pageScale) * 100) / 100;
  
    // Calculate caloric surplus/deficit
    const targetCalories = profile.daily_calories || 0;
@@ -171,7 +195,7 @@
     <style>
       @page { 
         size: A4;
-        margin: 8mm 10mm; 
+        margin: 6mm 8mm; 
       }
       * { box-sizing: border-box; }
       html, body {
@@ -180,38 +204,40 @@
       }
       body { 
         font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
-        font-size: 9pt;
-        line-height: 1.3;
+        font-size: 8pt;
+        line-height: 1.22;
         color: #1f2937;
         background: #ffffff;
       }
       .page {
-        width: 100%;
-        max-width: 190mm;
+        width: ${contentWidthMm}mm;
+        max-width: none;
         margin: 0 auto;
         padding: 0;
+        transform: scale(${pageScale});
+        transform-origin: top left;
       }
       .header {
-        padding-bottom: 6px;
-        margin-bottom: 8px;
+        padding-bottom: 4px;
+        margin-bottom: 6px;
         border-bottom: 2px solid #3b82f6;
       }
       .profile-section {
         display: flex;
-        gap: 8px;
-        margin-bottom: 10px;
+        gap: 6px;
+        margin-bottom: 6px;
       }
       .profile-card {
         flex: 1;
         background: #f8fafc;
         border-radius: 6px;
-        padding: 8px 10px;
+        padding: 6px 8px;
         border: 1px solid #e2e8f0;
       }
       .profile-label {
-        font-size: 7pt;
+        font-size: 6.5pt;
         color: #6b7280;
-        margin-bottom: 4px;
+        margin-bottom: 3px;
         text-transform: uppercase;
         letter-spacing: 0.04em;
         font-weight: 600;
@@ -219,25 +245,25 @@
       .profile-content {
         display: flex;
         flex-wrap: wrap;
-        gap: 4px;
+        gap: 3px;
         align-items: center;
-        font-size: 9pt;
+        font-size: 8pt;
       }
       .meals-section {
-        margin-bottom: 8px;
+        margin-bottom: 6px;
       }
       .meals-title {
-        font-size: 11pt;
+        font-size: 10pt;
         font-weight: 700;
         color: #1f2937;
-        margin: 0 0 6px 0;
-        padding-bottom: 4px;
+        margin: 0 0 5px 0;
+        padding-bottom: 3px;
         border-bottom: 1px solid #e2e8f0;
       }
       .meals-grid {
         display: flex;
         flex-direction: column;
-        gap: 6px;
+        gap: 5px;
       }
       .meal-card {
         page-break-inside: avoid;
@@ -252,42 +278,42 @@
         align-items: center;
         background: linear-gradient(135deg, #3b82f6, #2563eb);
         color: white;
-        padding: 6px 10px;
+        padding: 5px 8px;
       }
       .meal-header span:first-child {
         font-weight: 700;
-        font-size: 10pt;
+        font-size: 9pt;
       }
       .meal-header span:last-child {
-        font-size: 9pt;
+        font-size: 8pt;
         background: rgba(255,255,255,0.2);
-        padding: 2px 8px;
+        padding: 2px 7px;
         border-radius: 12px;
       }
       .meal-body {
-        padding: 6px 8px;
+        padding: 5px 7px;
         background: #ffffff;
       }
       .option-label {
-        font-size: 8pt;
+        font-size: 7.5pt;
         color: #6b7280;
-        margin-bottom: 4px;
+        margin-bottom: 3px;
         font-weight: 600;
       }
       .food-table {
         width: 100%;
         border-collapse: collapse;
-        font-size: 8pt;
+        font-size: 7.25pt;
         table-layout: fixed;
       }
       .food-table thead tr {
         background: #f1f5f9;
-        font-size: 7pt;
+        font-size: 6.5pt;
         text-transform: uppercase;
         letter-spacing: 0.02em;
       }
       .food-table th {
-        padding: 4px 6px;
+        padding: 3px 5px;
         text-align: left;
         font-weight: 600;
       }
@@ -295,7 +321,7 @@
       .food-table th:nth-child(2) { width: 18%; text-align: center; }
       .food-table th:nth-child(n+3) { width: 10%; text-align: right; }
       .food-table td {
-        padding: 3px 6px;
+        padding: 2px 5px;
         border-bottom: 1px solid #f1f5f9;
       }
       .food-table td:nth-child(2) { text-align: center; }
@@ -303,24 +329,24 @@
       .tips-section {
         background: #fffbeb;
         border-radius: 6px;
-        padding: 8px 10px;
+        padding: 6px 8px;
         border-left: 3px solid #f59e0b;
-        margin-bottom: 8px;
+        margin-bottom: 6px;
       }
       .tips-title {
         font-weight: 700;
         color: #92400e;
-        margin-bottom: 4px;
-        font-size: 9pt;
+        margin-bottom: 3px;
+        font-size: 8pt;
       }
       .tips-content {
-        font-size: 8pt;
+        font-size: 7.25pt;
         color: #78350f;
         line-height: 1.4;
       }
       .footer {
         text-align: center;
-        padding-top: 6px;
+        padding-top: 5px;
         border-top: 1px solid #e2e8f0;
         font-size: 7pt;
         color: #9ca3af;
