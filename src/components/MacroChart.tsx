@@ -1,4 +1,5 @@
 import { motion } from 'framer-motion';
+import { AnimatedCounter } from '@/components/ui-kit';
 
 interface MacroChartProps {
   protein: number;
@@ -68,7 +69,8 @@ export function MacroChart({
               <div className="flex items-center justify-between text-sm">
                 <span className="font-medium text-foreground tracking-tight">{macro.name}</span>
                 <span className={`${macro.textClass} font-semibold tabular-nums`}>
-                  {Math.round(macro.current)}g <span className="text-muted-foreground font-normal">/ {Math.round(macro.target)}g</span>
+                  <AnimatedCounter value={Math.round(macro.current)} duration={800 + index * 150} />g{' '}
+                  <span className="text-muted-foreground font-normal">/ {Math.round(macro.target)}g</span>
                 </span>
               </div>
             )}
