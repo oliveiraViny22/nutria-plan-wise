@@ -87,13 +87,13 @@ const ResetPassword = () => {
 
   if (!hasSession) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-secondary/5 p-4 pt-safe pb-safe">
+      <div className="min-h-screen flex items-center justify-center gradient-hero p-4 pt-safe pb-safe">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           className="w-full max-w-md"
         >
-          <div className="bg-card rounded-xl sm:rounded-2xl shadow-xl p-5 sm:p-8 text-center">
+          <div className="backdrop-blur-md bg-card/80 dark:bg-card/90 border border-border/40 dark:border-border/60 rounded-xl sm:rounded-2xl shadow-xl p-5 sm:p-8 text-center">
             <div className="flex items-center justify-between mb-4">
               <Logo />
               <ThemeToggle />
@@ -124,15 +124,15 @@ const ResetPassword = () => {
 
   if (success) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-secondary/5 p-4 pt-safe pb-safe">
+      <div className="min-h-screen flex items-center justify-center gradient-hero p-4 pt-safe pb-safe">
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           className="w-full max-w-md"
         >
-          <div className="bg-card rounded-xl sm:rounded-2xl shadow-xl p-5 sm:p-8 text-center">
-            <div className="w-12 h-12 sm:w-16 sm:h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4 sm:mb-6">
-              <CheckCircle className="w-6 h-6 sm:w-8 sm:h-8 text-green-600" />
+          <div className="backdrop-blur-md bg-card/80 dark:bg-card/90 border border-border/40 dark:border-border/60 rounded-xl sm:rounded-2xl shadow-xl p-5 sm:p-8 text-center">
+            <div className="w-12 h-12 sm:w-16 sm:h-16 bg-success/10 rounded-full flex items-center justify-center mx-auto mb-4 sm:mb-6">
+              <CheckCircle className="w-6 h-6 sm:w-8 sm:h-8 text-success" />
             </div>
             <h1 className="text-xl sm:text-2xl font-bold text-foreground mb-3 sm:mb-4">
               Senha atualizada!
@@ -151,13 +151,13 @@ const ResetPassword = () => {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-secondary/5 p-4 pt-safe pb-safe">
+    <div className="min-h-screen flex items-center justify-center gradient-hero p-4 pt-safe pb-safe">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         className="w-full max-w-md"
       >
-        <div className="bg-card rounded-xl sm:rounded-2xl shadow-xl p-5 sm:p-8">
+        <div className="backdrop-blur-md bg-card/80 dark:bg-card/90 border border-border/40 dark:border-border/60 rounded-xl sm:rounded-2xl shadow-xl p-5 sm:p-8">
           <div className="flex items-center justify-between mb-6 sm:mb-8">
             <Logo />
             <ThemeToggle />

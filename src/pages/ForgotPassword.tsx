@@ -39,7 +39,7 @@ export default function ForgotPassword() {
         transition={{ duration: 0.5 }}
         className="w-full max-w-md"
       >
-        <div className="card-elevated rounded-xl sm:rounded-2xl p-5 sm:p-8">
+        <div className="backdrop-blur-md bg-card/80 dark:bg-card/90 border border-border/40 dark:border-border/60 rounded-xl sm:rounded-2xl p-5 sm:p-8 shadow-xl">
           <div className="flex items-center justify-between mb-4 sm:mb-6">
             <Link to="/">
               <Logo />

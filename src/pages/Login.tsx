@@ -70,19 +70,21 @@ export default function Login() {
           transition={{ duration: 0.5 }}
           className="w-full max-w-md mx-auto"
         >
-          <div className="flex items-center justify-between mb-6 sm:mb-8">
-            <Link to="/">
-              <Logo size="lg" />
-            </Link>
-            <ThemeToggle />
-          </div>
+          {/* Glassmorphism card container */}
+          <div className="backdrop-blur-md bg-card/80 dark:bg-card/90 border border-border/40 dark:border-border/60 rounded-2xl p-6 sm:p-8 shadow-xl">
+            <div className="flex items-center justify-between mb-6 sm:mb-8">
+              <Link to="/">
+                <Logo size="lg" />
+              </Link>
+              <ThemeToggle />
+            </div>
 
-          <h1 className="text-2xl sm:text-3xl font-bold text-foreground mb-2">
-            Bem-vindo de volta
-          </h1>
-          <p className="text-sm sm:text-base text-muted-foreground mb-6 sm:mb-8">
-            Entre na sua conta para acessar seu plano alimentar
-          </p>
+            <h1 className="text-2xl sm:text-3xl font-bold text-foreground mb-2">
+              Bem-vindo de volta
+            </h1>
+            <p className="text-sm sm:text-base text-muted-foreground mb-6 sm:mb-8">
+              Entre na sua conta para acessar seu plano alimentar
+            </p>
 
           <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-5">
             <div className="space-y-2">
@@ -156,6 +158,7 @@ export default function Login() {
               Cadastre-se grátis
             </Link>
           </p>
+          </div>
         </motion.div>
       </div>
 

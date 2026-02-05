@@ -102,19 +102,21 @@ export default function Signup() {
           transition={{ duration: 0.5 }}
           className="w-full max-w-md mx-auto"
         >
-          <div className="flex items-center justify-between mb-6 sm:mb-8">
-            <Link to="/">
-              <Logo size="lg" />
-            </Link>
-            <ThemeToggle />
-          </div>
+          {/* Glassmorphism card container */}
+          <div className="backdrop-blur-md bg-card/80 dark:bg-card/90 border border-border/40 dark:border-border/60 rounded-2xl p-6 sm:p-8 shadow-xl">
+            <div className="flex items-center justify-between mb-6 sm:mb-8">
+              <Link to="/">
+                <Logo size="lg" />
+              </Link>
+              <ThemeToggle />
+            </div>
 
-          <h1 className="text-2xl sm:text-3xl font-bold text-foreground mb-1.5 sm:mb-2">
-            Crie sua conta
-          </h1>
-          <p className="text-sm sm:text-base text-muted-foreground mb-6 sm:mb-8">
-            Comece sua jornada para uma alimentação mais saudável
-          </p>
+            <h1 className="text-2xl sm:text-3xl font-bold text-foreground mb-1.5 sm:mb-2">
+              Crie sua conta
+            </h1>
+            <p className="text-sm sm:text-base text-muted-foreground mb-6 sm:mb-8">
+              Comece sua jornada para uma alimentação mais saudável
+            </p>
 
           <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-5">
             <div className="space-y-1.5 sm:space-y-2">
@@ -188,31 +190,31 @@ export default function Signup() {
                 <div className="space-y-1 pt-1">
                   <div className="flex items-center gap-1.5 text-xs">
                     {hasMinLength ? (
-                      <CheckCircle2 className="w-3 h-3 text-green-500" />
+                      <CheckCircle2 className="w-3 h-3 text-success" />
                     ) : (
                       <AlertCircle className="w-3 h-3 text-muted-foreground" />
                     )}
-                    <span className={hasMinLength ? 'text-green-600' : 'text-muted-foreground'}>
+                    <span className={hasMinLength ? 'text-success' : 'text-muted-foreground'}>
                       Mínimo 8 caracteres
                     </span>
                   </div>
                   <div className="flex items-center gap-1.5 text-xs">
                     {hasLetter ? (
-                      <CheckCircle2 className="w-3 h-3 text-green-500" />
+                      <CheckCircle2 className="w-3 h-3 text-success" />
                     ) : (
                       <AlertCircle className="w-3 h-3 text-muted-foreground" />
                     )}
-                    <span className={hasLetter ? 'text-green-600' : 'text-muted-foreground'}>
+                    <span className={hasLetter ? 'text-success' : 'text-muted-foreground'}>
                       Pelo menos uma letra
                     </span>
                   </div>
                   <div className="flex items-center gap-1.5 text-xs">
                     {hasNumber ? (
-                      <CheckCircle2 className="w-3 h-3 text-green-500" />
+                      <CheckCircle2 className="w-3 h-3 text-success" />
                     ) : (
                       <AlertCircle className="w-3 h-3 text-muted-foreground" />
                     )}
-                    <span className={hasNumber ? 'text-green-600' : 'text-muted-foreground'}>
+                    <span className={hasNumber ? 'text-success' : 'text-muted-foreground'}>
                       Pelo menos um número
                     </span>
                   </div>
@@ -304,6 +306,7 @@ export default function Signup() {
               Entrar
             </Link>
           </p>
+          </div>
         </motion.div>
       </div>
 
