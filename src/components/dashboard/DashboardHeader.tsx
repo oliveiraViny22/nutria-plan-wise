@@ -8,6 +8,7 @@ import {
   CreditCard,
   LayoutDashboard,
   Shield,
+  ClipboardCheck,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Logo } from '@/components/Logo';
@@ -96,6 +97,20 @@ export function DashboardHeader({
                     </Tooltip>
                   </>
                 ) : null}
+                
+                {/* Registro Diário - only for paid users */}
+                {planType !== 'gratuito' && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Link to="/daily-log">
+                        <Button variant="ghost" size="icon" className="w-10 h-10">
+                          <ClipboardCheck className="w-5 h-5" />
+                        </Button>
+                      </Link>
+                    </TooltipTrigger>
+                    <TooltipContent>Registro Diário</TooltipContent>
+                  </Tooltip>
+                )}
                 
                 {!isProfessional && !isLinkedStudent && planType !== 'gratuito' && (
                   <Tooltip>
