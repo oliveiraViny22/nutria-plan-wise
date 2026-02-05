@@ -30,6 +30,7 @@ import NotFound from "./pages/NotFound";
 import DailyLog from "./pages/DailyLog";
 import Admin from "./pages/Admin";
 import MealPlanPage from "./pages/MealPlanPage";
+import UIKit from "./pages/UIKit";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -80,6 +81,7 @@ const App = () => (
               <Route path="/admin" element={<ProtectedRoute allowedRoles={['admin']}><Admin /></ProtectedRoute>} />
               <Route path="/terms" element={<TermsOfUse />} />
               <Route path="/privacy" element={<PrivacyPolicy />} />
+              <Route path="/ui-kit" element={<UIKit />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
             <PWAInstallPrompt />
