@@ -3,8 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { 
   ArrowLeft, 
-  Printer, 
-  Share2, 
   Utensils, 
   Pill, 
   Lightbulb,
@@ -342,27 +340,6 @@ export default function MealPlanPage() {
     }
   };
 
-  const handlePrint = () => {
-    window.print();
-  };
-
-  const handleShare = async () => {
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: 'Meu Plano Alimentar - NutriAI',
-          text: `Confira meu plano alimentar personalizado!`,
-          url: window.location.href,
-        });
-      } catch (err) {
-        // User cancelled or error
-      }
-    } else {
-      // Fallback: copy URL
-      await navigator.clipboard.writeText(window.location.href);
-      toast.success('Link copiado para a área de transferência!');
-    }
-  };
 
   const toggleMeal = (mealId: string) => {
     setExpandedMeals(prev => ({ ...prev, [mealId]: !prev[mealId] }));
@@ -396,15 +373,7 @@ export default function MealPlanPage() {
             <p className="text-sm text-muted-foreground">Objetivo: {goalText}</p>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={handleShare}>
-              <Share2 className="w-4 h-4 mr-2" />
-              Compartilhar
-            </Button>
-             <MealPlanPdf />
-            <Button variant="default" size="sm" onClick={handlePrint}>
-              <Printer className="w-4 h-4 mr-2" />
-              Imprimir
-            </Button>
+            <MealPlanPdf />
             <ThemeToggle />
           </div>
         </div>
