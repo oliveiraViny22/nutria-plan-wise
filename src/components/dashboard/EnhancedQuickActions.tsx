@@ -51,6 +51,13 @@ export function EnhancedQuickActions({
   const hasRefeicoesPendentes = pendingMeals > 0;
   const hasPlanNotSaved = hasPlan && !isPlanSaved;
 
+  const scrollToSaveButton = () => {
+    const saveSection = document.getElementById('save-plan-section');
+    if (saveSection) {
+      saveSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  };
+
   const actions: QuickActionItem[] = [
     {
       id: 'unsaved-warning',
@@ -58,7 +65,8 @@ export function EnhancedQuickActions({
       shortLabel: 'Não salvo',
       icon: <AlertCircle className="h-4 w-4" />,
       variant: 'warning',
-      tooltip: 'Salve seu plano para acessar todas as funcionalidades',
+      tooltip: 'Clique para ir ao botão de salvar',
+      onClick: scrollToSaveButton,
       show: hasPlanNotSaved,
     },
     {

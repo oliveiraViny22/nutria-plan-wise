@@ -91,11 +91,13 @@ export function DashboardMeals({
       
       {/* Save Plan CTA */}
       {!isPlanSaved && !isLinkedStudent && planId && (
-        <SavePlanButton 
-          planId={planId}
-          isSaved={isPlanSaved}
-          onSave={onPlanSaved}
-        />
+        <div id="save-plan-section">
+          <SavePlanButton 
+            planId={planId}
+            isSaved={isPlanSaved}
+            onSave={onPlanSaved}
+          />
+        </div>
       )}
 
       <div className="space-y-3">
