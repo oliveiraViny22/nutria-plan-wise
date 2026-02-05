@@ -100,13 +100,13 @@ export function DashboardMeals({
         </div>
       )}
 
-      <div className="space-y-3">
+      <div className="space-y-2">
         {meals.map((meal, index) => (
           <motion.div
             key={meal.id}
-            initial={{ opacity: 0, x: -20 }}
+            initial={{ opacity: 0, x: -10 }}
             animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.4 + index * 0.1 }}
+            transition={{ delay: 0.3 + index * 0.05 }}
           >
             <MealCard
               mealName={MEAL_NAMES[meal.name as MealType] || meal.name}
@@ -114,21 +114,8 @@ export function DashboardMeals({
               status="pending"
               optionsCount={mealOptionsLimit > 1 ? mealOptionsLimit : undefined}
               onClick={isPlanSaved ? () => navigate(`/meal/${meal.id}`) : undefined}
-            >
-              {isPlanSaved && (
-                <div className="flex items-center gap-3 text-xs text-muted-foreground mt-2">
-                  <span className="text-protein font-medium">{meal.total_protein?.toFixed(0) || 0}g prot</span>
-                  <span className="text-carbs font-medium">{meal.total_carbs?.toFixed(0) || 0}g carb</span>
-                  <span className="text-fat font-medium">{meal.total_fat?.toFixed(0) || 0}g gord</span>
-                </div>
-              )}
-              {!isPlanSaved && (
-                <div className="flex items-center gap-1 text-xs text-muted-foreground mt-2">
-                  <Lock className="w-3 h-3" />
-                  <span>Salve o plano para ver os detalhes</span>
-                </div>
-              )}
-            </MealCard>
+              compact={true}
+            />
           </motion.div>
         ))}
       </div>
