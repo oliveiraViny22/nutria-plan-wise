@@ -125,10 +125,14 @@ export default function Onboarding() {
       return { calories: 2000, protein: 150, carbs: 250, fat: 65 };
     }
 
+    const weightNum = Number(weight);
+    const heightNum = Number(height);
+    const ageNum = Number(age);
+
     // Mifflin-St Jeor Equation
     const bmr = sex === 'male'
-      ? 10 * Number(weight) + 6.25 * Number(height) - 5 * Number(age) + 5
-      : 10 * Number(weight) + 6.25 * Number(height) - 5 * Number(age) - 161;
+      ? 10 * weightNum + 6.25 * heightNum - 5 * ageNum + 5
+      : 10 * weightNum + 6.25 * heightNum - 5 * ageNum - 161;
 
     const activityMultiplier = ACTIVITY_LEVELS[activity_level as keyof typeof ACTIVITY_LEVELS]?.multiplier || 1.55;
     const tdee = bmr * activityMultiplier;
@@ -136,26 +140,42 @@ export default function Onboarding() {
     const calorieAdjustment = goal ? GOALS[goal as keyof typeof GOALS]?.calorieAdjustment || 0 : 0;
     const calories = Math.round(tdee + calorieAdjustment);
 
-    // Macro distribution based on goal
-    let proteinRatio = 0.3;
-    let carbsRatio = 0.4;
-    let fatRatio = 0.3;
-
+    // =====================================================
+    // CÁLCULO DE MACROS BASEADO EM g/kg DE PESO CORPORAL
+    // =====================================================
+    // Referência científica: 1.6-2.2g/kg para hipertrofia
+    // - lose_weight: 2.0g/kg (preservar massa magra em déficit)
+    // - gain_muscle: 2.0g/kg (suporte à hipertrofia)
+    // - maintain: 1.8g/kg (manutenção)
+    // =====================================================
+    let proteinPerKg = 1.8; // default
+    let fatRatio = 0.25; // 25% das calorias para gordura
+    
     if (goal === 'gain_muscle') {
-      proteinRatio = 0.35;
-      carbsRatio = 0.45;
-      fatRatio = 0.2;
+      proteinPerKg = 2.0;
+      fatRatio = 0.20; // menos gordura, mais carbs para energia
     } else if (goal === 'lose_weight') {
-      proteinRatio = 0.35;
-      carbsRatio = 0.35;
-      fatRatio = 0.3;
+      proteinPerKg = 2.0; // maior proteína para preservar massa magra
+      fatRatio = 0.30; // mais gordura para saciedade
     }
+
+    // Proteína em gramas baseada no peso corporal
+    const protein = Math.round(weightNum * proteinPerKg);
+    const proteinCalories = protein * 4;
+    
+    // Gordura baseada em percentual das calorias
+    const fat = Math.round((calories * fatRatio) / 9);
+    const fatCalories = fat * 9;
+    
+    // Carboidratos preenchem o restante das calorias
+    const remainingCalories = calories - proteinCalories - fatCalories;
+    const carbs = Math.max(0, Math.round(remainingCalories / 4));
 
     return {
       calories,
-      protein: Math.round((calories * proteinRatio) / 4),
-      carbs: Math.round((calories * carbsRatio) / 4),
-      fat: Math.round((calories * fatRatio) / 9),
+      protein,
+      carbs,
+      fat,
     };
   };
 
