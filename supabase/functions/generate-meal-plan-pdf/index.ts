@@ -170,121 +170,166 @@
     <meta charset="UTF-8">
     <style>
       @page { 
-        size: 210mm 297mm; /* A4 exato */
-        margin: 12mm 15mm; 
+        size: A4;
+        margin: 8mm 10mm; 
       }
       * { box-sizing: border-box; }
       html, body {
-        width: 210mm;
-        height: 297mm;
         margin: 0;
         padding: 0;
       }
       body { 
         font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
-        font-size: 10pt;
-        line-height: 1.4;
+        font-size: 9pt;
+        line-height: 1.3;
         color: #1f2937;
         background: #ffffff;
       }
       .page {
-        width: 180mm; /* 210mm - 30mm margens */
-        height: 273mm; /* 297mm - 24mm margens */
+        width: 100%;
+        max-width: 190mm;
         margin: 0 auto;
         padding: 0;
-        display: flex;
-        flex-direction: column;
       }
       .header {
-        padding-bottom: 10px;
-        margin-bottom: 14px;
-        border-bottom: 3px solid #3b82f6;
-        flex-shrink: 0;
+        padding-bottom: 6px;
+        margin-bottom: 8px;
+        border-bottom: 2px solid #3b82f6;
       }
       .profile-section {
         display: flex;
-        gap: 12px;
-        margin-bottom: 16px;
-        flex-shrink: 0;
+        gap: 8px;
+        margin-bottom: 10px;
       }
       .profile-card {
         flex: 1;
-        background: linear-gradient(135deg, #f8fafc, #f1f5f9);
-        border-radius: 10px;
-        padding: 14px 16px;
+        background: #f8fafc;
+        border-radius: 6px;
+        padding: 8px 10px;
         border: 1px solid #e2e8f0;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
       }
       .profile-label {
-        font-size: 8pt;
+        font-size: 7pt;
         color: #6b7280;
-        margin-bottom: 6px;
+        margin-bottom: 4px;
         text-transform: uppercase;
-        letter-spacing: 0.05em;
+        letter-spacing: 0.04em;
         font-weight: 600;
       }
       .profile-content {
         display: flex;
         flex-wrap: wrap;
-        gap: 6px;
+        gap: 4px;
         align-items: center;
-        font-size: 10pt;
+        font-size: 9pt;
       }
       .meals-section {
-        flex: 1;
-        margin-bottom: 14px;
-        overflow: hidden;
+        margin-bottom: 8px;
       }
       .meals-title {
-        font-size: 13pt;
+        font-size: 11pt;
         font-weight: 700;
         color: #1f2937;
-        margin: 0 0 12px 0;
-        padding-bottom: 6px;
-        border-bottom: 2px solid #e2e8f0;
+        margin: 0 0 6px 0;
+        padding-bottom: 4px;
+        border-bottom: 1px solid #e2e8f0;
       }
       .meals-grid {
         display: flex;
         flex-direction: column;
-        gap: 10px;
+        gap: 6px;
       }
+      .meal-card {
+        page-break-inside: avoid;
+        break-inside: avoid;
+        border-radius: 6px;
+        overflow: hidden;
+        border: 1px solid #e2e8f0;
+      }
+      .meal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background: linear-gradient(135deg, #3b82f6, #2563eb);
+        color: white;
+        padding: 6px 10px;
+      }
+      .meal-header span:first-child {
+        font-weight: 700;
+        font-size: 10pt;
+      }
+      .meal-header span:last-child {
+        font-size: 9pt;
+        background: rgba(255,255,255,0.2);
+        padding: 2px 8px;
+        border-radius: 12px;
+      }
+      .meal-body {
+        padding: 6px 8px;
+        background: #ffffff;
+      }
+      .option-label {
+        font-size: 8pt;
+        color: #6b7280;
+        margin-bottom: 4px;
+        font-weight: 600;
+      }
+      .food-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 8pt;
+        table-layout: fixed;
+      }
+      .food-table thead tr {
+        background: #f1f5f9;
+        font-size: 7pt;
+        text-transform: uppercase;
+        letter-spacing: 0.02em;
+      }
+      .food-table th {
+        padding: 4px 6px;
+        text-align: left;
+        font-weight: 600;
+      }
+      .food-table th:nth-child(1) { width: 40%; }
+      .food-table th:nth-child(2) { width: 18%; text-align: center; }
+      .food-table th:nth-child(n+3) { width: 10%; text-align: right; }
+      .food-table td {
+        padding: 3px 6px;
+        border-bottom: 1px solid #f1f5f9;
+      }
+      .food-table td:nth-child(2) { text-align: center; }
+      .food-table td:nth-child(n+3) { text-align: right; }
       .tips-section {
-        background: linear-gradient(135deg, #fffbeb, #fef3c7);
-        border-radius: 10px;
-        padding: 12px 16px;
-        border-left: 4px solid #f59e0b;
-        margin-bottom: 12px;
-        flex-shrink: 0;
+        background: #fffbeb;
+        border-radius: 6px;
+        padding: 8px 10px;
+        border-left: 3px solid #f59e0b;
+        margin-bottom: 8px;
       }
       .tips-title {
         font-weight: 700;
         color: #92400e;
-        margin-bottom: 6px;
-        font-size: 10pt;
+        margin-bottom: 4px;
+        font-size: 9pt;
       }
       .tips-content {
-        font-size: 9pt;
+        font-size: 8pt;
         color: #78350f;
-        line-height: 1.5;
+        line-height: 1.4;
       }
       .footer {
         text-align: center;
-        padding-top: 10px;
+        padding-top: 6px;
         border-top: 1px solid #e2e8f0;
-        font-size: 8pt;
+        font-size: 7pt;
         color: #9ca3af;
-        flex-shrink: 0;
-        margin-top: auto;
       }
       @media print {
-        html, body {
-          width: 210mm;
-          height: 297mm;
-        }
         body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-        .page { 
-          page-break-after: avoid;
+        .meal-card { 
           page-break-inside: avoid;
+          break-inside: avoid;
         }
       }
     </style>
