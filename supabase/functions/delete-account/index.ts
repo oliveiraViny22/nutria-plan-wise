@@ -1,7 +1,24 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { getCorsHeaders, CLIENT_ERRORS, getErrorForLogging, createErrorResponse, createSuccessResponse } from "../_shared/security.ts";
+// Delete account edge function - v2
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.2";
 
 const ADMIN_EMAIL = "admin@nutriaplan.com";
+
+const getCorsHeaders = (req: Request): Record<string, string> => {
+  const origin = req.headers.get("origin") || "";
+  const allowedOrigins = [
+    "https://nutria-plan-wise.lovable.app",
+    "https://id-preview--0d4648d3-1fe4-49fc-9711-596d3211140b.lovable.app",
+    "http://localhost:5173",
+    "http://localhost:3000",
+  ];
+  const allowedOrigin = allowedOrigins.includes(origin) ? origin : allowedOrigins[0];
+  
+  return {
+    "Access-Control-Allow-Origin": allowedOrigin,
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+  };
+};
 
 Deno.serve(async (req) => {
   const corsHeaders = getCorsHeaders(req);
@@ -13,7 +30,10 @@ Deno.serve(async (req) => {
   try {
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
-      return createErrorResponse(CLIENT_ERRORS.AUTH_REQUIRED, 401, corsHeaders);
+      return new Response(
+        JSON.stringify({ error: "Autenticação necessária" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -29,12 +49,18 @@ Deno.serve(async (req) => {
     const { data: { user }, error: userError } = await supabaseUser.auth.getUser();
     
     if (userError || !user) {
-      return createErrorResponse(CLIENT_ERRORS.AUTH_FAILED, 401, corsHeaders);
+      return new Response(
+        JSON.stringify({ error: "Falha na autenticação" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     // Prevent admin deletion
     if (user.email === ADMIN_EMAIL) {
-      return createErrorResponse(CLIENT_ERRORS.FORBIDDEN, 403, corsHeaders);
+      return new Response(
+        JSON.stringify({ error: "Acesso negado" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     // Admin client for privileged operations
@@ -117,14 +143,23 @@ Deno.serve(async (req) => {
     const { error: deleteAuthError } = await supabaseAdmin.auth.admin.deleteUser(userId);
     
     if (deleteAuthError) {
-      console.error("Error deleting auth user:", getErrorForLogging(deleteAuthError));
-      return createErrorResponse(CLIENT_ERRORS.SERVER_ERROR, 500, corsHeaders);
+      console.error("Error deleting auth user:", deleteAuthError.message);
+      return new Response(
+        JSON.stringify({ error: "Ocorreu um erro ao processar sua requisição" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
-    return createSuccessResponse({ success: true, message: "Account deleted successfully" }, corsHeaders);
+    return new Response(
+      JSON.stringify({ success: true, message: "Account deleted successfully" }),
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
 
   } catch (error) {
-    console.error("Error in delete-account:", getErrorForLogging(error));
-    return createErrorResponse(CLIENT_ERRORS.SERVER_ERROR, 500, corsHeaders);
+    console.error("Error in delete-account:", error instanceof Error ? error.message : String(error));
+    return new Response(
+      JSON.stringify({ error: "Ocorreu um erro ao processar sua requisição" }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
   }
 });
