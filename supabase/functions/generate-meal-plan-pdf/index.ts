@@ -107,56 +107,56 @@
        const optionsHtml = meal.options
          .map((opt) => {
            const foodsHtml = opt.foods
-             .map(
-               (f) => `
-             <tr>
-                <td style="padding: 4px 6px; border-bottom: 1px solid #e2e8f0;">${f.name}</td>
-                <td style="padding: 4px 6px; border-bottom: 1px solid #e2e8f0; text-align: center;">${f.quantity}</td>
-                <td style="padding: 4px 6px; border-bottom: 1px solid #e2e8f0; text-align: right;">${f.calories}</td>
-                <td style="padding: 4px 6px; border-bottom: 1px solid #e2e8f0; text-align: right;">${f.protein}g</td>
-                <td style="padding: 4px 6px; border-bottom: 1px solid #e2e8f0; text-align: right;">${f.carbs}g</td>
-                <td style="padding: 4px 6px; border-bottom: 1px solid #e2e8f0; text-align: right;">${f.fat}g</td>
-             </tr>
-           `
-             )
-             .join("");
+              .map(
+                (f) => `
+              <tr>
+                 <td style="padding: 2px 4px; border-bottom: 1px solid #e2e8f0;">${f.name}</td>
+                 <td style="padding: 2px 4px; border-bottom: 1px solid #e2e8f0; text-align: center;">${f.quantity}</td>
+                 <td style="padding: 2px 4px; border-bottom: 1px solid #e2e8f0; text-align: right;">${f.calories}</td>
+                 <td style="padding: 2px 4px; border-bottom: 1px solid #e2e8f0; text-align: right;">${f.protein}g</td>
+                 <td style="padding: 2px 4px; border-bottom: 1px solid #e2e8f0; text-align: right;">${f.carbs}g</td>
+                 <td style="padding: 2px 4px; border-bottom: 1px solid #e2e8f0; text-align: right;">${f.fat}g</td>
+              </tr>
+            `
+              )
+              .join("");
  
-           return `
-          <div style="margin-bottom: 6px;">
-            ${meal.options.length > 1 ? `<div style="font-size: 8pt; color: #6b7280; margin-bottom: 3px; font-weight: 500;">Opção ${opt.option_number}</div>` : ''}
-            <table style="width: 100%; border-collapse: collapse; font-size: 8pt; table-layout: fixed;">
-               <thead>
-                <tr style="background: #f1f5f9; font-size: 7pt; text-transform: uppercase; letter-spacing: 0.03em;">
-                  <th style="padding: 5px 6px; text-align: left; font-weight: 600; width: 40%;">Alimento</th>
-                  <th style="padding: 5px 6px; text-align: center; font-weight: 600; width: 15%;">Qtd</th>
-                  <th style="padding: 5px 6px; text-align: right; font-weight: 600; width: 11%;">Kcal</th>
-                  <th style="padding: 5px 6px; text-align: right; font-weight: 600; width: 11%;">P</th>
-                  <th style="padding: 5px 6px; text-align: right; font-weight: 600; width: 11%;">C</th>
-                  <th style="padding: 5px 6px; text-align: right; font-weight: 600; width: 11%;">G</th>
-                 </tr>
-               </thead>
-               <tbody>
-                 ${foodsHtml}
-               </tbody>
-             </table>
-           </div>
-         `;
-         })
-         .join("");
+            return `
+           <div style="margin-bottom: 3px;">
+             ${meal.options.length > 1 ? `<div style="font-size: 7pt; color: #6b7280; margin-bottom: 2px; font-weight: 500;">Opção ${opt.option_number}</div>` : ''}
+             <table style="width: 100%; border-collapse: collapse; font-size: 7pt; table-layout: fixed;">
+                <thead>
+                 <tr style="background: #f1f5f9; font-size: 6pt; text-transform: uppercase; letter-spacing: 0.02em;">
+                   <th style="padding: 3px 4px; text-align: left; font-weight: 600; width: 40%;">Alimento</th>
+                   <th style="padding: 3px 4px; text-align: center; font-weight: 600; width: 15%;">Qtd</th>
+                   <th style="padding: 3px 4px; text-align: right; font-weight: 600; width: 11%;">Kcal</th>
+                   <th style="padding: 3px 4px; text-align: right; font-weight: 600; width: 11%;">P</th>
+                   <th style="padding: 3px 4px; text-align: right; font-weight: 600; width: 11%;">C</th>
+                   <th style="padding: 3px 4px; text-align: right; font-weight: 600; width: 11%;">G</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${foodsHtml}
+                </tbody>
+              </table>
+            </div>
+          `;
+          })
+          .join("");
  
-       return `
-        <div style="page-break-inside: avoid; break-inside: avoid;">
-          <div style="display: flex; justify-content: space-between; align-items: center; background: linear-gradient(135deg, #3b82f6, #2563eb); color: white; padding: 6px 10px; border-radius: 6px 6px 0 0;">
-            <span style="font-weight: 600; font-size: 9pt;">${mealLabel}</span>
-            <span style="font-size: 8pt; opacity: 0.95;">${meal.total_calories || 0} kcal</span>
-           </div>
-          <div style="border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 6px 6px; padding: 8px; background: #ffffff;">
-             ${optionsHtml}
-           </div>
-         </div>
-       `;
-     })
-     .join("");
+        return `
+         <div style="page-break-inside: avoid; break-inside: avoid; margin-bottom: 6px;">
+           <div style="display: flex; justify-content: space-between; align-items: center; background: linear-gradient(135deg, #3b82f6, #2563eb); color: white; padding: 4px 8px; border-radius: 4px 4px 0 0;">
+             <span style="font-weight: 600; font-size: 8pt;">${mealLabel}</span>
+             <span style="font-size: 7pt; opacity: 0.95;">${meal.total_calories || 0} kcal</span>
+            </div>
+           <div style="border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 4px 4px; padding: 4px; background: #ffffff;">
+              ${optionsHtml}
+            </div>
+          </div>
+        `;
+      })
+      .join("");
  
   // Generate tips HTML - compact inline format
    const tipsHtml = tips
@@ -168,64 +168,65 @@
  <html>
  <head>
    <meta charset="UTF-8">
-   <style>
-     @page { 
-       size: A4; 
-      margin: 8mm 10mm; 
-     }
-     * { box-sizing: border-box; }
-     body { 
-       font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
-      font-size: 9pt;
-      line-height: 1.35;
-       color: #1f2937;
-       margin: 0;
-       padding: 0;
-       background: #ffffff;
-      width: 100%;
-      height: 100%;
-     }
-    .container {
-      width: 100%;
-      max-width: 100%;
-      padding: 0;
-    }
-    .meals-grid {
-      display: grid;
-      grid-template-columns: 1fr;
-      gap: 10px;
-      width: 100%;
-      max-width: 600px;
-      margin: 0 auto;
-    }
-    @media print {
-      body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-      .meals-grid { page-break-inside: auto; }
-    }
-   </style>
+    <style>
+      @page { 
+        size: A4; 
+        margin: 6mm 8mm; 
+      }
+      * { box-sizing: border-box; }
+      body { 
+        font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+        font-size: 8pt;
+        line-height: 1.25;
+        color: #1f2937;
+        margin: 0;
+        padding: 0;
+        background: #ffffff;
+        width: 100%;
+        max-height: 100vh;
+        overflow: hidden;
+      }
+      .container {
+        width: 100%;
+        max-width: 100%;
+        padding: 0;
+      }
+      .meals-grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 6px;
+        width: 100%;
+        max-width: 580px;
+        margin: 0 auto;
+      }
+      @media print {
+        body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        .meals-grid { page-break-inside: auto; }
+      }
+    </style>
  </head>
  <body>
 <div class="container">
   <!-- Header -->
-  <div style="max-width: 600px; margin: 0 auto 8px auto;">
-    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #3b82f6; padding-bottom: 6px;">
-      <h1 style="font-size: 16pt; font-weight: 700; color: #1f2937; margin: 0;">
+  <div style="max-width: 580px; margin: 0 auto 6px auto;">
+    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #3b82f6; padding-bottom: 4px;">
+      <h1 style="font-size: 14pt; font-weight: 700; color: #1f2937; margin: 0;">
         🥗 Plano Alimentar
       </h1>
-      <div style="text-align: right; font-size: 8pt; color: #6b7280;">
+      <div style="text-align: right; font-size: 7pt; color: #6b7280;">
         ${generatedAt} · NutriAI
       </div>
     </div>
   </div>
  
-  <!-- Dados do Perfil - Horizontal Compacto -->
-  <div style="max-width: 600px; margin: 0 auto 10px auto; display: flex; flex-direction: column; gap: 8px; font-size: 9pt;">
-    <div style="background: #f8fafc; border-radius: 8px; padding: 8px 12px; border: 1px solid #e2e8f0;">
-      <div style="font-size: 7pt; color: #6b7280; margin-bottom: 3px; text-transform: uppercase; letter-spacing: 0.04em; font-weight: 600;">👤 Perfil</div>
-      <div style="display: flex; flex-wrap: wrap; gap: 6px; align-items: center;">
+  <!-- Dados do Perfil - Inline Compacto -->
+  <div style="max-width: 580px; margin: 0 auto 6px auto; display: flex; gap: 6px; font-size: 8pt;">
+    <div style="flex: 1; background: #f8fafc; border-radius: 6px; padding: 6px 10px; border: 1px solid #e2e8f0;">
+      <div style="font-size: 6pt; color: #6b7280; margin-bottom: 2px; text-transform: uppercase; letter-spacing: 0.03em; font-weight: 600;">👤 Perfil</div>
+      <div style="display: flex; flex-wrap: wrap; gap: 4px; align-items: center; font-size: 7pt;">
         <span><strong>${profile.name || "—"}</strong></span>
         <span style="color: #cbd5e1;">|</span>
-        <span>${profile.age ? `${profile.age} anos` : "—"}</span>
+        <span>${profile.age ? `${profile.age}a` : "—"}</span>
         <span style="color: #cbd5e1;">|</span>
         <span>${profile.weight ? `${profile.weight}kg` : "—"}</span>
         <span style="color: #cbd5e1;">|</span>
@@ -235,24 +236,21 @@
       </div>
     </div>
  
-    <div style="background: #f8fafc; border-radius: 8px; padding: 8px 12px; border: 1px solid #e2e8f0;">
-      <div style="font-size: 7pt; color: #6b7280; margin-bottom: 3px; text-transform: uppercase; letter-spacing: 0.04em; font-weight: 600;">🎯 Metas</div>
-      <div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center;">
-        <span style="font-size: 14pt; font-weight: 700; color: #f59e0b;">${plan.total_calories} <span style="font-size: 8pt; font-weight: 400;">kcal</span></span>
-        <span style="color: #cbd5e1;">|</span>
-        <span style="color: #3b82f6; font-weight: 600;">${plan.total_protein}g <span style="font-weight: 400;">P</span></span>
-        <span style="color: #eab308; font-weight: 600;">${plan.total_carbs}g <span style="font-weight: 400;">C</span></span>
-        <span style="color: #f97316; font-weight: 600;">${plan.total_fat}g <span style="font-weight: 400;">G</span></span>
-        <span style="color: #cbd5e1;">|</span>
-        <span style="font-size: 8pt; color: ${caloricDiff > 50 ? '#22c55e' : caloricDiff < -50 ? '#ef4444' : '#6b7280'}; font-weight: 500;">${caloricStatus}</span>
+    <div style="background: #f8fafc; border-radius: 6px; padding: 6px 10px; border: 1px solid #e2e8f0;">
+      <div style="font-size: 6pt; color: #6b7280; margin-bottom: 2px; text-transform: uppercase; letter-spacing: 0.03em; font-weight: 600;">🎯 Metas</div>
+      <div style="display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 7pt;">
+        <span style="font-size: 11pt; font-weight: 700; color: #f59e0b;">${plan.total_calories}<span style="font-size: 7pt; font-weight: 400;">kcal</span></span>
+        <span style="color: #3b82f6; font-weight: 600;">${plan.total_protein}g P</span>
+        <span style="color: #eab308; font-weight: 600;">${plan.total_carbs}g C</span>
+        <span style="color: #f97316; font-weight: 600;">${plan.total_fat}g G</span>
       </div>
     </div>
   </div>
  
-  <!-- Refeições - Coluna única centralizada -->
-  <div style="margin-bottom: 8px;">
-    <div style="max-width: 600px; margin: 0 auto;">
-      <h2 style="font-size: 10pt; font-weight: 700; color: #1f2937; margin: 0 0 6px 0; padding-bottom: 3px; border-bottom: 1px solid #e2e8f0;">
+  <!-- Refeições -->
+  <div style="margin-bottom: 6px;">
+    <div style="max-width: 580px; margin: 0 auto;">
+      <h2 style="font-size: 9pt; font-weight: 700; color: #1f2937; margin: 0 0 4px 0; padding-bottom: 2px; border-bottom: 1px solid #e2e8f0;">
         🍽️ Refeições do Dia
       </h2>
     </div>
@@ -261,16 +259,16 @@
     </div>
   </div>
  
-  <!-- Dicas - Compacto -->
-  <div style="max-width: 600px; margin: 0 auto;">
-    <div style="background: #fffbeb; border-radius: 8px; padding: 6px 10px; border-left: 3px solid #f59e0b; font-size: 8pt; color: #78350f;">
-      <strong style="margin-right: 4px;">💡 Dicas:</strong>${tipsHtml}
+  <!-- Dicas -->
+  <div style="max-width: 580px; margin: 0 auto;">
+    <div style="background: #fffbeb; border-radius: 6px; padding: 4px 8px; border-left: 3px solid #f59e0b; font-size: 7pt; color: #78350f;">
+      <strong>💡</strong> ${tipsHtml}
     </div>
   </div>
  
-  <!-- Footer compacto -->
-  <div style="margin-top: 6px; padding-top: 4px; border-top: 1px solid #e2e8f0; font-size: 7pt; color: #9ca3af; text-align: center;">
-    NutriAI • nutria-plan-wise.lovable.app • Consulte um nutricionista para orientação personalizada
+  <!-- Footer -->
+  <div style="margin-top: 4px; padding-top: 3px; border-top: 1px solid #e2e8f0; font-size: 6pt; color: #9ca3af; text-align: center;">
+    NutriAI • nutria-plan-wise.lovable.app
   </div>
 </div>
  </body>
