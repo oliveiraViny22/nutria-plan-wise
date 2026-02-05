@@ -299,15 +299,15 @@ export default function Dashboard() {
       </div>
     )}
 
-    <div className="min-h-screen bg-background overflow-x-hidden">
-      {/* Header - Mobile responsive with hamburger concept via scrollable icons */}
-      <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-md border-b border-border">
+    <div className="min-h-screen gradient-hero overflow-x-hidden">
+      {/* Header - Premium glass effect */}
+      <header className="sticky top-0 z-50 glass border-b border-border/30">
         <div className="container mx-auto px-3 sm:px-4 py-3 sm:py-4 flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             <MobileNav />
             <Logo />
             {isAdmin && (
-              <span className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 bg-primary/10 text-primary text-xs font-medium rounded-full border border-primary/20">
+              <span className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1 gradient-gold text-primary-foreground text-xs font-medium rounded-full shadow-sm">
                 <Shield className="w-3 h-3" />
                 Admin
               </span>
@@ -446,19 +446,19 @@ export default function Dashboard() {
         )}
 
 
-        {/* Welcome Section */}
+        {/* Welcome Section - Premium typography */}
         <motion.section
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="space-y-1 sm:space-y-2"
+          className="space-y-2"
         >
-          <h1 className="text-xl sm:text-2xl font-bold text-foreground">
+          <h1 className="text-2xl sm:text-3xl font-display font-bold text-foreground tracking-tight">
             Olá, {profile?.name?.split(' ')[0] || 'Usuário'}! 👋
           </h1>
-          <p className="text-sm sm:text-base text-muted-foreground">
+          <p className="text-sm sm:text-base text-muted-foreground font-light">
             {profile?.goal
               ? `Objetivo: ${GOALS[profile.goal as keyof typeof GOALS]?.label}`
-              : 'Acompanhe seu plano alimentar'}
+              : 'Acompanhe seu plano alimentar personalizado'}
           </p>
         </motion.section>
 
@@ -488,13 +488,15 @@ export default function Dashboard() {
           className="space-y-3 sm:space-y-4"
         >
 
-          {/* Calorie & Macros Row */}
-          <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2">
+          {/* Calorie & Macros Row - Premium cards */}
+          <div className="grid gap-4 sm:gap-5 grid-cols-1 sm:grid-cols-2">
             {/* Calorie Card */}
-            <div className="card-elevated rounded-xl sm:rounded-2xl p-4 sm:p-6 flex flex-col items-center">
-              <div className="flex items-center gap-2 mb-3 sm:mb-4">
-                <Flame className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
-                <h3 className="font-semibold text-foreground text-sm sm:text-base">Calorias</h3>
+            <div className="card-premium rounded-xl sm:rounded-2xl p-5 sm:p-6 flex flex-col items-center">
+              <div className="flex items-center gap-2 mb-4">
+                <div className="p-2 rounded-lg bg-accent/10">
+                  <Flame className="w-4 h-4 sm:w-5 sm:h-5 text-accent" />
+                </div>
+                <h3 className="font-display font-semibold text-foreground text-base sm:text-lg tracking-tight">Calorias</h3>
               </div>
               <CalorieRing
                 current={currentCalories}
@@ -503,10 +505,12 @@ export default function Dashboard() {
             </div>
 
             {/* Macros Card */}
-            <div className="card-elevated rounded-xl sm:rounded-2xl p-4 sm:p-6">
-              <div className="flex items-center gap-2 mb-3 sm:mb-4">
-                <Target className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
-                <h3 className="font-semibold text-foreground text-sm sm:text-base">Macros</h3>
+            <div className="card-premium rounded-xl sm:rounded-2xl p-5 sm:p-6">
+              <div className="flex items-center gap-2 mb-4">
+                <div className="p-2 rounded-lg bg-primary/10">
+                  <Target className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
+                </div>
+                <h3 className="font-display font-semibold text-foreground text-base sm:text-lg tracking-tight">Macronutrientes</h3>
               </div>
               <MacroChart
                 protein={currentProtein}
@@ -574,12 +578,12 @@ export default function Dashboard() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
           >
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-2 gap-3">
               {/* Botão Gerar Plano Alimentar com limite inline */}
               <Button
-                variant="default"
+                variant="premium"
                 size="default"
-                className="w-full bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70"
+                className="w-full"
                 onClick={generateMealPlanV5}
                 disabled={generating || generatingV5 || isLimitReached('diet')}
               >
@@ -672,7 +676,7 @@ export default function Dashboard() {
             className="space-y-4"
           >
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-foreground">
+              <h2 className="text-lg sm:text-xl font-display font-semibold text-foreground tracking-tight">
                 Plano de Hoje
               </h2>
               <div className="flex items-center gap-2">
@@ -723,15 +727,15 @@ export default function Dashboard() {
                 >
                   <Link
                     to={`/meal/${meal.id}`}
-                    className="card-interactive rounded-xl p-4 flex items-center justify-between"
+                    className="card-interactive rounded-xl p-4 flex items-center justify-between group"
                   >
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <h3 className="font-medium text-foreground">
+                        <h3 className="font-medium text-foreground tracking-tight">
                           {MEAL_NAMES[meal.name as MealType] || meal.name}
                         </h3>
                         {permissions.meal_options_limit > 1 && (
-                          <div className="flex items-center gap-1 text-xs text-primary bg-primary/10 px-2 py-0.5 rounded-full">
+                          <div className="flex items-center gap-1 text-xs text-accent bg-accent/10 px-2 py-0.5 rounded-full font-medium">
                             <Layers className="w-3 h-3" />
                             <span>{permissions.meal_options_limit} opções</span>
                           </div>
@@ -746,7 +750,7 @@ export default function Dashboard() {
                         compact
                       />
                     </div>
-                    <ChevronRight className="w-5 h-5 text-muted-foreground flex-shrink-0" />
+                    <ChevronRight className="w-5 h-5 text-muted-foreground flex-shrink-0 transition-transform group-hover:translate-x-1" />
                   </Link>
                 </motion.div>
               ))}
