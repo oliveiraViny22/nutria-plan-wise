@@ -65,43 +65,65 @@ export function SupplementToggle({ initialValue = false, onToggle, compact = fal
 
   if (compact) {
     return (
-      <div className={`flex items-center justify-between gap-3 p-3 rounded-lg ${locked ? 'bg-muted/50 border border-border' : 'bg-primary/5 border border-primary/20'}`}>
-        <div className="flex items-center gap-2">
-          <Pill className={`h-4 w-4 ${locked ? 'text-muted-foreground' : 'text-primary'}`} />
-          <span className={`text-sm font-medium ${locked ? 'text-muted-foreground' : ''}`}>Suplementação</span>
+      <div className="flex justify-center">
+        <div 
+          className={`
+            inline-flex items-center gap-3 px-5 py-3 rounded-xl
+            transition-all duration-200
+            ${locked 
+              ? 'bg-muted/50 border border-border cursor-not-allowed' 
+              : 'bg-gradient-to-r from-purple-500/10 to-violet-500/10 border border-purple-500/30 hover:border-purple-500/50 hover:shadow-lg hover:shadow-purple-500/10 hover:scale-[1.02] cursor-pointer'
+            }
+          `}
+        >
+          <div className={`
+            w-8 h-8 rounded-full flex items-center justify-center
+            ${locked 
+              ? 'bg-muted' 
+              : 'bg-gradient-to-br from-purple-500 to-violet-600 shadow-md shadow-purple-500/30'
+            }
+          `}>
+            <Pill className={`h-4 w-4 ${locked ? 'text-muted-foreground' : 'text-white'}`} />
+          </div>
+          <div className="flex items-center gap-2">
+            <span className={`text-sm font-medium ${locked ? 'text-muted-foreground' : 'text-foreground'}`}>
+              Suplementação
+            </span>
+            {locked ? (
+              <ProFeatureBadge 
+                tooltipTitle="Recurso Premium"
+                tooltipDescription="Sugestões de suplementação estão disponíveis nos planos pagos. Toque para ver opções de upgrade."
+              />
+            ) : (
+              <TooltipProvider delayDuration={200}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="h-3.5 w-3.5 text-purple-500/70 cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="max-w-xs p-3">
+                    <p className="text-sm font-medium mb-1">Como funciona?</p>
+                    <p className="text-sm text-muted-foreground">
+                      A IA sugere suplementos personalizados baseados no seu objetivo. 
+                      <strong className="text-foreground"> Suplementos são complementares</strong> e 
+                      não alteram os macros do seu plano alimentar principal.
+                    </p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
+          </div>
           {locked ? (
-            <ProFeatureBadge 
-              tooltipTitle="Recurso Premium"
-              tooltipDescription="Sugestões de suplementação estão disponíveis nos planos pagos. Toque para ver opções de upgrade."
-            />
+            <Lock className="h-4 w-4 text-muted-foreground ml-2" />
           ) : (
-            <TooltipProvider delayDuration={200}>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
-                </TooltipTrigger>
-                <TooltipContent side="bottom" className="max-w-xs p-3">
-                  <p className="text-sm font-medium mb-1">Como funciona?</p>
-                  <p className="text-sm text-muted-foreground">
-                    A IA sugere suplementos personalizados baseados no seu objetivo. 
-                    <strong className="text-foreground"> Suplementos são complementares</strong> e 
-                    não alteram os macros do seu plano alimentar principal.
-                  </p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+            <Switch
+              id="supplements-toggle-compact"
+              checked={enabled}
+              onCheckedChange={handleToggle}
+              disabled={saving}
+              className="ml-2 data-[state=checked]:bg-purple-600"
+            />
           )}
         </div>
-        {locked ? (
-          <Lock className="h-4 w-4 text-muted-foreground" />
-        ) : (
-          <Switch
-            id="supplements-toggle-compact"
-            checked={enabled}
-            onCheckedChange={handleToggle}
-            disabled={saving}
-          />
-        )}
       </div>
     );
   }
