@@ -22,6 +22,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
+import { StatusBadge } from '@/components/ui-kit';
 import { Logo } from '@/components/Logo';
 import { MobileNav } from '@/components/MobileNav';
 import { ThemeToggle } from '@/components/ThemeToggle';
@@ -366,29 +367,34 @@ export default function DailyLog() {
     switch (status) {
       case 'CONFIRMADA':
       case 'CONFIRMADA_TARDIA':
-        return <CheckCircle2 className="h-5 w-5 text-green-500" />;
+        return <CheckCircle2 className="h-5 w-5 text-success" />;
       case 'PULADA':
-        return <SkipForward className="h-5 w-5 text-amber-500" />;
+        return <SkipForward className="h-5 w-5 text-warning" />;
       case 'FORA_DO_PLANO':
-        return <AlertTriangle className="h-5 w-5 text-orange-500" />;
+        return <AlertTriangle className="h-5 w-5 text-destructive" />;
       default:
         return <Clock className="h-5 w-5 text-muted-foreground" />;
     }
   };
 
-  const getStatusBadge = (status?: string) => {
+  // Map legacy status to UI Kit status types
+  const mapStatusToUiKit = (status?: string): 'pending' | 'confirmed' | 'skipped' | 'out_of_plan' | 'late_confirmed' => {
     switch (status) {
       case 'CONFIRMADA':
-        return <Badge variant="default" className="bg-green-500">Confirmada</Badge>;
+        return 'confirmed';
       case 'CONFIRMADA_TARDIA':
-        return <Badge variant="secondary" className="bg-green-500/70">Confirmada (tardia)</Badge>;
+        return 'late_confirmed';
       case 'PULADA':
-        return <Badge variant="secondary" className="bg-amber-500/80 text-white">Pulada</Badge>;
+        return 'skipped';
       case 'FORA_DO_PLANO':
-        return <Badge variant="secondary" className="bg-orange-500/80 text-white">Fora do plano</Badge>;
+        return 'out_of_plan';
       default:
-        return <Badge variant="outline">Pendente</Badge>;
+        return 'pending';
     }
+  };
+
+  const getStatusBadge = (status?: string) => {
+    return <StatusBadge status={mapStatusToUiKit(status)} size="sm" />;
   };
 
   const completedMeals = meals.filter(m => m.log?.status && m.log.status !== 'PENDENTE').length;
