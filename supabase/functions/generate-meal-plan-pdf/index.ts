@@ -170,12 +170,13 @@
     <meta charset="UTF-8">
     <style>
       @page { 
-        size: A4; 
-        margin: 10mm 15mm; 
+        size: 210mm 297mm; /* A4 exato */
+        margin: 12mm 15mm; 
       }
       * { box-sizing: border-box; }
       html, body {
-        height: 100%;
+        width: 210mm;
+        height: 297mm;
         margin: 0;
         padding: 0;
       }
@@ -185,40 +186,39 @@
         line-height: 1.4;
         color: #1f2937;
         background: #ffffff;
-        display: flex;
-        flex-direction: column;
-        min-height: 277mm; /* A4 height minus margins */
       }
-      .container {
-        width: 100%;
-        max-width: 180mm; /* A4 width minus margins */
+      .page {
+        width: 180mm; /* 210mm - 30mm margens */
+        height: 273mm; /* 297mm - 24mm margens */
         margin: 0 auto;
-        flex: 1;
+        padding: 0;
         display: flex;
         flex-direction: column;
       }
       .header {
-        padding-bottom: 12px;
-        margin-bottom: 16px;
+        padding-bottom: 10px;
+        margin-bottom: 14px;
         border-bottom: 3px solid #3b82f6;
+        flex-shrink: 0;
       }
       .profile-section {
         display: flex;
-        gap: 16px;
-        margin-bottom: 20px;
+        gap: 12px;
+        margin-bottom: 16px;
+        flex-shrink: 0;
       }
       .profile-card {
         flex: 1;
         background: linear-gradient(135deg, #f8fafc, #f1f5f9);
-        border-radius: 12px;
-        padding: 16px 20px;
+        border-radius: 10px;
+        padding: 14px 16px;
         border: 1px solid #e2e8f0;
         box-shadow: 0 1px 3px rgba(0,0,0,0.05);
       }
       .profile-label {
         font-size: 8pt;
         color: #6b7280;
-        margin-bottom: 8px;
+        margin-bottom: 6px;
         text-transform: uppercase;
         letter-spacing: 0.05em;
         font-weight: 600;
@@ -226,66 +226,78 @@
       .profile-content {
         display: flex;
         flex-wrap: wrap;
-        gap: 8px;
+        gap: 6px;
         align-items: center;
-        font-size: 11pt;
+        font-size: 10pt;
       }
       .meals-section {
         flex: 1;
-        margin-bottom: 20px;
+        margin-bottom: 14px;
+        overflow: hidden;
       }
       .meals-title {
-        font-size: 14pt;
+        font-size: 13pt;
         font-weight: 700;
         color: #1f2937;
-        margin: 0 0 16px 0;
-        padding-bottom: 8px;
+        margin: 0 0 12px 0;
+        padding-bottom: 6px;
         border-bottom: 2px solid #e2e8f0;
       }
       .meals-grid {
-        display: grid;
-        grid-template-columns: 1fr;
-        gap: 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
       }
       .tips-section {
         background: linear-gradient(135deg, #fffbeb, #fef3c7);
-        border-radius: 12px;
-        padding: 16px 20px;
+        border-radius: 10px;
+        padding: 12px 16px;
         border-left: 4px solid #f59e0b;
-        margin-bottom: 16px;
+        margin-bottom: 12px;
+        flex-shrink: 0;
       }
       .tips-title {
         font-weight: 700;
         color: #92400e;
-        margin-bottom: 8px;
-        font-size: 11pt;
+        margin-bottom: 6px;
+        font-size: 10pt;
       }
       .tips-content {
-        font-size: 10pt;
+        font-size: 9pt;
         color: #78350f;
-        line-height: 1.6;
+        line-height: 1.5;
       }
       .footer {
         text-align: center;
-        padding-top: 12px;
+        padding-top: 10px;
         border-top: 1px solid #e2e8f0;
-        font-size: 9pt;
+        font-size: 8pt;
         color: #9ca3af;
+        flex-shrink: 0;
+        margin-top: auto;
       }
       @media print {
+        html, body {
+          width: 210mm;
+          height: 297mm;
+        }
         body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        .page { 
+          page-break-after: avoid;
+          page-break-inside: avoid;
+        }
       }
     </style>
   </head>
   <body>
-    <div class="container">
+    <div class="page">
       <!-- Header -->
       <div class="header">
         <div style="display: flex; justify-content: space-between; align-items: center;">
-          <h1 style="font-size: 22pt; font-weight: 700; color: #1f2937; margin: 0;">
+          <h1 style="font-size: 20pt; font-weight: 700; color: #1f2937; margin: 0;">
             🥗 Plano Alimentar
           </h1>
-          <div style="text-align: right; font-size: 10pt; color: #6b7280;">
+          <div style="text-align: right; font-size: 9pt; color: #6b7280;">
             ${generatedAt}<br>
             <span style="font-weight: 600; color: #3b82f6;">NutriAI</span>
           </div>
@@ -297,16 +309,16 @@
         <div class="profile-card">
           <div class="profile-label">👤 Perfil do Paciente</div>
           <div class="profile-content">
-            <span style="font-weight: 700; font-size: 13pt;">${profile.name || "—"}</span>
-            <span style="color: #cbd5e1; font-size: 14pt;">•</span>
+            <span style="font-weight: 700; font-size: 11pt;">${profile.name || "—"}</span>
+            <span style="color: #cbd5e1;">•</span>
             <span>${profile.age ? `${profile.age} anos` : "—"}</span>
-            <span style="color: #cbd5e1; font-size: 14pt;">•</span>
+            <span style="color: #cbd5e1;">•</span>
             <span>${profile.weight ? `${profile.weight} kg` : "—"}</span>
-            <span style="color: #cbd5e1; font-size: 14pt;">•</span>
+            <span style="color: #cbd5e1;">•</span>
             <span>${profile.height ? `${profile.height} cm` : "—"}</span>
           </div>
-          <div style="margin-top: 8px;">
-            <span style="background: #3b82f6; color: white; padding: 4px 12px; border-radius: 20px; font-size: 10pt; font-weight: 600;">
+          <div style="margin-top: 6px;">
+            <span style="background: #3b82f6; color: white; padding: 3px 10px; border-radius: 16px; font-size: 9pt; font-weight: 600;">
               ${goalLabel}
             </span>
           </div>
@@ -314,14 +326,14 @@
        
         <div class="profile-card">
           <div class="profile-label">🎯 Metas Nutricionais Diárias</div>
-          <div style="display: flex; align-items: baseline; gap: 8px; margin-bottom: 12px;">
-            <span style="font-size: 28pt; font-weight: 800; color: #f59e0b;">${plan.total_calories}</span>
-            <span style="font-size: 12pt; color: #6b7280;">kcal</span>
+          <div style="display: flex; align-items: baseline; gap: 6px; margin-bottom: 8px;">
+            <span style="font-size: 24pt; font-weight: 800; color: #f59e0b;">${plan.total_calories}</span>
+            <span style="font-size: 10pt; color: #6b7280;">kcal</span>
           </div>
-          <div style="display: flex; gap: 16px; font-size: 12pt;">
-            <span style="color: #3b82f6; font-weight: 700;">${plan.total_protein}g <span style="font-weight: 400; color: #6b7280;">Proteína</span></span>
-            <span style="color: #eab308; font-weight: 700;">${plan.total_carbs}g <span style="font-weight: 400; color: #6b7280;">Carbos</span></span>
-            <span style="color: #f97316; font-weight: 700;">${plan.total_fat}g <span style="font-weight: 400; color: #6b7280;">Gordura</span></span>
+          <div style="display: flex; gap: 12px; font-size: 10pt;">
+            <span style="color: #3b82f6; font-weight: 700;">${plan.total_protein}g <span style="font-weight: 400; color: #6b7280;">P</span></span>
+            <span style="color: #eab308; font-weight: 700;">${plan.total_carbs}g <span style="font-weight: 400; color: #6b7280;">C</span></span>
+            <span style="color: #f97316; font-weight: 700;">${plan.total_fat}g <span style="font-weight: 400; color: #6b7280;">G</span></span>
           </div>
         </div>
       </div>
@@ -342,7 +354,7 @@
      
       <!-- Footer -->
       <div class="footer">
-        <strong>NutriAI</strong> • nutria-plan-wise.lovable.app • Consulte sempre um nutricionista para orientação personalizada
+        <strong>NutriAI</strong> • nutria-plan-wise.lovable.app • Consulte sempre um nutricionista
       </div>
     </div>
   </body>
