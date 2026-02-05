@@ -496,11 +496,11 @@ export default function MealDetail() {
             animate={{ opacity: 1, y: 0 }}
             className="card-premium rounded-xl p-4 flex items-center gap-3"
           >
-            <div className="p-2.5 rounded-lg gradient-gold shadow-sm">
+            <div className="p-2.5 rounded-lg gradient-primary shadow-sm">
               <Lock className="w-5 h-5 text-primary-foreground" />
             </div>
             <div className="flex-1">
-              <h3 className="font-display font-semibold text-foreground tracking-tight">Plano não salvo</h3>
+              <h3 className="font-sans font-semibold text-foreground tracking-tight">Plano não salvo</h3>
               <p className="text-sm text-muted-foreground">
                 Salve seu plano no Dashboard para ver quantidades e macros detalhados.
               </p>
@@ -551,7 +551,7 @@ export default function MealDetail() {
               <TabsContent key={option.id} value={option.option_number.toString()} className="space-y-4 mt-4">
                 <motion.section initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="card-elevated rounded-xl p-4">
                   <div className="flex items-center justify-between mb-3">
-                    <h2 className="font-display font-semibold text-sm tracking-tight">Macros da Opção {option.option_number}</h2>
+                    <h2 className="font-sans font-semibold text-sm tracking-tight">Macros da Opção {option.option_number}</h2>
                     {isPlanSaved ? (
                       <Badge variant="secondary" className="text-xs">{option.total_calories} kcal</Badge>
                     ) : (
@@ -570,7 +570,7 @@ export default function MealDetail() {
                 </motion.section>
 
                 <motion.section initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-3">
-                  <h2 className="font-display font-semibold text-sm tracking-tight">Alimentos</h2>
+                  <h2 className="font-sans font-semibold text-sm tracking-tight">Alimentos</h2>
                   {option.foods?.map((optionFood: MealOptionFood) => {
                     const food = optionFood.food as Food;
                     if (!food) return null;

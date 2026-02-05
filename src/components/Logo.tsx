@@ -20,13 +20,13 @@ export function Logo({ size = 'md', showText = true }: LogoProps) {
 
   return (
     <div className="flex items-center gap-2.5">
-      <div className={`${sizeClasses[size]} rounded-xl gradient-gold flex items-center justify-center shadow-md`}>
+      <div className={`${sizeClasses[size]} rounded-xl gradient-primary flex items-center justify-center shadow-md`}>
         <Leaf className="text-primary-foreground w-1/2 h-1/2 drop-shadow-sm" />
       </div>
       {showText && (
-        <span className={`font-display font-semibold ${textSizeClasses[size]} tracking-tight`}>
+        <span className={`font-sans font-bold ${textSizeClasses[size]} tracking-tight`}>
           <span className="text-foreground">Nutri</span>
-          <span className="text-gold">AI</span>
+          <span className="text-gradient">Plan</span>
         </span>
       )}
     </div>

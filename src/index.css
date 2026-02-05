@@ -2,155 +2,155 @@
 @tailwind components;
 @tailwind utilities;
 
-/* NutriAI Planner Design System - Premium & Sophisticated */
+/* NutriSystem Design System - Verde, Saúde e Renovação */
 
-@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap');
 
 @layer base {
   :root {
-    /* Light theme - Elegant cream and gold accents */
-    --background: 45 20% 97%;
-    --foreground: 30 15% 15%;
+    /* Light theme - Fresh, clean and calming */
+    --background: 120 15% 98%;
+    --foreground: 150 20% 15%;
 
     --card: 0 0% 100%;
-    --card-foreground: 30 15% 15%;
+    --card-foreground: 150 20% 15%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 30 15% 15%;
+    --popover-foreground: 150 20% 15%;
 
-    /* Primary: Rich emerald with gold undertones */
-    --primary: 158 55% 35%;
-    --primary-foreground: 45 30% 98%;
+    /* Primary: Vibrant yet calming green */
+    --primary: 152 55% 42%;
+    --primary-foreground: 0 0% 100%;
 
-    /* Secondary: Warm champagne tones */
-    --secondary: 40 25% 92%;
-    --secondary-foreground: 35 30% 25%;
+    /* Secondary: Soft sage for supporting elements */
+    --secondary: 140 20% 94%;
+    --secondary-foreground: 150 25% 25%;
 
-    --muted: 45 15% 93%;
-    --muted-foreground: 30 10% 45%;
+    --muted: 120 12% 94%;
+    --muted-foreground: 150 10% 45%;
 
-    /* Accent: Sophisticated gold */
-    --accent: 42 75% 50%;
-    --accent-foreground: 30 20% 10%;
+    /* Accent: Warm yellow for energy and positivity */
+    --accent: 48 85% 55%;
+    --accent-foreground: 48 90% 15%;
 
     --destructive: 0 65% 50%;
     --destructive-foreground: 0 0% 100%;
 
-    /* Warning - Rich amber */
-    --warning: 38 92% 50%;
-    --warning-foreground: 38 92% 10%;
+    /* Warning - Soft amber */
+    --warning: 42 90% 55%;
+    --warning-foreground: 42 90% 12%;
 
-    /* Success - Deep emerald */
-    --success: 158 55% 35%;
-    --success-foreground: 45 30% 98%;
+    /* Success - Fresh green */
+    --success: 152 55% 42%;
+    --success-foreground: 0 0% 100%;
 
-    --border: 40 20% 88%;
-    --input: 40 20% 88%;
-    --ring: 42 75% 50%;
+    --border: 140 15% 88%;
+    --input: 140 15% 88%;
+    --ring: 152 55% 42%;
 
-    --radius: 0.625rem;
+    --radius: 0.75rem;
 
-    /* Premium gradients */
-    --gradient-primary: linear-gradient(135deg, hsl(158, 55%, 35%) 0%, hsl(165, 45%, 40%) 50%, hsl(42, 75%, 50%) 100%);
-    --gradient-hero: linear-gradient(180deg, hsl(45, 20%, 97%) 0%, hsl(40, 25%, 94%) 50%, hsl(45, 20%, 92%) 100%);
-    --gradient-card: linear-gradient(180deg, hsl(0, 0%, 100%) 0%, hsl(45, 15%, 98%) 100%);
-    --gradient-accent: linear-gradient(135deg, hsl(42, 75%, 50%) 0%, hsl(38, 85%, 55%) 100%);
-    --gradient-gold: linear-gradient(135deg, hsl(42, 75%, 50%) 0%, hsl(38, 70%, 45%) 50%, hsl(45, 80%, 55%) 100%);
+    /* Fresh, nature-inspired gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(152, 55%, 42%) 0%, hsl(165, 50%, 48%) 50%, hsl(140, 45%, 50%) 100%);
+    --gradient-hero: linear-gradient(180deg, hsl(120, 15%, 98%) 0%, hsl(140, 18%, 96%) 50%, hsl(130, 15%, 94%) 100%);
+    --gradient-card: linear-gradient(180deg, hsl(0, 0%, 100%) 0%, hsl(140, 12%, 98%) 100%);
+    --gradient-accent: linear-gradient(135deg, hsl(48, 85%, 55%) 0%, hsl(45, 90%, 60%) 100%);
+    --gradient-success: linear-gradient(135deg, hsl(152, 55%, 42%) 0%, hsl(160, 50%, 48%) 100%);
 
-    /* Elegant shadows */
-    --shadow-sm: 0 1px 3px 0 hsl(30 15% 15% / 0.04), 0 1px 2px -1px hsl(30 15% 15% / 0.03);
-    --shadow-md: 0 4px 12px -2px hsl(30 15% 15% / 0.06), 0 2px 6px -2px hsl(30 15% 15% / 0.04);
-    --shadow-lg: 0 12px 28px -6px hsl(30 15% 15% / 0.1), 0 4px 12px -4px hsl(30 15% 15% / 0.06);
-    --shadow-xl: 0 24px 48px -12px hsl(30 15% 15% / 0.12), 0 8px 16px -6px hsl(30 15% 15% / 0.08);
-    --shadow-glow: 0 0 28px -6px hsl(42 75% 50% / 0.25);
-    --shadow-gold: 0 4px 20px -4px hsl(42 75% 50% / 0.3);
+    /* Soft, welcoming shadows */
+    --shadow-sm: 0 1px 3px 0 hsl(150 15% 15% / 0.04), 0 1px 2px -1px hsl(150 15% 15% / 0.03);
+    --shadow-md: 0 4px 12px -2px hsl(150 15% 15% / 0.06), 0 2px 6px -2px hsl(150 15% 15% / 0.04);
+    --shadow-lg: 0 12px 28px -6px hsl(150 15% 15% / 0.1), 0 4px 12px -4px hsl(150 15% 15% / 0.06);
+    --shadow-xl: 0 24px 48px -12px hsl(150 15% 15% / 0.12), 0 8px 16px -6px hsl(150 15% 15% / 0.08);
+    --shadow-glow: 0 0 28px -6px hsl(152 55% 42% / 0.25);
+    --shadow-success: 0 4px 20px -4px hsl(152 55% 42% / 0.3);
 
-    /* Macro colors - refined and sophisticated */
-    --macro-protein: 215 75% 50%;
-    --macro-carbs: 42 85% 48%;
-    --macro-fat: 350 70% 52%;
+    /* Macro colors - balanced and clear */
+    --macro-protein: 210 70% 50%;
+    --macro-carbs: 45 85% 50%;
+    --macro-fat: 350 65% 55%;
 
-    /* Sidebar - cream and elegant */
-    --sidebar-background: 45 18% 96%;
-    --sidebar-foreground: 30 15% 20%;
-    --sidebar-primary: 158 55% 35%;
-    --sidebar-primary-foreground: 45 30% 98%;
-    --sidebar-accent: 40 20% 92%;
-    --sidebar-accent-foreground: 35 30% 25%;
-    --sidebar-border: 40 20% 88%;
-    --sidebar-ring: 42 75% 50%;
+    /* Sidebar - clean and professional */
+    --sidebar-background: 140 15% 97%;
+    --sidebar-foreground: 150 20% 20%;
+    --sidebar-primary: 152 55% 42%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 140 18% 93%;
+    --sidebar-accent-foreground: 150 25% 25%;
+    --sidebar-border: 140 15% 88%;
+    --sidebar-ring: 152 55% 42%;
   }
 
   .dark {
-    /* Dark theme - Deep charcoal with gold accents */
-    --background: 30 20% 6%;
-    --foreground: 40 15% 92%;
+    /* Dark theme - Deep forest tones with soft glow */
+    --background: 150 20% 7%;
+    --foreground: 140 12% 92%;
 
-    --card: 30 18% 9%;
-    --card-foreground: 40 15% 92%;
+    --card: 150 18% 10%;
+    --card-foreground: 140 12% 92%;
 
-    --popover: 30 18% 9%;
-    --popover-foreground: 40 15% 92%;
+    --popover: 150 18% 10%;
+    --popover-foreground: 140 12% 92%;
 
-    /* Primary: Luminous emerald-gold */
-    --primary: 158 60% 45%;
-    --primary-foreground: 30 20% 6%;
+    /* Primary: Luminous green */
+    --primary: 152 60% 50%;
+    --primary-foreground: 150 20% 7%;
 
-    /* Secondary: Deep warm tones */
-    --secondary: 35 20% 14%;
-    --secondary-foreground: 40 15% 85%;
+    /* Secondary: Deep sage */
+    --secondary: 145 18% 15%;
+    --secondary-foreground: 140 12% 85%;
 
-    --muted: 30 15% 13%;
-    --muted-foreground: 35 12% 55%;
+    --muted: 150 15% 14%;
+    --muted-foreground: 140 10% 55%;
 
-    /* Accent: Bright gold */
-    --accent: 42 80% 55%;
-    --accent-foreground: 30 20% 6%;
+    /* Accent: Warm golden yellow */
+    --accent: 48 80% 58%;
+    --accent-foreground: 48 90% 10%;
 
     --destructive: 0 60% 50%;
     --destructive-foreground: 0 0% 100%;
 
     /* Warning */
-    --warning: 42 85% 55%;
-    --warning-foreground: 42 85% 10%;
+    --warning: 45 85% 55%;
+    --warning-foreground: 45 85% 10%;
 
     /* Success */
-    --success: 158 60% 45%;
-    --success-foreground: 30 20% 6%;
+    --success: 152 60% 50%;
+    --success-foreground: 150 20% 7%;
 
-    --border: 30 15% 16%;
-    --input: 30 15% 16%;
-    --ring: 42 80% 55%;
+    --border: 150 15% 18%;
+    --input: 150 15% 18%;
+    --ring: 152 60% 50%;
 
-    /* Dark mode gradients - rich and luxurious */
-    --gradient-primary: linear-gradient(135deg, hsl(158, 60%, 45%) 0%, hsl(165, 50%, 50%) 50%, hsl(42, 80%, 55%) 100%);
-    --gradient-hero: linear-gradient(180deg, hsl(30, 20%, 6%) 0%, hsl(30, 18%, 8%) 50%, hsl(35, 20%, 10%) 100%);
-    --gradient-card: linear-gradient(180deg, hsl(30, 18%, 9%) 0%, hsl(30, 16%, 11%) 100%);
-    --gradient-accent: linear-gradient(135deg, hsl(42, 80%, 55%) 0%, hsl(38, 75%, 50%) 100%);
-    --gradient-gold: linear-gradient(135deg, hsl(42, 80%, 55%) 0%, hsl(38, 75%, 50%) 50%, hsl(45, 85%, 60%) 100%);
+    /* Dark mode gradients - rich forest tones */
+    --gradient-primary: linear-gradient(135deg, hsl(152, 60%, 50%) 0%, hsl(165, 55%, 55%) 50%, hsl(140, 50%, 55%) 100%);
+    --gradient-hero: linear-gradient(180deg, hsl(150, 20%, 7%) 0%, hsl(150, 18%, 9%) 50%, hsl(145, 18%, 11%) 100%);
+    --gradient-card: linear-gradient(180deg, hsl(150, 18%, 10%) 0%, hsl(150, 16%, 12%) 100%);
+    --gradient-accent: linear-gradient(135deg, hsl(48, 80%, 58%) 0%, hsl(45, 75%, 52%) 100%);
+    --gradient-success: linear-gradient(135deg, hsl(152, 60%, 50%) 0%, hsl(160, 55%, 55%) 100%);
 
-    /* Dark mode shadows - subtle gold glows */
+    /* Dark mode shadows - subtle green glows */
     --shadow-sm: 0 1px 3px 0 hsl(0 0% 0% / 0.2), 0 1px 2px -1px hsl(0 0% 0% / 0.15);
     --shadow-md: 0 4px 12px -2px hsl(0 0% 0% / 0.25), 0 2px 6px -2px hsl(0 0% 0% / 0.2);
     --shadow-lg: 0 12px 28px -6px hsl(0 0% 0% / 0.35), 0 4px 12px -4px hsl(0 0% 0% / 0.25);
     --shadow-xl: 0 24px 48px -12px hsl(0 0% 0% / 0.4), 0 8px 16px -6px hsl(0 0% 0% / 0.3);
-    --shadow-glow: 0 0 28px -6px hsl(42 80% 55% / 0.35);
-    --shadow-gold: 0 4px 20px -4px hsl(42 80% 55% / 0.4);
+    --shadow-glow: 0 0 28px -6px hsl(152 60% 50% / 0.35);
+    --shadow-success: 0 4px 20px -4px hsl(152 60% 50% / 0.4);
 
     /* Macro colors - bright for dark mode */
-    --macro-protein: 215 80% 60%;
-    --macro-carbs: 42 90% 55%;
-    --macro-fat: 350 75% 58%;
+    --macro-protein: 210 75% 58%;
+    --macro-carbs: 48 90% 55%;
+    --macro-fat: 350 70% 60%;
 
     /* Sidebar - dark and sophisticated */
-    --sidebar-background: 30 18% 8%;
-    --sidebar-foreground: 40 12% 88%;
-    --sidebar-primary: 158 60% 45%;
-    --sidebar-primary-foreground: 30 20% 6%;
-    --sidebar-accent: 35 18% 13%;
-    --sidebar-accent-foreground: 40 15% 85%;
-    --sidebar-border: 30 15% 16%;
-    --sidebar-ring: 42 80% 55%;
+    --sidebar-background: 150 18% 9%;
+    --sidebar-foreground: 140 10% 88%;
+    --sidebar-primary: 152 60% 50%;
+    --sidebar-primary-foreground: 150 20% 7%;
+    --sidebar-accent: 145 16% 14%;
+    --sidebar-accent-foreground: 140 12% 85%;
+    --sidebar-border: 150 15% 18%;
+    --sidebar-ring: 152 60% 50%;
   }
 }
 
@@ -164,7 +164,7 @@
     font-feature-settings: "rlig" 1, "calt" 1;
   }
 
-  /* Custom scrollbar */
+  /* Custom scrollbar - subtle and clean */
   ::-webkit-scrollbar {
     width: 8px;
     height: 8px;
@@ -175,12 +175,12 @@
   }
 
   ::-webkit-scrollbar-thumb {
-    @apply bg-muted-foreground/20 rounded-full hover:bg-muted-foreground/30;
+    @apply bg-primary/20 rounded-full hover:bg-primary/30;
   }
 }
 
 @layer components {
-  /* Glass effect - premium frosted glass */
+  /* Glass effect - clean frosted look */
   .glass {
     @apply bg-card/90 backdrop-blur-xl border border-border/50;
     box-shadow: var(--shadow-md);
@@ -203,11 +203,11 @@
     background: var(--gradient-accent);
   }
 
-  .gradient-gold {
-    background: var(--gradient-gold);
+  .gradient-success {
+    background: var(--gradient-success);
   }
 
-  /* Card variants - premium refined */
+  /* Card variants - warm and inviting */
   .card-elevated {
     box-shadow: var(--shadow-md);
     @apply bg-card border border-border/40 transition-all duration-300;
@@ -215,7 +215,7 @@
 
   .card-elevated:hover {
     box-shadow: var(--shadow-lg);
-    @apply border-accent/20;
+    @apply border-primary/20;
   }
 
   .card-interactive {
@@ -225,13 +225,13 @@
 
   .card-interactive:hover {
     box-shadow: var(--shadow-lg);
-    @apply border-accent/30 -translate-y-0.5;
+    @apply border-primary/30 -translate-y-0.5;
   }
 
-  /* Premium card with gold accent */
+  /* Premium card with green accent */
   .card-premium {
     box-shadow: var(--shadow-md);
-    @apply bg-card border border-accent/20 transition-all duration-300;
+    @apply bg-card border border-primary/20 transition-all duration-300;
     position: relative;
   }
 
@@ -241,22 +241,22 @@
     top: 0;
     left: 0;
     right: 0;
-    height: 2px;
-    background: var(--gradient-gold);
+    height: 3px;
+    background: var(--gradient-primary);
     border-radius: var(--radius) var(--radius) 0 0;
   }
 
   .card-premium:hover {
-    box-shadow: var(--shadow-gold);
+    box-shadow: var(--shadow-success);
   }
 
-  /* Premium glow effect */
+  /* Success glow effect */
   .glow-primary {
     box-shadow: var(--shadow-glow);
   }
 
-  .glow-gold {
-    box-shadow: var(--shadow-gold);
+  .glow-success {
+    box-shadow: var(--shadow-success);
   }
 
   /* Subtle surface variants */
@@ -269,19 +269,19 @@
     @apply bg-muted/40 border border-border/20;
   }
 
-  /* Premium text styles */
+  /* Clean text styles */
   .text-premium {
-    @apply font-display font-semibold tracking-tight;
+    @apply font-semibold tracking-tight;
   }
 
-  .text-gold {
-    background: var(--gradient-gold);
+  .text-gradient {
+    background: var(--gradient-primary);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
   }
 
-  /* Macro color utilities - refined */
+  /* Macro color utilities */
   .text-protein {
     color: hsl(var(--macro-protein));
   }
@@ -331,8 +331,8 @@
     --tw-ring-color: hsl(var(--macro-fat) / 0.4);
   }
 
-  .ring-gold {
-    --tw-ring-color: hsl(42 75% 50% / 0.4);
+  .ring-success {
+    --tw-ring-color: hsl(152 55% 42% / 0.4);
   }
 
   /* Divider styles */
@@ -344,8 +344,8 @@
     @apply border-t border-border;
   }
 
-  .divider-gold {
-    @apply border-t border-accent/30;
+  .divider-primary {
+    @apply border-t border-primary/30;
   }
 }
 
@@ -391,6 +391,15 @@
     to {
       opacity: 1;
       transform: scale(1);
+    }
+  }
+
+  @keyframes shimmer {
+    0% {
+      background-position: -200% 0;
+    }
+    100% {
+      background-position: 200% 0;
     }
   }
 
@@ -451,12 +460,12 @@
     -webkit-overflow-scrolling: touch;
   }
 
-  /* Shimmer effect for premium badges */
+  /* Subtle shimmer for badges */
   .shimmer-badge {
     background: linear-gradient(
       90deg,
       transparent 0%,
-      hsl(38, 92%, 50%, 0.3) 50%,
+      hsl(152, 55%, 42%, 0.2) 50%,
       transparent 100%
     );
     background-size: 200% 100%;
@@ -478,9 +487,14 @@
     background: linear-gradient(
       90deg,
       transparent 0%,
-      hsl(var(--foreground) / 0.15) 50%,
+      hsl(var(--foreground) / 0.1) 50%,
       transparent 100%
     );
     animation: shimmer 3s ease-in-out infinite;
+  }
+
+  /* Progress indicator - nature growth */
+  .progress-nature {
+    @apply bg-gradient-to-r from-primary to-success;
   }
 }
