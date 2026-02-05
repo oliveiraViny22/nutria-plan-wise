@@ -130,16 +130,18 @@ export function DashboardHeader({
                   </TooltipTrigger>
                   <TooltipContent>Meu Perfil</TooltipContent>
                 </Tooltip>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Link to="/chat">
-                      <Button variant="ghost" size="icon" className="w-10 h-10">
-                        <MessageCircle className="w-5 h-5" />
-                      </Button>
-                    </Link>
-                  </TooltipTrigger>
-                  <TooltipContent>Chat IA</TooltipContent>
-                </Tooltip>
+                {planType !== 'gratuito' && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Link to="/chat">
+                        <Button variant="ghost" size="icon" className="w-10 h-10">
+                          <MessageCircle className="w-5 h-5" />
+                        </Button>
+                      </Link>
+                    </TooltipTrigger>
+                    <TooltipContent>Chat IA</TooltipContent>
+                  </Tooltip>
+                )}
               </>
             )}
             <ThemeToggle />
