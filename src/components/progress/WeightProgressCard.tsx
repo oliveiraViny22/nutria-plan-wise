@@ -11,8 +11,8 @@ import {
   TrendingUp,
   TrendingDown,
   Minus,
-  ChevronDown,
-  ChevronUp
+  Pencil,
+  Trash2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -66,6 +66,8 @@ export function WeightProgressCard({
   const [loading, setLoading] = useState(false);
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [showAllLogs, setShowAllLogs] = useState(false);
+  const [editingLogId, setEditingLogId] = useState<string | null>(null);
+  const [editWeight, setEditWeight] = useState('');
 
   // Calculate progress
   const sortedLogs = [...logs].sort((a, b) => 
@@ -208,6 +210,81 @@ export function WeightProgressCard({
     const value = e.target.value;
     if (value === '' || /^\d*\.?\d{0,1}$/.test(value)) {
       setWeight(value);
+    }
+  };
+
+  const handleEditWeightChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    if (value === '' || /^\d*\.?\d{0,1}$/.test(value)) {
+      setEditWeight(value);
+    }
+  };
+
+  const handleStartEdit = (log: WeightLog) => {
+    setEditingLogId(log.id);
+    setEditWeight(log.weight_kg.toFixed(1));
+  };
+
+  const handleCancelEdit = () => {
+    setEditingLogId(null);
+    setEditWeight('');
+  };
+
+  const handleSaveEdit = async (logId: string, logDate: string) => {
+    const weightValue = parseFloat(editWeight);
+    
+    if (isNaN(weightValue) || weightValue < 20 || weightValue > 500) {
+      toast.error('Peso inválido (20-500 kg)');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const { error } = await supabase
+        .from('weight_logs')
+        .update({ weight_kg: weightValue })
+        .eq('id', logId);
+
+      if (error) throw error;
+
+      // Update profile if this is today's log
+      const isToday = format(new Date(), 'yyyy-MM-dd') === logDate;
+      if (isToday) {
+        await supabase
+          .from('profiles')
+          .update({ weight: weightValue })
+          .eq('user_id', userId);
+      }
+
+      toast.success('Peso atualizado!');
+      setEditingLogId(null);
+      setEditWeight('');
+      onUpdate();
+    } catch (error) {
+      console.error('Error updating weight:', error);
+      toast.error('Erro ao atualizar peso');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteLog = async (logId: string) => {
+    setLoading(true);
+    try {
+      const { error } = await supabase
+        .from('weight_logs')
+        .delete()
+        .eq('id', logId);
+
+      if (error) throw error;
+
+      toast.success('Registro removido!');
+      onUpdate();
+    } catch (error) {
+      console.error('Error deleting weight log:', error);
+      toast.error('Erro ao remover registro');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -501,11 +578,12 @@ export function WeightProgressCard({
                 {(showAllLogs ? timelineLogs : timelineLogs.slice(0, 3)).map((log, index) => {
                   const prevLog = timelineLogs[index + 1];
                   const diff = prevLog ? log.weight_kg - prevLog.weight_kg : 0;
+                  const isEditing = editingLogId === log.id;
                   
                   return (
                     <div
                       key={log.id}
-                      className="flex items-center justify-between py-1.5 px-2 rounded bg-muted/20 hover:bg-muted/40 transition-colors"
+                      className="flex items-center justify-between py-1.5 px-2 rounded bg-muted/20 hover:bg-muted/40 transition-colors group"
                     >
                       <div className="flex items-center gap-2">
                         <div className="w-1.5 h-1.5 rounded-full bg-primary" />
@@ -513,19 +591,75 @@ export function WeightProgressCard({
                           {format(new Date(log.log_date), "dd/MM", { locale: ptBR })}
                         </span>
                       </div>
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-xs font-semibold tabular-nums">
-                          {log.weight_kg.toFixed(1)}
-                        </span>
-                        {diff !== 0 && (
-                          <span className={cn(
-                            "text-[10px] tabular-nums",
-                            diff > 0 ? 'text-destructive' : 'text-success'
-                          )}>
-                            {diff > 0 ? '+' : ''}{diff.toFixed(1)}
+                      
+                      {isEditing ? (
+                        <div className="flex items-center gap-1.5">
+                          <Input
+                            type="text"
+                            inputMode="decimal"
+                            value={editWeight}
+                            onChange={handleEditWeightChange}
+                            className="w-14 h-6 text-center text-xs font-semibold px-1"
+                            autoFocus
+                            disabled={loading}
+                          />
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-5 w-5"
+                            onClick={handleCancelEdit}
+                            disabled={loading}
+                          >
+                            <X className="w-3 h-3" />
+                          </Button>
+                          <Button
+                            size="icon"
+                            className="h-5 w-5"
+                            onClick={() => handleSaveEdit(log.id, log.log_date)}
+                            disabled={loading || !editWeight}
+                          >
+                            {loading ? (
+                              <Loader2 className="w-3 h-3 animate-spin" />
+                            ) : (
+                              <Check className="w-3 h-3" />
+                            )}
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-xs font-semibold tabular-nums">
+                            {log.weight_kg.toFixed(1)}
                           </span>
-                        )}
-                      </div>
+                          {diff !== 0 && (
+                            <span className={cn(
+                              "text-[10px] tabular-nums",
+                              diff > 0 ? 'text-destructive' : 'text-success'
+                            )}>
+                              {diff > 0 ? '+' : ''}{diff.toFixed(1)}
+                            </span>
+                          )}
+                          <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-5 w-5 text-muted-foreground hover:text-foreground"
+                              onClick={() => handleStartEdit(log)}
+                              disabled={loading}
+                            >
+                              <Pencil className="w-3 h-3" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-5 w-5 text-muted-foreground hover:text-destructive"
+                              onClick={() => handleDeleteLog(log.id)}
+                              disabled={loading}
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </Button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   );
                 })}
