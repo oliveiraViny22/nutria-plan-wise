@@ -105,9 +105,9 @@ export default function Progress() {
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'complete':
-        return <CheckCircle2 className="h-4 w-4 text-green-500" />;
+        return <CheckCircle2 className="h-4 w-4 text-success" />;
       case 'partial':
-        return <Clock className="h-4 w-4 text-yellow-500" />;
+        return <Clock className="h-4 w-4 text-warning" />;
       default:
         return <XCircle className="h-4 w-4 text-muted-foreground" />;
     }
@@ -164,40 +164,48 @@ export default function Progress() {
 
           {/* Adherence Tab */}
           <TabsContent value="adherence" className="space-y-4 sm:space-y-6">
-            {/* Stats Cards */}
+            {/* Stats Cards - Glassmorphism */}
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4"
             >
-              <Card>
+              <Card className="backdrop-blur-md bg-card/80 dark:bg-card/90 border-border/40 dark:border-border/60 shadow-lg">
                 <CardContent className="pt-3 sm:pt-4 text-center p-3 sm:p-4">
-                  <Scale className="h-4 w-4 sm:h-5 sm:w-5 mx-auto text-primary mb-1 sm:mb-2" />
-                  <p className="text-lg sm:text-2xl font-bold">{currentWeight.toFixed(1)}</p>
-                  <p className="text-[10px] sm:text-xs text-muted-foreground">Peso Atual</p>
+                  <div className="w-10 h-10 mx-auto mb-2 rounded-full bg-primary/10 flex items-center justify-center">
+                    <Scale className="h-5 w-5 text-primary" />
+                  </div>
+                  <p className="text-lg sm:text-2xl font-bold tabular-nums">{currentWeight.toFixed(1)}</p>
+                  <p className="text-[10px] sm:text-xs text-muted-foreground">Peso Atual (kg)</p>
                 </CardContent>
               </Card>
 
-              <Card>
+              <Card className="backdrop-blur-md bg-card/80 dark:bg-card/90 border-border/40 dark:border-border/60 shadow-lg">
                 <CardContent className="pt-3 sm:pt-4 text-center p-3 sm:p-4">
-                  <Target className="h-4 w-4 sm:h-5 sm:w-5 mx-auto text-accent mb-1 sm:mb-2" />
-                  <p className="text-lg sm:text-2xl font-bold">{adherenceRate}%</p>
+                  <div className="w-10 h-10 mx-auto mb-2 rounded-full bg-accent/10 flex items-center justify-center">
+                    <Target className="h-5 w-5 text-accent" />
+                  </div>
+                  <p className="text-lg sm:text-2xl font-bold tabular-nums">{adherenceRate}%</p>
                   <p className="text-[10px] sm:text-xs text-muted-foreground">Adesão</p>
                 </CardContent>
               </Card>
 
-              <Card>
+              <Card className="backdrop-blur-md bg-card/80 dark:bg-card/90 border-border/40 dark:border-border/60 shadow-lg">
                 <CardContent className="pt-3 sm:pt-4 text-center p-3 sm:p-4">
-                  <CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5 mx-auto text-green-500 mb-1 sm:mb-2" />
-                  <p className="text-lg sm:text-2xl font-bold">{completeDays}</p>
+                  <div className="w-10 h-10 mx-auto mb-2 rounded-full bg-success/10 flex items-center justify-center">
+                    <CheckCircle2 className="h-5 w-5 text-success" />
+                  </div>
+                  <p className="text-lg sm:text-2xl font-bold tabular-nums">{completeDays}</p>
                   <p className="text-[10px] sm:text-xs text-muted-foreground">Dias Completos</p>
                 </CardContent>
               </Card>
 
-              <Card>
+              <Card className="backdrop-blur-md bg-card/80 dark:bg-card/90 border-border/40 dark:border-border/60 shadow-lg">
                 <CardContent className="pt-3 sm:pt-4 text-center p-3 sm:p-4">
-                  <Calendar className="h-4 w-4 sm:h-5 sm:w-5 mx-auto text-muted-foreground mb-1 sm:mb-2" />
-                  <p className="text-lg sm:text-2xl font-bold">{totalTrackedDays}</p>
+                  <div className="w-10 h-10 mx-auto mb-2 rounded-full bg-muted flex items-center justify-center">
+                    <Calendar className="h-5 w-5 text-muted-foreground" />
+                  </div>
+                  <p className="text-lg sm:text-2xl font-bold tabular-nums">{totalTrackedDays}</p>
                   <p className="text-[10px] sm:text-xs text-muted-foreground">Dias Rastreados</p>
                 </CardContent>
               </Card>
@@ -209,7 +217,7 @@ export default function Progress() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.1 }}
             >
-              <Card>
+              <Card className="backdrop-blur-md bg-card/80 dark:bg-card/90 border-border/40 dark:border-border/60 shadow-lg">
                 <CardHeader>
                   <CardTitle className="text-base">Calorias Consumidas</CardTitle>
                   <CardDescription>
