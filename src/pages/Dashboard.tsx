@@ -20,6 +20,7 @@ import { DashboardSkeleton } from '@/components/DashboardSkeleton';
 import { SuccessAnimation } from '@/components/SuccessAnimation';
 import { QuickActionsBar } from '@/components/QuickActionsBar';
 import { CollapsibleMetrics } from '@/components/CollapsibleMetrics';
+import { NutritionalValidationAlert } from '@/components/NutritionalValidationAlert';
 
 import { useTutorial } from '@/hooks/useTutorial';
 import { useAuth } from '@/contexts/AuthContext';
@@ -30,6 +31,7 @@ import { useAccountPermissions } from '@/hooks/useAccountPermissions';
 import { useUsageLimits } from '@/hooks/useUsageLimits';
 import { useSuccessSound } from '@/hooks/useSuccessSound';
 import { useMetabolicCalculations } from '@/hooks/useMetabolicCalculations';
+import { useNutritionalValidation } from '@/hooks/useNutritionalValidation';
 import { supabase } from '@/integrations/supabase/client';
 import { DietPlan, Meal } from '@/lib/types';
 import { toast } from 'sonner';
@@ -64,6 +66,39 @@ export default function Dashboard() {
   const [todayMealsLogged, setTodayMealsLogged] = useState(0);
   
   const metabolicData = useMetabolicCalculations(profile);
+  const nutritionalValidation = useNutritionalValidation(profile);
+
+  // Aplica as recomendações nutricionais calculadas
+  const handleApplyRecommendations = async () => {
+    if (!nutritionalValidation.recommendations) return;
+    
+    try {
+      const { calories, protein, carbs, fat } = nutritionalValidation.recommendations;
+      
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          daily_calories: calories,
+          protein_target: protein,
+          carbs_target: carbs,
+          fat_target: fat,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('user_id', profile?.user_id);
+
+      if (error) throw error;
+
+      toast.success('Metas nutricionais atualizadas!', {
+        description: `Calorias: ${calories} | P: ${protein}g | C: ${carbs}g | G: ${fat}g`
+      });
+      
+      // Refresh page to update UI
+      window.location.reload();
+    } catch (error: any) {
+      console.error('Error applying recommendations:', error);
+      toast.error(error.message || 'Erro ao aplicar recomendações');
+    }
+  };
 
   // Handle checkout success
   useEffect(() => {
@@ -255,6 +290,17 @@ export default function Dashboard() {
                   metabolicData={metabolicData}
                   weight={profile?.weight}
                   goal={profile?.goal}
+                />
+              </FadeInView>
+            )}
+
+            {/* Nutritional Validation Alert */}
+            {nutritionalValidation.issues.length > 0 && (
+              <FadeInView delay={0.1} direction="up">
+                <NutritionalValidationAlert
+                  validation={nutritionalValidation}
+                  onApplyRecommendations={handleApplyRecommendations}
+                  showApplyButton={!isLinkedStudent}
                 />
               </FadeInView>
             )}
