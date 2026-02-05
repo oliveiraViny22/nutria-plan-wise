@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
-import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
   ArrowLeft,
@@ -7,11 +7,14 @@ import {
   Loader2,
   ThumbsDown,
   AlertTriangle,
+  Lock,
+  Save,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { MobileNav } from '@/components/MobileNav';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { MacroChart } from '@/components/MacroChart';
+import { HiddenMacroValue } from '@/components/HiddenMacroValue';
 
 import { supabase } from '@/integrations/supabase/client';
 import { useLinkedStudent } from '@/hooks/useLinkedStudent';
@@ -21,7 +24,7 @@ import { useSubscription } from '@/hooks/useSubscription';
 import { useSubstitution } from '@/hooks/useSubstitution';
 import { useUsageLimits } from '@/hooks/useUsageLimits';
 import { useAuth } from '@/contexts/AuthContext';
-import { Meal, Food, MEAL_NAMES, MealType, MealOption, MealOptionFood } from '@/lib/types';
+import { Meal, Food, MEAL_NAMES, MealType, MealOption, MealOptionFood, DietPlan } from '@/lib/types';
 import { getCategoryLabel, getCategoryColor, isValidCategory } from '@/lib/food-categories';
 import { toast } from 'sonner';
 import { SubstitutionModal } from '@/components/SubstitutionModal';
@@ -109,6 +112,7 @@ export default function MealDetail() {
   const canRemoveDirectly = isProfessional && isProfessionalViewingStudent;
   
   const [meal, setMeal] = useState<Meal | null>(null);
+  const [dietPlan, setDietPlan] = useState<DietPlan | null>(null);
   const [mealOptions, setMealOptions] = useState<MealOption[]>([]);
   const [selectedOption, setSelectedOption] = useState<string>('1');
   const [allFoods, setAllFoods] = useState<Food[]>([]);
@@ -117,6 +121,9 @@ export default function MealDetail() {
   const [selectedMealOptionFood, setSelectedMealOptionFood] = useState<MealOptionFood | null>(null);
   const [currentOptionId, setCurrentOptionId] = useState<string | null>(null);
   const [showUpgradeDialog, setShowUpgradeDialog] = useState(false);
+  
+  // Check if plan is saved (gate logic)
+  const isPlanSaved = dietPlan?.is_saved ?? true;
   
   // Dialog de remoção (apenas para profissionais)
   const [showRemoveDialog, setShowRemoveDialog] = useState(false);
@@ -171,6 +178,17 @@ export default function MealDetail() {
       }
       
       setMeal(mealData as Meal);
+
+      // Fetch diet plan to check is_saved status
+      const { data: planData, error: planError } = await supabase
+        .from('diet_plans')
+        .select('*')
+        .eq('id', mealData.diet_plan_id)
+        .single();
+
+      if (!planError && planData) {
+        setDietPlan(planData as DietPlan);
+      }
 
       const { data: optionsData, error: optionsError } = await supabase
         .from('meal_options')
@@ -471,8 +489,33 @@ export default function MealDetail() {
       </header>
 
       <main className="container mx-auto px-3 sm:px-4 py-4 sm:py-6 space-y-4 pb-safe">
+        {/* Plan Not Saved Warning */}
+        {!isPlanSaved && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="card-premium rounded-xl p-4 flex items-center gap-3"
+          >
+            <div className="p-2.5 rounded-lg gradient-gold shadow-sm">
+              <Lock className="w-5 h-5 text-primary-foreground" />
+            </div>
+            <div className="flex-1">
+              <h3 className="font-display font-semibold text-foreground tracking-tight">Plano não salvo</h3>
+              <p className="text-sm text-muted-foreground">
+                Salve seu plano no Dashboard para ver quantidades e macros detalhados.
+              </p>
+            </div>
+            <Link to="/dashboard">
+              <Button variant="premium" size="sm" className="gap-2">
+                <Save className="w-4 h-4" />
+                <span className="hidden sm:inline">Ir para Dashboard</span>
+              </Button>
+            </Link>
+          </motion.div>
+        )}
+
         {/* Warning de limite próximo de substituições */}
-        {substitutionLimitNear && (
+        {substitutionLimitNear && isPlanSaved && (
           <motion.div
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
@@ -508,15 +551,26 @@ export default function MealDetail() {
               <TabsContent key={option.id} value={option.option_number.toString()} className="space-y-4 mt-4">
                 <motion.section initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="card-elevated rounded-xl p-4">
                   <div className="flex items-center justify-between mb-3">
-                    <h2 className="font-semibold text-sm">Macros da Opção {option.option_number}</h2>
-                    <Badge variant="secondary" className="text-xs">{option.total_calories} kcal</Badge>
+                    <h2 className="font-display font-semibold text-sm tracking-tight">Macros da Opção {option.option_number}</h2>
+                    {isPlanSaved ? (
+                      <Badge variant="secondary" className="text-xs">{option.total_calories} kcal</Badge>
+                    ) : (
+                      <Badge variant="secondary" className="text-xs blur-sm select-none">░░░ kcal</Badge>
+                    )}
                   </div>
-                  <MacroChart protein={option.total_protein} carbs={option.total_carbs} fat={option.total_fat}
-                    proteinTarget={option.total_protein} carbsTarget={option.total_carbs} fatTarget={option.total_fat} />
+                  {isPlanSaved ? (
+                    <MacroChart protein={option.total_protein} carbs={option.total_carbs} fat={option.total_fat}
+                      proteinTarget={option.total_protein} carbsTarget={option.total_carbs} fatTarget={option.total_fat} />
+                  ) : (
+                    <div className="space-y-4 blur-sm select-none pointer-events-none">
+                      <MacroChart protein={100} carbs={150} fat={50}
+                        proteinTarget={100} carbsTarget={150} fatTarget={50} />
+                    </div>
+                  )}
                 </motion.section>
 
                 <motion.section initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-3">
-                  <h2 className="font-semibold text-sm">Alimentos</h2>
+                  <h2 className="font-display font-semibold text-sm tracking-tight">Alimentos</h2>
                   {option.foods?.map((optionFood: MealOptionFood) => {
                     const food = optionFood.food as Food;
                     if (!food) return null;
@@ -537,15 +591,30 @@ export default function MealDetail() {
                                 </span>
                               )}
                             </div>
-                            <p className="text-xs text-muted-foreground mt-0.5">{qty}{getUnit(food.serving_size)}</p>
-                            <div className="flex flex-wrap gap-2 mt-2">
-                              <Badge variant="outline" className="text-[10px]">{nutrients.calories} kcal</Badge>
-                              <Badge variant="outline" className="text-[10px]">P: {nutrients.protein}g</Badge>
-                              <Badge variant="outline" className="text-[10px]">C: {nutrients.carbs}g</Badge>
-                              <Badge variant="outline" className="text-[10px]">G: {nutrients.fat}g</Badge>
-                            </div>
+                            {isPlanSaved ? (
+                              <>
+                                <p className="text-xs text-muted-foreground mt-0.5">{qty}{getUnit(food.serving_size)}</p>
+                                <div className="flex flex-wrap gap-2 mt-2">
+                                  <Badge variant="outline" className="text-[10px]">{nutrients.calories} kcal</Badge>
+                                  <Badge variant="outline" className="text-[10px]">P: {nutrients.protein}g</Badge>
+                                  <Badge variant="outline" className="text-[10px]">C: {nutrients.carbs}g</Badge>
+                                  <Badge variant="outline" className="text-[10px]">G: {nutrients.fat}g</Badge>
+                                </div>
+                              </>
+                            ) : (
+                              <>
+                                <p className="text-xs text-muted-foreground mt-0.5 blur-sm select-none">???g</p>
+                                <div className="flex flex-wrap gap-2 mt-2 blur-sm select-none">
+                                  <Badge variant="outline" className="text-[10px]">░░░ kcal</Badge>
+                                  <Badge variant="outline" className="text-[10px]">P: ░░g</Badge>
+                                  <Badge variant="outline" className="text-[10px]">C: ░░g</Badge>
+                                  <Badge variant="outline" className="text-[10px]">G: ░░g</Badge>
+                                </div>
+                              </>
+                            )}
                           </div>
-                          <div className="flex flex-col gap-1">
+                          {isPlanSaved && (
+                            <div className="flex flex-col gap-1">
                             {/* Botão de substituição para alimentos substituíveis */}
                             {canSub && (
                               <TooltipProvider>
@@ -620,6 +689,7 @@ export default function MealDetail() {
                               </TooltipProvider>
                             )}
                           </div>
+                          )}
                         </div>
                       </div>
                     );
