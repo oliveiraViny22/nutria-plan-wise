@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { StreakBadge } from '@/components/ui-kit/StatusBadge';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { 
@@ -236,29 +237,23 @@ export function AdherenceStreak() {
                 <Flame 
                   className={`w-7 h-7 ${streak.currentStreak > 0 ? 'text-white' : 'text-muted-foreground'}`} 
                 />
-                {streak.currentStreak > 0 && (
-                  <motion.div
-                    initial={{ scale: 0, rotate: -10 }}
-                    animate={{ scale: 1, rotate: 0 }}
-                    transition={{ delay: 0.3, type: 'spring', stiffness: 300 }}
-                    className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-background border-2 border-primary flex items-center justify-center shadow-md"
-                  >
-                    <span className="text-xs font-bold text-primary counter-value">
-                      {streak.currentStreak}
-                    </span>
-                  </motion.div>
-                )}
               </motion.div>
 
               {/* Streak Info */}
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-1 flex-wrap">
-                  <h3 className="font-semibold text-foreground text-sm">
-                    {streak.currentStreak === 0 
-                      ? 'Comece sua sequência!' 
-                      : `${streak.currentStreak} ${streak.currentStreak === 1 ? 'dia' : 'dias'} seguidos`
-                    }
-                  </h3>
+                  {streak.currentStreak === 0 ? (
+                    <h3 className="font-semibold text-foreground text-sm">
+                      Comece sua sequência!
+                    </h3>
+                  ) : (
+                    <StreakBadge 
+                      days={streak.currentStreak} 
+                      size="md" 
+                      showFire={false}
+                      milestone={!!currentMilestone && currentMilestone.days >= 14}
+                    />
+                  )}
                   {currentMilestone && (
                     <Badge 
                       variant="secondary" 
