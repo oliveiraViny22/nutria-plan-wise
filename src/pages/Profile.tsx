@@ -4,19 +4,12 @@ import { motion } from 'framer-motion';
 import { 
   User, 
   Loader2,
-  Target,
   Utensils,
   Trash2,
   AlertTriangle,
   Lock,
-  Calendar,
-  Ruler,
-  Weight,
-  UserCircle,
   Apple,
-  Info,
-  Moon,
-  Check
+  ChevronDown
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -24,7 +17,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Badge } from '@/components/ui/badge';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -44,10 +37,6 @@ import { NutritionalValidationAlert } from '@/components/NutritionalValidationAl
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import {
-  ACTIVITY_LEVELS,
-  GOALS,
-} from '@/lib/types';
 import { ObjectiveChangeWizard } from '@/components/ObjectiveChangeWizard';
 import { StudentObjectiveRequestDialog } from '@/components/StudentObjectiveRequestDialog';
 import { UpgradeDialog } from '@/components/UpgradeDialog';
@@ -56,24 +45,14 @@ import { SupplementToggle } from '@/components/SupplementToggle';
 import { useLinkedStudent } from '@/hooks/useLinkedStudent';
 import { useSubscription } from '@/hooks/useSubscription';
 import { useNutritionalValidation } from '@/hooks/useNutritionalValidation';
+import {
+  CompactProfileData,
+  CompactObjectiveDisplay,
+  CompactMealPreferences,
+  InlineBadgeList,
+} from '@/components/profile';
 
 const ADMIN_EMAIL = "admin@nutriaplan.com";
-
-// Ícones para objetivos
-const GOAL_ICONS = {
-  lose_weight: '🔥',
-  maintain: '⚖️',
-  gain_muscle: '💪',
-};
-
-// Ícones para níveis de atividade
-const ACTIVITY_ICONS = {
-  sedentary: '🛋️',
-  light: '🚶',
-  moderate: '🏃',
-  active: '🏋️',
-  very_active: '🏆',
-};
 
 export default function Profile() {
   const navigate = useNavigate();
@@ -84,6 +63,7 @@ export default function Profile() {
   const [showObjectiveWizard, setShowObjectiveWizard] = useState(false);
   const [showStudentRequestDialog, setShowStudentRequestDialog] = useState(false);
   const [showUpgradeDialog, setShowUpgradeDialog] = useState(false);
+  const [dangerZoneOpen, setDangerZoneOpen] = useState(false);
   
   const { isLinkedStudent, professionalId } = useLinkedStudent();
   const { subscriptionInfo } = useSubscription();
@@ -107,60 +87,6 @@ export default function Profile() {
   });
 
   const [savingPreference, setSavingPreference] = useState(false);
-
-  // Opções de preferência noturna (para 6 refeições - distribuição)
-  const EVENING_MEAL_OPTIONS = [
-    { 
-      value: 'full_dinner' as const, 
-      label: 'Jantar completo + Ceia leve',
-      description: 'Jantar com 3-5 itens, ceia com 2-3 itens',
-      icon: '🍽️'
-    },
-    { 
-      value: 'light_dinner' as const, 
-      label: 'Jantar leve + Ceia substancial',
-      description: 'Jantar com 2-3 itens, ceia com 3-5 itens',
-      icon: '🌙'
-    },
-    { 
-      value: 'no_preference' as const, 
-      label: 'Sem preferência',
-      description: 'O sistema decide a melhor distribuição',
-      icon: '⚖️'
-    },
-  ];
-
-  // Opções de tipo de refeição noturna única (para 3-5 refeições)
-  const LAST_EVENING_MEAL_OPTIONS = [
-    { 
-      value: 'dinner' as const, 
-      label: '🍽️ Jantar',
-      description: 'Refeição quente e completa com proteína, carboidrato e vegetais',
-      examples: 'Ex: Frango grelhado, arroz, feijão e salada'
-    },
-    { 
-      value: 'supper' as const, 
-      label: '🌙 Ceia',
-      description: 'Refeição leve e prática, ideal para quem prefere algo mais leve à noite',
-      examples: 'Ex: Sanduíche natural, iogurte com frutas, omelete'
-    },
-  ];
-
-  // Opções de preferência de lanche (para 4 refeições)
-  const SNACK_PREFERENCE_OPTIONS = [
-    { 
-      value: 'morning_snack' as const, 
-      label: '☀️ Lanche da Manhã',
-      description: 'Entre café da manhã e almoço, ideal para quem acorda cedo',
-      examples: 'Ex: Frutas, iogurte, castanhas'
-    },
-    { 
-      value: 'afternoon_snack' as const, 
-      label: '🌅 Lanche da Tarde',
-      description: 'Entre almoço e jantar, ideal para manter a energia',
-      examples: 'Ex: Sanduíche, smoothie, mix de frutas'
-    },
-  ];
 
   useEffect(() => {
     if (profile) {
@@ -276,9 +202,7 @@ export default function Profile() {
       if (error) throw error;
 
       setFormData(prev => ({ ...prev, evening_meal_preference: value }));
-      toast.success('Preferência noturna atualizada!', {
-        description: 'A alteração será aplicada ao gerar um novo plano.'
-      });
+      toast.success('Preferência noturna atualizada!');
       await refreshProfile();
     } catch (error: any) {
       console.error('Error saving evening preference:', error);
@@ -304,11 +228,7 @@ export default function Profile() {
       if (error) throw error;
 
       setFormData(prev => ({ ...prev, last_evening_meal: value }));
-      toast.success('Tipo de refeição noturna atualizado!', {
-        description: value === 'dinner' 
-          ? 'Seu plano terá Jantar como refeição noturna.' 
-          : 'Seu plano terá Ceia como refeição noturna.'
-      });
+      toast.success('Refeição noturna atualizada!');
       await refreshProfile();
     } catch (error: any) {
       console.error('Error saving last evening meal:', error);
@@ -334,11 +254,7 @@ export default function Profile() {
       if (error) throw error;
 
       setFormData(prev => ({ ...prev, snack_preference: value }));
-      toast.success('Preferência de lanche atualizada!', {
-        description: value === 'morning_snack' 
-          ? 'Seu lanche será no meio da manhã.' 
-          : 'Seu lanche será no meio da tarde.'
-      });
+      toast.success('Preferência de lanche atualizada!');
       await refreshProfile();
     } catch (error: any) {
       console.error('Error saving snack preference:', error);
@@ -348,16 +264,6 @@ export default function Profile() {
     }
   };
 
-  const getSexLabel = (sex: string) => {
-    switch (sex) {
-      case 'male': return 'Masculino';
-      case 'female': return 'Feminino';
-      case 'other': return 'Outro';
-      default: return '-';
-    }
-  };
-
-  // Aplica as recomendações nutricionais calculadas
   const handleApplyRecommendations = async () => {
     if (!user || !nutritionalValidation.recommendations) return;
     
@@ -419,238 +325,89 @@ export default function Profile() {
         {/* Page Header */}
         <PageHeader
           title="Meu Perfil"
-          description="Gerencie suas informações pessoais e preferências alimentares"
+          description="Gerencie suas informações e preferências"
           icon={<User className="w-5 h-5" />}
           backTo="/dashboard"
           backLabel="Dashboard"
-          className="mb-6"
+          className="mb-4"
         />
-        <Tabs defaultValue="personal" className="space-y-4 sm:space-y-6">
-          {/* Tabs - Consolidated to 2 tabs */}
+
+        <Tabs defaultValue="personal" className="space-y-4">
+          {/* Tabs */}
           <TabsList className="grid w-full grid-cols-2 h-auto">
-            <TabsTrigger value="personal" className="text-xs sm:text-sm py-2.5 sm:py-3 px-2 sm:px-4">
-              <User className="h-4 w-4 mr-1.5 sm:mr-2" />
+            <TabsTrigger value="personal" className="text-xs sm:text-sm py-2 px-2 sm:px-4">
+              <User className="h-4 w-4 mr-1.5" />
               <span>Dados Pessoais</span>
             </TabsTrigger>
-            <TabsTrigger value="diet" className="text-xs sm:text-sm py-2.5 sm:py-3 px-2 sm:px-4">
-              <Utensils className="h-4 w-4 mr-1.5 sm:mr-2" />
+            <TabsTrigger value="diet" className="text-xs sm:text-sm py-2 px-2 sm:px-4">
+              <Utensils className="h-4 w-4 mr-1.5" />
               <span>Dieta & Alimentos</span>
             </TabsTrigger>
           </TabsList>
 
-          {/* Personal Data Tab - Includes Objective */}
+          {/* Personal Data Tab */}
           <TabsContent value="personal">
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              className="space-y-6"
+              className="space-y-4"
             >
-              {/* Personal Info Card */}
+              {/* Compact Personal Info Card */}
               <Card>
-                <CardHeader className="pb-4">
+                <CardHeader className="pb-3">
                   <div className="flex items-center justify-between">
-                    <div>
-                      <CardTitle className="flex items-center gap-2">
-                        <UserCircle className="h-5 w-5 text-primary" />
-                        Informações Pessoais
-                      </CardTitle>
-                      <CardDescription>Definidas no cadastro</CardDescription>
-                    </div>
-                    <Badge variant="secondary" className="gap-1">
-                      <Lock className="h-3 w-3" />
-                      Somente leitura
-                    </Badge>
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <User className="h-4 w-4 text-primary" />
+                      Informações Pessoais
+                    </CardTitle>
+                    <TooltipProvider delayDuration={200}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div className="flex items-center gap-1 text-xs text-muted-foreground cursor-help">
+                            <Lock className="h-3 w-3" />
+                            <span className="hidden sm:inline">Somente leitura</span>
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent side="left" className="max-w-xs p-3">
+                          <p className="font-semibold mb-1">Por que não posso alterar?</p>
+                          <p className="text-sm text-muted-foreground">
+                            Os dados pessoais são fixados no cadastro para garantir a precisão 
+                            do seu histórico e evolução nutricional.
+                          </p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
                   </div>
                 </CardHeader>
                 <CardContent>
-                  {/* Info Banner */}
-                  <div className="bg-muted/50 rounded-lg p-4 mb-6 flex items-start gap-3">
-                    <Lock className="h-5 w-5 text-muted-foreground shrink-0 mt-0.5" />
-                    <div className="text-sm text-muted-foreground">
-                      <p className="font-medium text-foreground mb-1">Por que não posso alterar?</p>
-                      <p>
-                        Os dados pessoais são fixados no cadastro para garantir a precisão 
-                        do seu histórico e evolução nutricional.
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Personal Data Display */}
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    {/* Name */}
-                    <div className="col-span-full p-4 rounded-xl bg-muted/30 border">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                          <User className="h-5 w-5 text-primary" />
-                        </div>
-                        <div>
-                          <p className="text-xs text-muted-foreground uppercase tracking-wide">Nome</p>
-                          <p className="font-semibold text-lg">{formData.name || '-'}</p>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Age */}
-                    <div className="p-4 rounded-xl bg-muted/30 border">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                          <Calendar className="h-5 w-5 text-primary" />
-                        </div>
-                        <div>
-                          <p className="text-xs text-muted-foreground uppercase tracking-wide">Idade</p>
-                          <p className="font-semibold text-lg">{formData.age ? `${formData.age} anos` : '-'}</p>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Sex */}
-                    <div className="p-4 rounded-xl bg-muted/30 border">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                          <UserCircle className="h-5 w-5 text-primary" />
-                        </div>
-                        <div>
-                          <p className="text-xs text-muted-foreground uppercase tracking-wide">Sexo</p>
-                          <p className="font-semibold text-lg">{getSexLabel(formData.sex)}</p>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Height */}
-                    <div className="p-4 rounded-xl bg-muted/30 border">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                          <Ruler className="h-5 w-5 text-primary" />
-                        </div>
-                        <div>
-                          <p className="text-xs text-muted-foreground uppercase tracking-wide">Altura</p>
-                          <p className="font-semibold text-lg">{formData.height ? `${formData.height} cm` : '-'}</p>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Weight */}
-                    <div className="p-4 rounded-xl bg-muted/30 border">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                          <Weight className="h-5 w-5 text-primary" />
-                        </div>
-                        <div>
-                          <p className="text-xs text-muted-foreground uppercase tracking-wide">Peso</p>
-                          <p className="font-semibold text-lg">{formData.weight ? `${formData.weight} kg` : '-'}</p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+                  <CompactProfileData
+                    name={formData.name}
+                    age={formData.age}
+                    sex={formData.sex}
+                    height={formData.height}
+                    weight={formData.weight}
+                  />
                 </CardContent>
               </Card>
 
-              {/* Objective Card - Moved from Goals tab */}
+              {/* Compact Objective Card */}
               <Card>
-                <CardHeader className="pb-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <CardTitle className="flex items-center gap-2">
-                        <Target className="h-5 w-5 text-primary" />
-                        Objetivo Principal
-                      </CardTitle>
-                      <CardDescription>Definido no cadastro</CardDescription>
-                    </div>
-                    <Badge variant="secondary" className="gap-1">
-                      <Lock className="h-3 w-3" />
-                      Somente leitura
-                    </Badge>
-                  </div>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Utensils className="h-4 w-4 text-primary" />
+                    Objetivo & Atividade
+                  </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  {/* Info Banner */}
-                  <div className="bg-muted/50 rounded-lg p-4 mb-6 flex items-start gap-3">
-                    <Lock className="h-5 w-5 text-muted-foreground shrink-0 mt-0.5" />
-                    <div className="text-sm text-muted-foreground">
-                      <p className="font-medium text-foreground mb-1">Por que não posso alterar?</p>
-                      <p>
-                        O objetivo e nível de atividade são fixados para manter a consistência 
-                        do seu plano alimentar e histórico de adesão.
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Goal Display */}
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    {/* Current Goal */}
-                    <div className="p-4 rounded-xl bg-muted/30 border">
-                      <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center text-2xl">
-                          {formData.goal ? GOAL_ICONS[formData.goal as keyof typeof GOAL_ICONS] : '🎯'}
-                        </div>
-                        <div>
-                          <p className="text-xs text-muted-foreground uppercase tracking-wide">Objetivo</p>
-                          <p className="font-semibold text-lg">
-                            {formData.goal ? GOALS[formData.goal as keyof typeof GOALS]?.label : '-'}
-                          </p>
-                          {formData.goal && (
-                            <p className="text-xs text-muted-foreground">
-                              {GOALS[formData.goal as keyof typeof GOALS]?.calorieAdjustment > 0 ? '+' : ''}
-                              {GOALS[formData.goal as keyof typeof GOALS]?.calorieAdjustment} kcal/dia
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Current Activity Level */}
-                    <div className="p-4 rounded-xl bg-muted/30 border">
-                      <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center text-2xl">
-                          {formData.activity_level ? ACTIVITY_ICONS[formData.activity_level as keyof typeof ACTIVITY_ICONS] : '🏃'}
-                        </div>
-                        <div>
-                          <p className="text-xs text-muted-foreground uppercase tracking-wide">Nível de Atividade</p>
-                          <p className="font-semibold text-lg">
-                            {formData.activity_level ? ACTIVITY_LEVELS[formData.activity_level as keyof typeof ACTIVITY_LEVELS]?.label : '-'}
-                          </p>
-                          {formData.activity_level && (
-                            <p className="text-xs text-muted-foreground">
-                              {ACTIVITY_LEVELS[formData.activity_level as keyof typeof ACTIVITY_LEVELS]?.description}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Request Change Button */}
-                  <div className="mt-6 pt-4 border-t">
-                    {isLinkedStudent && professionalId ? (
-                      <Button 
-                        variant="outline" 
-                        className="w-full"
-                        onClick={() => setShowStudentRequestDialog(true)}
-                      >
-                        <Target className="h-4 w-4 mr-2" />
-                        Solicitar Alteração ao Profissional
-                      </Button>
-                    ) : isPaidUser ? (
-                      <Button 
-                        variant="outline" 
-                        className="w-full"
-                        onClick={() => setShowObjectiveWizard(true)}
-                      >
-                        <Target className="h-4 w-4 mr-2" />
-                        Alterar Objetivo
-                      </Button>
-                    ) : (
-                      <Button 
-                        variant="outline" 
-                        className="w-full"
-                        onClick={() => setShowUpgradeDialog(true)}
-                      >
-                        <Lock className="h-4 w-4 mr-2" />
-                        Alterar Objetivo
-                        <Badge variant="secondary" className="ml-2 text-xs">Pro</Badge>
-                      </Button>
-                    )}
-                  </div>
+                  <CompactObjectiveDisplay
+                    goal={formData.goal}
+                    activityLevel={formData.activity_level}
+                    isLinkedStudent={isLinkedStudent}
+                    isPaidUser={isPaidUser}
+                    onRequestChange={() => setShowObjectiveWizard(true)}
+                    onStudentRequest={() => setShowStudentRequestDialog(true)}
+                    onUpgrade={() => setShowUpgradeDialog(true)}
+                  />
                 </CardContent>
               </Card>
 
@@ -661,319 +418,150 @@ export default function Profile() {
                 showApplyButton={!isLinkedStudent}
               />
 
-              {/* Delete Account Section */}
+              {/* Collapsible Delete Account Section */}
               {!isAdmin && (
-                <Card className="border-destructive/30 bg-destructive/5">
-                  <CardHeader>
-                    <CardTitle className="text-destructive flex items-center gap-2">
-                      <AlertTriangle className="h-5 w-5" />
-                      Zona de Perigo
-                    </CardTitle>
-                    <CardDescription>
-                      Ações irreversíveis para sua conta
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button variant="destructive" className="w-full sm:w-auto">
-                          <Trash2 className="h-4 w-4 mr-2" />
-                          Excluir minha conta
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle className="flex items-center gap-2 text-destructive">
-                            <AlertTriangle className="h-5 w-5" />
-                            Excluir conta permanentemente?
-                          </AlertDialogTitle>
-                          <AlertDialogDescription className="space-y-3">
-                            <p>
-                              Esta ação é <strong>irreversível</strong>. Todos os seus dados serão excluídos permanentemente:
-                            </p>
-                            <ul className="list-disc list-inside text-sm space-y-1">
-                              <li>Perfil e informações pessoais</li>
-                              <li>Planos alimentares e histórico</li>
-                              <li>Registros de refeições e adesão</li>
-                              <li>Conversas com o chat nutricional</li>
-                            </ul>
-                            <div className="pt-2">
-                              <Label htmlFor="confirm-delete" className="text-sm font-medium">
-                                Digite <strong>EXCLUIR</strong> para confirmar:
-                              </Label>
-                              <Input
-                                id="confirm-delete"
-                                value={deleteConfirmText}
-                                onChange={(e) => setDeleteConfirmText(e.target.value.toUpperCase())}
-                                placeholder="EXCLUIR"
-                                className="mt-2"
-                              />
-                            </div>
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel onClick={() => setDeleteConfirmText('')}>
-                            Cancelar
-                          </AlertDialogCancel>
-                          <AlertDialogAction
-                            onClick={handleDeleteAccount}
-                            disabled={deleteConfirmText !== 'EXCLUIR' || deleting}
-                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                          >
-                            {deleting ? (
-                              <>
-                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                Excluindo...
-                              </>
-                            ) : (
-                              'Sim, excluir minha conta'
-                            )}
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  </CardContent>
-                </Card>
+                <Collapsible open={dangerZoneOpen} onOpenChange={setDangerZoneOpen}>
+                  <Card className="border-destructive/20">
+                    <CollapsibleTrigger asChild>
+                      <CardHeader className="pb-3 cursor-pointer hover:bg-muted/30 transition-colors">
+                        <div className="flex items-center justify-between">
+                          <CardTitle className="text-sm text-destructive flex items-center gap-2">
+                            <AlertTriangle className="h-4 w-4" />
+                            Zona de Perigo
+                          </CardTitle>
+                          <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${dangerZoneOpen ? 'rotate-180' : ''}`} />
+                        </div>
+                      </CardHeader>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <CardContent className="pt-0">
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="destructive" size="sm" className="w-full sm:w-auto">
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Excluir minha conta
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle className="flex items-center gap-2 text-destructive">
+                                <AlertTriangle className="h-5 w-5" />
+                                Excluir conta permanentemente?
+                              </AlertDialogTitle>
+                              <AlertDialogDescription className="space-y-3">
+                                <p>
+                                  Esta ação é <strong>irreversível</strong>. Todos os seus dados serão excluídos:
+                                </p>
+                                <ul className="list-disc list-inside text-sm space-y-1">
+                                  <li>Perfil e informações pessoais</li>
+                                  <li>Planos alimentares e histórico</li>
+                                  <li>Registros de refeições e adesão</li>
+                                </ul>
+                                <div className="pt-2">
+                                  <Label htmlFor="confirm-delete" className="text-sm font-medium">
+                                    Digite <strong>EXCLUIR</strong> para confirmar:
+                                  </Label>
+                                  <Input
+                                    id="confirm-delete"
+                                    value={deleteConfirmText}
+                                    onChange={(e) => setDeleteConfirmText(e.target.value.toUpperCase())}
+                                    placeholder="EXCLUIR"
+                                    className="mt-2"
+                                  />
+                                </div>
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel onClick={() => setDeleteConfirmText('')}>
+                                Cancelar
+                              </AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={handleDeleteAccount}
+                                disabled={deleteConfirmText !== 'EXCLUIR' || deleting}
+                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                              >
+                                {deleting ? (
+                                  <>
+                                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                    Excluindo...
+                                  </>
+                                ) : (
+                                  'Sim, excluir'
+                                )}
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </CardContent>
+                    </CollapsibleContent>
+                  </Card>
+                </Collapsible>
               )}
             </motion.div>
           </TabsContent>
 
-          {/* Diet & Foods Tab - Consolidated */}
+          {/* Diet & Foods Tab */}
           <TabsContent value="diet">
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              className="space-y-6"
+              className="space-y-4"
             >
               {/* Diet Configuration Card */}
               <Card>
-                <CardHeader className="pb-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <CardTitle className="flex items-center gap-2">
-                        <Utensils className="h-5 w-5 text-primary" />
-                        Configuração da Dieta
-                      </CardTitle>
-                      <CardDescription>Preferências de refeições</CardDescription>
-                    </div>
-                  </div>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Utensils className="h-4 w-4 text-primary" />
+                    Configuração da Dieta
+                  </CardTitle>
                 </CardHeader>
-                <CardContent>
-                  {/* Meals per Day Display */}
-                  <div className="p-4 rounded-xl bg-muted/30 border mb-6">
-                    <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
-                        <span className="text-2xl font-bold text-primary">{formData.meals_per_day}</span>
-                      </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground uppercase tracking-wide">Refeições por Dia</p>
-                        <p className="font-semibold text-lg">{formData.meals_per_day} refeições</p>
-                      </div>
-                    </div>
-                  </div>
+                <CardContent className="space-y-4">
+                  <CompactMealPreferences
+                    mealsPerDay={formData.meals_per_day}
+                    snackPreference={formData.snack_preference}
+                    lastEveningMeal={formData.last_evening_meal}
+                    eveningMealPreference={formData.evening_meal_preference}
+                    savingPreference={savingPreference}
+                    onSnackChange={handleSaveSnackPreference}
+                    onEveningMealChange={handleSaveLastEveningMeal}
+                    onEveningPreferenceChange={handleSaveEveningPreference}
+                  />
 
-                  {/* Preferences Display */}
-                  <div className="mb-6">
-                    <p className="text-sm font-medium mb-3">Preferências Alimentares</p>
-                    <div className="flex flex-wrap gap-2">
-                      {formData.preferences.length > 0 ? (
-                        formData.preferences.map((pref) => (
-                          <Badge key={pref} variant="secondary" className="px-3 py-1.5">
-                            {pref}
-                          </Badge>
-                        ))
-                      ) : (
-                        <span className="text-sm text-muted-foreground">Nenhuma preferência definida</span>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Restrictions Display */}
-                  <div className="mb-6">
-                    <p className="text-sm font-medium mb-3">Restrições Alimentares</p>
-                    <div className="flex flex-wrap gap-2">
-                      {formData.restrictions.length > 0 ? (
-                        formData.restrictions.map((rest) => (
-                          <Badge key={rest} variant="destructive" className="px-3 py-1.5">
-                            {rest}
-                          </Badge>
-                        ))
-                      ) : (
-                        <span className="text-sm text-muted-foreground">Nenhuma restrição definida</span>
-                      )}
-                    </div>
+                  {/* Inline Preferences & Restrictions */}
+                  <div className="pt-3 border-t border-border/50 space-y-2">
+                    <InlineBadgeList
+                      title="Preferências"
+                      items={formData.preferences}
+                      variant="secondary"
+                      emptyText="Nenhuma"
+                    />
+                    <InlineBadgeList
+                      title="Restrições"
+                      items={formData.restrictions}
+                      variant="destructive"
+                      emptyText="Nenhuma"
+                    />
                   </div>
 
                   {/* Supplement Toggle - Only for paid users */}
                   {isPaidUser && (
-                    <div className="mb-6">
-                      <p className="text-sm font-medium mb-3">Suplementação</p>
+                    <div className="pt-3 border-t border-border/50">
                       <SupplementToggle 
                         initialValue={(profile as any)?.include_supplements || false}
                       />
                     </div>
                   )}
-
-                  {/* Snack Preference Choice - For 4 meals */}
-                  {formData.meals_per_day === 4 && (
-                    <div className="mb-6">
-                      <div className="flex items-center gap-2 mb-3">
-                        <Utensils className="w-4 h-4 text-primary" />
-                        <p className="text-sm font-medium">Horário do Lanche</p>
-                        <TooltipProvider delayDuration={200}>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Info className="w-4 h-4 text-muted-foreground cursor-help" />
-                            </TooltipTrigger>
-                            <TooltipContent side="right" className="max-w-xs p-3">
-                              <p className="font-semibold mb-2">Lanche da Manhã vs Tarde</p>
-                              <ul className="text-sm space-y-2">
-                                <li><strong>☀️ Manhã:</strong> Entre café da manhã e almoço.</li>
-                                <li><strong>🌅 Tarde:</strong> Entre almoço e jantar.</li>
-                              </ul>
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                      </div>
-                      <div className="grid gap-2">
-                        {SNACK_PREFERENCE_OPTIONS.map((option) => (
-                          <button
-                            key={option.value}
-                            type="button"
-                            disabled={savingPreference}
-                            onClick={() => handleSaveSnackPreference(option.value)}
-                            className={`p-3 rounded-xl border text-left transition-all relative ${
-                              formData.snack_preference === option.value
-                                ? 'border-primary bg-primary/10'
-                                : 'border-border hover:border-primary/50'
-                            } ${savingPreference ? 'opacity-50 cursor-not-allowed' : ''}`}
-                          >
-                            <span className="font-medium text-foreground text-sm block">
-                              {option.label}
-                            </span>
-                            <span className="text-xs text-muted-foreground block">
-                              {option.description}
-                            </span>
-                            {formData.snack_preference === option.value && (
-                              <Check className="w-5 h-5 text-primary absolute top-3 right-3" />
-                            )}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Last Evening Meal Choice - For 3-5 meals */}
-                  {formData.meals_per_day >= 3 && formData.meals_per_day <= 5 && (
-                    <div className="mb-6">
-                      <div className="flex items-center gap-2 mb-3">
-                        <Moon className="w-4 h-4 text-primary" />
-                        <p className="text-sm font-medium">Tipo de Refeição Noturna</p>
-                        <TooltipProvider delayDuration={200}>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Info className="w-4 h-4 text-muted-foreground cursor-help" />
-                            </TooltipTrigger>
-                            <TooltipContent side="right" className="max-w-xs p-3">
-                              <p className="font-semibold mb-2">Jantar vs Ceia</p>
-                              <ul className="text-sm space-y-2">
-                                <li><strong>🍽️ Jantar:</strong> Refeição quente e completa.</li>
-                                <li><strong>🌙 Ceia:</strong> Refeição leve e prática.</li>
-                              </ul>
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                      </div>
-                      <div className="grid gap-2">
-                        {LAST_EVENING_MEAL_OPTIONS.map((option) => (
-                          <button
-                            key={option.value}
-                            type="button"
-                            disabled={savingPreference}
-                            onClick={() => handleSaveLastEveningMeal(option.value)}
-                            className={`p-3 rounded-xl border text-left transition-all relative ${
-                              formData.last_evening_meal === option.value
-                                ? 'border-primary bg-primary/10'
-                                : 'border-border hover:border-primary/50'
-                            } ${savingPreference ? 'opacity-50 cursor-not-allowed' : ''}`}
-                          >
-                            <span className="font-medium text-foreground text-sm block">
-                              {option.label}
-                            </span>
-                            <span className="text-xs text-muted-foreground block">
-                              {option.description}
-                            </span>
-                            {formData.last_evening_meal === option.value && (
-                              <Check className="w-5 h-5 text-primary absolute top-3 right-3" />
-                            )}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Evening Meal Preference - Only for 6 meals */}
-                  {formData.meals_per_day === 6 && (
-                    <div className="mb-6">
-                      <div className="flex items-center gap-2 mb-3">
-                        <Moon className="w-4 h-4 text-primary" />
-                        <p className="text-sm font-medium">Distribuição Noturna</p>
-                        <TooltipProvider delayDuration={200}>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Info className="w-4 h-4 text-muted-foreground cursor-help" />
-                            </TooltipTrigger>
-                            <TooltipContent side="right" className="max-w-xs p-3">
-                              <p className="font-semibold mb-2">Como isso afeta seu plano?</p>
-                              <p className="text-sm">
-                                Com 6 refeições você tem jantar E ceia. Esta escolha define 
-                                como as calorias são distribuídas entre eles.
-                              </p>
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                      </div>
-                      <div className="grid gap-2">
-                        {EVENING_MEAL_OPTIONS.map((option) => (
-                          <button
-                            key={option.value}
-                            type="button"
-                            disabled={savingPreference}
-                            onClick={() => handleSaveEveningPreference(option.value)}
-                            className={`p-3 rounded-xl border text-left transition-all flex items-center gap-3 ${
-                              formData.evening_meal_preference === option.value
-                                ? 'border-primary bg-primary/10'
-                                : 'border-border hover:border-primary/50'
-                            } ${savingPreference ? 'opacity-50 cursor-not-allowed' : ''}`}
-                          >
-                            <span className="text-xl">{option.icon}</span>
-                            <div className="flex-1">
-                              <span className="font-medium text-foreground text-sm block">
-                                {option.label}
-                              </span>
-                              <span className="text-xs text-muted-foreground">
-                                {option.description}
-                              </span>
-                            </div>
-                            {formData.evening_meal_preference === option.value && (
-                              <Check className="w-5 h-5 text-primary shrink-0" />
-                            )}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
                 </CardContent>
               </Card>
 
-              {/* Food Preferences Card - Moved from Foods tab */}
+              {/* Food Preferences Card */}
               <Card>
-                <CardHeader className="pb-4">
-                  <CardTitle className="flex items-center gap-2">
-                    <Apple className="h-5 w-5 text-primary" />
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Apple className="h-4 w-4 text-primary" />
                     Alimentos Favoritos e Evitados
                   </CardTitle>
-                  <CardDescription>Personalize seu plano alimentar</CardDescription>
+                  <CardDescription className="text-xs">Personalize seu plano alimentar</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <FoodPreferencesManager
