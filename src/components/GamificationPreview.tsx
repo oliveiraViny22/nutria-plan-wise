@@ -120,7 +120,7 @@ export function GamificationPreview({ isLocked }: GamificationPreviewProps) {
   }
 
   return (
-    <div className="flex flex-col gap-3 sm:gap-4 md:grid md:grid-cols-2">
+    <div className="flex flex-col gap-3 sm:gap-4 lg:grid lg:grid-cols-2">
       <LockedFeaturePreview
         featureName="Sequência de Adesão"
         featureKey="gamification_streak"
