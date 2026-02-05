@@ -66,6 +66,8 @@ import { toast } from 'sonner';
 import { FreePlanBadge } from '@/components/FeatureBadge';
 import { SavePlanButton } from '@/components/SavePlanButton';
 import { HiddenMacroBlock } from '@/components/HiddenMacroValue';
+import { HydrationCard } from '@/components/HydrationCard';
+import type { UserGoal } from '@/lib/hydration-recommendations';
 
 export default function Dashboard() {
   const { profile, signOut } = useAuth();
@@ -518,8 +520,8 @@ export default function Dashboard() {
           className="space-y-3 sm:space-y-4"
         >
 
-          {/* Calorie & Macros Row - Using NutritionCard */}
-          <div className="grid gap-4 sm:gap-5 grid-cols-1 sm:grid-cols-2">
+          {/* Calorie, Macros & Hydration Row - Using NutritionCard */}
+          <div className="grid gap-4 sm:gap-5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
             {/* Calorie Card */}
             <NutritionCard
               variant="metric"
@@ -548,6 +550,15 @@ export default function Dashboard() {
                 fatTarget={profile?.fat_target || 65}
               />
             </NutritionCard>
+
+            {/* Hydration Card */}
+            <div className="sm:col-span-2 lg:col-span-1">
+              <HydrationCard 
+                weight={profile?.weight} 
+                goal={(profile?.goal as UserGoal) || 'maintain'}
+                variant="card"
+              />
+            </div>
           </div>
 
 

@@ -14,6 +14,7 @@ import {
   Beef,
   Wheat,
   Droplets,
+  Droplet,
   AlertTriangle,
   Lock,
 } from 'lucide-react';
@@ -46,6 +47,7 @@ import { ProFeatureBadge } from '@/components/FeatureBadge';
 import { SupplementsPreview } from '@/components/SupplementsPreview';
  import { MealPlanPdf } from '@/components/MealPlanPdf';
 import { MetricCard, MacroBadge, FadeInView, AnimatedCounter } from '@/components/ui-kit';
+import { calculateHydration, getHydrationLabel } from '@/lib/hydration-recommendations';
 
 interface MealData {
   id: string;
@@ -409,7 +411,8 @@ export default function MealPlanPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {/* Grid 5 colunas no desktop, 2 no mobile - compacto para PDF */}
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-3 print:grid-cols-5 print:gap-2">
                 <MetricCard
                   label="Calorias"
                   value={planTotals.calories}
@@ -438,6 +441,25 @@ export default function MealPlanPage() {
                   icon={<Droplets className="h-4 w-4" />}
                   color="fat"
                 />
+                {/* Hydration Card */}
+                <Card className="bg-gradient-to-br from-card to-muted/20 border-border/30 col-span-2 md:col-span-1 print:col-span-1">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-lg shrink-0 bg-sky-500/10 text-sky-500">
+                        <Droplet className="h-4 w-4" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-muted-foreground truncate">Hidratação</p>
+                        <div className="flex items-baseline gap-1">
+                          <span className="text-2xl font-bold tabular-nums">
+                            {calculateHydration(profile?.weight, (profile?.goal as UserGoal) || 'maintain').liters}
+                          </span>
+                          <span className="text-sm text-muted-foreground">L</span>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
               </div>
             </CardContent>
           </Card>
