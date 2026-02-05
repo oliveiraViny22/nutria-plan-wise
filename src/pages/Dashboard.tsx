@@ -472,7 +472,7 @@ export default function Dashboard() {
         {metabolicData && (
           <FadeInView delay={0.05} direction="up">
             <TooltipProvider delayDuration={200}>
-              <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <div className="cursor-help">
@@ -504,13 +504,12 @@ export default function Dashboard() {
                   </TooltipTrigger>
                   <TooltipContent side="bottom" className="max-w-[280px] p-3">
                     <p className="font-semibold mb-1">TDEE - Gasto Energético Total</p>
-                    <p className="text-sm">Total de calorias que você gasta por dia, incluindo atividades físicas. Calculado via Mifflin-St Jeor.</p>
+                    <p className="text-sm">Total de calorias que você gasta por dia, incluindo atividades físicas.</p>
                   </TooltipContent>
                 </Tooltip>
-                {/* Hydration Card with Tooltip */}
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <div className="cursor-help col-span-2 lg:col-span-1">
+                    <div className="cursor-help">
                       <HydrationCard 
                         weight={profile?.weight} 
                         goal={(profile?.goal as UserGoal) || 'maintain'}
@@ -522,9 +521,9 @@ export default function Dashboard() {
                     <p className="font-semibold mb-1">💧 Hidratação Personalizada</p>
                     <p className="text-sm mb-2">
                       Calculado com base no seu peso ({profile?.weight || 70}kg × 35ml) 
-                      {profile?.goal === 'lose_weight' && ' + 15% para auxiliar no metabolismo e saciedade.'}
-                      {profile?.goal === 'gain_muscle' && ' + 20% para suportar a recuperação muscular.'}
-                      {profile?.goal === 'maintain' && ' para manutenção do equilíbrio hídrico.'}
+                      {profile?.goal === 'lose_weight' && ' + 15% para metabolismo.'}
+                      {profile?.goal === 'gain_muscle' && ' + 20% para recuperação.'}
+                      {profile?.goal === 'maintain' && ' para equilíbrio hídrico.'}
                     </p>
                     <p className="text-xs text-muted-foreground italic">
                       Ajuste conforme atividade física e clima.
