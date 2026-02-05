@@ -19,6 +19,13 @@ import {
   Beef,
   Wheat,
   Droplets,
+  Navigation,
+  Sparkles,
+  TrendingUp,
+  LayoutGrid,
+  ChevronRight,
+  FileText,
+  Users,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -47,6 +54,28 @@ import {
   StatusBadge,
   StreakBadge,
   PlanBadge,
+  // Navigation
+  PageHeader,
+  NavTabs,
+  BreadcrumbNav,
+  StepIndicator,
+  QuickActions,
+  // Data Visualization
+  ProgressRing,
+  MiniBarChart,
+  Sparkline,
+  StatComparison,
+  DonutChart,
+  // Micro-Interactions
+  PulseDot,
+  SkeletonLoader,
+  AnimatedCounter,
+  SuccessCheckmark,
+  LoadingSpinner,
+  InlineStatus,
+  HoverScale,
+  FadeInView,
+  ConfettiBurst,
 } from '@/components/ui-kit';
 
 export default function UIKit() {
@@ -132,8 +161,17 @@ export default function UIKit() {
             <TabsTrigger value="cards" className="gap-2">
               <Layers className="h-4 w-4" /> Cards
             </TabsTrigger>
+            <TabsTrigger value="navigation" className="gap-2">
+              <Navigation className="h-4 w-4" /> Navegação
+            </TabsTrigger>
+            <TabsTrigger value="dataviz" className="gap-2">
+              <BarChart3 className="h-4 w-4" /> Dados
+            </TabsTrigger>
             <TabsTrigger value="feedback" className="gap-2">
               <Bell className="h-4 w-4" /> Feedback
+            </TabsTrigger>
+            <TabsTrigger value="micro" className="gap-2">
+              <Sparkles className="h-4 w-4" /> Micro-Interações
             </TabsTrigger>
             <TabsTrigger value="nutrition" className="gap-2">
               <Utensils className="h-4 w-4" /> Nutrição
@@ -461,6 +499,204 @@ export default function UIKit() {
             </Card>
           </TabsContent>
 
+          {/* NAVIGATION TAB */}
+          <TabsContent value="navigation" className="space-y-8">
+            <Card>
+              <CardHeader>
+                <CardTitle>Componentes de Navegação</CardTitle>
+                <CardDescription>Headers, breadcrumbs, tabs e indicadores de passo</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-8">
+                {/* Page Header */}
+                <div>
+                  <h3 className="font-semibold mb-4">Page Header</h3>
+                  <div className="border rounded-lg p-4 bg-muted/20">
+                    <PageHeader
+                      title="Meu Plano Alimentar"
+                      description="Gerencie suas refeições e acompanhe seu progresso"
+                      icon={<Utensils className="h-6 w-6" />}
+                      badge={<Badge variant="secondary">Ativo</Badge>}
+                      actions={
+                        <Button size="sm">
+                          <FileText className="h-4 w-4 mr-2" /> Exportar
+                        </Button>
+                      }
+                    />
+                  </div>
+                </div>
+
+                {/* Breadcrumb */}
+                <div>
+                  <h3 className="font-semibold mb-4">Breadcrumb</h3>
+                  <BreadcrumbNav
+                    items={[
+                      { label: 'Dashboard', to: '/dashboard' },
+                      { label: 'Plano Alimentar', to: '/meal-plan' },
+                      { label: 'Café da Manhã' },
+                    ]}
+                  />
+                </div>
+
+                {/* Nav Tabs Variants */}
+                <div>
+                  <h3 className="font-semibold mb-4">Nav Tabs (Variantes)</h3>
+                  <div className="space-y-4">
+                    <div>
+                      <p className="text-sm text-muted-foreground mb-2">Default</p>
+                      <NavTabs
+                        variant="default"
+                        items={[
+                          { label: 'Visão Geral', to: '/ui-kit', end: true },
+                          { label: 'Refeições', to: '/ui-kit/meals' },
+                          { label: 'Progresso', to: '/ui-kit/progress' },
+                        ]}
+                      />
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground mb-2">Pills</p>
+                      <NavTabs
+                        variant="pills"
+                        items={[
+                          { label: 'Semanal', to: '/ui-kit', end: true, icon: <LayoutGrid className="h-4 w-4" /> },
+                          { label: 'Mensal', to: '/ui-kit/monthly' },
+                        ]}
+                      />
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground mb-2">Underline</p>
+                      <NavTabs
+                        variant="underline"
+                        items={[
+                          { label: 'Alunos', to: '/ui-kit', end: true, icon: <Users className="h-4 w-4" /> },
+                          { label: 'Planos', to: '/ui-kit/plans' },
+                          { label: 'Relatórios', to: '/ui-kit/reports' },
+                        ]}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Step Indicator */}
+                <div>
+                  <h3 className="font-semibold mb-4">Step Indicator</h3>
+                  <StepIndicator
+                    steps={['Perfil', 'Preferências', 'Objetivos', 'Confirmar']}
+                    currentStep={2}
+                  />
+                </div>
+
+                {/* Quick Actions */}
+                <div>
+                  <h3 className="font-semibold mb-4">Quick Actions</h3>
+                  <QuickActions
+                    actions={[
+                      { label: 'Novo Plano', icon: <Utensils className="h-4 w-4" />, onClick: () => toast.info('Novo plano'), variant: 'primary' },
+                      { label: 'Exportar', icon: <FileText className="h-4 w-4" />, onClick: () => toast.info('Exportar') },
+                      { label: 'Progresso', icon: <TrendingUp className="h-4 w-4" />, onClick: () => toast.info('Ver progresso') },
+                    ]}
+                  />
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* DATA VISUALIZATION TAB */}
+          <TabsContent value="dataviz" className="space-y-8">
+            <Card>
+              <CardHeader>
+                <CardTitle>Visualização de Dados</CardTitle>
+                <CardDescription>Gráficos, rings de progresso e sparklines</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-8">
+                {/* Progress Rings */}
+                <div>
+                  <h3 className="font-semibold mb-4">Progress Rings</h3>
+                  <div className="flex flex-wrap items-end gap-6">
+                    <ProgressRing value={75} size="sm" color="primary" />
+                    <ProgressRing value={60} size="md" color="success" label="Meta" />
+                    <ProgressRing value={85} size="lg" color="protein" label="Proteína" />
+                    <ProgressRing value={45} max={100} size="xl" color="warning" />
+                  </div>
+                </div>
+
+                {/* Mini Bar Chart */}
+                <div>
+                  <h3 className="font-semibold mb-4">Mini Bar Chart</h3>
+                  <div className="max-w-sm">
+                    <MiniBarChart
+                      data={[
+                        { value: 80, label: 'Seg', color: 'success' },
+                        { value: 60, label: 'Ter', color: 'success' },
+                        { value: 90, label: 'Qua', color: 'success' },
+                        { value: 45, label: 'Qui', color: 'warning' },
+                        { value: 70, label: 'Sex', color: 'success' },
+                        { value: 85, label: 'Sáb', color: 'success' },
+                        { value: 55, label: 'Dom', color: 'warning' },
+                      ]}
+                      height={64}
+                      showLabels
+                    />
+                  </div>
+                </div>
+
+                {/* Sparklines */}
+                <div>
+                  <h3 className="font-semibold mb-4">Sparklines</h3>
+                  <div className="flex flex-wrap gap-8">
+                    <div>
+                      <p className="text-sm text-muted-foreground mb-2">Calorias</p>
+                      <Sparkline data={[1800, 2100, 1950, 2200, 2050, 1900, 2150]} color="primary" />
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground mb-2">Proteína</p>
+                      <Sparkline data={[80, 95, 110, 105, 120, 115, 125]} color="success" />
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground mb-2">Adesão</p>
+                      <Sparkline data={[70, 85, 90, 75, 95, 100, 85]} color="warning" showArea={false} />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Stat Comparison */}
+                <div>
+                  <h3 className="font-semibold mb-4">Stat Comparison</h3>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <StatComparison label="Calorias" current={2100} previous={1950} unit="kcal" />
+                    <StatComparison label="Proteína" current={125} previous={110} unit="g" />
+                    <StatComparison label="Adesão" current={85} previous={90} format="percent" />
+                    <StatComparison label="Sequência" current={7} previous={7} unit="dias" />
+                  </div>
+                </div>
+
+                {/* Donut Chart */}
+                <div>
+                  <h3 className="font-semibold mb-4">Donut Chart</h3>
+                  <div className="flex flex-wrap gap-8">
+                    <DonutChart
+                      segments={[
+                        { value: 120, color: 'protein', label: 'Proteína' },
+                        { value: 250, color: 'carbs', label: 'Carbos' },
+                        { value: 65, color: 'fat', label: 'Gordura' },
+                      ]}
+                      centerValue="2100"
+                      centerLabel="kcal"
+                    />
+                    <DonutChart
+                      segments={[
+                        { value: 75, color: 'success' },
+                        { value: 25, color: 'warning' },
+                      ]}
+                      size={80}
+                      strokeWidth={12}
+                      centerValue="75%"
+                    />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
           {/* FEEDBACK TAB */}
           <TabsContent value="feedback" className="space-y-8">
             <Card>
@@ -541,6 +777,126 @@ export default function UIKit() {
                       <p className="text-sm mb-1">100%</p>
                       <Progress value={100} />
                     </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* MICRO-INTERACTIONS TAB */}
+          <TabsContent value="micro" className="space-y-8">
+            <Card>
+              <CardHeader>
+                <CardTitle>Micro-Interações</CardTitle>
+                <CardDescription>Animações, loaders e feedback visual</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-8">
+                {/* Pulse Dots */}
+                <div>
+                  <h3 className="font-semibold mb-4">Pulse Dots</h3>
+                  <div className="flex items-center gap-6">
+                    <div className="flex items-center gap-2">
+                      <PulseDot color="primary" size="sm" />
+                      <span className="text-sm">Ativo</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <PulseDot color="success" size="md" />
+                      <span className="text-sm">Online</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <PulseDot color="warning" size="lg" />
+                      <span className="text-sm">Atenção</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Loading States */}
+                <div>
+                  <h3 className="font-semibold mb-4">Loading States</h3>
+                  <div className="flex flex-wrap items-center gap-6">
+                    <LoadingSpinner size="sm" />
+                    <LoadingSpinner size="md" label="Carregando..." />
+                    <LoadingSpinner size="lg" />
+                  </div>
+                </div>
+
+                {/* Skeleton Loaders */}
+                <div>
+                  <h3 className="font-semibold mb-4">Skeleton Loaders</h3>
+                  <div className="flex flex-wrap items-center gap-4">
+                    <SkeletonLoader variant="circular" width={48} height={48} />
+                    <div className="space-y-2">
+                      <SkeletonLoader variant="text" width={120} />
+                      <SkeletonLoader variant="text" width={200} />
+                    </div>
+                    <SkeletonLoader variant="card" width={200} height={100} />
+                  </div>
+                </div>
+
+                {/* Animated Counter */}
+                <div>
+                  <h3 className="font-semibold mb-4">Animated Counter</h3>
+                  <div className="text-4xl font-bold">
+                    <AnimatedCounter value={2147} duration={1500} />
+                    <span className="text-lg text-muted-foreground ml-2">kcal</span>
+                  </div>
+                </div>
+
+                {/* Inline Status */}
+                <div>
+                  <h3 className="font-semibold mb-4">Inline Status</h3>
+                  <div className="flex flex-wrap gap-3">
+                    <InlineStatus status="success" message="Plano salvo com sucesso!" />
+                    <InlineStatus status="error" message="Erro ao processar" />
+                    <InlineStatus status="warning" message="Limite próximo" />
+                    <InlineStatus status="info" message="Nova atualização" />
+                    <InlineStatus status="loading" message="Gerando plano..." />
+                  </div>
+                </div>
+
+                {/* Success Checkmark */}
+                <div>
+                  <h3 className="font-semibold mb-4">Success Checkmark</h3>
+                  <div className="flex items-center gap-6">
+                    <SuccessCheckmark show={true} size="sm" />
+                    <SuccessCheckmark show={true} size="md" />
+                    <SuccessCheckmark show={true} size="lg" />
+                  </div>
+                </div>
+
+                {/* Hover Scale */}
+                <div>
+                  <h3 className="font-semibold mb-4">Hover Scale</h3>
+                  <div className="flex gap-4">
+                    <HoverScale>
+                      <div className="p-4 bg-muted rounded-lg">
+                        Hover me (sutil)
+                      </div>
+                    </HoverScale>
+                    <HoverScale scale={1.05}>
+                      <div className="p-4 bg-primary/10 rounded-lg">
+                        Hover me (maior)
+                      </div>
+                    </HoverScale>
+                  </div>
+                </div>
+
+                {/* Fade In View */}
+                <div>
+                  <h3 className="font-semibold mb-4">Fade In View</h3>
+                  <div className="grid grid-cols-4 gap-4">
+                    <FadeInView delay={0}>
+                      <div className="p-4 bg-muted rounded-lg text-center">1</div>
+                    </FadeInView>
+                    <FadeInView delay={0.1}>
+                      <div className="p-4 bg-muted rounded-lg text-center">2</div>
+                    </FadeInView>
+                    <FadeInView delay={0.2}>
+                      <div className="p-4 bg-muted rounded-lg text-center">3</div>
+                    </FadeInView>
+                    <FadeInView delay={0.3}>
+                      <div className="p-4 bg-muted rounded-lg text-center">4</div>
+                    </FadeInView>
                   </div>
                 </div>
               </CardContent>
