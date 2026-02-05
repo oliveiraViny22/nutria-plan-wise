@@ -40,6 +40,7 @@ import { CalorieRing } from '@/components/CalorieRing';
 import { MacroChart } from '@/components/MacroChart';
 import { AIRebalancer } from '@/components/AIRebalancer';
 import { SupplementToggle } from '@/components/SupplementToggle';
+import { MetricCard, NutritionCard } from '@/components/ui-kit';
 
 import { UpgradeDialog } from '@/components/UpgradeDialog';
 import { WeeklyAdherenceChart } from '@/components/WeeklyAdherenceChart';
@@ -467,7 +468,7 @@ export default function Dashboard() {
           </p>
         </motion.section>
 
-        {/* Metabolic Base - Responsive display with formula explanation */}
+        {/* Metabolic Base - Using MetricCard from UI Kit */}
         {metabolicData && (
           <motion.section
             initial={{ opacity: 0, y: 20 }}
@@ -475,47 +476,41 @@ export default function Dashboard() {
             transition={{ delay: 0.05 }}
           >
             <TooltipProvider delayDuration={200}>
-              <div className="flex flex-col items-center gap-2 p-3 sm:p-4 rounded-xl bg-gradient-to-r from-amber-500/10 via-orange-500/5 to-amber-500/10 border border-amber-500/20">
-                {/* Values row - responsive wrap for very small screens */}
-                <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-6">
-                  <div className="flex items-center gap-1.5">
-                    <Flame className="h-4 w-4 text-amber-500 shrink-0" />
-                    <span className="text-xs text-muted-foreground whitespace-nowrap">Metabolismo:</span>
-                  </div>
-                  <div className="flex items-center gap-3 sm:gap-4">
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <div className="flex items-center gap-1 cursor-help">
-                          <span className="text-sm sm:text-base font-bold tabular-nums text-amber-600 dark:text-amber-400">{metabolicData.bmr}</span>
-                          <span className="text-[10px] sm:text-xs text-muted-foreground">TMB</span>
-                          <Info className="h-3 w-3 text-muted-foreground shrink-0" />
-                        </div>
-                      </TooltipTrigger>
-                      <TooltipContent side="bottom" className="max-w-[280px] p-3">
-                        <p className="font-semibold mb-1">Taxa Metabólica Basal</p>
-                        <p className="text-sm">Calorias que seu corpo queima em repouso para manter funções vitais.</p>
-                      </TooltipContent>
-                    </Tooltip>
-                    <span className="text-muted-foreground/50">•</span>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <div className="flex items-center gap-1 cursor-help">
-                          <span className="text-sm sm:text-base font-bold tabular-nums text-orange-600 dark:text-orange-400">{metabolicData.tdee}</span>
-                          <span className="text-[10px] sm:text-xs text-muted-foreground">TDEE</span>
-                          <Info className="h-3 w-3 text-muted-foreground shrink-0" />
-                        </div>
-                      </TooltipTrigger>
-                      <TooltipContent side="bottom" className="max-w-[280px] p-3">
-                        <p className="font-semibold mb-1">Gasto Energético Total</p>
-                        <p className="text-sm">Total de calorias que você gasta por dia, incluindo atividades físicas.</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </div>
-                </div>
-                {/* Explanation text - responsive sizing */}
-                <p className="text-[10px] sm:text-xs text-muted-foreground text-center leading-relaxed max-w-md">
-                  Baseado na fórmula de Mifflin-St Jeor (idade, sexo, altura, peso e atividade)
-                </p>
+              <div className="grid grid-cols-2 gap-3">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="cursor-help">
+                      <MetricCard
+                        label="Taxa Metabólica Basal"
+                        value={metabolicData.bmr}
+                        unit="kcal"
+                        icon={<Flame className="h-4 w-4" />}
+                        color="calories"
+                      />
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="max-w-[280px] p-3">
+                    <p className="font-semibold mb-1">TMB - Taxa Metabólica Basal</p>
+                    <p className="text-sm">Calorias que seu corpo queima em repouso para manter funções vitais.</p>
+                  </TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="cursor-help">
+                      <MetricCard
+                        label="Gasto Energético Total"
+                        value={metabolicData.tdee}
+                        unit="kcal"
+                        icon={<Target className="h-4 w-4" />}
+                        color="success"
+                      />
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="max-w-[280px] p-3">
+                    <p className="font-semibold mb-1">TDEE - Gasto Energético Total</p>
+                    <p className="text-sm">Total de calorias que você gasta por dia, incluindo atividades físicas. Calculado via Mifflin-St Jeor.</p>
+                  </TooltipContent>
+                </Tooltip>
               </div>
             </TooltipProvider>
           </motion.section>
@@ -529,30 +524,27 @@ export default function Dashboard() {
           className="space-y-3 sm:space-y-4"
         >
 
-          {/* Calorie & Macros Row - Premium cards */}
+          {/* Calorie & Macros Row - Using NutritionCard */}
           <div className="grid gap-4 sm:gap-5 grid-cols-1 sm:grid-cols-2">
             {/* Calorie Card */}
-            <div className="card-premium rounded-xl sm:rounded-2xl p-5 sm:p-6 flex flex-col items-center">
-              <div className="flex items-center gap-2 mb-4">
-                <div className="p-2 rounded-lg bg-accent/10">
-                  <Flame className="w-4 h-4 sm:w-5 sm:h-5 text-accent" />
-                </div>
-                <h3 className="font-sans font-semibold text-foreground text-base sm:text-lg tracking-tight">Calorias</h3>
-              </div>
+            <NutritionCard
+              variant="metric"
+              title="Calorias"
+              icon={<Flame className="w-4 h-4 sm:w-5 sm:h-5" />}
+              className="flex flex-col items-center"
+            >
               <CalorieRing
                 current={currentCalories}
                 target={profile?.daily_calories || 2000}
               />
-            </div>
+            </NutritionCard>
 
             {/* Macros Card */}
-            <div className="card-premium rounded-xl sm:rounded-2xl p-5 sm:p-6">
-              <div className="flex items-center gap-2 mb-4">
-                <div className="p-2 rounded-lg bg-primary/10">
-                  <Target className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
-                </div>
-                <h3 className="font-sans font-semibold text-foreground text-base sm:text-lg tracking-tight">Macronutrientes</h3>
-              </div>
+            <NutritionCard
+              variant="metric"
+              title="Macronutrientes"
+              icon={<Target className="w-4 h-4 sm:w-5 sm:h-5" />}
+            >
               <MacroChart
                 protein={currentProtein}
                 carbs={currentCarbs}
@@ -561,7 +553,7 @@ export default function Dashboard() {
                 carbsTarget={profile?.carbs_target || 250}
                 fatTarget={profile?.fat_target || 65}
               />
-            </div>
+            </NutritionCard>
           </div>
 
 
