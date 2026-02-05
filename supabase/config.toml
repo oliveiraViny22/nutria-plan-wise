@@ -45,3 +45,6 @@ verify_jwt = false
 [functions.delete-account]
 verify_jwt = false
 
+[functions.generate-plan]
+verify_jwt = false
+
