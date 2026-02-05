@@ -1,12 +1,9 @@
-import { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { 
   TrendingUp, 
   TrendingDown, 
   Minus, 
-  ChevronDown, 
   Target,
-  Info,
   Beef,
   Wheat,
   Droplets
@@ -48,8 +45,6 @@ export function InteractiveMacroCard({
   carbsTarget,
   fatTarget,
 }: InteractiveMacroCardProps) {
-  const [expandedMacro, setExpandedMacro] = useState<string | null>(null);
-
   const macros: MacroData[] = [
     {
       name: 'Proteína',
@@ -123,7 +118,6 @@ export function InteractiveMacroCard({
         {macros.map((macro, index) => {
           const percentage = Math.min((macro.current / macro.target) * 100, 100);
           const deviation = getDeviation(macro.current, macro.target);
-          const isExpanded = expandedMacro === macro.name;
           
           // Responsive ring size
           const mobileSize = 56;
@@ -137,7 +131,7 @@ export function InteractiveMacroCard({
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.1 }}
               className={cn(
-                "relative rounded-xl cursor-pointer transition-all duration-300",
+                "relative rounded-xl transition-all duration-300",
                 // Glassmorphism effect with improved dark mode contrast
                 "backdrop-blur-md",
                 "bg-card/80 dark:bg-card/90",
@@ -149,14 +143,10 @@ export function InteractiveMacroCard({
                 "hover:bg-card/95 dark:hover:bg-card",
                 "hover:border-border/60 dark:hover:border-border/80",
                 "hover:shadow-xl",
-                "active:scale-[0.98]",
-                isExpanded && "ring-2 ring-primary/30 dark:ring-primary/40",
                 // Mobile: horizontal layout, Desktop: vertical
                 "flex items-center gap-3 p-3 sm:flex-col sm:p-4"
               )}
-              onClick={() => setExpandedMacro(isExpanded ? null : macro.name)}
               whileHover={{ scale: 1.01 }}
-              whileTap={{ scale: 0.98 }}
             >
               {/* Circular progress - left on mobile, centered on desktop */}
               <div className="flex-shrink-0 sm:order-2">
@@ -278,10 +268,6 @@ export function InteractiveMacroCard({
                 <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground sm:hidden">
                   <Target className="w-3 h-3" />
                   <span className="tabular-nums">Meta: {macro.target}{macro.unit}</span>
-                  <ChevronDown className={cn(
-                    "w-3 h-3 ml-auto transition-transform",
-                    isExpanded && "rotate-180"
-                  )} />
                 </div>
               </div>
 
@@ -312,42 +298,7 @@ export function InteractiveMacroCard({
                     }
                   </TooltipContent>
                 </Tooltip>
-                
-                {/* Expand indicator for desktop */}
-                <ChevronDown className={cn(
-                  "w-3 h-3 text-muted-foreground/50 mt-1 transition-transform",
-                  isExpanded && "rotate-180"
-                )} />
               </div>
-
-              {/* Expanded details */}
-              <AnimatePresence>
-                {isExpanded && (
-                  <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: 'auto' }}
-                    exit={{ opacity: 0, height: 0 }}
-                    transition={{ duration: 0.2 }}
-                    className="w-full pt-3 mt-2 border-t border-border/30 sm:order-4"
-                  >
-                    <div className="flex items-start gap-1.5 text-xs text-muted-foreground">
-                      <Info className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
-                      <span>{macro.description}</span>
-                    </div>
-                    
-                    <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
-                      <div className="bg-background/60 rounded-md p-2 text-center">
-                        <span className="block text-muted-foreground text-[10px]">Atual</span>
-                        <span className={cn("font-semibold tabular-nums", macro.textClass)}>{macro.current}g</span>
-                      </div>
-                      <div className="bg-background/60 rounded-md p-2 text-center">
-                        <span className="block text-muted-foreground text-[10px]">Meta</span>
-                        <span className="font-semibold text-foreground tabular-nums">{macro.target}g</span>
-                      </div>
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
             </motion.div>
           );
         })}
