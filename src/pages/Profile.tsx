@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { 
-  ArrowLeft, 
   User, 
   Loader2,
   Target,
@@ -40,6 +39,7 @@ import {
 import { Logo } from '@/components/Logo';
 import { MobileNav } from '@/components/MobileNav';
 import { ThemeToggle } from '@/components/ThemeToggle';
+import { PageHeader, BreadcrumbNav } from '@/components/ui-kit';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -356,6 +356,11 @@ export default function Profile() {
 
   const isAdmin = user?.email === ADMIN_EMAIL;
 
+  const breadcrumbItems = [
+    { label: 'Dashboard', to: '/dashboard' },
+    { label: 'Meu Perfil' },
+  ];
+
   return (
     <div className="min-h-screen bg-background overflow-x-hidden theme-patient">
       {/* Header */}
@@ -363,12 +368,8 @@ export default function Profile() {
         <div className="container mx-auto px-3 sm:px-4 py-2 sm:py-3 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 sm:gap-3">
             <MobileNav />
-            <Button variant="ghost" size="icon" className="hidden md:flex w-9 h-9 sm:w-10 sm:h-10" onClick={() => navigate('/dashboard')}>
-              <ArrowLeft className="h-4 w-4 sm:h-5 sm:w-5" />
-            </Button>
             <Logo size="sm" />
           </div>
-          <h1 className="text-base sm:text-lg font-semibold hidden xs:block">Meu Perfil</h1>
           <div className="flex items-center gap-2">
             <ThemeToggle />
           </div>
@@ -376,6 +377,18 @@ export default function Profile() {
       </header>
 
       <main className="container mx-auto px-3 sm:px-4 py-4 sm:py-6 pb-20 sm:pb-24 max-w-4xl">
+        {/* Breadcrumb Navigation */}
+        <BreadcrumbNav items={breadcrumbItems} className="mb-4" />
+        
+        {/* Page Header */}
+        <PageHeader
+          title="Meu Perfil"
+          description="Gerencie suas informações pessoais e preferências alimentares"
+          icon={<User className="w-5 h-5" />}
+          backTo="/dashboard"
+          backLabel="Dashboard"
+          className="mb-6"
+        />
         <Tabs defaultValue="personal" className="space-y-4 sm:space-y-6">
           {/* Tabs - Consolidated to 2 tabs */}
           <TabsList className="grid w-full grid-cols-2 h-auto">

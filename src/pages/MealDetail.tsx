@@ -2,19 +2,20 @@ import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
-  ArrowLeft,
   RefreshCw,
   Loader2,
   ThumbsDown,
   AlertTriangle,
   Lock,
   Save,
+  UtensilsCrossed,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { MobileNav } from '@/components/MobileNav';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { MacroChart } from '@/components/MacroChart';
 import { HiddenMacroValue } from '@/components/HiddenMacroValue';
+import { PageHeader, BreadcrumbNav } from '@/components/ui-kit';
 
 import { supabase } from '@/integrations/supabase/client';
 import { useLinkedStudent } from '@/hooks/useLinkedStudent';
@@ -468,27 +469,36 @@ export default function MealDetail() {
     );
   }
 
+  const mealDisplayName = MEAL_NAMES[meal.name as MealType] || meal.name;
+  
+  const breadcrumbItems = [
+    { label: 'Dashboard', to: '/dashboard' },
+    { label: 'Plano Alimentar', to: '/meal-plan' },
+    { label: mealDisplayName },
+  ];
+
   return (
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-md border-b border-border pt-safe">
         <div className="container mx-auto px-3 sm:px-4 py-3 sm:py-4 flex items-center gap-3 sm:gap-4">
           <MobileNav />
-          <Button variant="ghost" size="icon" className="hidden md:flex h-9 w-9" onClick={() => navigate(-1)}>
-            <ArrowLeft className="w-4 h-4" />
-          </Button>
-          <div className="min-w-0 flex-1">
-            <h1 className="font-semibold text-foreground text-sm sm:text-base truncate">
-              {MEAL_NAMES[meal.name as MealType] || meal.name}
-            </h1>
-            <p className="text-xs sm:text-sm text-muted-foreground">
-              {visibleMealOptions.length} {visibleMealOptions.length === 1 ? 'opção' : 'opções'}
-            </p>
-          </div>
           <ThemeToggle />
         </div>
       </header>
 
       <main className="container mx-auto px-3 sm:px-4 py-4 sm:py-6 space-y-4 pb-safe">
+        {/* Breadcrumb Navigation */}
+        <BreadcrumbNav items={breadcrumbItems} className="mb-2" />
+        
+        {/* Page Header */}
+        <PageHeader
+          title={mealDisplayName}
+          description={`${visibleMealOptions.length} ${visibleMealOptions.length === 1 ? 'opção disponível' : 'opções disponíveis'}`}
+          icon={<UtensilsCrossed className="w-5 h-5" />}
+          backTo="/dashboard"
+          backLabel="Voltar"
+        />
+
         {/* Plan Not Saved Warning */}
         {!isPlanSaved && (
           <motion.div

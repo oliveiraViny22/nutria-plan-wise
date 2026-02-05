@@ -510,8 +510,43 @@
 
   /* Professional interface - technical, data-dense, cooler tones */
   .theme-professional {
-    --primary: 180 45% 38%;
-    --accent: 200 60% 50%;
+    /* Cooler, more clinical teal-blue */
+    --primary: 190 50% 38%;
+    --primary-foreground: 0 0% 100%;
+    
+    /* Subtle steel accent */
+    --accent: 210 35% 55%;
+    --accent-foreground: 210 50% 10%;
+    
+    /* More neutral, professional backgrounds */
+    --background: 200 8% 97%;
+    --card: 200 5% 99%;
+    --muted: 200 10% 94%;
+    --muted-foreground: 200 10% 40%;
+    
+    /* Border with blue-gray undertone */
+    --border: 200 12% 85%;
+    
+    /* Clinical success green */
+    --success: 165 50% 42%;
+    
+    /* Sidebar for professional */
+    --sidebar-background: 200 12% 96%;
+    --sidebar-accent: 200 10% 92%;
+  }
+
+  /* Professional dark mode overrides */
+  .dark .theme-professional {
+    --primary: 190 55% 48%;
+    --accent: 210 40% 58%;
+    --background: 200 15% 8%;
+    --card: 200 12% 11%;
+    --muted: 200 12% 15%;
+    --muted-foreground: 200 8% 55%;
+    --border: 200 12% 20%;
+    --success: 165 55% 50%;
+    --sidebar-background: 200 14% 10%;
+    --sidebar-accent: 200 12% 14%;
   }
 
   /* Professional card - more technical, data-focused */
@@ -528,6 +563,22 @@
   /* Professional stats - compact data display */
   .stats-professional {
     @apply font-mono text-sm tracking-tight;
+  }
+  
+  /* Professional header - more structured */
+  .header-professional {
+    @apply bg-background/95 backdrop-blur border-b border-border/60;
+  }
+  
+  /* Professional metric cards - clinical precision */
+  .metric-professional {
+    @apply bg-card border border-border/50 rounded-lg p-4;
+    font-variant-numeric: tabular-nums;
+  }
+  
+  /* Professional badge - subtle authority */
+  .badge-professional {
+    @apply bg-primary/10 text-primary border border-primary/20 font-medium;
   }
 
   /* ========================== */
