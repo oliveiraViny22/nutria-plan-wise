@@ -23,6 +23,7 @@ import { MobileNav } from '@/components/MobileNav';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { WeightLogForm } from '@/components/progress/WeightLogForm';
 import { WeightEvolutionChart } from '@/components/progress/WeightEvolutionChart';
+import { WeightLogHistory } from '@/components/progress/WeightLogHistory';
 import { BodyMeasurementsForm } from '@/components/progress/BodyMeasurementsForm';
 import { BodyMeasurementsChart } from '@/components/progress/BodyMeasurementsChart';
 import { useAuth } from '@/contexts/AuthContext';
@@ -282,6 +283,13 @@ export default function Progress() {
               logs={weightLogs}
               targetWeight={targetWeight}
               goal={goal}
+            />
+
+            {/* Weight Log History with Edit/Delete */}
+            <WeightLogHistory
+              logs={weightLogs}
+              userId={user?.id || ''}
+              onUpdate={fetchData}
             />
           </TabsContent>
 
