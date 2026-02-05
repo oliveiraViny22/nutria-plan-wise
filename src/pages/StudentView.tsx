@@ -48,7 +48,7 @@ export default function StudentView() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background theme-professional">
       {/* Header */}
       <header className="sticky top-0 z-50 glass border-b pt-safe">
         <div className="container mx-auto px-3 sm:px-4 py-2.5 sm:py-3 flex items-center justify-between">
