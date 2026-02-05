@@ -469,42 +469,28 @@ export function AIRebalancer({
       )}
 
       <motion.div
-        whileHover={{ scale: 1.01 }}
-        whileTap={{ scale: 0.99 }}
-        className="w-full"
+        whileHover={{ scale: 1.02 }}
+        whileTap={{ scale: 0.98 }}
+        className="flex justify-center"
       >
         <Button
-          variant="secondary"
-          size={compact ? "default" : "lg"}
-          className={cn(
-            "w-full gap-2.5 relative overflow-hidden group",
-            "bg-gradient-to-r from-accent/10 via-accent/5 to-transparent",
-            "border border-accent/20 hover:border-accent/40",
-            "text-accent-foreground hover:bg-accent/15",
-            "transition-all duration-300",
-            compact && "h-10"
-          )}
+          variant="outline"
+          size="lg"
+          className="gap-2 px-6"
           onClick={handleOptimize}
           disabled={loading || isLimitReached}
         >
-          {/* Subtle shimmer */}
-          <span className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 bg-gradient-to-r from-transparent via-accent/10 to-transparent" />
-          
           {loading ? (
             <>
-              <Loader2 className="w-4 h-4 animate-spin text-accent" />
-              <span className="hidden sm:inline">Analisando plano...</span>
-              <span className="sm:hidden">Analisando...</span>
+              <Loader2 className="w-5 h-5 animate-spin" />
+              <span>Analisando...</span>
             </>
           ) : (
             <>
-              <Sparkles className="w-4 h-4 text-accent" />
-              <span className="hidden sm:inline font-medium">
-                Otimizar Plano
-              </span>
-              <span className="sm:hidden font-medium">Otimizar</span>
+              <Sparkles className="w-5 h-5" />
+              <span>Otimizar Plano</span>
               {usageInfo && !usageInfo.isUnlimited && (
-                <span className="ml-1 px-1.5 py-0.5 bg-accent/20 rounded text-[10px] tabular-nums">
+                <span className="ml-1 px-2 py-0.5 bg-muted rounded-full text-xs">
                   {usageInfo.remaining}/{usageInfo.limit}
                 </span>
               )}
