@@ -192,9 +192,11 @@
     }
     .meals-grid {
       display: grid;
-      grid-template-columns: repeat(2, 1fr);
+      grid-template-columns: 1fr;
       gap: 10px;
       width: 100%;
+      max-width: 600px;
+      margin: 0 auto;
     }
     @media print {
       body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
