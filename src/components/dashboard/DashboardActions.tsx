@@ -65,7 +65,7 @@ export function DashboardActions({
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.2 }}
-      className="flex flex-col gap-3"
+      className="flex flex-col gap-4"
     >
       {/* Primary Generate Plan button - centered CTA */}
       <div className="flex justify-center">
@@ -103,18 +103,27 @@ export function DashboardActions({
         </motion.div>
       </div>
 
-      {/* Optimize button - only shows when there's a saved plan */}
+      {/* Optimize button - distinct secondary style with visual separation */}
       {hasPlan && planId && canAdjust && (
-        <AIRebalancer
-          planId={planId}
-          targets={targets}
-          currentMacros={currentMacros}
-          userGoal={userGoal}
-          onComplete={onPlanOptimized}
-          compact={false}
-          usageInfo={usage?.adjustments}
-          isLimitReached={isLimitReachedAdjustment}
-        />
+        <div className="relative pt-3">
+          {/* Visual separator */}
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 flex items-center gap-2 px-3 bg-background">
+            <div className="w-8 h-px bg-border" />
+            <span className="text-[10px] text-muted-foreground uppercase tracking-wider">ou</span>
+            <div className="w-8 h-px bg-border" />
+          </div>
+          
+          <AIRebalancer
+            planId={planId}
+            targets={targets}
+            currentMacros={currentMacros}
+            userGoal={userGoal}
+            onComplete={onPlanOptimized}
+            compact={false}
+            usageInfo={usage?.adjustments}
+            isLimitReached={isLimitReachedAdjustment}
+          />
+        </div>
       )}
     </motion.section>
   );
