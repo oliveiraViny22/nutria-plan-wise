@@ -22,6 +22,7 @@ import {
   ClipboardCheck,
   FileText,
   Sparkles,
+  Info,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Logo } from '@/components/Logo';
@@ -33,6 +34,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 
 import { CalorieRing } from '@/components/CalorieRing';
 import { MacroChart } from '@/components/MacroChart';
@@ -56,6 +58,7 @@ import { useLinkedStudent } from '@/hooks/useLinkedStudent';
 import { useAccountPermissions } from '@/hooks/useAccountPermissions';
 import { useUsageLimits } from '@/hooks/useUsageLimits';
 import { useSuccessSound } from '@/hooks/useSuccessSound';
+import { useMetabolicCalculations } from '@/hooks/useMetabolicCalculations';
 import { supabase } from '@/integrations/supabase/client';
 import { DietPlan, Meal, GOALS, MEAL_NAMES, MealType } from '@/lib/types';
 import { toast } from 'sonner';
@@ -90,6 +93,9 @@ export default function Dashboard() {
   const [planReleased, setPlanReleased] = useState(false);
   const [showSuccessAnimation, setShowSuccessAnimation] = useState(false);
   const [todayMealsLogged, setTodayMealsLogged] = useState(0);
+  
+  // Metabolic calculations for TMB/TDEE display
+  const metabolicData = useMetabolicCalculations(profile);
 
   // Handle checkout success
   useEffect(() => {
@@ -522,6 +528,75 @@ export default function Dashboard() {
               />
             </div>
           </div>
+
+          {/* Metabolic Base Card - TMB & TDEE */}
+          {metabolicData && (
+            <TooltipProvider delayDuration={200}>
+              <Card className="border-amber-500/30 bg-gradient-to-br from-amber-500/5 to-orange-500/10">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Flame className="h-5 w-5 text-amber-500" />
+                    Metabolismo Base
+                  </CardTitle>
+                  <CardDescription className="text-xs">
+                    Calculado pela fórmula de Mifflin-St Jeor
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 gap-4">
+                    {/* TMB with Tooltip */}
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className="bg-background/60 rounded-xl p-4 text-center cursor-help hover:bg-background/80 transition-colors">
+                          <div className="w-8 h-8 mx-auto mb-2 rounded-full bg-amber-500/20 flex items-center justify-center relative">
+                            <Flame className="h-4 w-4 text-amber-500" />
+                            <Info className="h-3 w-3 text-muted-foreground absolute -top-1 -right-1" />
+                          </div>
+                          <p className="text-2xl font-bold tabular-nums text-amber-600 dark:text-amber-400">{metabolicData.bmr}</p>
+                          <p className="text-xs text-muted-foreground">TMB (kcal/dia)</p>
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom" className="max-w-xs p-3">
+                        <p className="font-semibold mb-1">O que é TMB?</p>
+                        <p className="text-sm">
+                          A Taxa Metabólica Basal é a quantidade de calorias que seu corpo queima 
+                          <strong> apenas para manter as funções vitais</strong> (respiração, batimentos 
+                          cardíacos, temperatura corporal) enquanto você está em repouso absoluto.
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
+                    
+                    {/* TDEE with Tooltip */}
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className="bg-background/60 rounded-xl p-4 text-center cursor-help hover:bg-background/80 transition-colors">
+                          <div className="w-8 h-8 mx-auto mb-2 rounded-full bg-orange-500/20 flex items-center justify-center relative">
+                            <TrendingUp className="h-4 w-4 text-orange-500" />
+                            <Info className="h-3 w-3 text-muted-foreground absolute -top-1 -right-1" />
+                          </div>
+                          <p className="text-2xl font-bold tabular-nums text-orange-600 dark:text-orange-400">{metabolicData.tdee}</p>
+                          <p className="text-xs text-muted-foreground">TDEE (kcal/dia)</p>
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom" className="max-w-xs p-3">
+                        <p className="font-semibold mb-1">O que é TDEE?</p>
+                        <p className="text-sm">
+                          O Gasto Energético Total Diário inclui a TMB mais todas as calorias 
+                          que você queima com <strong>atividades físicas e digestão</strong>. 
+                          É o total que você gasta em um dia normal.
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
+                  
+                  <p className="text-xs text-muted-foreground text-center mt-3">
+                    Seu corpo queima aproximadamente <span className="font-semibold text-foreground">{metabolicData.bmr}</span> em repouso 
+                    e <span className="font-semibold text-foreground">{metabolicData.tdee} kcal</span> com sua atividade física.
+                  </p>
+                </CardContent>
+              </Card>
+            </TooltipProvider>
+          )}
 
         </motion.section>
 
