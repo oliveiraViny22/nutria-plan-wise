@@ -12,12 +12,12 @@ interface HydrationResult {
   emoji: string;
 }
 
-// Base calculation: 35ml per kg of body weight
+// Base calculation: 40ml per kg of body weight (more realistic)
 // Adjustments based on goal
 const GOAL_MULTIPLIERS: Record<UserGoal, number> = {
-  lose_weight: 1.15, // +15% for metabolism and satiety
+  lose_weight: 1.1,  // +10% for metabolism and satiety
   maintain: 1.0,     // Standard
-  gain_muscle: 1.2,  // +20% for muscle recovery and performance
+  gain_muscle: 1.15, // +15% for muscle recovery and performance
 };
 
 const GOAL_TIPS: Record<UserGoal, string> = {
@@ -29,7 +29,7 @@ const GOAL_TIPS: Record<UserGoal, string> = {
 const GOAL_EMOJIS: Record<UserGoal, string> = {
   lose_weight: '🔥',
   maintain: '💧',
-  gain_muscle: '💪',
+  gain_muscle: '💧',
 };
 
 export function calculateHydration(
@@ -39,8 +39,8 @@ export function calculateHydration(
   // Default weight if not provided
   const weight = weightKg || 70;
   
-  // Base: 35ml per kg
-  const baseML = weight * 35;
+  // Base: 40ml per kg (more realistic recommendation)
+  const baseML = weight * 40;
   
   // Apply goal multiplier
   const adjustedML = baseML * GOAL_MULTIPLIERS[goal];
@@ -48,8 +48,8 @@ export function calculateHydration(
   // Convert to liters (rounded to 0.5L increments for practicality)
   const liters = Math.round(adjustedML / 500) * 0.5;
   
-  // Ensure minimum of 2L and maximum of 4.5L
-  const finalLiters = Math.max(2, Math.min(4.5, liters));
+  // Ensure minimum of 2L and maximum of 5L
+  const finalLiters = Math.max(2, Math.min(5, liters));
   
   // Convert to 250ml glasses
   const glasses = Math.round(finalLiters * 4);
