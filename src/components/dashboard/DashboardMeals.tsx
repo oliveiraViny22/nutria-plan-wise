@@ -1,10 +1,25 @@
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Lock } from 'lucide-react';
+import { Lock, Coffee, Sun, Apple, Moon, Utensils, Cookie } from 'lucide-react';
 import { MealCard } from '@/components/ui-kit';
 import { SavePlanButton } from '@/components/SavePlanButton';
 import { EmptyPlanState } from '@/components/EmptyPlanState';
 import { MEAL_NAMES, MealType, Meal } from '@/lib/types';
+
+// Map meal types to icons
+const MEAL_ICONS: Record<string, React.ElementType> = {
+  breakfast: Coffee,
+  morning_snack: Apple,
+  lunch: Sun,
+  afternoon_snack: Cookie,
+  dinner: Moon,
+  supper: Utensils,
+};
+
+function getMealIcon(mealName: string) {
+  const key = mealName.toLowerCase().replace(/\s+/g, '_');
+  return MEAL_ICONS[key] || Utensils;
+}
 
 interface DashboardMealsProps {
   hasPlan: boolean;
@@ -108,28 +123,34 @@ export function DashboardMeals({
             animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: 0.2 + index * 0.03 }}
           >
-            <div
-              className={`
-                flex flex-col items-center justify-center p-3 rounded-lg border
-                bg-card hover:bg-muted/30 transition-all cursor-pointer
-                border-l-4 border-l-muted-foreground/30 border-t-0 border-r-border/50 border-b-border/50
-                hover:shadow-sm hover:scale-[1.02] active:scale-[0.98]
-                min-h-[72px]
-              `}
-              onClick={isPlanSaved ? () => navigate(`/meal/${meal.id}`) : undefined}
-            >
-              <span className="font-medium text-foreground text-xs sm:text-sm text-center line-clamp-1">
-                {MEAL_NAMES[meal.name as MealType] || meal.name}
-              </span>
-              {isPlanSaved && meal.total_calories !== undefined && (
-                <span className="text-sm sm:text-base font-semibold text-foreground tabular-nums mt-1">
-                  {meal.total_calories} <span className="text-[10px] text-muted-foreground">kcal</span>
-                </span>
-              )}
-              {!isPlanSaved && (
-                <Lock className="w-3 h-3 text-muted-foreground mt-1" />
-              )}
-            </div>
+            {(() => {
+              const IconComponent = getMealIcon(meal.name);
+              return (
+                <div
+                  className={`
+                    flex flex-col items-center justify-center p-3 rounded-xl
+                    bg-card/50 hover:bg-muted/40 transition-all cursor-pointer
+                    border border-border/30 hover:border-border/50
+                    hover:shadow-sm hover:scale-[1.02] active:scale-[0.98]
+                    min-h-[80px] gap-1
+                  `}
+                  onClick={isPlanSaved ? () => navigate(`/meal/${meal.id}`) : undefined}
+                >
+                  <IconComponent className="w-4 h-4 text-muted-foreground" />
+                  <span className="font-medium text-foreground text-xs sm:text-sm text-center line-clamp-1">
+                    {MEAL_NAMES[meal.name as MealType] || meal.name}
+                  </span>
+                  {isPlanSaved && meal.total_calories !== undefined && (
+                    <span className="text-sm font-semibold text-foreground tabular-nums">
+                      {meal.total_calories} <span className="text-[10px] text-muted-foreground">kcal</span>
+                    </span>
+                  )}
+                  {!isPlanSaved && (
+                    <Lock className="w-3 h-3 text-muted-foreground" />
+                  )}
+                </div>
+              );
+            })()}
           </motion.div>
         ))}
       </div>
