@@ -6,3 +6,8 @@ export { DashboardGamification } from './DashboardGamification';
 export { DashboardActions } from './DashboardActions';
 export { DashboardMeals } from './DashboardMeals';
 export { DashboardFooter } from './DashboardFooter';
+
+// Enhanced interactive components
+export { InteractiveMacroCard } from './InteractiveMacroCard';
+export { EnhancedCalorieRing } from './EnhancedCalorieRing';
+export { EnhancedQuickActions } from './EnhancedQuickActions';
