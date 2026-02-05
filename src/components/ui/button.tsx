@@ -21,7 +21,7 @@ const buttonVariants = cva(
         hero: "gradient-primary text-primary-foreground hover:opacity-90 shadow-elevated hover:glow-success font-semibold text-base px-8 tracking-wide",
         subtle: "bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground",
         success: "bg-success text-success-foreground hover:bg-success/90 shadow-soft",
-        premium: "gradient-primary text-primary-foreground hover:opacity-90 glow-success font-medium",
+        premium: "bg-gradient-to-r from-primary via-primary to-accent text-primary-foreground font-semibold shadow-lg shadow-primary/30 hover:shadow-xl hover:shadow-primary/40 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200",
       },
       size: {
         default: "h-10 px-4 py-2",
