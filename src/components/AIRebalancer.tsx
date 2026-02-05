@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Settings2,
@@ -467,30 +468,50 @@ export function AIRebalancer({
         </div>
       )}
 
-      <Button
-        variant="outline"
-        size={compact ? "default" : "default"}
-        className={compact ? "w-full gap-2" : "w-full gap-2"}
-        onClick={handleOptimize}
-        disabled={loading || isLimitReached}
+      <motion.div
+        whileHover={{ scale: 1.01 }}
+        whileTap={{ scale: 0.99 }}
+        className="w-full"
       >
-        {loading ? (
-          <>
-            <Loader2 className="w-4 h-4 animate-spin" />
-            <span className="hidden sm:inline">Analisando...</span>
-          </>
-        ) : (
-          <>
-            <Sparkles className="w-4 h-4" />
-            <span className="hidden sm:inline">
-              Otimizar Plano {usageInfo && !usageInfo.isUnlimited && `(${usageInfo.remaining}/${usageInfo.limit})`}
-            </span>
-            <span className="sm:hidden">
-              Otimizar {usageInfo && !usageInfo.isUnlimited && `(${usageInfo.remaining})`}
-            </span>
-          </>
-        )}
-      </Button>
+        <Button
+          variant="secondary"
+          size={compact ? "default" : "lg"}
+          className={cn(
+            "w-full gap-2.5 relative overflow-hidden group",
+            "bg-gradient-to-r from-accent/10 via-accent/5 to-transparent",
+            "border border-accent/20 hover:border-accent/40",
+            "text-accent-foreground hover:bg-accent/15",
+            "transition-all duration-300",
+            compact && "h-10"
+          )}
+          onClick={handleOptimize}
+          disabled={loading || isLimitReached}
+        >
+          {/* Subtle shimmer */}
+          <span className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 bg-gradient-to-r from-transparent via-accent/10 to-transparent" />
+          
+          {loading ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin text-accent" />
+              <span className="hidden sm:inline">Analisando plano...</span>
+              <span className="sm:hidden">Analisando...</span>
+            </>
+          ) : (
+            <>
+              <Sparkles className="w-4 h-4 text-accent" />
+              <span className="hidden sm:inline font-medium">
+                Otimizar Plano
+              </span>
+              <span className="sm:hidden font-medium">Otimizar</span>
+              {usageInfo && !usageInfo.isUnlimited && (
+                <span className="ml-1 px-1.5 py-0.5 bg-accent/20 rounded text-[10px] tabular-nums">
+                  {usageInfo.remaining}/{usageInfo.limit}
+                </span>
+              )}
+            </>
+          )}
+        </Button>
+      </motion.div>
 
       <Dialog open={showDialog} onOpenChange={setShowDialog}>
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
