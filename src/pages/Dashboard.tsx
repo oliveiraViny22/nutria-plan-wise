@@ -324,10 +324,8 @@ export default function Dashboard() {
             <DashboardGamification
               hasPlan={!!currentDietPlan}
               planType={subscriptionPlan?.type}
-              isLinkedStudent={isLinkedStudent}
               mealsLogged={todayMealsLogged}
               totalMeals={meals.length}
-              includeSupplements={(profile as any)?.include_supplements || false}
             />
 
             <DashboardActions
@@ -383,6 +381,7 @@ export default function Dashboard() {
               planReleased={planReleased}
               mealOptionsLimit={permissions.meal_options_limit}
               generating={generating || generatingV5}
+              includeSupplements={(profile as any)?.include_supplements || false}
               onGeneratePlan={generateMealPlanV5}
               onPlanSaved={fetchCurrentPlan}
             />
