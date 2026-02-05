@@ -4,8 +4,6 @@ import {
   ClipboardCheck, 
   FileText, 
   Utensils,
-  RefreshCcw,
-  Sparkles,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -51,6 +49,7 @@ export function EnhancedQuickActions({
   const allMealsLogged = pendingMeals === 0 && totalMeals > 0;
   const hasRefeicoesPendentes = pendingMeals > 0;
 
+  // Removed generate button - now only in DashboardActions
   const actions: QuickActionItem[] = [
     {
       id: 'register',
@@ -70,25 +69,6 @@ export function EnhancedQuickActions({
       icon: <Utensils className="h-4 w-4" />,
       variant: 'success',
       show: isPaidUser && isPlanSaved && allMealsLogged,
-    },
-    {
-      id: 'generate',
-      label: 'Gerar novo plano',
-      shortLabel: 'Gerar',
-      icon: isGenerating ? (
-        <motion.div
-          animate={{ rotate: 360 }}
-          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-        >
-          <RefreshCcw className="h-4 w-4" />
-        </motion.div>
-      ) : (
-        <Sparkles className="h-4 w-4" />
-      ),
-      onClick: onGeneratePlan,
-      variant: 'primary',
-      tooltip: 'Criar um novo plano alimentar',
-      show: !hasPlan && canGeneratePlan,
     },
     {
       id: 'view-plan',
