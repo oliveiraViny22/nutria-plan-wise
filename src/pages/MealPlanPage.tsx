@@ -46,6 +46,7 @@ import {
 import { MealReplacementSection } from '@/components/MealReplacementCard';
 import { ProFeatureBadge } from '@/components/FeatureBadge';
 import { SupplementsPreview } from '@/components/SupplementsPreview';
+ import { MealPlanPdf } from '@/components/MealPlanPdf';
 
 interface MealData {
   id: string;
@@ -399,6 +400,7 @@ export default function MealPlanPage() {
               <Share2 className="w-4 h-4 mr-2" />
               Compartilhar
             </Button>
+             <MealPlanPdf />
             <Button variant="default" size="sm" onClick={handlePrint}>
               <Printer className="w-4 h-4 mr-2" />
               Imprimir
