@@ -282,7 +282,7 @@ export default function MealPlanPage() {
       // Get active diet plan
       const { data: plan, error: planError } = await supabase
         .from('diet_plans')
-        .select('id, total_calories, total_protein, total_carbs, total_fat')
+        .select('id, total_calories, total_protein, total_carbs, total_fat, is_saved')
         .eq('user_id', user!.id)
         .eq('status', 'active')
         .single();
@@ -290,6 +290,13 @@ export default function MealPlanPage() {
       if (planError || !plan) {
         toast.error('Nenhum plano alimentar ativo encontrado');
         setLoading(false);
+        return;
+      }
+
+      // Redirect to dashboard if plan is not saved (gate protection)
+      if (!plan.is_saved) {
+        toast.error('Salve o plano primeiro para ver o plano completo');
+        navigate('/');
         return;
       }
 

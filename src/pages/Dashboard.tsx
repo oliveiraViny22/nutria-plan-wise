@@ -787,7 +787,7 @@ export default function Dashboard() {
                     calories={currentDietPlan.is_saved ? meal.total_calories || 0 : undefined}
                     status="pending"
                     optionsCount={permissions.meal_options_limit > 1 ? permissions.meal_options_limit : undefined}
-                    onClick={() => navigate(`/meal/${meal.id}`)}
+                    onClick={currentDietPlan.is_saved ? () => navigate(`/meal/${meal.id}`) : undefined}
                   >
                     {currentDietPlan.is_saved && (
                       <div className="flex items-center gap-3 text-xs text-muted-foreground mt-2">

@@ -235,6 +235,14 @@ export default function MealDetail() {
     fetchAllFoods();
   }, [mealId]);
 
+  // Redirect to dashboard if plan is not saved (gate protection)
+  useEffect(() => {
+    if (!loading && dietPlan && !dietPlan.is_saved) {
+      toast.error('Salve o plano primeiro para ver os detalhes da refeição');
+      navigate('/');
+    }
+  }, [loading, dietPlan, navigate]);
+
   const visibleMealOptions = useMemo(() => {
     if (!meal_options_limit || meal_options_limit <= 0) return mealOptions;
     return mealOptions.filter(opt => opt.option_number <= meal_options_limit);
