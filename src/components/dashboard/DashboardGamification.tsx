@@ -1,6 +1,5 @@
 import { motion } from 'framer-motion';
 import { DailyLogCTA } from '@/components/DailyLogCTA';
-import { WeeklyAdherenceChart } from '@/components/WeeklyAdherenceChart';
 import { AdherenceStreak } from '@/components/AdherenceStreak';
 import { GamificationPreview } from '@/components/GamificationPreview';
 import { SupplementToggle } from '@/components/SupplementToggle';
@@ -51,14 +50,7 @@ export function DashboardGamification({
         {!isPaidUser ? (
           <GamificationPreview isLocked={true} />
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4">
-            <div className="min-w-0">
-              <AdherenceStreak />
-            </div>
-            <div className="min-w-0">
-              <WeeklyAdherenceChart />
-            </div>
-          </div>
+          <AdherenceStreak />
         )}
       </motion.section>
 
