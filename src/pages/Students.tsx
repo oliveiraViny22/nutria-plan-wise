@@ -134,7 +134,7 @@ export default function Students() {
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
         >
-          <Card className="border-l-4 border-l-primary">
+          <Card className="card-professional border-l-4 border-l-primary">
             <CardContent className="py-3 sm:py-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
                 <div className="flex items-center gap-2 sm:gap-3">
@@ -250,7 +250,7 @@ export default function Students() {
                   exit={{ opacity: 0, y: -10 }}
                   transition={{ delay: index * 0.05 }}
                 >
-                  <Card className="card-interactive">
+                  <Card className="card-professional">
                     <CardContent className="py-4">
                       <div className="flex items-center justify-between gap-4">
                         <div className="flex items-center gap-4 min-w-0">
@@ -277,7 +277,7 @@ export default function Students() {
 
                         <div className="flex items-center gap-4 shrink-0">
                           {/* Stats */}
-                          <div className="hidden md:flex items-center gap-4 text-sm">
+                          <div className="hidden md:flex items-center gap-4 stats-professional">
                             {student.profile?.goal && (
                               <div className="flex items-center gap-1.5 text-muted-foreground">
                                 <Target className="h-4 w-4" />

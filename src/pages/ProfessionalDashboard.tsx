@@ -186,14 +186,14 @@ export default function ProfessionalDashboard() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
           >
-            <Card>
+            <Card className="card-professional">
               <CardContent className="pt-4 sm:pt-6 px-3 sm:px-6">
                 <div className="flex items-center gap-2 sm:gap-3">
                   <div className="p-1.5 sm:p-2 rounded-lg bg-success/10">
                     <Utensils className="h-4 w-4 sm:h-5 sm:w-5 text-success" />
                   </div>
                   <div>
-                    <p className="text-xl sm:text-2xl font-bold counter-value">{metrics.totalDiets}</p>
+                    <p className="text-xl sm:text-2xl font-bold stats-professional">{metrics.totalDiets}</p>
                     <p className="text-[10px] sm:text-sm text-muted-foreground">Total de Dietas</p>
                   </div>
                 </div>
@@ -206,14 +206,14 @@ export default function ProfessionalDashboard() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.15 }}
           >
-            <Card>
+            <Card className="card-professional">
               <CardContent className="pt-4 sm:pt-6 px-3 sm:px-6">
                 <div className="flex items-center gap-2 sm:gap-3">
                   <div className="p-1.5 sm:p-2 rounded-lg bg-primary/10">
                     <Calendar className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
                   </div>
                   <div>
-                    <p className="text-xl sm:text-2xl font-bold counter-value">{metrics.dietsThisMonth}</p>
+                    <p className="text-xl sm:text-2xl font-bold stats-professional">{metrics.dietsThisMonth}</p>
                     <p className="text-[10px] sm:text-sm text-muted-foreground">Dietas este Mês</p>
                   </div>
                 </div>
@@ -226,14 +226,14 @@ export default function ProfessionalDashboard() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
           >
-            <Card>
+            <Card className="card-professional">
               <CardContent className="pt-4 sm:pt-6 px-3 sm:px-6">
                 <div className="flex items-center gap-2 sm:gap-3">
                   <div className="p-1.5 sm:p-2 rounded-lg bg-accent/10">
                     <CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5 text-accent" />
                   </div>
                   <div>
-                    <p className="text-xl sm:text-2xl font-bold counter-value">{metrics.studentsWithActiveDiets}</p>
+                    <p className="text-xl sm:text-2xl font-bold stats-professional">{metrics.studentsWithActiveDiets}</p>
                     <p className="text-[10px] sm:text-sm text-muted-foreground">Planos Ativos</p>
                   </div>
                 </div>
