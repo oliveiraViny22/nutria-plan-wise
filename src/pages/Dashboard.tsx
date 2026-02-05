@@ -468,11 +468,11 @@ export default function Dashboard() {
           </section>
         </FadeInView>
 
-        {/* Metabolic Base - Using MetricCard from UI Kit */}
+        {/* Metabolic Base + Hydration - Using MetricCard from UI Kit */}
         {metabolicData && (
           <FadeInView delay={0.05} direction="up">
             <TooltipProvider delayDuration={200}>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <div className="cursor-help">
@@ -507,6 +507,30 @@ export default function Dashboard() {
                     <p className="text-sm">Total de calorias que você gasta por dia, incluindo atividades físicas. Calculado via Mifflin-St Jeor.</p>
                   </TooltipContent>
                 </Tooltip>
+                {/* Hydration Card with Tooltip */}
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="cursor-help col-span-2 lg:col-span-1">
+                      <HydrationCard 
+                        weight={profile?.weight} 
+                        goal={(profile?.goal as UserGoal) || 'maintain'}
+                        variant="metric"
+                      />
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="max-w-[300px] p-3">
+                    <p className="font-semibold mb-1">💧 Hidratação Personalizada</p>
+                    <p className="text-sm mb-2">
+                      Calculado com base no seu peso ({profile?.weight || 70}kg × 35ml) 
+                      {profile?.goal === 'lose_weight' && ' + 15% para auxiliar no metabolismo e saciedade.'}
+                      {profile?.goal === 'gain_muscle' && ' + 20% para suportar a recuperação muscular.'}
+                      {profile?.goal === 'maintain' && ' para manutenção do equilíbrio hídrico.'}
+                    </p>
+                    <p className="text-xs text-muted-foreground italic">
+                      Ajuste conforme atividade física e clima.
+                    </p>
+                  </TooltipContent>
+                </Tooltip>
               </div>
             </TooltipProvider>
           </FadeInView>
@@ -520,8 +544,8 @@ export default function Dashboard() {
           className="space-y-3 sm:space-y-4"
         >
 
-          {/* Calorie, Macros & Hydration Row - Using NutritionCard */}
-          <div className="grid gap-4 sm:gap-5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+          {/* Calorie & Macros Row - Using NutritionCard */}
+          <div className="grid gap-4 sm:gap-5 grid-cols-1 sm:grid-cols-2">
             {/* Calorie Card */}
             <NutritionCard
               variant="metric"
@@ -550,15 +574,6 @@ export default function Dashboard() {
                 fatTarget={profile?.fat_target || 65}
               />
             </NutritionCard>
-
-            {/* Hydration Card */}
-            <div className="sm:col-span-2 lg:col-span-1">
-              <HydrationCard 
-                weight={profile?.weight} 
-                goal={(profile?.goal as UserGoal) || 'maintain'}
-                variant="card"
-              />
-            </div>
           </div>
 
 
