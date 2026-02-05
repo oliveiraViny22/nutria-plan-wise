@@ -112,7 +112,7 @@ export default function Students() {
   }
 
   return (
-    <div className="min-h-screen bg-background overflow-x-hidden">
+    <div className="min-h-screen bg-background overflow-x-hidden theme-professional">
       {/* Header */}
       <header className="sticky top-0 z-50 glass border-b">
         <div className="container mx-auto px-3 sm:px-4 py-2 sm:py-3 flex items-center justify-between gap-2">

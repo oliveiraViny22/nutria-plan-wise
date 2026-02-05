@@ -304,7 +304,7 @@ export default function Dashboard() {
       </div>
     )}
 
-    <div className="min-h-screen gradient-hero overflow-x-hidden">
+    <div className="min-h-screen gradient-hero overflow-x-hidden theme-patient">
       {/* Header - Premium glass effect */}
       <header className="sticky top-0 z-50 glass border-b border-border/30">
         <div className="container mx-auto px-3 sm:px-4 py-3 sm:py-4 flex items-center justify-between gap-2">
