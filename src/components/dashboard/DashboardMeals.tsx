@@ -1,7 +1,6 @@
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Lock, ClipboardCheck, FileText } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { Lock } from 'lucide-react';
 import { MealCard } from '@/components/ui-kit';
 import { SavePlanButton } from '@/components/SavePlanButton';
 import { EmptyPlanState } from '@/components/EmptyPlanState';
@@ -88,32 +87,6 @@ export function DashboardMeals({
         <h2 className="text-lg sm:text-xl font-sans font-semibold text-foreground tracking-tight">
           Plano de Hoje
         </h2>
-        <div className="flex items-center gap-2">
-          {isPlanSaved ? (
-            <Link to="/meal-plan">
-              <Button variant="outline" size="sm" className="gap-2">
-                <FileText className="h-4 w-4" />
-                <span className="hidden sm:inline">Ver Plano Completo</span>
-                <span className="sm:hidden">Plano</span>
-              </Button>
-            </Link>
-          ) : (
-            <Button variant="outline" size="sm" className="gap-2 opacity-50 cursor-not-allowed" disabled>
-              <Lock className="h-4 w-4" />
-              <span className="hidden sm:inline">Ver Plano Completo</span>
-              <span className="sm:hidden">Plano</span>
-            </Button>
-          )}
-          {isPaidUser && isPlanSaved && (
-            <Link to="/daily-log">
-              <Button variant="outline" size="sm" className="gap-2">
-                <ClipboardCheck className="h-4 w-4" />
-                <span className="hidden sm:inline">Registrar consumo</span>
-                <span className="sm:hidden">Registrar</span>
-              </Button>
-            </Link>
-          )}
-        </div>
       </div>
       
       {/* Save Plan CTA */}
