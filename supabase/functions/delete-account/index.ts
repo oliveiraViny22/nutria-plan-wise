@@ -136,7 +136,14 @@ Deno.serve(async (req) => {
     // 9. Delete AI usage logs
     await supabaseAdmin.from("ai_usage_logs").delete().eq("user_id", userId);
     
-    // 10. Delete profile
+    // 10. Delete objective change requests (both as student and professional)
+    await supabaseAdmin.from("objective_change_requests").delete().eq("student_id", userId);
+    await supabaseAdmin.from("objective_change_requests").delete().eq("professional_id", userId);
+    
+    // 11. Delete conversion events
+    await supabaseAdmin.from("conversion_events").delete().eq("user_id", userId);
+    
+    // 12. Delete profile
     await supabaseAdmin.from("profiles").delete().eq("user_id", userId);
     
     // 11. Finally, delete from auth.users
