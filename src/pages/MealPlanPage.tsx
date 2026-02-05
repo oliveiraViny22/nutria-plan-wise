@@ -99,7 +99,7 @@ const NUTRITION_TIPS: Record<string, { title: string; tips: string[] }> = {
   'gain_muscle': {
     title: 'Dicas para Ganho de Massa',
     tips: [
-      '🥩 Distribua proteínas ao longo do dia (0.3-0.5g/kg por refeição)',
+      '🏋️ Treine com intensidade progressiva para estímulo muscular',
       '🍚 Carboidratos complexos são seus aliados para energia',
       '⏱️ Consuma proteína nas 2 horas pós-treino',
       '🥜 Gorduras saudáveis ajudam na produção hormonal',
