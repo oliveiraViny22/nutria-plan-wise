@@ -21,9 +21,7 @@ import { Badge } from '@/components/ui/badge';
 import { Logo } from '@/components/Logo';
 import { MobileNav } from '@/components/MobileNav';
 import { ThemeToggle } from '@/components/ThemeToggle';
-import { WeightLogForm } from '@/components/progress/WeightLogForm';
-import { WeightEvolutionChart } from '@/components/progress/WeightEvolutionChart';
-import { WeightLogHistory } from '@/components/progress/WeightLogHistory';
+import { WeightProgressCard } from '@/components/progress/WeightProgressCard';
 import { BodyMeasurementsForm } from '@/components/progress/BodyMeasurementsForm';
 import { BodyMeasurementsChart } from '@/components/progress/BodyMeasurementsChart';
 import { useAuth } from '@/contexts/AuthContext';
@@ -237,58 +235,12 @@ export default function Progress() {
 
           {/* Weight Tab - Available for all users */}
           <TabsContent value="weight" className="space-y-4 sm:space-y-6">
-            {/* Quick Stats */}
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
-            >
-              <div className="flex items-center gap-4">
-                <Card className="backdrop-blur-md bg-card/80 border-border/40 shadow-lg">
-                  <CardContent className="p-4 flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                      <Scale className="h-5 w-5 text-primary" />
-                    </div>
-                    <div>
-                      <p className="text-2xl font-bold tabular-nums">{currentWeight.toFixed(1)}</p>
-                      <p className="text-xs text-muted-foreground">kg atual</p>
-                    </div>
-                  </CardContent>
-                </Card>
-                
-                {goal && (
-                  <Card className="backdrop-blur-md bg-card/80 border-border/40 shadow-lg">
-                    <CardContent className="p-4 flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-accent/10 flex items-center justify-center">
-                        <Target className="h-5 w-5 text-accent" />
-                      </div>
-                      <div>
-                        <p className="text-2xl font-bold tabular-nums">{targetWeight.toFixed(1)}</p>
-                        <p className="text-xs text-muted-foreground">kg meta</p>
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
-              </div>
-              
-              <WeightLogForm
-                userId={user?.id || ''}
-                currentWeight={currentWeight}
-                onWeightLogged={fetchData}
-              />
-            </motion.div>
-
-            {/* Weight Evolution Chart */}
-            <WeightEvolutionChart
-              logs={weightLogs}
+            <WeightProgressCard
+              userId={user?.id || ''}
+              currentWeight={currentWeight}
               targetWeight={targetWeight}
               goal={goal}
-            />
-
-            {/* Weight Log History with Edit/Delete */}
-            <WeightLogHistory
               logs={weightLogs}
-              userId={user?.id || ''}
               onUpdate={fetchData}
             />
           </TabsContent>
