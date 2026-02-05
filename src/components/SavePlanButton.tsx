@@ -72,23 +72,22 @@ export function SavePlanButton({ planId, isSaved, onSave, compact = false }: Sav
         size={compact ? 'default' : 'lg'}
         className={`
           w-full gap-2 relative overflow-hidden
-          bg-gradient-to-r from-amber-500 to-orange-500 
-          hover:from-amber-600 hover:to-orange-600
-          text-white font-semibold
-          shadow-lg shadow-amber-500/25
+          gradient-gold
+          text-primary-foreground font-semibold tracking-wide
+          shadow-gold
           ${compact ? 'h-10' : 'h-12'}
         `}
       >
         {/* Shimmer effect */}
         <motion.div
-          className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
+          className="absolute inset-0 bg-gradient-to-r from-transparent via-white/25 to-transparent"
           initial={{ x: '-100%' }}
           animate={{ x: '200%' }}
           transition={{ 
             repeat: Infinity, 
-            duration: 2, 
+            duration: 2.5, 
             ease: 'linear',
-            repeatDelay: 1 
+            repeatDelay: 1.5 
           }}
         />
         

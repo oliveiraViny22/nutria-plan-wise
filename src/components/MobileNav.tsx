@@ -150,13 +150,13 @@ export function MobileNav() {
           <Menu className="h-5 w-5" />
         </Button>
       </SheetTrigger>
-      <SheetContent side="left" className="w-[280px] p-0">
-        <SheetHeader className="border-b p-4">
+      <SheetContent side="left" className="w-[280px] p-0 gradient-hero border-r border-border/30">
+        <SheetHeader className="border-b border-border/30 p-4">
           <SheetTitle className="flex items-center justify-between">
             <div className="flex items-center gap-2 flex-wrap">
               <Logo size="sm" />
               {isAdmin ? (
-                <Badge variant="outline" className="gap-1 bg-primary/10 text-primary border-primary/20">
+                <Badge variant="outline" className="gap-1 gradient-gold text-primary-foreground border-0 shadow-sm">
                   <Shield className="w-3 h-3" />
                   Admin
                 </Badge>
@@ -184,20 +184,20 @@ export function MobileNav() {
                 to={item.href}
                 onClick={() => setOpen(false)}
                 className={cn(
-                  "flex items-center gap-3 px-4 py-3 text-sm font-medium transition-colors",
-                  "hover:bg-muted/50",
+                  "flex items-center gap-3 px-4 py-3 text-sm font-medium transition-all duration-200",
+                  "hover:bg-accent/10",
                   isActive(item.href)
-                    ? "bg-primary/10 text-primary border-r-2 border-primary"
+                    ? "bg-accent/15 text-accent border-r-2 border-accent"
                     : "text-muted-foreground hover:text-foreground"
                 )}
               >
                 {item.icon}
-                <span className="flex-1">{item.label}</span>
-                <ChevronRight className="h-4 w-4 opacity-50" />
+                <span className="flex-1 tracking-tight">{item.label}</span>
+                <ChevronRight className="h-4 w-4 opacity-40" />
               </Link>
             ))}
           
-          <div className="border-t mt-4 pt-4 space-y-1">
+          <div className="border-t border-border/30 mt-4 pt-4 space-y-1">
             <ThemeToggleItem />
             <button
               onClick={handleSignOut}
