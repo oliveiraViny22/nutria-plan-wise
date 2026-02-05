@@ -37,12 +37,14 @@ export default function Pricing() {
     }
     
     // Free users can ONLY see the paid personal plan as upgrade option
+    // Exclude "Premium Aluno" which is for students linked to professionals
     if (isFreePlan) {
-      return p.type === 'plano_pessoal_pago' && p.name !== 'Premium';
+      return p.type === 'plano_pessoal_pago' && !p.name.toLowerCase().includes('premium');
     }
 
     // Premium is a special plan for students linked to professionals
-    if (p.name === 'Premium') {
+    // Match both "Premium" and "Premium Aluno"
+    if (p.name.toLowerCase().includes('premium')) {
       return isLinkedToProfessional;
     }
     
