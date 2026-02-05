@@ -10,7 +10,7 @@ import {
 } from '@/components/ui/tooltip';
 import { MetricCard } from '@/components/ui-kit';
 import { HydrationCard } from '@/components/HydrationCard';
-import type { UserGoal } from '@/lib/hydration-recommendations';
+import { calculateHydration, type UserGoal } from '@/lib/hydration-recommendations';
 import { cn } from '@/lib/utils';
 
 interface MetabolicData {
@@ -45,6 +45,9 @@ export function CollapsibleMetrics({
   if (!metabolicData) return null;
 
   const toggleCollapse = () => setIsCollapsed(!isCollapsed);
+  
+  // Use the proper hydration calculation with goal multipliers
+  const hydration = calculateHydration(weight, (goal as UserGoal) || 'maintain');
 
   return (
     <div className={cn("space-y-2", className)}>
@@ -118,7 +121,7 @@ export function CollapsibleMetrics({
             <div className="w-px h-4 bg-border" />
             <div className="flex items-center gap-1.5">
               <span>💧</span>
-              <span className="font-medium">{((weight || 70) * 0.04).toFixed(1)}L</span>
+              <span className="font-medium">{hydration.liters}L</span>
             </div>
           </motion.div>
         ) : (
