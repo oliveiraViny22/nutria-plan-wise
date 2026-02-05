@@ -95,6 +95,69 @@ export type Database = {
         }
         Relationships: []
       }
+      body_measurements: {
+        Row: {
+          arm_cm: number | null
+          body_fat_percent: number | null
+          calf_cm: number | null
+          chest_cm: number | null
+          created_at: string
+          hip_cm: number | null
+          id: string
+          measurement_date: string
+          notes: string | null
+          recorded_by: string | null
+          thigh_cm: number | null
+          user_id: string
+          waist_cm: number | null
+        }
+        Insert: {
+          arm_cm?: number | null
+          body_fat_percent?: number | null
+          calf_cm?: number | null
+          chest_cm?: number | null
+          created_at?: string
+          hip_cm?: number | null
+          id?: string
+          measurement_date?: string
+          notes?: string | null
+          recorded_by?: string | null
+          thigh_cm?: number | null
+          user_id: string
+          waist_cm?: number | null
+        }
+        Update: {
+          arm_cm?: number | null
+          body_fat_percent?: number | null
+          calf_cm?: number | null
+          chest_cm?: number | null
+          created_at?: string
+          hip_cm?: number | null
+          id?: string
+          measurement_date?: string
+          notes?: string | null
+          recorded_by?: string | null
+          thigh_cm?: number | null
+          user_id?: string
+          waist_cm?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "body_measurements_recorded_by_fkey"
+            columns: ["recorded_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "body_measurements_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
       conversion_events: {
         Row: {
           created_at: string
@@ -1223,6 +1286,41 @@ export type Database = {
           processed_at?: string | null
         }
         Relationships: []
+      }
+      weight_logs: {
+        Row: {
+          created_at: string
+          id: string
+          log_date: string
+          notes: string | null
+          user_id: string
+          weight_kg: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          log_date?: string
+          notes?: string | null
+          user_id: string
+          weight_kg: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          log_date?: string
+          notes?: string | null
+          user_id?: string
+          weight_kg?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "weight_logs_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
       }
     }
     Views: {
