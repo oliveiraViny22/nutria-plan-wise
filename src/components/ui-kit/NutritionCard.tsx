@@ -108,6 +108,7 @@ interface MealCardProps {
   optionsCount?: number;
   children?: ReactNode;
   onClick?: () => void;
+  compact?: boolean;
 }
 
 export function MealCard({
@@ -118,12 +119,44 @@ export function MealCard({
   optionsCount,
   children,
   onClick,
+  compact = false,
 }: MealCardProps) {
   const statusStyles = {
     pending: 'border-l-muted-foreground/30',
     confirmed: 'border-l-success',
     skipped: 'border-l-warning',
   };
+
+  if (compact) {
+    return (
+      <div
+        className={cn(
+          'flex items-center justify-between px-4 py-3 rounded-lg border border-border/50 bg-card',
+          'hover:bg-muted/30 transition-colors cursor-pointer',
+          'border-l-4',
+          statusStyles[status]
+        )}
+        onClick={onClick}
+      >
+        <div className="flex items-center gap-3">
+          <span className="font-medium text-foreground text-sm">{mealName}</span>
+          {optionsCount !== undefined && optionsCount > 1 && (
+            <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+              {optionsCount} opções
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          {calories !== undefined && (
+            <span className="font-semibold text-foreground tabular-nums text-sm">
+              {calories} <span className="text-xs text-muted-foreground">kcal</span>
+            </span>
+          )}
+          {children}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <Card
