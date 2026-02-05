@@ -40,7 +40,7 @@ import { CalorieRing } from '@/components/CalorieRing';
 import { MacroChart } from '@/components/MacroChart';
 import { AIRebalancer } from '@/components/AIRebalancer';
 import { SupplementToggle } from '@/components/SupplementToggle';
-import { MetricCard, NutritionCard } from '@/components/ui-kit';
+import { MetricCard, NutritionCard, MealCard } from '@/components/ui-kit';
 
 import { UpgradeDialog } from '@/components/UpgradeDialog';
 import { WeeklyAdherenceChart } from '@/components/WeeklyAdherenceChart';
@@ -759,33 +759,27 @@ export default function Dashboard() {
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: 0.4 + index * 0.1 }}
                 >
-                  <Link
-                    to={`/meal/${meal.id}`}
-                    className="card-interactive rounded-xl p-4 flex items-center justify-between group"
+                  <MealCard
+                    mealName={MEAL_NAMES[meal.name as MealType] || meal.name}
+                    calories={currentDietPlan.is_saved ? meal.total_calories || 0 : undefined}
+                    status="pending"
+                    optionsCount={permissions.meal_options_limit > 1 ? permissions.meal_options_limit : undefined}
+                    onClick={() => navigate(`/meal/${meal.id}`)}
                   >
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <h3 className="font-medium text-foreground tracking-tight">
-                          {MEAL_NAMES[meal.name as MealType] || meal.name}
-                        </h3>
-                        {permissions.meal_options_limit > 1 && (
-                          <div className="flex items-center gap-1 text-xs text-accent bg-accent/10 px-2 py-0.5 rounded-full font-medium">
-                            <Layers className="w-3 h-3" />
-                            <span>{permissions.meal_options_limit} opções</span>
-                          </div>
-                        )}
+                    {currentDietPlan.is_saved && (
+                      <div className="flex items-center gap-3 text-xs text-muted-foreground mt-2">
+                        <span className="text-protein font-medium">{meal.total_protein?.toFixed(0) || 0}g prot</span>
+                        <span className="text-carbs font-medium">{meal.total_carbs?.toFixed(0) || 0}g carb</span>
+                        <span className="text-fat font-medium">{meal.total_fat?.toFixed(0) || 0}g gord</span>
                       </div>
-                      <HiddenMacroBlock
-                        calories={meal.total_calories}
-                        protein={meal.total_protein}
-                        carbs={meal.total_carbs}
-                        fat={meal.total_fat}
-                        isHidden={!currentDietPlan.is_saved}
-                        compact
-                      />
-                    </div>
-                    <ChevronRight className="w-5 h-5 text-muted-foreground flex-shrink-0 transition-transform group-hover:translate-x-1" />
-                  </Link>
+                    )}
+                    {!currentDietPlan.is_saved && (
+                      <div className="flex items-center gap-1 text-xs text-muted-foreground mt-2">
+                        <Lock className="w-3 h-3" />
+                        <span>Salve o plano para ver os detalhes</span>
+                      </div>
+                    )}
+                  </MealCard>
                 </motion.div>
               ))}
             </div>
