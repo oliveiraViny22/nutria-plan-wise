@@ -61,6 +61,8 @@ import { DietPlan, Meal, GOALS, MEAL_NAMES, MealType } from '@/lib/types';
 import { toast } from 'sonner';
 import { UsageLimitsBadge } from '@/components/UsageLimitsBadge';
 import { FreePlanBadge } from '@/components/FeatureBadge';
+import { SavePlanButton } from '@/components/SavePlanButton';
+import { HiddenMacroBlock } from '@/components/HiddenMacroValue';
 
 export default function Dashboard() {
   const { profile, signOut } = useAuth();
@@ -674,16 +676,24 @@ export default function Dashboard() {
                 Plano de Hoje
               </h2>
               <div className="flex items-center gap-2">
-                {/* View full plan button */}
-                <Link to="/meal-plan">
-                  <Button variant="outline" size="sm" className="gap-2">
-                    <FileText className="h-4 w-4" />
+                {/* View full plan button - disabled if not saved */}
+                {currentDietPlan.is_saved ? (
+                  <Link to="/meal-plan">
+                    <Button variant="outline" size="sm" className="gap-2">
+                      <FileText className="h-4 w-4" />
+                      <span className="hidden sm:inline">Ver Plano Completo</span>
+                      <span className="sm:hidden">Plano</span>
+                    </Button>
+                  </Link>
+                ) : (
+                  <Button variant="outline" size="sm" className="gap-2 opacity-50 cursor-not-allowed" disabled>
+                    <Lock className="h-4 w-4" />
                     <span className="hidden sm:inline">Ver Plano Completo</span>
                     <span className="sm:hidden">Plano</span>
                   </Button>
-                </Link>
-                {/* Only show daily log button for paid users */}
-                {subscriptionPlan && subscriptionPlan.type !== 'gratuito' && (
+                )}
+                {/* Only show daily log button for paid users with saved plan */}
+                {subscriptionPlan && subscriptionPlan.type !== 'gratuito' && currentDietPlan.is_saved && (
                   <Link to="/daily-log">
                     <Button variant="outline" size="sm" className="gap-2">
                       <ClipboardCheck className="h-4 w-4" />
@@ -694,6 +704,15 @@ export default function Dashboard() {
                 )}
               </div>
             </div>
+            
+            {/* Save Plan CTA - show prominently when plan is not saved */}
+            {!currentDietPlan.is_saved && !isLinkedStudent && (
+              <SavePlanButton 
+                planId={currentDietPlan.id}
+                isSaved={currentDietPlan.is_saved}
+                onSave={fetchCurrentPlan}
+              />
+            )}
             <div className="space-y-3">
               {meals.map((meal, index) => (
                 <motion.div
@@ -718,10 +737,14 @@ export default function Dashboard() {
                           </div>
                         )}
                       </div>
-                      <p className="text-sm text-muted-foreground">
-                        {meal.total_calories} kcal • P: {Math.round(meal.total_protein)}g • C:{' '}
-                        {Math.round(meal.total_carbs)}g • G: {Math.round(meal.total_fat)}g
-                      </p>
+                      <HiddenMacroBlock
+                        calories={meal.total_calories}
+                        protein={meal.total_protein}
+                        carbs={meal.total_carbs}
+                        fat={meal.total_fat}
+                        isHidden={!currentDietPlan.is_saved}
+                        compact
+                      />
                     </div>
                     <ChevronRight className="w-5 h-5 text-muted-foreground flex-shrink-0" />
                   </Link>

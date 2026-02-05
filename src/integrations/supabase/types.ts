@@ -183,6 +183,7 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          is_saved: boolean
           objective_change_count: number
           objective_locked_until: string | null
           status: string
@@ -196,6 +197,7 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: string
+          is_saved?: boolean
           objective_change_count?: number
           objective_locked_until?: string | null
           status?: string
@@ -209,6 +211,7 @@ export type Database = {
         Update: {
           created_at?: string
           id?: string
+          is_saved?: boolean
           objective_change_count?: number
           objective_locked_until?: string | null
           status?: string
