@@ -127,6 +127,7 @@ export interface DietPlan {
   total_protein: number;
   total_carbs: number;
   total_fat: number;
+  is_saved: boolean;
   created_at: string;
   updated_at: string;
 }
