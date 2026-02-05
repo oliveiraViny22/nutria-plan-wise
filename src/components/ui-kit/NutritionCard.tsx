@@ -199,27 +199,23 @@ export function MetricCard({
   };
 
   return (
-    <Card className="bg-gradient-to-br from-card to-muted/20 border-border/30">
-      <CardContent className="p-4">
-        <div className="flex items-center gap-3">
-          {icon && (
-            <div className={cn('p-2 rounded-lg shrink-0', colorStyles[color])}>
-              {icon}
-            </div>
-          )}
-          <div className="flex-1 min-w-0">
-            <p className="text-sm text-muted-foreground truncate">{label}</p>
-            <div className="flex items-baseline gap-1">
-              <span className="text-2xl font-bold tabular-nums">{value}</span>
-              {unit && <span className="text-sm text-muted-foreground">{unit}</span>}
-            </div>
+    <Card className="bg-gradient-to-br from-card to-muted/20 border-border/30 h-full">
+      <CardContent className="p-4 h-full flex flex-col items-center justify-center text-center">
+        {icon && (
+          <div className={cn('p-2 rounded-lg shrink-0 mb-2', colorStyles[color])}>
+            {icon}
           </div>
-          {trend && trendValue && (
-            <div className={cn('text-sm font-medium', trendStyles[trend])}>
-              {trend === 'up' ? '↑' : trend === 'down' ? '↓' : '→'} {trendValue}
-            </div>
-          )}
+        )}
+        <p className="text-sm text-muted-foreground">{label}</p>
+        <div className="flex items-baseline gap-1 justify-center">
+          <span className="text-2xl font-bold tabular-nums">{value}</span>
+          {unit && <span className="text-sm text-muted-foreground">{unit}</span>}
         </div>
+        {trend && trendValue && (
+          <div className={cn('text-sm font-medium mt-1', trendStyles[trend])}>
+            {trend === 'up' ? '↑' : trend === 'down' ? '↓' : '→'} {trendValue}
+          </div>
+        )}
       </CardContent>
     </Card>
   );
