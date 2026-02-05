@@ -138,16 +138,19 @@ export function InteractiveMacroCard({
               transition={{ delay: index * 0.1 }}
               className={cn(
                 "relative rounded-xl cursor-pointer transition-all duration-300",
-                // Glassmorphism effect
-                "backdrop-blur-sm bg-background/60 dark:bg-background/40",
-                "border border-white/20 dark:border-white/10",
-                "shadow-lg shadow-black/5 dark:shadow-black/20",
+                // Glassmorphism effect with improved dark mode contrast
+                "backdrop-blur-md",
+                "bg-card/80 dark:bg-card/90",
+                "border border-border/40 dark:border-border/60",
+                "shadow-lg shadow-foreground/5 dark:shadow-foreground/10",
+                // Subtle macro-colored tint using existing design tokens
+                macro.bgClass,
                 // Hover states
-                "hover:bg-background/80 dark:hover:bg-background/60",
-                "hover:border-white/30 dark:hover:border-white/20",
-                "hover:shadow-xl hover:shadow-black/10",
+                "hover:bg-card/95 dark:hover:bg-card",
+                "hover:border-border/60 dark:hover:border-border/80",
+                "hover:shadow-xl",
                 "active:scale-[0.98]",
-                isExpanded && "ring-2 ring-primary/20",
+                isExpanded && "ring-2 ring-primary/30 dark:ring-primary/40",
                 // Mobile: horizontal layout, Desktop: vertical
                 "flex items-center gap-3 p-3 sm:flex-col sm:p-4"
               )}
