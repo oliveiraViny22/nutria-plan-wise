@@ -602,9 +602,13 @@ export default function Dashboard() {
             {subscriptionPlan.type === 'gratuito' ? (
               <GamificationPreview isLocked={true} />
             ) : (
-              <div className="flex flex-col gap-3 sm:gap-4 lg:grid lg:grid-cols-2"> 
-                <AdherenceStreak />
-                <WeeklyAdherenceChart />
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4">
+                <div className="min-w-0">
+                  <AdherenceStreak />
+                </div>
+                <div className="min-w-0">
+                  <WeeklyAdherenceChart />
+                </div>
               </div>
             )}
           </motion.section>

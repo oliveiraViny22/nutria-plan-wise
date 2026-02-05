@@ -218,16 +218,16 @@ export function AdherenceStreak() {
         whileTap={{ scale: 0.99 }}
         className="cursor-pointer"
       >
-        <Card className="card-elevated overflow-hidden h-full hover:border-primary/30 transition-colors">
-          <CardContent className="py-4">
-            <div className="flex items-center gap-4">
+        <Card className="card-elevated overflow-hidden hover:border-primary/30 transition-colors h-full">
+          <CardContent className="py-4 h-full flex flex-col">
+            <div className="flex items-center gap-3 sm:gap-4 flex-1">
               {/* Streak Fire Icon with bloom animation */}
               <motion.div
                 initial={{ scale: 0.8, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 transition={{ type: 'spring', stiffness: 200, damping: 15 }}
                 className={`
-                  relative w-14 h-14 rounded-full flex items-center justify-center flex-shrink-0
+                  relative w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center flex-shrink-0
                   ${streak.currentStreak > 0 
                     ? 'bg-gradient-to-br from-primary to-primary/70 ring-celebrate' 
                     : 'bg-muted'
@@ -235,15 +235,15 @@ export function AdherenceStreak() {
                 `}
               >
                 <Flame 
-                  className={`w-7 h-7 ${streak.currentStreak > 0 ? 'text-white' : 'text-muted-foreground'}`} 
+                  className={`w-6 h-6 sm:w-7 sm:h-7 ${streak.currentStreak > 0 ? 'text-white' : 'text-muted-foreground'}`} 
                 />
               </motion.div>
 
               {/* Streak Info */}
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1 flex-wrap">
+                <div className="flex items-center gap-1.5 sm:gap-2 mb-1 flex-wrap">
                   {streak.currentStreak === 0 ? (
-                    <h3 className="font-semibold text-foreground text-sm">
+                    <h3 className="font-semibold text-foreground text-xs sm:text-sm">
                       Comece sua sequência!
                     </h3>
                   ) : (
@@ -266,18 +266,18 @@ export function AdherenceStreak() {
                 </div>
 
                 {streak.currentStreak === 0 ? (
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-[10px] sm:text-xs text-muted-foreground">
                     Registre suas refeições hoje para iniciar!
                   </p>
                 ) : (
-                  <div className="space-y-1">
+                  <div className="space-y-0.5 sm:space-y-1">
                     {nextMilestone && (
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-[10px] sm:text-xs text-muted-foreground">
                         Mais {daysToNextMilestone} {daysToNextMilestone === 1 ? 'dia' : 'dias'} para "{nextMilestone.label}"
                       </p>
                     )}
                     {streak.bestStreak > streak.currentStreak && (
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-[10px] sm:text-xs text-muted-foreground">
                         Recorde: {streak.bestStreak} dias
                       </p>
                     )}
@@ -286,14 +286,14 @@ export function AdherenceStreak() {
 
                 {/* Today's status indicator */}
                 {streak.currentStreak > 0 && (
-                  <div className="flex items-center gap-1 mt-2">
+                  <div className="flex items-center gap-1 mt-1.5 sm:mt-2">
                     <div 
                       className={`
-                        w-2 h-2 rounded-full 
+                        w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full 
                         ${streak.isActiveToday ? 'bg-green-500 animate-pulse' : 'bg-amber-500'}
                       `} 
                     />
-                    <span className="text-xs text-muted-foreground">
+                    <span className="text-[10px] sm:text-xs text-muted-foreground">
                       {streak.isActiveToday 
                         ? 'Ativo hoje!' 
                         : 'Registre hoje para manter a sequência'

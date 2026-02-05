@@ -251,8 +251,8 @@ export function WeeklyAdherenceChart() {
         whileTap={{ scale: 0.99 }}
         className="cursor-pointer"
       >
-        <Card className="card-elevated overflow-hidden h-full hover:border-primary/30 transition-colors">
-          <CardContent className="py-4 space-y-4">
+        <Card className="card-elevated overflow-hidden hover:border-primary/30 transition-colors h-full">
+          <CardContent className="py-4 space-y-3 sm:space-y-4 h-full flex flex-col">
             {/* Header with ProgressRing */}
             <div className="flex items-center justify-between gap-4">
               <div className="flex items-center gap-3">
@@ -281,7 +281,7 @@ export function WeeklyAdherenceChart() {
 
             {/* Week Days Chart with growth animation */}
             <TooltipProvider delayDuration={100}>
-              <div className="flex items-end justify-between gap-1.5 h-20">
+              <div className="flex items-end justify-between gap-1 sm:gap-1.5 h-16 sm:h-20 flex-shrink-0">
                 {stats.days.map((day, index) => {
                   const height = day.status === 'future' 
                     ? 20 
@@ -343,7 +343,7 @@ export function WeeklyAdherenceChart() {
             </div>
 
             {/* Stats Summary */}
-            <div className="flex items-center justify-between text-xs pt-2 border-t">
+            <div className="flex items-center justify-between text-xs pt-2 border-t mt-auto">
               <div className="flex items-center gap-4">
                 <div className="flex items-center gap-1 text-success">
                   <CheckCircle2 className="h-3.5 w-3.5" />
