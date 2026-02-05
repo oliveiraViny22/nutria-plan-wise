@@ -40,7 +40,7 @@ import { CalorieRing } from '@/components/CalorieRing';
 import { MacroChart } from '@/components/MacroChart';
 import { AIRebalancer } from '@/components/AIRebalancer';
 import { SupplementToggle } from '@/components/SupplementToggle';
-import { MetricCard, NutritionCard, MealCard } from '@/components/ui-kit';
+import { MetricCard, NutritionCard, MealCard, FadeInView } from '@/components/ui-kit';
 
 import { UpgradeDialog } from '@/components/UpgradeDialog';
 import { WeeklyAdherenceChart } from '@/components/WeeklyAdherenceChart';
@@ -453,28 +453,22 @@ export default function Dashboard() {
 
 
         {/* Welcome Section - Premium typography */}
-        <motion.section
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="space-y-2"
-        >
-          <h1 className="text-2xl sm:text-3xl font-sans font-bold text-foreground tracking-tight">
-            Olá, {profile?.name?.split(' ')[0] || 'Usuário'}! 👋
-          </h1>
-          <p className="text-sm sm:text-base text-muted-foreground font-light">
-            {profile?.goal
-              ? `Objetivo: ${GOALS[profile.goal as keyof typeof GOALS]?.label}`
-              : 'Acompanhe seu plano alimentar personalizado'}
-          </p>
-        </motion.section>
+        <FadeInView direction="up">
+          <section className="space-y-2">
+            <h1 className="text-2xl sm:text-3xl font-sans font-bold text-foreground tracking-tight">
+              Olá, {profile?.name?.split(' ')[0] || 'Usuário'}! 👋
+            </h1>
+            <p className="text-sm sm:text-base text-muted-foreground font-light">
+              {profile?.goal
+                ? `Objetivo: ${GOALS[profile.goal as keyof typeof GOALS]?.label}`
+                : 'Acompanhe seu plano alimentar personalizado'}
+            </p>
+          </section>
+        </FadeInView>
 
         {/* Metabolic Base - Using MetricCard from UI Kit */}
         {metabolicData && (
-          <motion.section
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.05 }}
-          >
+          <FadeInView delay={0.05} direction="up">
             <TooltipProvider delayDuration={200}>
               <div className="grid grid-cols-2 gap-3">
                 <Tooltip>
@@ -513,7 +507,7 @@ export default function Dashboard() {
                 </Tooltip>
               </div>
             </TooltipProvider>
-          </motion.section>
+          </FadeInView>
         )}
 
         {/* Stats Cards + Goals - Reorganized layout */}
