@@ -66,19 +66,16 @@
      "Beba pelo menos 2L de água por dia, especialmente antes das refeições",
      "Vegetais de folhas verdes podem ser consumidos à vontade",
      "Evite comer nas 3 horas antes de dormir",
-     "Combine a dieta com atividade física regular",
    ],
    maintain: [
      "Mantenha consistência nos horários das refeições",
      "Inclua variedade de frutas e vegetais coloridos",
      "Proteínas são importantes para preservar massa muscular",
-     "Monitore seu peso semanalmente para ajustes finos",
    ],
    gain_muscle: [
      "Distribua proteínas ao longo do dia (0.3-0.5g/kg por refeição)",
      "Carboidratos complexos são seus aliados para energia",
      "Consuma proteína nas 2 horas pós-treino",
-     "Sono de qualidade é essencial para recuperação",
    ],
  };
  
@@ -112,30 +109,30 @@
            const foodsHtml = opt.foods
              .map(
                (f) => `
-             <tr style="font-size: 8pt;">
-               <td style="padding: 3px 6px; border-bottom: 1px solid #e5e7eb;">${f.name}</td>
-               <td style="padding: 3px 6px; border-bottom: 1px solid #e5e7eb; text-align: center;">${f.quantity}</td>
-               <td style="padding: 3px 6px; border-bottom: 1px solid #e5e7eb; text-align: right;">${f.calories}</td>
-               <td style="padding: 3px 6px; border-bottom: 1px solid #e5e7eb; text-align: right;">${f.protein}g</td>
-               <td style="padding: 3px 6px; border-bottom: 1px solid #e5e7eb; text-align: right;">${f.carbs}g</td>
-               <td style="padding: 3px 6px; border-bottom: 1px solid #e5e7eb; text-align: right;">${f.fat}g</td>
+             <tr>
+               <td style="padding: 6px 10px; border-bottom: 1px solid #e5e7eb;">${f.name}</td>
+               <td style="padding: 6px 10px; border-bottom: 1px solid #e5e7eb; text-align: center; white-space: nowrap;">${f.quantity}</td>
+               <td style="padding: 6px 10px; border-bottom: 1px solid #e5e7eb; text-align: right;">${f.calories}</td>
+               <td style="padding: 6px 10px; border-bottom: 1px solid #e5e7eb; text-align: right;">${f.protein}g</td>
+               <td style="padding: 6px 10px; border-bottom: 1px solid #e5e7eb; text-align: right;">${f.carbs}g</td>
+               <td style="padding: 6px 10px; border-bottom: 1px solid #e5e7eb; text-align: right;">${f.fat}g</td>
              </tr>
            `
              )
              .join("");
  
            return `
-           <div style="margin-bottom: 8px;">
-             <div style="font-size: 8pt; color: #6b7280; margin-bottom: 4px;">Opção ${opt.option_number}</div>
-             <table style="width: 100%; border-collapse: collapse;">
+           <div style="margin-bottom: 12px;">
+             ${meal.options.length > 1 ? `<div style="font-size: 9pt; color: #6b7280; margin-bottom: 6px; font-weight: 500;">Opção ${opt.option_number}</div>` : ''}
+             <table style="width: 100%; border-collapse: collapse; font-size: 9pt;">
                <thead>
-                 <tr style="background: #f9fafb; font-size: 7pt; text-transform: uppercase; letter-spacing: 0.05em;">
-                   <th style="padding: 4px 6px; text-align: left; font-weight: 600;">Alimento</th>
-                   <th style="padding: 4px 6px; text-align: center; font-weight: 600;">Qtd</th>
-                   <th style="padding: 4px 6px; text-align: right; font-weight: 600;">Kcal</th>
-                   <th style="padding: 4px 6px; text-align: right; font-weight: 600;">Prot</th>
-                   <th style="padding: 4px 6px; text-align: right; font-weight: 600;">Carb</th>
-                   <th style="padding: 4px 6px; text-align: right; font-weight: 600;">Gord</th>
+                 <tr style="background: #f1f5f9; font-size: 8pt; text-transform: uppercase; letter-spacing: 0.03em;">
+                   <th style="padding: 8px 10px; text-align: left; font-weight: 600; width: 40%;">Alimento</th>
+                   <th style="padding: 8px 10px; text-align: center; font-weight: 600; width: 15%;">Quantidade</th>
+                   <th style="padding: 8px 10px; text-align: right; font-weight: 600; width: 11%;">Kcal</th>
+                   <th style="padding: 8px 10px; text-align: right; font-weight: 600; width: 11%;">Prot</th>
+                   <th style="padding: 8px 10px; text-align: right; font-weight: 600; width: 11%;">Carb</th>
+                   <th style="padding: 8px 10px; text-align: right; font-weight: 600; width: 11%;">Gord</th>
                  </tr>
                </thead>
                <tbody>
@@ -148,12 +145,12 @@
          .join("");
  
        return `
-         <div style="margin-bottom: 16px; page-break-inside: avoid;">
-           <div style="display: flex; justify-content: space-between; align-items: center; background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); color: white; padding: 8px 12px; border-radius: 6px 6px 0 0;">
-             <span style="font-weight: 600; font-size: 10pt;">${mealLabel}</span>
-             <span style="font-size: 8pt; opacity: 0.9;">${meal.total_calories || 0} kcal</span>
+         <div style="margin-bottom: 20px; page-break-inside: avoid;">
+           <div style="display: flex; justify-content: space-between; align-items: center; background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); color: white; padding: 10px 16px; border-radius: 8px 8px 0 0;">
+             <span style="font-weight: 600; font-size: 11pt;">${mealLabel}</span>
+             <span style="font-size: 10pt; opacity: 0.9; font-weight: 500;">${meal.total_calories || 0} kcal</span>
            </div>
-           <div style="border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 6px 6px; padding: 10px;">
+           <div style="border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 8px 8px; padding: 16px; background: #ffffff;">
              ${optionsHtml}
            </div>
          </div>
@@ -165,7 +162,7 @@
    const tipsHtml = tips
      .map(
        (tip) => `
-       <li style="margin-bottom: 6px; padding-left: 8px; border-left: 2px solid #3b82f6;">${tip}</li>
+       <li style="margin-bottom: 8px; padding: 8px 12px; background: #fffbeb; border-radius: 6px; border-left: 3px solid #f59e0b;">${tip}</li>
      `
      )
      .join("");
@@ -177,127 +174,134 @@
    <meta charset="UTF-8">
    <style>
      @page { 
-       size: Executive; 
-       margin: 15mm 12mm; 
+       size: A4; 
+       margin: 20mm 18mm; 
      }
      * { box-sizing: border-box; }
      body { 
        font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
-       font-size: 9pt;
-       line-height: 1.4;
+       font-size: 10pt;
+       line-height: 1.5;
        color: #1f2937;
        margin: 0;
        padding: 0;
+       background: #ffffff;
+     }
+     .container {
+       max-width: 100%;
+       margin: 0 auto;
      }
    </style>
  </head>
  <body>
+   <div class="container">
    <!-- Header com Logo e Dados do Usuário -->
-   <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #3b82f6; padding-bottom: 12px; margin-bottom: 16px;">
+   <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 3px solid #3b82f6; padding-bottom: 16px; margin-bottom: 24px;">
      <div>
-       <h1 style="font-size: 18pt; font-weight: 700; color: #1f2937; margin: 0 0 4px 0;">
+       <h1 style="font-size: 22pt; font-weight: 700; color: #1f2937; margin: 0 0 6px 0;">
          🥗 Plano Alimentar Personalizado
        </h1>
-       <p style="font-size: 9pt; color: #6b7280; margin: 0;">
+       <p style="font-size: 10pt; color: #6b7280; margin: 0;">
          NutriAI • Seu assistente nutricional inteligente
        </p>
      </div>
-     <div style="text-align: right; font-size: 8pt; color: #6b7280;">
+     <div style="text-align: right; font-size: 9pt; color: #6b7280;">
        <p style="margin: 0;">Gerado em: ${generatedAt}</p>
      </div>
    </div>
  
    <!-- Dados do Perfil -->
-   <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px;">
-     <div style="background: #f8fafc; border-radius: 8px; padding: 14px;">
-       <h3 style="font-size: 10pt; font-weight: 600; color: #374151; margin: 0 0 10px 0; display: flex; align-items: center; gap: 6px;">
+   <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 28px;">
+     <div style="background: #f8fafc; border-radius: 10px; padding: 18px; border: 1px solid #e2e8f0;">
+       <h3 style="font-size: 12pt; font-weight: 600; color: #374151; margin: 0 0 14px 0; display: flex; align-items: center; gap: 8px;">
          👤 Dados Pessoais
        </h3>
-       <table style="width: 100%; font-size: 9pt;">
+       <table style="width: 100%; font-size: 10pt;">
          <tr>
-           <td style="padding: 4px 0; color: #6b7280;">Nome:</td>
-           <td style="padding: 4px 0; font-weight: 500; text-align: right;">${profile.name || "Não informado"}</td>
+           <td style="padding: 6px 0; color: #6b7280;">Nome:</td>
+           <td style="padding: 6px 0; font-weight: 600; text-align: right;">${profile.name || "Não informado"}</td>
          </tr>
          <tr>
-           <td style="padding: 4px 0; color: #6b7280;">Idade:</td>
-           <td style="padding: 4px 0; font-weight: 500; text-align: right;">${profile.age ? `${profile.age} anos` : "Não informado"}</td>
+           <td style="padding: 6px 0; color: #6b7280;">Idade:</td>
+           <td style="padding: 6px 0; font-weight: 500; text-align: right;">${profile.age ? `${profile.age} anos` : "Não informado"}</td>
          </tr>
          <tr>
-           <td style="padding: 4px 0; color: #6b7280;">Peso:</td>
-           <td style="padding: 4px 0; font-weight: 500; text-align: right;">${profile.weight ? `${profile.weight} kg` : "Não informado"}</td>
+           <td style="padding: 6px 0; color: #6b7280;">Peso:</td>
+           <td style="padding: 6px 0; font-weight: 500; text-align: right;">${profile.weight ? `${profile.weight} kg` : "Não informado"}</td>
          </tr>
          <tr>
-           <td style="padding: 4px 0; color: #6b7280;">Altura:</td>
-           <td style="padding: 4px 0; font-weight: 500; text-align: right;">${profile.height ? `${profile.height} cm` : "Não informado"}</td>
+           <td style="padding: 6px 0; color: #6b7280;">Altura:</td>
+           <td style="padding: 6px 0; font-weight: 500; text-align: right;">${profile.height ? `${profile.height} cm` : "Não informado"}</td>
          </tr>
-         <tr>
-           <td style="padding: 4px 0; color: #6b7280;">Objetivo:</td>
-           <td style="padding: 4px 0; font-weight: 600; text-align: right; color: #3b82f6;">${goalLabel}</td>
+         <tr style="border-top: 1px solid #e2e8f0;">
+           <td style="padding: 10px 0 6px 0; color: #6b7280;">Objetivo:</td>
+           <td style="padding: 10px 0 6px 0; font-weight: 700; text-align: right; color: #3b82f6; font-size: 11pt;">${goalLabel}</td>
          </tr>
        </table>
      </div>
  
-     <div style="background: #f8fafc; border-radius: 8px; padding: 14px;">
-       <h3 style="font-size: 10pt; font-weight: 600; color: #374151; margin: 0 0 10px 0; display: flex; align-items: center; gap: 6px;">
+     <div style="background: #f8fafc; border-radius: 10px; padding: 18px; border: 1px solid #e2e8f0;">
+       <h3 style="font-size: 12pt; font-weight: 600; color: #374151; margin: 0 0 14px 0; display: flex; align-items: center; gap: 8px;">
          🎯 Metas Nutricionais
        </h3>
-       <table style="width: 100%; font-size: 9pt;">
+       <table style="width: 100%; font-size: 10pt;">
          <tr>
-           <td style="padding: 4px 0; color: #6b7280;">Calorias Diárias:</td>
-           <td style="padding: 4px 0; font-weight: 600; text-align: right; color: #f59e0b;">${plan.total_calories} kcal</td>
+           <td style="padding: 6px 0; color: #6b7280;">Calorias do Plano:</td>
+           <td style="padding: 6px 0; font-weight: 700; text-align: right; color: #f59e0b; font-size: 12pt;">${plan.total_calories} kcal</td>
          </tr>
          <tr>
-           <td style="padding: 4px 0; color: #6b7280;">Meta de Calorias:</td>
-           <td style="padding: 4px 0; font-weight: 500; text-align: right;">${targetCalories} kcal</td>
+           <td style="padding: 6px 0; color: #6b7280;">Meta Calculada:</td>
+           <td style="padding: 6px 0; font-weight: 500; text-align: right;">${targetCalories} kcal</td>
          </tr>
          <tr>
-           <td style="padding: 4px 0; color: #6b7280;">Balanço:</td>
-           <td style="padding: 4px 0; font-weight: 500; text-align: right; color: ${caloricDiff > 50 ? '#22c55e' : caloricDiff < -50 ? '#ef4444' : '#6b7280'};">
+           <td style="padding: 6px 0; color: #6b7280;">Balanço Calórico:</td>
+           <td style="padding: 6px 0; font-weight: 600; text-align: right; color: ${caloricDiff > 50 ? '#22c55e' : caloricDiff < -50 ? '#ef4444' : '#6b7280'};">
              ${caloricStatus}
            </td>
          </tr>
-         <tr style="border-top: 1px solid #e5e7eb;">
-           <td style="padding: 6px 0 4px 0; color: #6b7280;">Proteína:</td>
-           <td style="padding: 6px 0 4px 0; font-weight: 500; text-align: right;">${plan.total_protein}g</td>
+         <tr style="border-top: 1px solid #e2e8f0;">
+           <td style="padding: 10px 0 6px 0; color: #6b7280;">Proteína:</td>
+           <td style="padding: 10px 0 6px 0; font-weight: 600; text-align: right; color: #3b82f6;">${plan.total_protein}g</td>
          </tr>
          <tr>
-           <td style="padding: 4px 0; color: #6b7280;">Carboidratos:</td>
-           <td style="padding: 4px 0; font-weight: 500; text-align: right;">${plan.total_carbs}g</td>
+           <td style="padding: 6px 0; color: #6b7280;">Carboidratos:</td>
+           <td style="padding: 6px 0; font-weight: 600; text-align: right; color: #eab308;">${plan.total_carbs}g</td>
          </tr>
          <tr>
-           <td style="padding: 4px 0; color: #6b7280;">Gordura:</td>
-           <td style="padding: 4px 0; font-weight: 500; text-align: right;">${plan.total_fat}g</td>
+           <td style="padding: 6px 0; color: #6b7280;">Gordura:</td>
+           <td style="padding: 6px 0; font-weight: 600; text-align: right; color: #f97316;">${plan.total_fat}g</td>
          </tr>
        </table>
      </div>
    </div>
  
    <!-- Refeições -->
-   <div style="margin-bottom: 20px;">
-     <h2 style="font-size: 12pt; font-weight: 600; color: #1f2937; margin: 0 0 12px 0; display: flex; align-items: center; gap: 8px;">
+   <div style="margin-bottom: 28px;">
+     <h2 style="font-size: 14pt; font-weight: 700; color: #1f2937; margin: 0 0 18px 0; padding-bottom: 10px; border-bottom: 2px solid #e2e8f0; display: flex; align-items: center; gap: 10px;">
        🍽️ Refeições do Dia
      </h2>
      ${mealsHtml}
    </div>
  
    <!-- Dicas -->
-   <div style="background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border-radius: 8px; padding: 14px; page-break-inside: avoid;">
-     <h3 style="font-size: 10pt; font-weight: 600; color: #92400e; margin: 0 0 10px 0; display: flex; align-items: center; gap: 6px;">
+   <div style="background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border-radius: 10px; padding: 18px; page-break-inside: avoid; border: 1px solid #fcd34d;">
+     <h3 style="font-size: 12pt; font-weight: 700; color: #92400e; margin: 0 0 14px 0; display: flex; align-items: center; gap: 8px;">
        💡 Dicas para ${goalLabel}
      </h3>
-     <ul style="margin: 0; padding: 0; list-style: none; font-size: 9pt; color: #78350f;">
+     <ul style="margin: 0; padding: 0; list-style: none; font-size: 10pt; color: #78350f;">
        ${tipsHtml}
      </ul>
    </div>
  
    <!-- Footer -->
-   <div style="margin-top: 20px; padding-top: 12px; border-top: 1px solid #e5e7eb; font-size: 7pt; color: #9ca3af; text-align: center;">
-     <p style="margin: 0;">
+   <div style="margin-top: 28px; padding-top: 16px; border-top: 2px solid #e2e8f0; font-size: 8pt; color: #9ca3af; text-align: center;">
+     <p style="margin: 0 0 4px 0;">
        Este plano foi gerado automaticamente pelo NutriAI. Consulte um nutricionista para orientação personalizada.
      </p>
-     <p style="margin: 4px 0 0 0;">
+     <p style="margin: 0;">
        nutria-plan-wise.lovable.app
      </p>
+   </div>
    </div>
  </body>
  </html>
