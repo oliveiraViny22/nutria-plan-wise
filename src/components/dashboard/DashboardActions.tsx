@@ -103,27 +103,18 @@ export function DashboardActions({
         </motion.div>
       </div>
 
-      {/* Optimize button - distinct secondary style with visual separation */}
+      {/* Optimize button */}
       {hasPlan && planId && canAdjust && (
-        <div className="relative pt-3">
-          {/* Visual separator */}
-          <div className="absolute top-0 left-1/2 -translate-x-1/2 flex items-center gap-2 px-3 bg-background">
-            <div className="w-8 h-px bg-border" />
-            <span className="text-[10px] text-muted-foreground uppercase tracking-wider">ou</span>
-            <div className="w-8 h-px bg-border" />
-          </div>
-          
-          <AIRebalancer
-            planId={planId}
-            targets={targets}
-            currentMacros={currentMacros}
-            userGoal={userGoal}
-            onComplete={onPlanOptimized}
-            compact={false}
-            usageInfo={usage?.adjustments}
-            isLimitReached={isLimitReachedAdjustment}
-          />
-        </div>
+        <AIRebalancer
+          planId={planId}
+          targets={targets}
+          currentMacros={currentMacros}
+          userGoal={userGoal}
+          onComplete={onPlanOptimized}
+          compact={false}
+          usageInfo={usage?.adjustments}
+          isLimitReached={isLimitReachedAdjustment}
+        />
       )}
     </motion.section>
   );
