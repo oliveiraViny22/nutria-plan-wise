@@ -20,24 +20,19 @@ export function HydrationCard({
 
   if (variant === 'metric') {
     return (
-      <Card className={cn("bg-gradient-to-br from-card to-muted/20 border-border/30", className)}>
-        <CardContent className="p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg shrink-0 bg-sky-500/10 text-sky-500">
-              <Droplet className="h-4 w-4" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm text-muted-foreground truncate">Hidratação</p>
-              <div className="flex items-baseline gap-1">
-                <span className="text-2xl font-bold tabular-nums">{hydration.liters}</span>
-                <span className="text-sm text-muted-foreground">L</span>
-              </div>
-            </div>
-            <div className="text-xs text-muted-foreground text-right">
-              <span className="block">{hydration.glasses} copos</span>
-              <span className="block text-sky-500">{hydration.emoji}</span>
-            </div>
+      <Card className={cn("bg-gradient-to-br from-card to-muted/20 border-border/30 h-full", className)}>
+        <CardContent className="p-4 h-full flex flex-col items-center justify-center text-center">
+          <div className="p-2 rounded-lg shrink-0 bg-sky-500/10 text-sky-500 mb-2">
+            <Droplet className="h-4 w-4" />
           </div>
+          <p className="text-sm text-muted-foreground">Hidratação</p>
+          <div className="flex items-baseline gap-1 justify-center">
+            <span className="text-2xl font-bold tabular-nums">{hydration.liters}</span>
+            <span className="text-sm text-muted-foreground">L</span>
+          </div>
+          <p className="text-xs text-muted-foreground mt-1">
+            {hydration.glasses} copos {hydration.emoji}
+          </p>
         </CardContent>
       </Card>
     );
