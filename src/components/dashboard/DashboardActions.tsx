@@ -65,48 +65,44 @@ export function DashboardActions({
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.2 }}
+      className="flex flex-col gap-3"
     >
-      <div className="grid grid-cols-2 gap-3">
-        <Button
-          variant="premium"
-          size="default"
-          className="w-full"
-          onClick={onGeneratePlan}
-          disabled={generating || generatingV5 || isLimitReachedDiet}
-        >
-          {generatingV5 ? (
-            <>
-              <Loader2 className="w-4 h-4 animate-spin" />
-              <span className="hidden sm:inline">Gerando...</span>
-            </>
-          ) : (
-            <>
-              <UtensilsCrossed className="w-4 h-4" />
-              <span className="hidden sm:inline">
-                Gerar Plano {usage && !usage.diets.isUnlimited && `(${usage.diets.remaining}/${usage.diets.limit})`}
-              </span>
-              <span className="sm:hidden">
-                Gerar {usage && !usage.diets.isUnlimited && `(${usage.diets.remaining})`}
-              </span>
-            </>
-          )}
-        </Button>
-
-        {hasPlan && planId && canAdjust ? (
-          <AIRebalancer
-            planId={planId}
-            targets={targets}
-            currentMacros={currentMacros}
-            userGoal={userGoal}
-            onComplete={onPlanOptimized}
-            compact
-            usageInfo={usage?.adjustments}
-            isLimitReached={isLimitReachedAdjustment}
-          />
+      {/* Single Generate Plan button - always visible when user can create */}
+      <Button
+        variant="premium"
+        size="lg"
+        className="w-full"
+        onClick={onGeneratePlan}
+        disabled={generating || generatingV5 || isLimitReachedDiet}
+      >
+        {generatingV5 ? (
+          <>
+            <Loader2 className="w-5 h-5 animate-spin" />
+            <span>Gerando plano...</span>
+          </>
         ) : (
-          <div />
+          <>
+            <UtensilsCrossed className="w-5 h-5" />
+            <span>
+              Gerar Plano {usage && !usage.diets.isUnlimited && `(${usage.diets.remaining}/${usage.diets.limit})`}
+            </span>
+          </>
         )}
-      </div>
+      </Button>
+
+      {/* Optimize button - only shows when there's a saved plan */}
+      {hasPlan && planId && canAdjust && (
+        <AIRebalancer
+          planId={planId}
+          targets={targets}
+          currentMacros={currentMacros}
+          userGoal={userGoal}
+          onComplete={onPlanOptimized}
+          compact={false}
+          usageInfo={usage?.adjustments}
+          isLimitReached={isLimitReachedAdjustment}
+        />
+      )}
     </motion.section>
   );
 }
