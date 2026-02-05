@@ -3,7 +3,7 @@
 // =====================================================
 
 import type { AnchorFood, AnchorsByRole, Food } from "./types.ts";
-import { ROLE_ALIASES } from "./constants/index.ts";
+import { ROLE_ALIASES } from "./constants.ts";
 import { logDebug, logInfo } from "./logger.ts";
 
 /**
