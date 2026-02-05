@@ -11,7 +11,8 @@ import {
   Target,
   CheckCircle2,
   XCircle,
-  Clock
+  Clock,
+  Ruler
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -22,8 +23,12 @@ import { MobileNav } from '@/components/MobileNav';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { WeightLogForm } from '@/components/progress/WeightLogForm';
 import { WeightEvolutionChart } from '@/components/progress/WeightEvolutionChart';
+import { BodyMeasurementsForm } from '@/components/progress/BodyMeasurementsForm';
+import { BodyMeasurementsChart } from '@/components/progress/BodyMeasurementsChart';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAccountPermissions } from '@/hooks/useAccountPermissions';
+import { useUserRole } from '@/hooks/useUserRole';
+import { useLinkedStudent } from '@/hooks/useLinkedStudent';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { format, subDays } from 'date-fns';
@@ -46,14 +51,32 @@ interface WeightLog {
   log_date: string;
 }
 
+interface BodyMeasurement {
+  id: string;
+  measurement_date: string;
+  waist_cm: number | null;
+  hip_cm: number | null;
+  chest_cm: number | null;
+  arm_cm: number | null;
+  thigh_cm: number | null;
+  calf_cm: number | null;
+  body_fat_percent: number | null;
+}
+
 export default function Progress() {
   const navigate = useNavigate();
   const { user, profile } = useAuth();
   const permissions = useAccountPermissions();
+  const { isProfessional, loading: roleLoading } = useUserRole();
+  const { isLinkedStudent, professionalId } = useLinkedStudent();
   const isPaidUser = permissions.plan_name.toLowerCase() !== 'gratuito';
+  
+  // Can access body measurements if professional or linked student
+  const canAccessMeasurements = isProfessional || isLinkedStudent;
   
   const [dailyLogs, setDailyLogs] = useState<DailyLogEntry[]>([]);
   const [weightLogs, setWeightLogs] = useState<WeightLog[]>([]);
+  const [bodyMeasurements, setBodyMeasurements] = useState<BodyMeasurement[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -67,8 +90,8 @@ export default function Progress() {
     try {
       const ninetyDaysAgo = subDays(new Date(), 90).toISOString().split('T')[0];
       
-      // Fetch daily logs and weight logs in parallel
-      const [logsResult, weightResult] = await Promise.all([
+      // Fetch daily logs, weight logs, and body measurements in parallel
+      const [logsResult, weightResult, measurementsResult] = await Promise.all([
         supabase
           .from('daily_logs')
           .select('*')
@@ -79,14 +102,23 @@ export default function Progress() {
           .from('weight_logs')
           .select('*')
           .eq('user_id', user?.id)
-          .order('log_date', { ascending: true })
+          .order('log_date', { ascending: true }),
+        canAccessMeasurements 
+          ? supabase
+              .from('body_measurements')
+              .select('*')
+              .eq('user_id', user?.id)
+              .order('measurement_date', { ascending: true })
+          : Promise.resolve({ data: [], error: null })
       ]);
 
       if (logsResult.error) throw logsResult.error;
       if (weightResult.error) throw weightResult.error;
+      if (measurementsResult.error) throw measurementsResult.error;
       
       setDailyLogs((logsResult.data || []) as DailyLogEntry[]);
       setWeightLogs((weightResult.data || []) as WeightLog[]);
+      setBodyMeasurements((measurementsResult.data || []) as BodyMeasurement[]);
     } catch (error) {
       console.error('Error fetching data:', error);
       toast.error('Erro ao carregar dados');
@@ -173,11 +205,21 @@ export default function Progress() {
 
       <main className="container mx-auto px-3 sm:px-4 py-4 sm:py-6 space-y-4 sm:space-y-6">
         <Tabs defaultValue="weight" className="space-y-4 sm:space-y-6">
-          <TabsList className={`grid w-full h-auto ${isPaidUser ? 'grid-cols-3' : 'grid-cols-1'}`}>
+          <TabsList className={`grid w-full h-auto ${
+            canAccessMeasurements 
+              ? (isPaidUser ? 'grid-cols-4' : 'grid-cols-2')
+              : (isPaidUser ? 'grid-cols-3' : 'grid-cols-1')
+          }`}>
             <TabsTrigger value="weight" className="text-xs sm:text-sm py-2 sm:py-2.5">
               <Scale className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
               Peso
             </TabsTrigger>
+            {canAccessMeasurements && (
+              <TabsTrigger value="measurements" className="text-xs sm:text-sm py-2 sm:py-2.5">
+                <Ruler className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                Medidas
+              </TabsTrigger>
+            )}
             {isPaidUser && (
               <>
                 <TabsTrigger value="adherence" className="text-xs sm:text-sm py-2 sm:py-2.5">
@@ -242,6 +284,41 @@ export default function Progress() {
               goal={goal}
             />
           </TabsContent>
+
+          {/* Body Measurements Tab - Professionals and linked students only */}
+          {canAccessMeasurements && (
+            <TabsContent value="measurements" className="space-y-4 sm:space-y-6">
+              {/* Quick Stats and Form */}
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
+              >
+                <div className="flex items-center gap-4">
+                  <Card className="backdrop-blur-md bg-card/80 border-border/40 shadow-lg">
+                    <CardContent className="p-4 flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                        <Ruler className="h-5 w-5 text-primary" />
+                      </div>
+                      <div>
+                        <p className="text-2xl font-bold tabular-nums">{bodyMeasurements.length}</p>
+                        <p className="text-xs text-muted-foreground">registros</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+                
+                <BodyMeasurementsForm
+                  userId={user?.id || ''}
+                  recordedBy={isProfessional ? user?.id : undefined}
+                  onMeasurementLogged={fetchData}
+                />
+              </motion.div>
+
+              {/* Body Measurements Chart */}
+              <BodyMeasurementsChart measurements={bodyMeasurements} />
+            </TabsContent>
+          )}
 
           {/* Adherence Tab - Paid users only */}
           {isPaidUser && (
