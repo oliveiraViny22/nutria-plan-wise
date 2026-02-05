@@ -144,11 +144,15 @@ export function MealPlanPdf({
   };
 
   return (
-    <div className="flex gap-2">
+    <div className="flex gap-1.5">
       {/* Print Button */}
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogTrigger asChild>
-          <Button variant={variant} size={size} className="gap-2">
+          <Button 
+            variant="default" 
+            size={size} 
+            className="gap-2 bg-primary hover:bg-primary/90 shadow-sm"
+          >
             <Printer className="h-4 w-4" />
             Imprimir
           </Button>
@@ -215,8 +219,13 @@ export function MealPlanPdf({
       {/* Share Button */}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="icon" className="h-9 w-9">
+          <Button 
+            variant="secondary" 
+            size={size} 
+            className="gap-2 shadow-sm"
+          >
             <Share2 className="h-4 w-4" />
+            Compartilhar
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
