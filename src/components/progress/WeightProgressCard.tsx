@@ -22,7 +22,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { format, differenceInDays } from 'date-fns';
+import { format, differenceInDays, differenceInWeeks, startOfWeek, endOfWeek, eachWeekOfInterval, isWithinInterval } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { 
@@ -98,12 +98,67 @@ export function WeightProgressCard({
     return 'text-muted-foreground';
   };
 
-  // Chart data with gradient
-  const chartData = sortedLogs.map(log => ({
-    date: format(new Date(log.log_date), 'dd/MM', { locale: ptBR }),
-    fullDate: format(new Date(log.log_date), "dd 'de' MMM", { locale: ptBR }),
-    weight: log.weight_kg,
-  }));
+  // Determine chart interval based on date range
+  const getChartInterval = () => {
+    if (sortedLogs.length < 2) return 'daily';
+    const firstDate = new Date(sortedLogs[0].log_date);
+    const lastDate = new Date(sortedLogs[sortedLogs.length - 1].log_date);
+    const daysDiff = differenceInDays(lastDate, firstDate);
+    
+    if (daysDiff > 60) return 'monthly';
+    if (daysDiff > 14) return 'weekly';
+    return 'daily';
+  };
+
+  const chartInterval = getChartInterval();
+
+  // Group logs by week for cleaner visualization
+  const getWeeklyChartData = () => {
+    if (sortedLogs.length === 0) return [];
+    
+    const firstDate = new Date(sortedLogs[0].log_date);
+    const lastDate = new Date(sortedLogs[sortedLogs.length - 1].log_date);
+    
+    // Get all weeks in the range
+    const weeks = eachWeekOfInterval(
+      { start: firstDate, end: lastDate },
+      { weekStartsOn: 1 }
+    );
+
+    return weeks.map((weekStart, index) => {
+      const weekEnd = endOfWeek(weekStart, { weekStartsOn: 1 });
+      
+      // Find all logs in this week
+      const logsInWeek = sortedLogs.filter(log => {
+        const logDate = new Date(log.log_date);
+        return isWithinInterval(logDate, { start: weekStart, end: weekEnd });
+      });
+
+      // Use the last log of the week (most recent) or null
+      const weekLog = logsInWeek.length > 0 
+        ? logsInWeek[logsInWeek.length - 1] 
+        : null;
+
+      return {
+        weekLabel: `Sem ${index + 1}`,
+        dateLabel: format(weekStart, "dd/MM", { locale: ptBR }),
+        fullDate: format(weekStart, "'Semana de' dd 'de' MMM", { locale: ptBR }),
+        weight: weekLog?.weight_kg || null,
+        hasData: !!weekLog,
+      };
+    }).filter(week => week.weight !== null); // Only show weeks with data
+  };
+
+  // Chart data - use weekly aggregation for cleaner view
+  const chartData = sortedLogs.length <= 7 
+    ? sortedLogs.map((log, index) => ({
+        dateLabel: format(new Date(log.log_date), 'dd/MM', { locale: ptBR }),
+        fullDate: format(new Date(log.log_date), "dd 'de' MMM, yyyy", { locale: ptBR }),
+        weight: log.weight_kg,
+        isFirst: index === 0,
+        isLast: index === sortedLogs.length - 1,
+      }))
+    : getWeeklyChartData();
 
   const handleSubmit = async () => {
     const weightValue = parseFloat(weight);
@@ -343,14 +398,23 @@ export function WeightProgressCard({
       {logs.length > 0 && (
         <Card className="backdrop-blur-md bg-card/80 border-border/40 shadow-lg overflow-hidden">
           <CardContent className="p-4 sm:p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-base font-semibold flex items-center gap-2">
-                <TrendingUp className="h-5 w-5 text-primary" />
-                Evolução do Peso
-              </h3>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
+              <div>
+                <h3 className="text-base font-semibold flex items-center gap-2">
+                  <TrendingUp className="h-5 w-5 text-primary" />
+                  Evolução do Peso
+                </h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {chartInterval === 'weekly' 
+                    ? 'Visualização semanal • Registre semanalmente para melhor acompanhamento'
+                    : chartInterval === 'monthly'
+                    ? 'Visualização mensal'
+                    : 'Desde o primeiro registro'}
+                </p>
+              </div>
               {logs.length >= 2 && (
-                <Badge variant="outline" className={cn("text-xs", getTrendColor())}>
-                  {totalChange > 0 ? '+' : ''}{totalChange.toFixed(1)} kg total
+                <Badge variant="outline" className={cn("text-xs self-start sm:self-auto", getTrendColor())}>
+                  {totalChange > 0 ? '+' : ''}{totalChange.toFixed(1)} kg desde o início
                 </Badge>
               )}
             </div>
@@ -366,7 +430,7 @@ export function WeightProgressCard({
                       </linearGradient>
                     </defs>
                     <XAxis 
-                      dataKey="date" 
+                      dataKey="dateLabel" 
                       stroke="hsl(var(--muted-foreground))"
                       fontSize={11}
                       tickLine={false}
@@ -391,6 +455,21 @@ export function WeightProgressCard({
                       formatter={(value: number) => [`${value.toFixed(1)} kg`, 'Peso']}
                       labelFormatter={(label, payload) => payload[0]?.payload?.fullDate || label}
                     />
+                    {/* Start weight reference line */}
+                    {firstLog && (
+                      <ReferenceLine 
+                        y={firstLog.weight_kg} 
+                        stroke="hsl(var(--muted-foreground))" 
+                        strokeDasharray="3 3"
+                        strokeOpacity={0.5}
+                        label={{ 
+                          value: 'Início', 
+                          position: 'left',
+                          fill: 'hsl(var(--muted-foreground))',
+                          fontSize: 10
+                        }}
+                      />
+                    )}
                     {goal && (
                       <ReferenceLine 
                         y={targetWeight} 
@@ -409,23 +488,28 @@ export function WeightProgressCard({
                       dataKey="weight"
                       stroke="transparent"
                       fill="url(#weightGradient)"
+                      connectNulls
                     />
                     <Line
                       type="monotone"
                       dataKey="weight"
                       stroke="hsl(var(--primary))"
                       strokeWidth={3}
-                      dot={{ fill: 'hsl(var(--primary))', strokeWidth: 2, r: 4 }}
-                      activeDot={{ r: 6, strokeWidth: 0 }}
+                      dot={{ fill: 'hsl(var(--primary))', strokeWidth: 2, r: 5 }}
+                      activeDot={{ r: 7, strokeWidth: 0 }}
+                      connectNulls
                     />
                   </ComposedChart>
                 </ResponsiveContainer>
               </div>
             ) : (
-              <div className="h-32 flex flex-col items-center justify-center text-center">
+              <div className="h-32 flex flex-col items-center justify-center text-center px-4">
                 <Scale className="h-8 w-8 text-muted-foreground mb-2" />
                 <p className="text-sm text-muted-foreground">
-                  Registre mais pesos para ver o gráfico de evolução
+                  Registre seu peso semanalmente para acompanhar sua evolução
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  O gráfico aparecerá após o segundo registro
                 </p>
               </div>
             )}
