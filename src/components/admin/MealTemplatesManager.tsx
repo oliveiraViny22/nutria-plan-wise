@@ -533,8 +533,8 @@ export function MealTemplatesManager() {
                       <p className="text-sm">Nenhum template para {tab.label.toLowerCase()}</p>
                     </div>
                   ) : (
-                    <ScrollArea className="max-h-[400px]">
-                      <div className="space-y-3 pr-3">
+                    <ScrollArea className="max-h-[600px]">
+                      <div className="space-y-4 pr-4">
                         {tabTemplates.map((template) => (
                         <Collapsible
                           key={template.id}
@@ -604,15 +604,16 @@ export function MealTemplatesManager() {
                                   </Button>
                                 </div>
                                 {template.roles?.length ? (
+                                  <div className="overflow-x-auto">
                                   <Table>
                                     <TableHeader>
                                       <TableRow>
-                                        <TableHead className="w-8">#</TableHead>
-                                        <TableHead>Papel</TableHead>
-                                        <TableHead>Qtd (g)</TableHead>
-                                        <TableHead>Obrigatório</TableHead>
-                                        <TableHead>Categorias</TableHead>
-                                        <TableHead className="w-24">Ações</TableHead>
+                                        <TableHead className="w-10">#</TableHead>
+                                        <TableHead className="min-w-[120px]">Papel</TableHead>
+                                        <TableHead className="min-w-[90px]">Qtd (g)</TableHead>
+                                        <TableHead className="min-w-[80px]">Obrig.</TableHead>
+                                        <TableHead className="min-w-[180px]">Categorias</TableHead>
+                                        <TableHead className="w-20">Ações</TableHead>
                                       </TableRow>
                                     </TableHeader>
                                     <TableBody>
@@ -694,6 +695,7 @@ export function MealTemplatesManager() {
                                         ))}
                                     </TableBody>
                                   </Table>
+                                  </div>
                                 ) : (
                                   <p className="text-sm text-muted-foreground text-center py-4">
                                     Nenhum papel configurado. Adicione papéis para definir os slots de alimentos.
