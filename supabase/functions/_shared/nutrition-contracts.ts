@@ -40,15 +40,27 @@ export const GENERATOR_CONTRACT = {
 } as const;
 
 // =====================================================
-// CONTRATOS DO REBALANCEADOR (SEM TOLERÂNCIAS)
+// CONTRATOS DO REBALANCEADOR (TOLERÂNCIAS REAIS v2)
 // =====================================================
+// Alinhado com VALIDATION_CONSTANTS em ai-rebalance/index.ts
 
 export const REBALANCER_CONTRACT = {
-  /** SEM tolerância: deve atingir meta exata */
-  CALORIE_TOLERANCE_PERCENT: 0,
-  PROTEIN_TOLERANCE_PERCENT: 0,
-  CARBS_TOLERANCE_PERCENT: 0,
-  FAT_TOLERANCE_GRAMS: 0,
+  /** Tolerância calórica: 95-105% (5% margem) */
+  CALORIE_MIN_PERCENT: 95,
+  CALORIE_MAX_PERCENT: 105,
+  
+  /** Proteína mínima: 95% para cut, 90% para outros */
+  PROTEIN_MIN_PERCENT_CUT: 95,
+  PROTEIN_MIN_PERCENT_DEFAULT: 90,
+  
+  /** Carboidratos mínimos: 90% (80% para bulk) */
+  CARBS_MIN_PERCENT: 90,
+  CARBS_MIN_PERCENT_BULK: 80,
+  
+  /** Gordura: 110% padrão, 115% tolerância clínica */
+  FAT_MAX_PERCENT_STANDARD: 110,
+  FAT_MAX_PERCENT_TOLERANCE: 115,
+  FAT_HARD_FAIL_PERCENT: 120,
   
   /** Limites de quantidade */
   MIN_QUANTITY_GRAMS: 5,
