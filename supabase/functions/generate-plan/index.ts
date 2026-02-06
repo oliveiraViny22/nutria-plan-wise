@@ -380,59 +380,84 @@ function validateNutritionalContracts(
 
 /**
  * Escalona porções para atingir calorias alvo
- * v5.9: ESCALONAMENTO INTELIGENTE que prioriza carbs/gorduras e protege proteína
+ * v5.10: ESCALONAMENTO INTELIGENTE com proteção robusta de proteína
  * 
- * O problema anterior: scaling proporcional dobrava a proteína junto com tudo.
- * Solução: 
- *   1. Identificar alimentos por macro primário (carb-rich vs protein-rich)
- *   2. Escalar carb-rich mais agressivamente
- *   3. Proteger protein-rich de escalonamento excessivo
+ * Estratégia:
+ *   1. Se proteína já está acima de 100% da meta, NÃO escalar alimentos proteicos
+ *   2. Escalar apenas alimentos com baixa densidade proteica (carbs, gorduras, vegetais)
+ *   3. Usar ratio proteína/calorias para determinar qual escalar
  */
 function scale(mwo: MealWithOptions[], targetCals: number, targetProtein?: number): void {
-  const PROTEIN_CAP_PERCENT = 1.15; // Proteína não deve exceder 115% da meta
-  const CARB_RICH_THRESHOLD = 15; // g carbs per 100g = carb-rich food
-  const PROTEIN_RICH_THRESHOLD = 15; // g protein per 100g = protein-rich food
+  const PROTEIN_CAP_PERCENT = 1.05; // Proteína não deve exceder 105% da meta
   
-  for (let iter = 0; iter < 3; iter++) {
+  for (let iter = 0; iter < 5; iter++) {
     const current = totals(mwo);
-    log("ScaleIter", { iter, currentCals: current.calories, targetCals, diff: Math.abs(current.calories - targetCals) / targetCals });
+    const proteinPercent = targetProtein ? (current.protein / targetProtein) * 100 : 0;
+    
+    log("ScaleIter", { 
+      iter, 
+      currentCals: current.calories, 
+      currentProtein: current.protein,
+      targetCals, 
+      targetProtein,
+      proteinPercent: Math.round(proteinPercent),
+      diff: Math.abs(current.calories - targetCals) / targetCals 
+    });
     
     if (!current.calories || isNaN(current.calories)) {
       log("ScaleAbortNaN", { iter, current });
       return;
     }
     
+    // Se calorias estão dentro de ±10%, parar
     if (Math.abs(current.calories - targetCals) / targetCals <= 0.1) break;
     
+    const calorieDeficit = current.calories < targetCals;
     const overallFactor = targetCals / (current.calories || 1);
     const limits = getScaleLimits(undefined);
     
-    // Determinar se proteína já está alta demais para escalar
-    const proteinCapped = targetProtein && current.protein >= targetProtein * PROTEIN_CAP_PERCENT;
+    // Proteína já está saturada? (acima de 105% da meta)
+    const proteinSaturated = targetProtein && current.protein >= targetProtein * PROTEIN_CAP_PERCENT;
+    
+    if (proteinSaturated) {
+      log("ScaleProteinSaturated", { 
+        currentProtein: current.protein, 
+        cap: targetProtein * PROTEIN_CAP_PERCENT 
+      });
+    }
     
     for (const m of mwo) {
       for (const opt of m.options) {
-        if (!opt || !opt.foods) {
-          log("ScaleSkipBadOpt", { mealType: m.mealType, opt: !!opt, foods: opt?.foods?.length });
-          continue;
-        }
+        if (!opt || !opt.foods) continue;
+        
         for (const f of opt.foods) {
-          if (!f || typeof f.quantity_grams !== 'number') {
-            log("ScaleSkipBadFood", { f: !!f, qty: f?.quantity_grams });
-            continue;
-          }
+          if (!f || typeof f.quantity_grams !== 'number') continue;
           
-          const isProteinRich = f.food.protein >= PROTEIN_RICH_THRESHOLD;
-          const isCarbRich = f.food.carbs >= CARB_RICH_THRESHOLD;
+          // Calcular ratio proteína/calorias do alimento
+          // Alto ratio = alimento denso em proteína (ex: frango, peixe, whey)
+          // Baixo ratio = alimento denso em carbs/gordura (ex: arroz, azeite)
+          const proteinRatio = f.food.calories > 0 
+            ? (f.food.protein * 4) / f.food.calories  // proteína contribui 4 kcal/g
+            : 0;
+          
+          // Alimento é "proteico" se >30% das calorias vêm de proteína
+          const isProteinDense = proteinRatio > 0.30;
           
           let itemFactor = overallFactor;
           
-          // Se proteína está saturada, não escalar alimentos proteicos
-          if (proteinCapped && isProteinRich && !isCarbRich) {
-            itemFactor = 1.0; // Manter proteína como está
-          } else if (proteinCapped && isCarbRich && !isProteinRich) {
-            // Compensar escalando carbs mais agressivamente
-            itemFactor = Math.min(overallFactor * 1.3, 2.0);
+          if (proteinSaturated && calorieDeficit) {
+            // Precisamos adicionar calorias MAS sem adicionar proteína
+            if (isProteinDense) {
+              itemFactor = 1.0; // NÃO escalar alimentos proteicos
+            } else {
+              // Escalar alimentos não-proteicos mais agressivamente
+              itemFactor = Math.min(overallFactor * 1.5, 2.5);
+            }
+          } else if (proteinSaturated && !calorieDeficit) {
+            // Precisamos reduzir calorias - reduzir tudo exceto proteína pura
+            if (isProteinDense) {
+              itemFactor = 1.0; // Manter proteína intacta
+            }
           }
           
           const newQty = Math.round(f.quantity_grams * itemFactor / 5) * 5;
