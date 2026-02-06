@@ -879,17 +879,27 @@ function scale(mwo: MealWithOptions[], targetCals: number, targetProtein?: numbe
   }
   
   // =====================================================
-  // v5.16: FALLBACK DE INJEÇÃO CALÓRICA
-  // Se após scaling o plano ainda está abaixo de 90% das calorias,
-  // E a proteína está bloqueando (>110%), escalar AGRESSIVAMENTE
-  // apenas carboidratos e leguminosas sem limite de max
+  // v5.17: FALLBACK DE INJEÇÃO CALÓRICA (MELHORADO)
+  // Se após scaling o plano ainda está abaixo de 88% das calorias,
+  // E a proteína está perto/acima da meta (>98%), escalar AGRESSIVAMENTE
+  // carboidratos e leguminosas além do limite normal
   // =====================================================
   const postScaleTotals = totals(mwo);
   const postScaleCaloriePercent = postScaleTotals.calories / targetCals;
   const postScaleProteinPercent = targetProtein ? (postScaleTotals.protein / targetProtein) : 0;
   
-  // Detectar situação de travamento: calorias baixas + proteína alta
-  const isStalled = postScaleCaloriePercent < 0.90 && postScaleProteinPercent > 1.05;
+  // Log para debug
+  log("PostScaleTotals", {
+    calories: postScaleTotals.calories,
+    protein: Math.round(postScaleTotals.protein * 10) / 10,
+    carbs: Math.round(postScaleTotals.carbs * 10) / 10,
+    fat: Math.round(postScaleTotals.fat * 10) / 10,
+    targetCals
+  });
+  
+  // Detectar situação de travamento: calorias baixas + proteína perto/acima da meta
+  // Condição relaxada: proteína > 98% já indica que não podemos escalar proteínas
+  const isStalled = postScaleCaloriePercent < 0.88 && postScaleProteinPercent > 0.98;
   
   if (isStalled && isBulk) {
     log("ScaleStalledDetected", {
