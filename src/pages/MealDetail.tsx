@@ -26,7 +26,7 @@ import { useSubstitution } from '@/hooks/useSubstitution';
 import { useUsageLimits } from '@/hooks/useUsageLimits';
 import { useAuth } from '@/contexts/AuthContext';
 import { Meal, Food, MEAL_NAMES, MealType, MealOption, MealOptionFood, DietPlan } from '@/lib/types';
-import { getCategoryLabel, getCategoryColor, isValidCategory } from '@/lib/food-categories';
+import { getCategoryLabel, getCategoryColor, isValidCategory, getCategoryDisplayOrder } from '@/lib/food-categories';
 import { toast } from 'sonner';
 import { SubstitutionModal } from '@/components/SubstitutionModal';
 import { UpgradeDialog } from '@/components/UpgradeDialog';
@@ -584,7 +584,12 @@ export default function MealDetail() {
 
                 <motion.section initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-3">
                   <h2 className="font-sans font-semibold text-sm tracking-tight">Alimentos</h2>
-                  {option.foods?.map((optionFood: MealOptionFood) => {
+                  {/* Ordenar alimentos por categoria: Carboidratos > Proteínas > Vegetais > Frutas > Gorduras */}
+                  {[...(option.foods || [])].sort((a, b) => {
+                    const foodA = a.food as Food;
+                    const foodB = b.food as Food;
+                    return getCategoryDisplayOrder(foodA?.category) - getCategoryDisplayOrder(foodB?.category);
+                  }).map((optionFood: MealOptionFood) => {
                     const food = optionFood.food as Food;
                     if (!food) return null;
                     const qty = getTotalGrams(optionFood.quantity_grams);

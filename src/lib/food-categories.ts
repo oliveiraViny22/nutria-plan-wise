@@ -73,6 +73,32 @@ export const MEAL_CATEGORY_PRIORITIES: Record<string, FoodCategory[]> = {
 };
 
 /**
+ * Ordem de exibição de alimentos por categoria (para UI)
+ * Carboidratos > Proteínas > Vegetais > Óleos > Frutas > Gorduras
+ */
+export const CATEGORY_DISPLAY_ORDER: FoodCategory[] = [
+  'carboidratos',
+  'proteinas',
+  'leguminosas',
+  'vegetais',
+  'laticinios',
+  'frutas',
+  'gorduras',
+  'mistos',
+  'suplementos',
+];
+
+/**
+ * Retorna a ordem de exibição para uma categoria (menor = primeiro)
+ */
+export function getCategoryDisplayOrder(category: string | null | undefined): number {
+  if (!category) return 999;
+  const normalized = category.toLowerCase().trim();
+  const index = CATEGORY_DISPLAY_ORDER.indexOf(normalized as FoodCategory);
+  return index >= 0 ? index : 999;
+}
+
+/**
  * Categorias que NÃO devem entrar automaticamente nos planos
  */
 export const EXCLUDED_FROM_AUTO_PLAN: FoodCategory[] = ['suplementos'];
