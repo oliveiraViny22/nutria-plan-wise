@@ -2,6 +2,7 @@ import { motion } from 'framer-motion';
 import { DailyLogCTA } from '@/components/DailyLogCTA';
 import { AdherenceStreak } from '@/components/AdherenceStreak';
 import { GamificationPreview } from '@/components/GamificationPreview';
+import { ProgressCard } from '@/components/dashboard/ProgressCard';
 
 interface DashboardGamificationProps {
   hasPlan: boolean;
@@ -44,7 +45,10 @@ export function DashboardGamification({
         {!isPaidUser ? (
           <GamificationPreview isLocked={true} />
         ) : (
-          <AdherenceStreak />
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4">
+            <AdherenceStreak />
+            <ProgressCard />
+          </div>
         )}
       </motion.section>
     </>
