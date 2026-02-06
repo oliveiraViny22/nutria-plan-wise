@@ -45,41 +45,43 @@ export function LockedFeaturePreview({
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      className={`relative overflow-hidden rounded-xl ${className}`}
+      className={`relative overflow-hidden rounded-xl ${className} grid`}
     >
-      {/* Blurred content - maintains layout flow but invisible */}
-      <div className="blur-[6px] select-none pointer-events-none opacity-50 invisible">
+      {/* Blurred content - maintains layout flow */}
+      <div className="col-start-1 row-start-1 blur-[6px] select-none pointer-events-none opacity-75">
         {children}
       </div>
 
-      {/* Overlay with CTA - full coverage with centered content */}
-      <div className="absolute inset-0 flex flex-col items-center justify-center bg-card/95 backdrop-blur-sm z-10 rounded-xl border border-border/50">
+      {/* Overlay with CTA - contributes to layout height (no clipping on mobile) */}
+      <div className="col-start-1 row-start-1 flex flex-col items-center justify-center text-center p-4 bg-background/60 backdrop-blur-[2px] z-10">
         <motion.div
           initial={{ scale: 0.9, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           transition={{ delay: 0.1 }}
-          className="flex flex-col items-center gap-3 text-center p-4"
+          className="flex flex-col items-center gap-3 max-w-full"
         >
-          <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center border border-primary/20">
+          <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center border border-primary/20 flex-shrink-0">
             <Lock className="w-5 h-5 text-primary" />
           </div>
-          <div>
-            <h4 className="font-semibold text-foreground text-sm">
+
+          <div className="min-w-0 max-w-full">
+            <h4 className="font-semibold text-foreground text-sm truncate">
               {featureName}
             </h4>
             {description && (
-              <p className="text-xs text-muted-foreground mt-1 max-w-[200px] mx-auto">
+              <p className="text-xs text-muted-foreground mt-1 max-w-[220px] mx-auto line-clamp-2">
                 {description}
               </p>
             )}
           </div>
+
           <Button
             size="sm"
             onClick={trackAndNavigate}
             className="gap-2 text-sm h-9 px-4 gradient-primary hover:opacity-90 shimmer-badge-subtle"
           >
-            <Sparkles className="w-3.5 h-3.5" />
-            Desbloquear Pro
+            <Sparkles className="w-3.5 h-3.5 flex-shrink-0" />
+            <span className="truncate">Desbloquear Pro</span>
           </Button>
         </motion.div>
       </div>
