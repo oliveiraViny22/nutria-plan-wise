@@ -14,7 +14,7 @@ export function DashboardGamification({
 }: DashboardGamificationProps) {
   if (!hasPlan) return null;
 
-  const isPaidUser = planType !== 'gratuito';
+  const isPaidUser = planType && planType !== 'gratuito';
 
   return (
     <motion.section
