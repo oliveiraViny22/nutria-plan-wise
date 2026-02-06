@@ -303,7 +303,6 @@ const DEFAULT_OPTIMIZER_SETTINGS: OptimizerSettings = {
 
 // Configurações carregadas por request (sem cache global para evitar dados stale em serverless)
 async function loadOptimizerSettings(supabase: any): Promise<OptimizerSettings> {
-
   try {
     const { data, error } = await supabase
       .from('system_settings')
@@ -317,7 +316,7 @@ async function loadOptimizerSettings(supabase: any): Promise<OptimizerSettings> 
     }
 
     if (data?.value) {
-      loadedSettings = { ...DEFAULT_OPTIMIZER_SETTINGS, ...(data.value as object) };
+      const loadedSettings = { ...DEFAULT_OPTIMIZER_SETTINGS, ...(data.value as object) };
       console.log('Configurações do otimizador carregadas do admin:', JSON.stringify(loadedSettings));
       return loadedSettings;
     }
@@ -1624,11 +1623,27 @@ serve(async (req) => {
       const optionCurrentTotals = calculateTotals(optionFoods, optionInitialQuantities);
       console.log(`Opção ${optionNumber} - Totais atuais: ${JSON.stringify(optionCurrentTotals)}`);
 
-      // Validar plano atual
+      // Validar plano atual (tolerâncias amplas)
       const optionValidation = validatePlan(optionCurrentTotals, targets, objective, settings);
+      
+      // Calcular desvios absolutos das metas
+      const percents = calculatePercents(optionCurrentTotals, targets);
+      const calorieDelta = Math.abs(percents.calories - 100);
+      const proteinDelta = Math.abs(percents.protein - 100);
+      const carbsDelta = Math.abs(percents.carbs - 100);
+      const fatDelta = Math.abs(percents.fat - 100);
+      
+      // NOVA LÓGICA: Otimizar mesmo se "válido" mas com desvios significativos
+      // Threshold: Se qualquer macro desviar >5% da meta, aplicar refinamento
+      const OPTIMIZATION_THRESHOLD = 5; // 5% de desvio
+      const needsOptimization = 
+        calorieDelta > OPTIMIZATION_THRESHOLD ||
+        proteinDelta > OPTIMIZATION_THRESHOLD ||
+        carbsDelta > OPTIMIZATION_THRESHOLD ||
+        fatDelta > OPTIMIZATION_THRESHOLD;
 
-      if (optionValidation.valid) {
-        console.log(`Opção ${optionNumber} já está válida`);
+      if (optionValidation.valid && !needsOptimization) {
+        console.log(`Opção ${optionNumber} já está válida e otimizada (desvios < ${OPTIMIZATION_THRESHOLD}%)`);
         optionResults.push({
           optionNumber,
           foods: optionFoods,
@@ -1642,6 +1657,14 @@ serve(async (req) => {
           foodChanges: [],
         });
         continue;
+      }
+      
+      // Log do motivo da otimização
+      if (optionValidation.valid && needsOptimization) {
+        console.log(`Opção ${optionNumber} válida mas com desvios significativos - aplicando refinamento`);
+        console.log(`  Desvios: Cal=${calorieDelta.toFixed(1)}%, Prot=${proteinDelta.toFixed(1)}%, Carb=${carbsDelta.toFixed(1)}%, Fat=${fatDelta.toFixed(1)}%`);
+      } else {
+        console.log(`Opção ${optionNumber} inválida: ${optionValidation.errors.join('; ')}`);
       }
 
       // Criar cópia do mapa inicial
