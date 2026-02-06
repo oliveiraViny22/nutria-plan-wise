@@ -152,7 +152,15 @@ interface RebalanceResult {
 interface PlanMetadata {
   g10Status?: G10Status;
   normalizationApplied?: boolean;
+  objective?: Objective; // Adicionado para validação por perfil
 }
+
+// Limites de carboidratos por objetivo
+const CARBS_MIN_BY_OBJECTIVE: Record<Objective, number> = {
+  cut: 0.90,      // 90%
+  maintain: 0.90, // 90%
+  bulk: 0.80,     // 80% - Bulk tem piso menor de carbs
+};
 
 function validateFinalPlan(
   totals: MacroTargets,
@@ -166,6 +174,10 @@ function validateFinalPlan(
 
   const g10Status = meta?.g10Status;
   const normalizationApplied = meta?.normalizationApplied === true;
+  const objective = meta?.objective || "maintain"; // Default para maintain
+
+  // Obter limite de carbs baseado no objetivo
+  const carbsMinThreshold = CARBS_MIN_BY_OBJECTIVE[objective];
 
   const metrics = {
     caloriePercent: Math.round(caloriePercent * 1000) / 10,
@@ -194,10 +206,10 @@ function validateFinalPlan(
     if (
       caloriePercent <= VALIDATION_CONSTANTS.CALORIES_MAX &&
       proteinPercent >= VALIDATION_CONSTANTS.PROTEIN_MIN &&
-      carbPercent >= VALIDATION_CONSTANTS.CARBS_MIN &&
+      carbPercent >= carbsMinThreshold && // Usa threshold por objetivo
       fatPercent <= VALIDATION_CONSTANTS.FAT_MAX_STANDARD
     ) {
-      console.log(`[VALIDAÇÃO FINAL] ✅ VALIDATED (G-10 PASS)`);
+      console.log(`[VALIDAÇÃO FINAL] ✅ VALIDATED (G-10 PASS, objetivo: ${objective})`);
       return { status: "VALIDATED", metrics };
     }
   }
@@ -216,19 +228,19 @@ function validateFinalPlan(
     if (
       caloriePercent <= VALIDATION_CONSTANTS.CALORIES_MAX &&
       proteinPercent >= VALIDATION_CONSTANTS.PROTEIN_MIN &&
-      carbPercent >= VALIDATION_CONSTANTS.CARBS_MIN &&
+      carbPercent >= carbsMinThreshold && // Usa threshold por objetivo
       fatPercent <= VALIDATION_CONSTANTS.FAT_MAX_TOLERANCE
     ) {
       const isWithTolerance = fatPercent > VALIDATION_CONSTANTS.FAT_MAX_STANDARD;
       if (isWithTolerance) {
-        console.log(`[VALIDAÇÃO FINAL] ⚠️ VALIDATED_WITH_TOLERANCE - Gordura: ${metrics.fatPercent}%`);
+        console.log(`[VALIDAÇÃO FINAL] ⚠️ VALIDATED_WITH_TOLERANCE - Gordura: ${metrics.fatPercent}% (objetivo: ${objective})`);
         return {
           status: "VALIDATED_WITH_TOLERANCE",
           note: `Validado sob tolerância clínica de gordura (${metrics.fatPercent}% ≤ ${VALIDATION_CONSTANTS.FAT_MAX_TOLERANCE * 100}%)`,
           metrics,
         };
       } else {
-        console.log(`[VALIDAÇÃO FINAL] ✅ VALIDATED (G-10 ALLOW_REBALANCE com normalização)`);
+        console.log(`[VALIDAÇÃO FINAL] ✅ VALIDATED (G-10 ALLOW_REBALANCE com normalização, objetivo: ${objective})`);
         return { status: "VALIDATED", metrics };
       }
     }
@@ -242,8 +254,8 @@ function validateFinalPlan(
   if (proteinPercent < VALIDATION_CONSTANTS.PROTEIN_MIN) {
     reasons.push(`Proteína ${metrics.proteinPercent}% < ${VALIDATION_CONSTANTS.PROTEIN_MIN * 100}%`);
   }
-  if (carbPercent < VALIDATION_CONSTANTS.CARBS_MIN) {
-    reasons.push(`Carboidratos ${metrics.carbPercent}% < ${VALIDATION_CONSTANTS.CARBS_MIN * 100}%`);
+  if (carbPercent < carbsMinThreshold) {
+    reasons.push(`Carboidratos ${metrics.carbPercent}% < ${carbsMinThreshold * 100}% (${objective})`);
   }
   if (fatPercent > VALIDATION_CONSTANTS.FAT_MAX_TOLERANCE) {
     reasons.push(`Gordura ${metrics.fatPercent}% > ${VALIDATION_CONSTANTS.FAT_MAX_TOLERANCE * 100}%`);
@@ -1756,6 +1768,7 @@ serve(async (req) => {
       {
         g10Status: g10Metadata.g10Status,
         normalizationApplied: optionResults.some(r => r.normalizationApplied),
+        objective, // Passar objetivo para validação por perfil
       }
     );
     
