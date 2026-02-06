@@ -47,6 +47,19 @@ const FATTY_FOOD_RULES = {
 };
 
 /**
+ * Normaliza categoria para comparação consistente:
+ * Remove acentos, lowercase, trim.
+ * Ex: "Laticínios" -> "laticinios"
+ */
+function normalizeCategory(v: unknown): string {
+  return String(v ?? "")
+    .toLowerCase()
+    .trim()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+};
+
+/**
  * Verifica se um alimento deve ser bloqueado como âncora primária
  * devido ao alto teor de gordura ou tipo problemático.
  */
@@ -171,13 +184,7 @@ async function loadData(sb: any) {
     sb.from("meal_anchor_foods").select("*, food:foods(id, name, calories, protein, carbs, fat, category, is_optional, unit_name, unit_weight_grams, unit_increment, unit_enabled)").eq("is_active", true).order("sort_order"),
   ]);
 
-  const normalizeCategory = (v: unknown): string =>
-    String(v ?? "")
-      .toLowerCase()
-      .trim()
-      // remove acentos/diacríticos (ex: "laticínios" -> "laticinios")
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "");
+  // normalizeCategory agora é global (linha ~48)
 
   const catMap = new Map<string, string[]>();
   for (const c of cats || []) {
@@ -255,7 +262,7 @@ function buildMeal(mt: string, opt: number, roles: any[], foods: Food[], anchors
     const cands = foods.filter(f => 
       !combined.has(f.id) && 
       !usedM.has(f.id) && 
-      roleCats.includes((f.category || "").toLowerCase()) &&
+      roleCats.includes(normalizeCategory(f.category)) &&
       !isFattyForRandomSelection(f) &&
       !hasSimilarFood(f.name, usedGroups)
     );
@@ -285,7 +292,7 @@ function buildMeal(mt: string, opt: number, roles: any[], foods: Food[], anchors
     const cands = foods.filter(f => 
       !combined.has(f.id) && 
       !usedM.has(f.id) && 
-      roleCats.includes((f.category || "").toLowerCase()) &&
+      roleCats.includes(normalizeCategory(f.category)) &&
       !isFattyForRandomSelection(f) &&
       !hasSimilarFood(f.name, usedGroups)
     );
@@ -371,17 +378,32 @@ function validateNutritionalContracts(mwo: MealWithOptions[], targets: MacroTarg
 function scale(mwo: MealWithOptions[], targetCals: number): void {
   for (let iter = 0; iter < 3; iter++) {
     const current = totals(mwo);
+    log("ScaleIter", { iter, currentCals: current.calories, targetCals, diff: Math.abs(current.calories - targetCals) / targetCals });
+    
+    if (!current.calories || isNaN(current.calories)) {
+      log("ScaleAbortNaN", { iter, current });
+      return; // Evitar divisão por 0/NaN
+    }
+    
     if (Math.abs(current.calories - targetCals) / targetCals <= 0.1) break;
     
     const factor = targetCals / (current.calories || 1);
-    const limits = getScaleLimits();
+    const limits = getScaleLimits(undefined); // Default limits
     
     for (const m of mwo) {
       for (const opt of m.options) {
+        if (!opt || !opt.foods) {
+          log("ScaleSkipBadOpt", { mealType: m.mealType, opt: !!opt, foods: opt?.foods?.length });
+          continue;
+        }
         for (const f of opt.foods) {
+          if (!f || typeof f.quantity_grams !== 'number') {
+            log("ScaleSkipBadFood", { f: !!f, qty: f?.quantity_grams });
+            continue;
+          }
           const newQty = Math.round(f.quantity_grams * factor / 5) * 5;
-          const minQty = limits.minPortionGrams;
-          const maxQty = limits.maxPortionGrams;
+          const minQty = limits.min;
+          const maxQty = limits.max;
           f.quantity_grams = Math.max(minQty, Math.min(maxQty, newQty));
         }
         // Recalcular totais da opção
@@ -515,13 +537,34 @@ serve(async (req) => {
     }
 
     const mwo: MealWithOptions[] = [], usedG = new Set<string>();
+    
+    // Debug: listar templates disponíveis
+    log("TemplateDebug", { 
+      mTypes, 
+      tplMapKeys: [...tplMap.keys()], 
+      ancMapKeys: [...ancMap.keys()],
+      sampleFoodCats: foods.slice(0, 10).map(f => ({ name: f.name, cat: f.category, normCat: normalizeCategory(f.category) }))
+    });
+    
     for (const mt of mTypes) {
       const tpl = tplMap.get(mt);
-      if (!tpl) continue;
+      if (!tpl) {
+        log("NoTemplateForMealType", { mealType: mt });
+        continue;
+      }
+      
+      // Debug: roles para este meal type
+      log("RolesForMealType", { 
+        mealType: mt, 
+        rolesCount: tpl.roles.length,
+        roles: tpl.roles.map((r: any) => ({ name: r.role_name, required: r.is_required, cats: r.categories }))
+      });
+      
       const ancs = ancMap.get(mt) || new Map();
       const opts: MealResult[] = [], usedP = new Set<string>();
       for (let o = 1; o <= optLim; o++) {
         const meal = buildMeal(mt, o, tpl.roles, foods, ancs, usedG, usedP, profile.preferred_foods || []);
+        log("MealBuilt", { mealType: mt, option: o, foodsCount: meal.foods.length, totals: meal.totals });
         for (const f of meal.foods) usedP.add(f.food.id);
         opts.push(meal);
       }
@@ -553,7 +596,16 @@ serve(async (req) => {
     }
 
     const tgt: MacroTargets = { calories: profile.daily_calories || 2000, protein: profile.protein_target || 100, carbs: profile.carbs_target || 250, fat: profile.fat_target || 65 };
+    
+    // Debug: totais ANTES do scale
+    const preScaleTotals = totals(mwo);
+    log("PreScaleTotals", { ...preScaleTotals });
+    
     scale(mwo, tgt.calories);
+    
+    // Debug: totais APÓS o scale
+    const postScaleTotals = totals(mwo);
+    log("PostScaleTotals", { ...postScaleTotals, targetCals: tgt.calories });
 
     // Validar contratos nutricionais ANTES de salvar
     const validation = validateNutritionalContracts(mwo, tgt);
