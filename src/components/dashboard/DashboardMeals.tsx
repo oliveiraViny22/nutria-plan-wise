@@ -5,6 +5,7 @@ import { MealCard } from '@/components/ui-kit';
 import { SavePlanButton } from '@/components/SavePlanButton';
 import { EmptyPlanState } from '@/components/EmptyPlanState';
 import { SupplementToggle } from '@/components/SupplementToggle';
+import { DailyLogCTA } from '@/components/DailyLogCTA';
 import { MEAL_NAMES, MealType, Meal } from '@/lib/types';
 
 // Map meal types to icons
@@ -33,6 +34,8 @@ interface DashboardMealsProps {
   mealOptionsLimit: number;
   generating: boolean;
   includeSupplements?: boolean;
+  mealsLogged?: number;
+  totalMeals?: number;
   onGeneratePlan: () => void;
   onPlanSaved: () => void;
 }
@@ -48,6 +51,8 @@ export function DashboardMeals({
   mealOptionsLimit,
   generating,
   includeSupplements = false,
+  mealsLogged = 0,
+  totalMeals = 0,
   onGeneratePlan,
   onPlanSaved,
 }: DashboardMealsProps) {
@@ -107,12 +112,28 @@ export function DashboardMeals({
         </h2>
       </div>
 
-      {/* Supplement Toggle - below title, above meals */}
-      {!isLinkedStudent && (
+      {/* Daily Log + Supplement Toggle - side by side on desktop, stacked on mobile */}
+      {!isLinkedStudent && isPlanSaved && (
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4">
+          <DailyLogCTA 
+            mealsLogged={mealsLogged}
+            totalMeals={totalMeals}
+            locked={!isPaidUser}
+          />
+          <SupplementToggle 
+            initialValue={includeSupplements}
+            compact
+            locked={!isPaidUser}
+          />
+        </div>
+      )}
+      
+      {/* Show only Supplement Toggle if plan not saved yet */}
+      {!isLinkedStudent && !isPlanSaved && (
         <SupplementToggle 
           initialValue={includeSupplements}
           compact
-          locked={isPaidUser ? false : true}
+          locked={!isPaidUser}
         />
       )}
       

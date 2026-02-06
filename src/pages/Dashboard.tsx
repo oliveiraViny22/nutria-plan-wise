@@ -335,8 +335,6 @@ export default function Dashboard() {
             <DashboardGamification
               hasPlan={!!currentDietPlan}
               planType={subscriptionPlan?.type}
-              mealsLogged={todayMealsLogged}
-              totalMeals={meals.length}
             />
 
             {/* Linked Student Lock Notice */}
@@ -365,6 +363,8 @@ export default function Dashboard() {
               mealOptionsLimit={permissions.meal_options_limit}
               generating={generating || generatingV5}
               includeSupplements={(profile as any)?.include_supplements || false}
+              mealsLogged={todayMealsLogged}
+              totalMeals={meals.length}
               onGeneratePlan={generateMealPlanV5}
               onPlanSaved={fetchCurrentPlan}
             />
