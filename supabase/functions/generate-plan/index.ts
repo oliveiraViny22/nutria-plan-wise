@@ -367,15 +367,74 @@ function scale(mwo: MealWithOptions[], targetCals: number): void {
 
 async function save(sb: any, uid: string, mwo: MealWithOptions[]): Promise<string> {
   const t = totals(mwo);
+  
+  // Validar que temos totais válidos
+  if (!t.calories || isNaN(t.calories)) {
+    throw new Error("Invalid totals calculated - no calories");
+  }
+  
   await sb.from("diet_plans").update({ status: "archived" }).eq("user_id", uid).eq("status", "active");
-  const { data: plan } = await sb.from("diet_plans").insert({ user_id: uid, status: "active", total_calories: t.calories, total_protein: t.protein, total_carbs: t.carbs, total_fat: t.fat }).select().single();
+  
+  const { data: plan, error: planError } = await sb.from("diet_plans").insert({ 
+    user_id: uid, 
+    status: "active", 
+    total_calories: t.calories, 
+    total_protein: t.protein, 
+    total_carbs: t.carbs, 
+    total_fat: t.fat 
+  }).select().single();
+  
+  if (planError || !plan) {
+    log("SaveError", { error: planError?.message || "Plan insert failed" });
+    throw new Error(planError?.message || "Failed to create diet plan");
+  }
+  
   for (let i = 0; i < mwo.length; i++) {
-    const mw = mwo[i], o1 = mw.options[0]; if (!o1) continue;
-    const { data: meal } = await sb.from("meals").insert({ diet_plan_id: plan.id, name: o1.meal_name, sort_order: i + 1, total_calories: o1.totals.calories, total_protein: o1.totals.protein, total_carbs: o1.totals.carbs, total_fat: o1.totals.fat }).select().single();
+    const mw = mwo[i], o1 = mw.options[0]; 
+    if (!o1 || !o1.foods || o1.foods.length === 0) continue;
+    
+    const { data: meal, error: mealError } = await sb.from("meals").insert({ 
+      diet_plan_id: plan.id, 
+      name: o1.meal_name, 
+      sort_order: i + 1, 
+      total_calories: o1.totals.calories, 
+      total_protein: o1.totals.protein, 
+      total_carbs: o1.totals.carbs, 
+      total_fat: o1.totals.fat 
+    }).select().single();
+    
+    if (mealError || !meal) {
+      log("MealError", { error: mealError?.message, mealType: mw.mealType });
+      continue;
+    }
+    
     for (let j = 0; j < mw.options.length; j++) {
       const opt = mw.options[j];
-      const { data: mo } = await sb.from("meal_options").insert({ meal_id: meal.id, option_number: j + 1, name: j === 0 ? "Opção Principal" : `Opção ${j + 1}`, total_calories: opt.totals.calories, total_protein: opt.totals.protein, total_carbs: opt.totals.carbs, total_fat: opt.totals.fat }).select().single();
-      for (const f of opt.foods) await sb.from("meal_option_foods").insert({ meal_option_id: mo.id, food_id: f.food.id, quantity_grams: f.quantity_grams, display_quantity: f.display_quantity, display_unit: f.display_unit, calculated_grams: f.quantity_grams, unit_locked: true });
+      if (!opt.foods || opt.foods.length === 0) continue;
+      
+      const { data: mo, error: moError } = await sb.from("meal_options").insert({ 
+        meal_id: meal.id, 
+        option_number: j + 1, 
+        name: j === 0 ? "Opção Principal" : `Opção ${j + 1}`, 
+        total_calories: opt.totals.calories, 
+        total_protein: opt.totals.protein, 
+        total_carbs: opt.totals.carbs, 
+        total_fat: opt.totals.fat 
+      }).select().single();
+      
+      if (moError || !mo) continue;
+      
+      for (const f of opt.foods) {
+        await sb.from("meal_option_foods").insert({ 
+          meal_option_id: mo.id, 
+          food_id: f.food.id, 
+          quantity_grams: f.quantity_grams, 
+          display_quantity: f.display_quantity, 
+          display_unit: f.display_unit, 
+          calculated_grams: f.quantity_grams, 
+          unit_locked: true 
+        });
+      }
     }
   }
   return plan.id;
