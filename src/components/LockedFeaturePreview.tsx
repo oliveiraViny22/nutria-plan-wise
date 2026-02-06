@@ -45,10 +45,10 @@ export function LockedFeaturePreview({
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      className={`relative overflow-hidden rounded-xl ${className}`}
+      className={`relative overflow-hidden rounded-xl h-full min-h-[120px] ${className}`}
     >
       {/* Blurred content - maintains layout flow */}
-      <div className="blur-[6px] select-none pointer-events-none opacity-75">
+      <div className="blur-[6px] select-none pointer-events-none opacity-75 h-full">
         {children}
       </div>
 
