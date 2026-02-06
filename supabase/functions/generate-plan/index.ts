@@ -6,6 +6,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders, CLIENT_ERRORS, getErrorForLogging, createErrorResponse, createSuccessResponse } from "../_shared/security.ts";
 import { getCategoryLimits, getScaleLimits, SNACK_CATEGORY_LIMITS } from "../_shared/category-limits.ts";
+import { validateGeneratedPlan, fatPercentOfCalories, GENERATOR_CONTRACT, type MacroTargets } from "../_shared/nutrition-contracts.ts";
 
 interface Food { id: string; name: string; calories: number; protein: number; carbs: number; fat: number; category: string; is_optional: boolean | null; unit_name: string | null; unit_weight_grams: number | null; unit_increment: number | null; unit_enabled: boolean | null; }
 interface FoodSelection { food: Food; role_name: string; quantity_grams: number; display_quantity: number; display_unit: string; }
@@ -269,37 +270,64 @@ function buildMeal(mt: string, opt: number, roles: any[], foods: Food[], anchors
   return { meal_type: mt, meal_name: MEAL_NAMES[mt] || mt, foods: sel, totals: { calories: Math.round(cals), protein: Math.round(prot * 10) / 10, carbs: Math.round(carbs * 10) / 10, fat: Math.round(fat * 10) / 10 } };
 }
 
-function totals(mwo: MealWithOptions[]): { calories: number; protein: number; carbs: number; fat: number } {
+function totals(mwo: MealWithOptions[]): MacroTargets {
+  return totalsForOption(mwo, 0);
+}
+
+function totalsForOption(mwo: MealWithOptions[], optionIndex: number): MacroTargets {
   let c = 0, p = 0, cb = 0, f = 0;
-  for (const m of mwo) if (m.options[0]) { c += m.options[0].totals.calories; p += m.options[0].totals.protein; cb += m.options[0].totals.carbs; f += m.options[0].totals.fat; }
+  for (const m of mwo) {
+    const opt = m.options[optionIndex] || m.options[0];
+    if (opt) { c += opt.totals.calories; p += opt.totals.protein; cb += opt.totals.carbs; f += opt.totals.fat; }
+  }
   return { calories: Math.round(c), protein: Math.round(p * 10) / 10, carbs: Math.round(cb * 10) / 10, fat: Math.round(f * 10) / 10 };
 }
 
-function scale(mwo: MealWithOptions[], tgt: number): number {
-  for (let i = 0; i < 3; i++) {
-    const cur = totals(mwo).calories;
-    if (Math.abs(cur - tgt) / tgt <= 0.1) return 1;
-    const sf = tgt / cur;
-    for (const md of mwo) {
-      const isSnack = SNACK_MEALS.includes(md.mealType);
-      for (const o of md.options) for (const fs of o.foods) {
-        // Usar limites centralizados - aplicar limites de lanche se for lanche
-        const lim = isSnack 
-          ? getCategoryLimits((fs.food.category || "").toLowerCase(), true)
-          : getScaleLimits((fs.food.category || "").toLowerCase());
-        let ng = Math.round((fs.quantity_grams * sf) / 5) * 5;
-        ng = Math.max(lim.min, Math.min(lim.max, ng));
-        const cv = unitConv(fs.food, ng);
-        fs.quantity_grams = cv.calculated_grams; fs.display_quantity = cv.display_quantity; fs.display_unit = cv.display_unit;
+/**
+ * Valida contratos nutricionais para TODAS as opções de refeição
+ * Retorna warnings se alguma opção violar os contratos
+ */
+function validateNutritionalContracts(mwo: MealWithOptions[], targets: MacroTargets): { isValid: boolean; warnings: string[]; metrics: Record<string, any> } {
+  const warnings: string[] = [];
+  const metrics: Record<string, any> = {};
+  let isValid = true;
+  
+  // Determinar quantas opções existem (máximo entre todas as refeições)
+  const maxOptions = Math.max(...mwo.map(m => m.options.length), 1);
+  
+  // Índices de refeições principais (não-lanches)
+  const mainMealIndices = mwo
+    .map((m, i) => MAIN_MEALS.includes(m.mealType) ? i : -1)
+    .filter(i => i >= 0);
+  
+  for (let optIdx = 0; optIdx < maxOptions; optIdx++) {
+    const optTotals = totalsForOption(mwo, optIdx);
+    const optLabel = `Opção ${optIdx + 1}`;
+    
+    // Coletar proteína por refeição para esta opção
+    const mealProteinValues = mwo.map(m => {
+      const opt = m.options[optIdx] || m.options[0];
+      return opt?.totals.protein || 0;
+    });
+    
+    const validation = validateGeneratedPlan(optTotals, targets, mealProteinValues, mainMealIndices);
+    
+    if (!validation.isValid) {
+      isValid = false;
+      for (const error of validation.errors) {
+        warnings.push(`[${optLabel}] ${error}`);
       }
     }
-    for (const md of mwo) for (const o of md.options) {
-      let c = 0, p = 0, cb = 0, f = 0;
-      for (const s of o.foods) { const m = s.quantity_grams / 100; c += s.food.calories * m; p += s.food.protein * m; cb += s.food.carbs * m; f += s.food.fat * m; }
-      o.totals = { calories: Math.round(c), protein: Math.round(p * 10) / 10, carbs: Math.round(cb * 10) / 10, fat: Math.round(f * 10) / 10 };
-    }
+    
+    metrics[`option_${optIdx + 1}`] = validation.metrics;
   }
-  return tgt / totals(mwo).calories;
+  
+  // Log estruturado para debugging
+  if (warnings.length > 0) {
+    log("NutritionalWarnings", { warnings, metrics });
+  }
+  
+  return { isValid, warnings, metrics };
 }
 
 async function save(sb: any, uid: string, mwo: MealWithOptions[]): Promise<string> {
@@ -359,14 +387,29 @@ serve(async (req) => {
       if (opts[0]) for (const f of opts[0].foods) usedG.add(f.food.id);
     }
 
-    const tgt = { calories: profile.daily_calories || 2000, protein: profile.protein_target || 100, carbs: profile.carbs_target || 250, fat: profile.fat_target || 65 };
+    const tgt: MacroTargets = { calories: profile.daily_calories || 2000, protein: profile.protein_target || 100, carbs: profile.carbs_target || 250, fat: profile.fat_target || 65 };
     scale(mwo, tgt.calories);
 
+    // Validar contratos nutricionais ANTES de salvar
+    const validation = validateNutritionalContracts(mwo, tgt);
+    
     const planId = await save(sb, user.id, mwo);
     await sb.rpc("increment_usage", { _user_id: user.id, _feature: "diet" });
-    log("Done", { planId });
+    log("Done", { planId, valid: validation.isValid, warningsCount: validation.warnings.length });
 
     const fin = totals(mwo);
-    return createSuccessResponse({ plan_id: planId, totals: fin, targets: tgt, options_per_meal: optLim, meals: mwo.map(m => ({ type: m.mealType, name: m.options[0]?.meal_name, calories: m.options[0]?.totals.calories })) }, cors);
+    return createSuccessResponse({ 
+      plan_id: planId, 
+      totals: fin, 
+      targets: tgt, 
+      options_per_meal: optLim, 
+      meals: mwo.map(m => ({ type: m.mealType, name: m.options[0]?.meal_name, calories: m.options[0]?.totals.calories })),
+      // Incluir validação no response para debugging e UI
+      validation: {
+        isValid: validation.isValid,
+        warnings: validation.warnings,
+        metrics: validation.metrics,
+      }
+    }, cors);
   } catch (e) { log("Err", { e: getErrorForLogging(e) }); return createErrorResponse(CLIENT_ERRORS.SERVER_ERROR, 500, cors); }
 });
