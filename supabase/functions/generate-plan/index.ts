@@ -556,18 +556,31 @@ function validateNutritionalContracts(
 
 /**
  * Escalona porções para atingir calorias alvo
- * v5.11: ESCALONAMENTO COM PROTEÇÃO PREVENTIVA
+ * v5.14: ESCALONAMENTO AGRESSIVO PARA BULK
  * 
  * Estratégia:
  *   1. Calcular quanto de proteína resultaria do scaling proporcional
  *   2. Se proteína resultante excederia 110% da meta, escalar apenas não-proteicos
- *   3. Usar ratio proteína/calorias para classificar alimentos
+ *   3. Para bulk com alta demanda calórica, usar limites expandidos e mais iterações
  */
-function scale(mwo: MealWithOptions[], targetCals: number, targetProtein?: number): void {
+function scale(mwo: MealWithOptions[], targetCals: number, targetProtein?: number, objective: GeneratorObjective = "maintain"): void {
   const PROTEIN_MAX_PERCENT = 1.10; // Proteína máxima permitida: 110% da meta
   const PROTEIN_DENSE_RATIO = 0.25; // Alimento é "proteico" se >25% das calorias vêm de proteína
   
-  for (let iter = 0; iter < 5; iter++) {
+  // Para bulk com alta demanda, usar parâmetros mais agressivos
+  const isBulk = objective === "bulk";
+  const calorieGapPercent = Math.abs(targetCals - totals(mwo).calories) / targetCals;
+  const isHighDemand = calorieGapPercent > 0.25; // >25% de déficit
+  
+  const MAX_ITERATIONS = isBulk && isHighDemand ? 8 : 5;
+  const MAX_CARB_COMPENSATION = isBulk && isHighDemand ? 4.0 : 2.5;
+  const CONVERGENCE_THRESHOLD = isBulk ? 0.12 : 0.08; // 12% tolerância para bulk durante scaling
+  
+  if (isBulk && isHighDemand) {
+    log("ScaleBulkMode", { calorieGapPercent: Math.round(calorieGapPercent * 100), maxIterations: MAX_ITERATIONS, maxCompensation: MAX_CARB_COMPENSATION });
+  }
+  
+  for (let iter = 0; iter < MAX_ITERATIONS; iter++) {
     const current = totals(mwo);
     const proteinPercent = targetProtein ? (current.protein / targetProtein) : 0;
     
@@ -586,12 +599,11 @@ function scale(mwo: MealWithOptions[], targetCals: number, targetProtein?: numbe
       return;
     }
     
-    // Se calorias estão dentro de ±8%, parar (margem mais apertada)
-    if (Math.abs(current.calories - targetCals) / targetCals <= 0.08) break;
+    // Se calorias estão dentro da tolerância, parar
+    if (Math.abs(current.calories - targetCals) / targetCals <= CONVERGENCE_THRESHOLD) break;
     
     const calorieDeficit = current.calories < targetCals;
     const overallFactor = targetCals / (current.calories || 1);
-    const limits = getScaleLimits(undefined);
     
     // PROTEÇÃO PREVENTIVA: calcular proteína resultante se escalássemos tudo
     const projectedProtein = current.protein * overallFactor;
@@ -628,14 +640,14 @@ function scale(mwo: MealWithOptions[], targetCals: number, targetProtein?: numbe
     }
     
     // Calcular fator de compensação para alimentos não-proteicos
-    // Se precisamos adicionar X calorias mas não podemos escalar proteína,
-    // os carbs/gorduras precisam compensar proporcionalmente mais
     const calorieGap = targetCals - current.calories;
     const carbCompensationFactor = carbCaloriesTotal > 0 
-      ? Math.min(2.5, 1 + (calorieGap / carbCaloriesTotal))
+      ? Math.min(MAX_CARB_COMPENSATION, 1 + (calorieGap / carbCaloriesTotal))
       : overallFactor;
     
     for (const m of mwo) {
+      const isSnack = SNACK_MEALS.includes(m.mealType);
+      
       for (const opt of m.options) {
         if (!opt || !opt.foods) continue;
         
@@ -661,10 +673,16 @@ function scale(mwo: MealWithOptions[], targetCals: number, targetProtein?: numbe
           }
           
           const cat = (f.food.category || "").toLowerCase();
-          const catLimits = getCategoryLimits(cat, SNACK_MEALS.includes(m.mealType));
+          const catLimits = getCategoryLimits(cat, isSnack);
+          
+          // Para bulk com alta demanda, expandir limites de carboidratos
+          let maxQty = catLimits.max;
+          if (isBulk && isHighDemand && (cat === "carboidratos" || cat === "leguminosas")) {
+            maxQty = Math.round(catLimits.max * 1.5); // +50% para carbs em bulk
+          }
           
           const newQty = Math.round(f.quantity_grams * itemFactor / 5) * 5;
-          f.quantity_grams = Math.max(catLimits.min, Math.min(catLimits.max, newQty));
+          f.quantity_grams = Math.max(catLimits.min, Math.min(maxQty, newQty));
         }
         recalcOptionTotals(opt);
       }
@@ -676,7 +694,8 @@ function scale(mwo: MealWithOptions[], targetCals: number, targetProtein?: numbe
   log("ScaleFinal", {
     calories: finalTotals.calories,
     protein: Math.round(finalTotals.protein * 10) / 10,
-    proteinPercent: targetProtein ? Math.round((finalTotals.protein / targetProtein) * 100) : null
+    proteinPercent: targetProtein ? Math.round((finalTotals.protein / targetProtein) * 100) : null,
+    objective
   });
 }
 
@@ -703,17 +722,20 @@ function recalcOptionTotals(opt: MealResult): void {
 /**
  * Boost de carboidratos: aumenta porções de alimentos ricos em carbs
  * quando o plano está abaixo do threshold mínimo.
+ * v5.14: Modo agressivo para bulk com alta demanda
  * 
  * @param mwo - Plano de refeições
  * @param targetCarbs - Meta de carboidratos
  * @param minCarbPercent - Percentual mínimo de carbs (ex: 0.80 para 80%)
  * @param targetCals - Meta de calorias (para não exceder)
+ * @param objective - Objetivo do perfil (bulk/maintain/cut)
  */
 function boostCarbs(
   mwo: MealWithOptions[],
   targetCarbs: number,
   minCarbPercent: number,
-  targetCals: number
+  targetCals: number,
+  objective: GeneratorObjective = "maintain"
 ): void {
   const current = totals(mwo);
   const carbPercent = current.carbs / targetCarbs;
@@ -724,6 +746,9 @@ function boostCarbs(
     return;
   }
 
+  const isBulk = objective === "bulk";
+  const isHighDemand = carbPercent < 0.70; // <70% de carbs = alta demanda
+  
   const carbFloorGrams = targetCarbs * minCarbPercent;
   const carbDeficit = carbFloorGrams - current.carbs;
   log("CarbBoostStart", {
@@ -731,14 +756,17 @@ function boostCarbs(
     targetCarbs,
     carbPercent: Math.round(carbPercent * 100),
     deficit: Math.round(carbDeficit),
+    isBulk,
+    isHighDemand,
   });
 
-  // Identificar alimentos ricos em carboidratos (>=15g carbs/100g)
+  // Para bulk com alta demanda, usar parâmetros mais agressivos
   const CARB_RICH_THRESHOLD = 15; // g carbs per 100g
-  const MAX_BOOST_PERCENT = 1.5; // Máximo 50% de aumento por alimento (passo 1)
+  const MAX_BOOST_PERCENT = isBulk && isHighDemand ? 2.5 : 1.5; // 150% mais agressivo para bulk
+  const LIMIT_MULTIPLIER = isBulk && isHighDemand ? 1.5 : 1.0; // Expandir limites de categoria
 
   let totalCarbsAdded = 0;
-  const maxCarbsToAdd = carbDeficit * 1.1; // Permite overshoot de 10%
+  const maxCarbsToAdd = carbDeficit * 1.2; // Permite overshoot de 20%
 
   // ==========================================
   // PASSO 1: BOOST INICIAL (cap em 50% por item)
@@ -759,7 +787,9 @@ function boostCarbs(
         const cat = (f.food.category || "").toLowerCase();
         const limits = getCategoryLimits(cat, SNACK_MEALS.includes(m.mealType));
         const currentQty = f.quantity_grams;
-        const maxAllowedQty = Math.min(limits.max, currentQty * MAX_BOOST_PERCENT);
+        // Expandir limite máximo para bulk com alta demanda
+        const expandedMax = Math.round(limits.max * LIMIT_MULTIPLIER);
+        const maxAllowedQty = Math.min(expandedMax, currentQty * MAX_BOOST_PERCENT);
 
         const carbsPer100g = f.food.carbs;
         const remainingCarbs = maxCarbsToAdd - totalCarbsAdded;
@@ -1109,7 +1139,7 @@ serve(async (req) => {
     const preScaleTotals = totals(mwo);
     log("PreScaleTotals", { ...preScaleTotals });
     
-    scale(mwo, tgt.calories, tgt.protein);
+    scale(mwo, tgt.calories, tgt.protein, objective);
     
     // Debug: totais APÓS o scale
     const postScaleTotals = totals(mwo);
@@ -1117,7 +1147,7 @@ serve(async (req) => {
 
     // Boost de carboidratos para perfis bulk ou quando há déficit grande
     const carbsMinThreshold = objective === "bulk" ? 0.80 : 0.90;
-    boostCarbs(mwo, tgt.carbs, carbsMinThreshold, tgt.calories);
+    boostCarbs(mwo, tgt.carbs, carbsMinThreshold, tgt.calories, objective);
     
     // Debug: totais APÓS o boost de carbs
     const postBoostTotals = totals(mwo);
