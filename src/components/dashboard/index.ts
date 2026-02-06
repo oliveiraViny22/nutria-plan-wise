@@ -6,6 +6,7 @@ export { DashboardGamification } from './DashboardGamification';
 export { DashboardActions } from './DashboardActions';
 export { DashboardMeals } from './DashboardMeals';
 export { DashboardFooter } from './DashboardFooter';
+export { ProgressCard } from './ProgressCard';
 
 // Enhanced interactive components
 export { InteractiveMacroCard } from './InteractiveMacroCard';
