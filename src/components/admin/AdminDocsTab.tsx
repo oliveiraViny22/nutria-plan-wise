@@ -124,21 +124,43 @@ export function AdminDocsTab({
             <Card>
               <CardHeader>
                 <CardTitle className="text-base flex items-center gap-2">
-                  <Sparkles className="h-4 w-4 text-amber-500" />
-                  Rebalanceador de Macros
+                  <Code className="h-4 w-4 text-emerald-500" />
+                  Gerador de Planos v5.17
                 </CardTitle>
                 <CardDescription>
-                  Código completo do serviço de rebalanceamento de macros (core, hooks, componentes e edge function).
+                  Documentação completa: contratos, regras operacionais e código fonte do motor de geração.
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <a 
-                  href="/exports/rebalancer-service-code.txt"
-                  download="rebalancer-service-code.txt"
+                  href="/exports/generator-v5-documentation.txt"
+                  download="generator-v5-documentation.txt"
                   className="inline-flex items-center justify-center w-full gap-2 px-4 py-2 text-sm font-medium border rounded-md hover:bg-muted transition-colors"
                 >
                   <Download className="h-4 w-4" />
-                  Baixar Código do Rebalanceador (TXT)
+                  Baixar Documentação do Gerador (TXT)
+                </a>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Sparkles className="h-4 w-4 text-amber-500" />
+                  Rebalanceador v2
+                </CardTitle>
+                <CardDescription>
+                  Documentação completa: contratos, pipeline de 5 etapas e código fonte do motor de rebalanceamento.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <a 
+                  href="/exports/rebalancer-v2-documentation.txt"
+                  download="rebalancer-v2-documentation.txt"
+                  className="inline-flex items-center justify-center w-full gap-2 px-4 py-2 text-sm font-medium border rounded-md hover:bg-muted transition-colors"
+                >
+                  <Download className="h-4 w-4" />
+                  Baixar Documentação do Rebalanceador (TXT)
                 </a>
               </CardContent>
             </Card>
