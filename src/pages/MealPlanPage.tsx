@@ -33,9 +33,10 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCachedUserData } from '@/hooks/useCachedUserData';
 import { toast } from 'sonner';
-import { MEAL_NAMES, MealType, Food, MealOption } from '@/lib/types';
+import { MEAL_NAMES, MealType, Food, MealOption, MealOptionFood } from '@/lib/types';
 import { getCategoryDisplayOrder, getCategoryLabel, getCategoryColor } from '@/lib/food-categories';
-import { 
+import { getMealFoodDisplay } from '@/lib/unit-display';
+import {
   generateSupplementRecommendations, 
   getPriorityBadge,
   type UserGoal,
@@ -110,12 +111,10 @@ const NUTRITION_TIPS: Record<string, { title: string; tips: string[] }> = {
   },
 };
 
-// Formatação de quantidade
-function formatQuantity(grams: number, displayQty?: number | null, displayUnit?: string | null): string {
-  if (displayQty && displayUnit) {
-    return `${displayQty} ${displayUnit}`;
-  }
-  return `${Math.round(grams)}g`;
+// Formatação de quantidade com suporte a unidades + gramas dual display
+function formatQuantityDual(mof: { quantity_grams: number; display_quantity?: number | null; display_unit?: string | null }): string {
+  // Usar a função canônica de unit-display que já implementa o formato dual
+  return getMealFoodDisplay(mof as any);
 }
 
 // Componente de suplementação personalizada
@@ -558,7 +557,7 @@ export default function MealPlanPage() {
                                           <span className="text-xs font-medium truncate">{food.name}</span>
                                         </div>
                                         <span className="text-xs text-muted-foreground whitespace-nowrap shrink-0">
-                                          {formatQuantity(qty, mof.display_quantity, mof.display_unit)}
+                                          {formatQuantityDual(mof)}
                                         </span>
                                       </div>
                                       {/* Macros do alimento */}
