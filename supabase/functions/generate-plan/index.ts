@@ -413,18 +413,131 @@ function scale(mwo: MealWithOptions[], targetCals: number): void {
           const maxQty = limits.max;
           f.quantity_grams = Math.max(minQty, Math.min(maxQty, newQty));
         }
-        // Recalcular totais da opção
-        let cals = 0, prot = 0, carbs = 0, fat = 0;
-        for (const s of opt.foods) {
-          const m = s.quantity_grams / 100;
-          cals += s.food.calories * m;
-          prot += s.food.protein * m;
-          carbs += s.food.carbs * m;
-          fat += s.food.fat * m;
-        }
-        opt.totals = { calories: Math.round(cals), protein: Math.round(prot * 10) / 10, carbs: Math.round(carbs * 10) / 10, fat: Math.round(fat * 10) / 10 };
+        recalcOptionTotals(opt);
       }
     }
+  }
+}
+
+/**
+ * Recalcula os totais de uma opção de refeição
+ */
+function recalcOptionTotals(opt: MealResult): void {
+  let cals = 0, prot = 0, carbs = 0, fat = 0;
+  for (const s of opt.foods) {
+    const m = s.quantity_grams / 100;
+    cals += s.food.calories * m;
+    prot += s.food.protein * m;
+    carbs += s.food.carbs * m;
+    fat += s.food.fat * m;
+  }
+  opt.totals = { 
+    calories: Math.round(cals), 
+    protein: Math.round(prot * 10) / 10, 
+    carbs: Math.round(carbs * 10) / 10, 
+    fat: Math.round(fat * 10) / 10 
+  };
+}
+
+/**
+ * Boost de carboidratos: aumenta porções de alimentos ricos em carbs
+ * quando o plano está abaixo do threshold mínimo.
+ * 
+ * @param mwo - Plano de refeições
+ * @param targetCarbs - Meta de carboidratos
+ * @param minCarbPercent - Percentual mínimo de carbs (ex: 0.80 para 80%)
+ * @param targetCals - Meta de calorias (para não exceder)
+ */
+function boostCarbs(
+  mwo: MealWithOptions[], 
+  targetCarbs: number, 
+  minCarbPercent: number,
+  targetCals: number
+): void {
+  const current = totals(mwo);
+  const carbPercent = current.carbs / targetCarbs;
+  
+  // Só aplicar boost se carbs estiverem abaixo do threshold
+  if (carbPercent >= minCarbPercent) {
+    log("CarbBoostSkip", { carbPercent: Math.round(carbPercent * 100), threshold: minCarbPercent * 100 });
+    return;
+  }
+  
+  const carbDeficit = targetCarbs * minCarbPercent - current.carbs;
+  log("CarbBoostStart", { 
+    currentCarbs: current.carbs, 
+    targetCarbs, 
+    carbPercent: Math.round(carbPercent * 100),
+    deficit: Math.round(carbDeficit)
+  });
+  
+  // Identificar alimentos ricos em carboidratos (>40g carbs/100g)
+  // Priorizar: arroz, batata, pão, macarrão, frutas
+  const CARB_RICH_THRESHOLD = 15; // g carbs per 100g
+  const MAX_BOOST_PERCENT = 1.5; // Máximo 50% de aumento por alimento
+  
+  let totalCarbsAdded = 0;
+  const maxCarbsToAdd = carbDeficit * 1.1; // Permite overshoot de 10%
+  
+  for (const m of mwo) {
+    if (totalCarbsAdded >= maxCarbsToAdd) break;
+    
+    for (const opt of m.options) {
+      if (!opt?.foods || totalCarbsAdded >= maxCarbsToAdd) continue;
+      
+      // Ordenar por densidade de carbs (maior primeiro)
+      const carbFoods = opt.foods
+        .filter(f => f.food.carbs >= CARB_RICH_THRESHOLD)
+        .sort((a, b) => b.food.carbs - a.food.carbs);
+      
+      for (const f of carbFoods) {
+        if (totalCarbsAdded >= maxCarbsToAdd) break;
+        
+        const cat = (f.food.category || "").toLowerCase();
+        const limits = getCategoryLimits(cat, SNACK_MEALS.includes(m.mealType));
+        const currentQty = f.quantity_grams;
+        const maxAllowedQty = Math.min(limits.max, currentQty * MAX_BOOST_PERCENT);
+        
+        // Calcular quanto podemos adicionar
+        const carbsPer100g = f.food.carbs;
+        const remainingCarbs = maxCarbsToAdd - totalCarbsAdded;
+        const gramsNeeded = (remainingCarbs / carbsPer100g) * 100;
+        const newQty = Math.min(maxAllowedQty, currentQty + gramsNeeded);
+        const actualIncrease = newQty - currentQty;
+        
+        if (actualIncrease >= 10) { // Mínimo 10g de aumento
+          f.quantity_grams = Math.round(newQty / 5) * 5;
+          const carbsAdded = (actualIncrease / 100) * carbsPer100g;
+          totalCarbsAdded += carbsAdded;
+          
+          log("CarbBoostFood", { 
+            food: f.food.name, 
+            oldQty: currentQty, 
+            newQty: f.quantity_grams,
+            carbsAdded: Math.round(carbsAdded)
+          });
+        }
+      }
+      
+      recalcOptionTotals(opt);
+    }
+  }
+  
+  // Verificar se não excedemos calorias
+  const afterBoost = totals(mwo);
+  const calOvershoot = afterBoost.calories / targetCals;
+  
+  log("CarbBoostEnd", { 
+    carbsAdded: Math.round(totalCarbsAdded),
+    newCarbs: afterBoost.carbs,
+    newCarbPercent: Math.round((afterBoost.carbs / targetCarbs) * 100),
+    caloriePercent: Math.round(calOvershoot * 100)
+  });
+  
+  // Se calorias excederam 110%, fazer scale down proporcional
+  if (calOvershoot > 1.10) {
+    log("CarbBoostCalorieCorrection", { calOvershoot });
+    scale(mwo, targetCals);
   }
 }
 
@@ -617,6 +730,14 @@ serve(async (req) => {
     // Debug: totais APÓS o scale
     const postScaleTotals = totals(mwo);
     log("PostScaleTotals", { ...postScaleTotals, targetCals: tgt.calories });
+
+    // Boost de carboidratos para perfis bulk ou quando há déficit grande
+    const carbsMinThreshold = objective === "bulk" ? 0.80 : 0.90;
+    boostCarbs(mwo, tgt.carbs, carbsMinThreshold, tgt.calories);
+    
+    // Debug: totais APÓS o boost de carbs
+    const postBoostTotals = totals(mwo);
+    log("PostBoostTotals", { ...postBoostTotals, objective });
 
     // Validar contratos nutricionais ANTES de salvar (com objetivo para threshold de carbs)
     const validation = validateNutritionalContracts(mwo, tgt, objective);
