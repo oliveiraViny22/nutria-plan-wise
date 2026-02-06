@@ -20,8 +20,14 @@ export const KCAL_PER_GRAM = {
 // =====================================================
 
 export const GENERATOR_CONTRACT = {
-  /** Tolerância calórica: plano deve estar dentro de ±10% */
+  /** Tolerância calórica padrão: plano deve estar dentro de ±10% */
   CALORIE_TOLERANCE_PERCENT: 10,
+  
+  /** Tolerância calórica para bulk de alta caloria (>3000 kcal): ±20% */
+  CALORIE_TOLERANCE_PERCENT_BULK_HIGH: 20,
+  
+  /** Limite de calorias para considerar "bulk de alta caloria" */
+  HIGH_CALORIE_BULK_THRESHOLD: 3000,
   
   /** Tolerância de gordura: máximo 30% das calorias totais */
   MAX_FAT_PERCENT_OF_CALORIES: 30,
@@ -157,12 +163,18 @@ export function validateGeneratedPlan(
   // Obter limite de carbs baseado no objetivo
   const carbsMinThreshold = GENERATOR_CARBS_MIN_BY_OBJECTIVE[objective];
   
-  // CONTRATO 1: Calorias dentro de ±10%
+  // Tolerância calórica: relaxada para bulk de alta caloria
+  const isHighCalorieBulk = objective === "bulk" && targets.calories >= GENERATOR_CONTRACT.HIGH_CALORIE_BULK_THRESHOLD;
+  const calorieTolerance = isHighCalorieBulk 
+    ? GENERATOR_CONTRACT.CALORIE_TOLERANCE_PERCENT_BULK_HIGH 
+    : GENERATOR_CONTRACT.CALORIE_TOLERANCE_PERCENT;
+  
+  // CONTRATO 1: Calorias dentro da tolerância (dinâmica por objetivo)
   const calorieDiff = Math.abs(caloriePercent - 100);
-  if (calorieDiff > GENERATOR_CONTRACT.CALORIE_TOLERANCE_PERCENT) {
+  if (calorieDiff > calorieTolerance) {
     errors.push(
       `[G0] Calorias fora da tolerância: ${Math.round(totals.calories)} kcal ` +
-      `(${caloriePercent.toFixed(1)}% da meta, limite: ±${GENERATOR_CONTRACT.CALORIE_TOLERANCE_PERCENT}%)`
+      `(${caloriePercent.toFixed(1)}% da meta, limite: ±${calorieTolerance}%${isHighCalorieBulk ? ' [bulk alta caloria]' : ''})`
     );
   }
   
