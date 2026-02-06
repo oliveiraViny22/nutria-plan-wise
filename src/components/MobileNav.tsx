@@ -111,7 +111,7 @@ export function MobileNav() {
       label: 'Progresso',
       href: '/progress',
       icon: <TrendingUp className="h-5 w-5" />,
-      show: true,
+      show: isPaidUser,
     },
     {
       label: 'Meu Perfil',
