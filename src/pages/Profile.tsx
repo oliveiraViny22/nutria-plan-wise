@@ -33,7 +33,7 @@ import { Logo } from '@/components/Logo';
 import { MobileNav } from '@/components/MobileNav';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { PageHeader, BreadcrumbNav } from '@/components/ui-kit';
-import { NutritionalValidationAlert } from '@/components/NutritionalValidationAlert';
+
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -44,7 +44,7 @@ import { FoodPreferencesManager } from '@/components/FoodPreferencesManager';
 import { SupplementToggle } from '@/components/SupplementToggle';
 import { useLinkedStudent } from '@/hooks/useLinkedStudent';
 import { useSubscription } from '@/hooks/useSubscription';
-import { useNutritionalValidation } from '@/hooks/useNutritionalValidation';
+
 import {
   CompactProfileData,
   CompactObjectiveDisplay,
@@ -68,7 +68,7 @@ export default function Profile() {
   const { isLinkedStudent, professionalId } = useLinkedStudent();
   const { subscriptionInfo } = useSubscription();
   const isPaidUser = subscriptionInfo?.plan?.type !== 'gratuito';
-  const nutritionalValidation = useNutritionalValidation(profile);
+  
 
   const [formData, setFormData] = useState({
     name: '',
@@ -264,37 +264,6 @@ export default function Profile() {
     }
   };
 
-  const handleApplyRecommendations = async () => {
-    if (!user || !nutritionalValidation.recommendations) return;
-    
-    setLoading(true);
-    try {
-      const { calories, protein, carbs, fat } = nutritionalValidation.recommendations;
-      
-      const { error } = await supabase
-        .from('profiles')
-        .update({
-          daily_calories: calories,
-          protein_target: protein,
-          carbs_target: carbs,
-          fat_target: fat,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('user_id', user.id);
-
-      if (error) throw error;
-
-      toast.success('Metas nutricionais atualizadas!', {
-        description: `Calorias: ${calories} | P: ${protein}g | C: ${carbs}g | G: ${fat}g`
-      });
-      await refreshProfile();
-    } catch (error: any) {
-      console.error('Error applying recommendations:', error);
-      toast.error(error.message || 'Erro ao aplicar recomendações');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const isAdmin = user?.email === ADMIN_EMAIL;
 
@@ -410,13 +379,6 @@ export default function Profile() {
                   />
                 </CardContent>
               </Card>
-
-              {/* Nutritional Validation Alert */}
-              <NutritionalValidationAlert
-                validation={nutritionalValidation}
-                onApplyRecommendations={handleApplyRecommendations}
-                showApplyButton={!isLinkedStudent}
-              />
 
               {/* Collapsible Delete Account Section */}
               {!isAdmin && (
