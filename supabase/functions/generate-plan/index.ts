@@ -300,23 +300,38 @@ async function loadData(sb: any) {
   return { tplMap, ancMap };
 }
 
-function buildMeal(mt: string, opt: number, roles: any[], foods: Food[], anchors: Map<string, AnchorFood[]>, usedG: Set<string>, usedP: Set<string>, pref: string[]): MealResult {
+// v5.15: Adicionado objetivo para ajustes de bulk
+function buildMeal(mt: string, opt: number, roles: any[], foods: Food[], anchors: Map<string, AnchorFood[]>, usedG: Set<string>, usedP: Set<string>, pref: string[], objective: GeneratorObjective = "maintain"): MealResult {
   const sel: FoodSelection[] = [], usedM = new Set<string>(), filled = new Set<string>(), combined = new Set([...usedG, ...usedP]);
   const usedGroups = new Set<string>(); // Rastrear grupos similares (ex: iogurte)
   const prefSet = new Set(pref.map(p => p.toLowerCase()));
   const isSnack = SNACK_MEALS.includes(mt);
   const isMainMeal = MAIN_MEALS.includes(mt);
+  const isBulk = objective === "bulk";
+  
+  // v5.15: LIMITE MÁXIMO DE PROTEÍNA EM LANCHES (15g) para evitar excesso
+  const MAX_SNACK_PROTEIN = 15;
   
   // Contrato: proteína mínima por tipo de refeição
   const minProteinRequired = isMainMeal 
     ? GENERATOR_CONTRACT.MIN_PROTEIN_MAIN_MEAL_GRAMS  // 20g
     : GENERATOR_CONTRACT.MIN_PROTEIN_SNACK_GRAMS;     // 5g
   
+  // v5.15: Multiplicador de porção para carboidratos em bulk
+  const BULK_CARB_MULTIPLIER = isBulk ? 1.25 : 1.0; // +25% de carbs para bulk
+  
   // Helper para aplicar limites de quantidade baseado no tipo de refeição
-  const applyQuantityLimits = (food: Food, baseQty: number): number => {
+  const applyQuantityLimits = (food: Food, baseQty: number, applyBulkBoost = false): number => {
     const cat = (food.category || "").toLowerCase();
     const limits = getCategoryLimits(cat, isSnack);
-    const clampedQty = Math.max(limits.min, Math.min(limits.max, baseQty));
+    
+    // v5.15: Aplicar boost de carbs para bulk na montagem inicial
+    let adjustedQty = baseQty;
+    if (applyBulkBoost && isBulk && (cat === "carboidratos" || cat === "leguminosas")) {
+      adjustedQty = Math.round(baseQty * BULK_CARB_MULTIPLIER);
+    }
+    
+    const clampedQty = Math.max(limits.min, Math.min(limits.max, adjustedQty));
     return Math.round(clampedQty / 5) * 5; // Arredondar para múltiplo de 5
   };
   
@@ -335,20 +350,57 @@ function buildMeal(mt: string, opt: number, roles: any[], foods: Food[], anchors
     return prot;
   };
   
+  // v5.15: Verificar se adicionar alimento excederia limite de proteína em lanche
+  const wouldExceedSnackProtein = (food: Food, grams: number): boolean => {
+    if (!isSnack) return false;
+    const currentProt = getCurrentProtein();
+    const addedProt = (food.protein * grams) / 100;
+    return (currentProt + addedProt) > MAX_SNACK_PROTEIN;
+  };
+  
+  // v5.15: Calcular quantidade máxima para não exceder proteína em lanche
+  const getMaxQtyForSnackProtein = (food: Food, baseQty: number): number => {
+    if (!isSnack || food.protein <= 0) return baseQty;
+    const currentProt = getCurrentProtein();
+    const remainingProt = Math.max(0, MAX_SNACK_PROTEIN - currentProt);
+    const maxGramsForProtein = (remainingProt / food.protein) * 100;
+    return Math.min(baseQty, Math.max(20, maxGramsForProtein)); // Mínimo 20g
+  };
+  
   // Anchors first - aplicar filtro de âncoras gordas (v5.8.1) + detecção de duplicados
+  // v5.15: Aplicar limite de proteína em lanches e boost de carbs para bulk
   for (const [rn, ancs] of anchors.entries()) {
     if (filled.has(rn.split("_")[0])) continue;
+    
+    // v5.15: Em lanches, pular âncoras proteicas se já atingiu limite
+    if (isSnack && rn.includes("proteina") && getCurrentProtein() >= MAX_SNACK_PROTEIN) {
+      log("SnackProteinLimitReached", { mealType: mt, role: rn, currentProtein: getCurrentProtein() });
+      continue;
+    }
+    
     // Filtrar âncoras: excluir usadas + gordas + similares já usadas + bloqueio contextual
     const avail = ancs.filter(a => 
       !combined.has(a.food.id) && 
       (a.option_number === 0 || a.option_number === opt) &&
       !isFattyAnchor(a.food) &&
       !hasSimilarFood(a.food.name, usedGroups) &&
-      !isBlockedForMealType(a.food, mt)
+      !isBlockedForMealType(a.food, mt) &&
+      // v5.15: Em lanches, excluir se excederia proteína
+      !wouldExceedSnackProtein(a.food, a.default_quantity_grams)
     );
     const anc = avail.find(a => a.option_number === opt) || avail[0];
     if (anc?.food) {
-      const qty = applyQuantityLimits(anc.food, anc.default_quantity_grams);
+      // v5.15: Aplicar limite de proteína em lanches + boost de carbs para bulk
+      const isCarb = (anc.food.category || "").toLowerCase() === "carboidratos" || 
+                     (anc.food.category || "").toLowerCase() === "leguminosas";
+      let baseQty = anc.default_quantity_grams;
+      
+      // Limitar quantidade para não exceder proteína em lanche
+      if (isSnack && anc.food.protein > 0) {
+        baseQty = getMaxQtyForSnackProtein(anc.food, baseQty);
+      }
+      
+      const qty = applyQuantityLimits(anc.food, baseQty, isCarb);
       const cv = unitConv(anc.food, qty);
       sel.push({ food: anc.food, role_name: rn, quantity_grams: cv.calculated_grams, display_quantity: cv.display_quantity, display_unit: cv.display_unit });
       usedM.add(anc.food.id); filled.add(rn.split("_")[0]);
@@ -357,8 +409,16 @@ function buildMeal(mt: string, opt: number, roles: any[], foods: Food[], anchors
   }
   
   // Required roles - aplicar filtro de gordura (v5.8.2) + detecção de duplicados + bloqueio contextual
+  // v5.15: Aplicar limite de proteína em lanches e boost de carbs para bulk
   for (const r of roles.filter((r: any) => r.is_required && !filled.has(r.role_name.split("_")[0]))) {
     const roleCats: string[] = r.categories ?? [];
+    
+    // v5.15: Em lanches, pular roles de proteína se já atingiu limite
+    if (isSnack && r.role_name.includes("proteina") && getCurrentProtein() >= MAX_SNACK_PROTEIN) {
+      log("SnackProteinLimitReached", { mealType: mt, role: r.role_name, currentProtein: getCurrentProtein() });
+      continue;
+    }
+    
     // Filtrar: excluir usados + gordos + similares já usados + bloqueio por tipo de refeição
     const cands = foods.filter(f => 
       !combined.has(f.id) && 
@@ -366,7 +426,9 @@ function buildMeal(mt: string, opt: number, roles: any[], foods: Food[], anchors
       roleCats.includes(normalizeCategory(f.category)) &&
       !isFattyForRandomSelection(f) &&
       !hasSimilarFood(f.name, usedGroups) &&
-      !isBlockedForMealType(f, mt)
+      !isBlockedForMealType(f, mt) &&
+      // v5.15: Em lanches, excluir se excederia proteína
+      !wouldExceedSnackProtein(f, (r.min_quantity_grams + r.max_quantity_grams) / 2)
     );
     if (cands.length === 0) {
       log("NoCandidates", { mealType: mt, roleName: r.role_name, roleCats, usedMCount: usedM.size });
@@ -375,8 +437,16 @@ function buildMeal(mt: string, opt: number, roles: any[], foods: Food[], anchors
     const pool = pCands.length > 0 && Math.random() < 0.8 ? pCands : cands;
     const f = pool[Math.floor(Math.random() * pool.length)];
     if (f) { 
-      const baseQty = Math.round(((r.min_quantity_grams + r.max_quantity_grams) / 2) / 5) * 5;
-      const qty = applyQuantityLimits(f, baseQty);
+      const isCarb = (f.category || "").toLowerCase() === "carboidratos" || 
+                     (f.category || "").toLowerCase() === "leguminosas";
+      let baseQty = Math.round(((r.min_quantity_grams + r.max_quantity_grams) / 2) / 5) * 5;
+      
+      // v5.15: Limitar quantidade para não exceder proteína em lanche
+      if (isSnack && f.protein > 0) {
+        baseQty = getMaxQtyForSnackProtein(f, baseQty);
+      }
+      
+      const qty = applyQuantityLimits(f, baseQty, isCarb);
       const cv = unitConv(f, qty); 
       sel.push({ food: f, role_name: r.role_name, quantity_grams: cv.calculated_grams, display_quantity: cv.display_quantity, display_unit: cv.display_unit }); 
       usedM.add(f.id);
@@ -385,11 +455,18 @@ function buildMeal(mt: string, opt: number, roles: any[], foods: Food[], anchors
   }
   
   // Optional roles to fill target - aplicar filtro de gordura (v5.8.2) + detecção de duplicados + bloqueio contextual
+  // v5.15: Aplicar limite de proteína em lanches e boost de carbs para bulk
   const tgt = ITEM_COUNTS[mt] || { min: 2, max: 4 }, need = Math.max(0, (Math.floor(Math.random() * (tgt.max - tgt.min + 1)) + tgt.min) - sel.length);
   const optRoles = roles.filter((r: any) => !r.is_required && !filled.has(r.role_name.split("_")[0])).sort(() => Math.random() - 0.5);
   for (let i = 0; i < Math.min(optRoles.length, need); i++) {
     const r = optRoles[i];
     const roleCats: string[] = r.categories ?? [];
+    
+    // v5.15: Em lanches, pular roles de proteína se já atingiu limite
+    if (isSnack && r.role_name.includes("proteina") && getCurrentProtein() >= MAX_SNACK_PROTEIN) {
+      continue;
+    }
+    
     // Filtrar: excluir usados + gordos + similares já usados + bloqueio por tipo de refeição
     const cands = foods.filter(f => 
       !combined.has(f.id) && 
@@ -397,12 +474,22 @@ function buildMeal(mt: string, opt: number, roles: any[], foods: Food[], anchors
       roleCats.includes(normalizeCategory(f.category)) &&
       !isFattyForRandomSelection(f) &&
       !hasSimilarFood(f.name, usedGroups) &&
-      !isBlockedForMealType(f, mt)
+      !isBlockedForMealType(f, mt) &&
+      // v5.15: Em lanches, excluir se excederia proteína
+      !wouldExceedSnackProtein(f, (r.min_quantity_grams + r.max_quantity_grams) / 2)
     );
     const f = cands[Math.floor(Math.random() * cands.length)];
     if (f) {
-      const baseQty = Math.round(((r.min_quantity_grams + r.max_quantity_grams) / 2) / 5) * 5;
-      const qty = applyQuantityLimits(f, baseQty);
+      const isCarb = (f.category || "").toLowerCase() === "carboidratos" || 
+                     (f.category || "").toLowerCase() === "leguminosas";
+      let baseQty = Math.round(((r.min_quantity_grams + r.max_quantity_grams) / 2) / 5) * 5;
+      
+      // v5.15: Limitar quantidade para não exceder proteína em lanche
+      if (isSnack && f.protein > 0) {
+        baseQty = getMaxQtyForSnackProtein(f, baseQty);
+      }
+      
+      const qty = applyQuantityLimits(f, baseQty, isCarb);
       const cv = unitConv(f, qty); 
       sel.push({ food: f, role_name: r.role_name, quantity_grams: cv.calculated_grams, display_quantity: cv.display_quantity, display_unit: cv.display_unit }); 
       usedM.add(f.id);
@@ -556,9 +643,10 @@ function validateNutritionalContracts(
 
 /**
  * Escalona porções para atingir calorias alvo
- * v5.14: ESCALONAMENTO AGRESSIVO PARA BULK
+ * v5.15: REDUÇÃO ATIVA DE PROTEÍNA + ESCALONAMENTO AGRESSIVO PARA BULK
  * 
  * Estratégia:
+ *   0. (v5.15) Se proteína inicial > 95% da meta, REDUZIR porções de alimentos proteicos
  *   1. Calcular quanto de proteína resultaria do scaling proporcional
  *   2. Se proteína resultante excederia 110% da meta, escalar apenas não-proteicos
  *   3. Para bulk com alta demanda calórica, usar limites expandidos e mais iterações
@@ -575,6 +663,107 @@ function scale(mwo: MealWithOptions[], targetCals: number, targetProtein?: numbe
   const MAX_ITERATIONS = isBulk && isHighDemand ? 8 : 5;
   const MAX_CARB_COMPENSATION = isBulk && isHighDemand ? 4.0 : 2.5;
   const CONVERGENCE_THRESHOLD = isBulk ? 0.12 : 0.08; // 12% tolerância para bulk durante scaling
+  
+  // =====================================================
+  // v5.15: REDUÇÃO ATIVA DE PROTEÍNA (ANTES DO SCALING)
+  // Se proteína inicial já está alta em relação às calorias,
+  // reduzir porções de alimentos proteicos para liberar espaço
+  // =====================================================
+  const initialTotals = totals(mwo);
+  const initialProteinPercent = targetProtein ? (initialTotals.protein / targetProtein) : 0;
+  const initialCaloriePercent = initialTotals.calories / targetCals;
+  
+  // Se proteína > 95% MAS calorias < 60%, temos um problema de proporção
+  // O scaling vai fazer a proteína explodir
+  if (targetProtein && initialProteinPercent > 0.95 && initialCaloriePercent < 0.60) {
+    const targetProteinForScaling = targetProtein * 0.70; // Reduzir para 70% para dar margem
+    const proteinExcess = initialTotals.protein - targetProteinForScaling;
+    
+    log("ProteinReductionStart", {
+      initialProtein: Math.round(initialTotals.protein),
+      targetProtein,
+      initialProteinPercent: Math.round(initialProteinPercent * 100),
+      initialCaloriePercent: Math.round(initialCaloriePercent * 100),
+      excessToRemove: Math.round(proteinExcess)
+    });
+    
+    if (proteinExcess > 0) {
+      // Ordenar alimentos por densidade proteica (maior primeiro) para reduzir os mais proteicos
+      const proteinFoodsToReduce: { food: FoodSelection; mealType: string; optIdx: number }[] = [];
+      
+      for (const m of mwo) {
+        for (let optIdx = 0; optIdx < m.options.length; optIdx++) {
+          const opt = m.options[optIdx];
+          if (!opt?.foods) continue;
+          for (const f of opt.foods) {
+            if (!f || typeof f.quantity_grams !== 'number') continue;
+            const proteinRatio = f.food.calories > 0 
+              ? (f.food.protein * 4) / f.food.calories
+              : 0;
+            // Alimentos com alta densidade proteica (>25% das calorias de proteína)
+            if (proteinRatio > PROTEIN_DENSE_RATIO && f.food.protein >= 10) {
+              proteinFoodsToReduce.push({ food: f, mealType: m.mealType, optIdx });
+            }
+          }
+        }
+      }
+      
+      // Ordenar por densidade proteica (maior primeiro)
+      proteinFoodsToReduce.sort((a, b) => b.food.food.protein - a.food.food.protein);
+      
+      let remainingExcess = proteinExcess;
+      
+      for (const { food: f, mealType } of proteinFoodsToReduce) {
+        if (remainingExcess <= 0) break;
+        
+        const cat = (f.food.category || "").toLowerCase();
+        const isSnack = SNACK_MEALS.includes(mealType);
+        const limits = getCategoryLimits(cat, isSnack);
+        const currentQty = f.quantity_grams;
+        const minQty = limits.min;
+        
+        if (currentQty <= minQty) continue;
+        
+        // Calcular quanto proteína podemos remover
+        const maxRemovableGrams = currentQty - minQty;
+        const proteinPer100g = f.food.protein || 0;
+        const maxRemovableProtein = (maxRemovableGrams / 100) * proteinPer100g;
+        
+        const proteinToRemove = Math.min(maxRemovableProtein, remainingExcess);
+        const gramsToRemove = (proteinToRemove / proteinPer100g) * 100;
+        
+        if (gramsToRemove >= 10) {
+          const newQty = Math.max(minQty, Math.round((currentQty - gramsToRemove) / 5) * 5);
+          const actualReduction = currentQty - newQty;
+          const actualProteinRemoved = (actualReduction / 100) * proteinPer100g;
+          
+          f.quantity_grams = newQty;
+          remainingExcess -= actualProteinRemoved;
+          
+          log("ProteinReduced", {
+            food: f.food.name,
+            oldQty: currentQty,
+            newQty,
+            proteinRemoved: Math.round(actualProteinRemoved * 10) / 10
+          });
+        }
+      }
+      
+      // Recalcular totais após redução
+      for (const m of mwo) {
+        for (const opt of m.options) {
+          if (opt) recalcOptionTotals(opt);
+        }
+      }
+      
+      const afterReduction = totals(mwo);
+      log("ProteinReductionEnd", {
+        newProtein: Math.round(afterReduction.protein),
+        newCalories: afterReduction.calories,
+        proteinRemoved: Math.round(initialTotals.protein - afterReduction.protein)
+      });
+    }
+  }
   
   if (isBulk && isHighDemand) {
     log("ScaleBulkMode", { calorieGapPercent: Math.round(calorieGapPercent * 100), maxIterations: MAX_ITERATIONS, maxCompensation: MAX_CARB_COMPENSATION });
@@ -1072,6 +1261,10 @@ serve(async (req) => {
 
     const mwo: MealWithOptions[] = [], usedG = new Set<string>();
     
+    // v5.15: Determinar objetivo ANTES de construir refeições para aplicar regras específicas
+    const objective = mapGoalToObjective(profile.goal);
+    log("ObjectiveMapped", { goal: profile.goal, objective });
+    
     // Debug: listar templates disponíveis
     log("TemplateDebug", { 
       mTypes, 
@@ -1097,7 +1290,8 @@ serve(async (req) => {
       const ancs = ancMap.get(mt) || new Map();
       const opts: MealResult[] = [], usedP = new Set<string>();
       for (let o = 1; o <= optLim; o++) {
-        const meal = buildMeal(mt, o, tpl.roles, foods, ancs, usedG, usedP, profile.preferred_foods || []);
+        // v5.15: Passar objetivo para buildMeal aplicar boost de carbs e limite de proteína
+        const meal = buildMeal(mt, o, tpl.roles, foods, ancs, usedG, usedP, profile.preferred_foods || [], objective);
         log("MealBuilt", { mealType: mt, option: o, foodsCount: meal.foods.length, totals: meal.totals });
         for (const f of meal.foods) usedP.add(f.food.id);
         opts.push(meal);
@@ -1130,10 +1324,6 @@ serve(async (req) => {
     }
 
     const tgt: MacroTargets = { calories: profile.daily_calories || 2000, protein: profile.protein_target || 100, carbs: profile.carbs_target || 250, fat: profile.fat_target || 65 };
-    
-    // Mapear goal do perfil para objetivo do gerador (cut/maintain/bulk)
-    const objective = mapGoalToObjective(profile.goal);
-    log("ObjectiveMapped", { goal: profile.goal, objective });
     
     // Debug: totais ANTES do scale
     const preScaleTotals = totals(mwo);
