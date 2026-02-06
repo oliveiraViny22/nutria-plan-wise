@@ -275,15 +275,26 @@ export function AIRebalancer({
         return;
       }
 
+      // Verificar status no nível raiz ou dentro de result
+      const resultStatus = data.status || data.result?.status;
+      const structuralIssue = data.structural_issue || data.result?.structural_issue;
+
       // Tratar caso de plano estruturalmente inválido (v5.1)
-      if (data.status === 'structurally_invalid') {
-        const structuralIssue = data.structural_issue;
+      if (resultStatus === 'structurally_invalid' || resultStatus === 'error') {
         console.error('[AIRebalancer] Plano estruturalmente inválido:', structuralIssue);
         
-        toast.error('Plano precisa ser regenerado', {
-          description: structuralIssue?.reason || 'A composição atual tem excesso de gordura que não pode ser corrigido por ajustes simples.',
-          duration: 10000,
-        });
+        // Verificar se há issue estrutural com sugestão de regeneração
+        if (structuralIssue?.reason) {
+          toast.error('Plano precisa ser regenerado', {
+            description: structuralIssue.reason,
+            duration: 10000,
+          });
+        } else {
+          toast.error('Não foi possível otimizar o plano', {
+            description: data.explanation || 'A composição atual não permite ajustes dentro das metas.',
+            duration: 8000,
+          });
+        }
         return;
       }
 
