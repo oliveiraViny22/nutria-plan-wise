@@ -209,13 +209,20 @@ export default function Dashboard() {
       await fetchCurrentPlan();
       await refreshUsage();
     } catch (error: any) {
-      console.error('Error generating plan v5:', error);
-      if (error?.context?.status === 403) {
+      console.error('Error generating plan:', error);
+      const status = error?.context?.status;
+
+      if (status === 401) {
+        toast.error('Sua sessão expirou. Faça login novamente para gerar o plano.');
+        navigate('/login');
+      } else if (status === 403) {
         toast.error('Limite de dietas atingido. Faça upgrade para continuar.');
         setShowUpgradeDialog(true);
         setUpgradeFeature('diet');
+      } else if (status === 404) {
+        toast.error('Serviço de geração indisponível no momento. Atualize a página e tente novamente.');
       } else {
-        toast.error('Erro ao gerar plano alimentar v5');
+        toast.error('Erro ao gerar plano alimentar');
       }
     } finally {
       setGeneratingV5(false);
