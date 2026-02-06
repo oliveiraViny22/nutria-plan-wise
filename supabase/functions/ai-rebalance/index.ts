@@ -1603,6 +1603,7 @@ serve(async (req) => {
       iterations: number;
       converged: boolean;
       normalizationApplied: boolean;
+      refinementStatus: RefinementStatus;
       foodChanges: Array<{
         food_id: string;
         food_name: string;
@@ -1680,6 +1681,7 @@ serve(async (req) => {
           iterations: 0,
           converged: true,
           normalizationApplied: false,
+          refinementStatus: RefinementStatus.CONVERGED,
           foodChanges: [],
         });
         continue;
@@ -1795,6 +1797,7 @@ serve(async (req) => {
         iterations: totalIterations,
         converged: refinementResult.converged,
         normalizationApplied: pipelineResult.normalizationApplied,
+        refinementStatus: refinementResult.refinementStatus,
         foodChanges: optionFoodChanges,
       });
     }
@@ -1881,6 +1884,35 @@ serve(async (req) => {
     // Verificar se normalization foi aplicada em alguma opção
     const anyNormalizationApplied = optionResults.some(r => r.normalizationApplied);
 
+    // Determinar refinementStatus principal (usar o pior status entre todas as opções)
+    const refinementStatusPriority = [
+      RefinementStatus.MAX_ITERATIONS_REACHED,
+      RefinementStatus.STOPPED_BY_LIMIT,
+      RefinementStatus.LOCAL_MINIMUM,
+      RefinementStatus.CONVERGED,
+    ];
+    const primaryRefinementStatus = optionResults.reduce((worst, result) => {
+      const worstIndex = refinementStatusPriority.indexOf(worst);
+      const currentIndex = refinementStatusPriority.indexOf(result.refinementStatus);
+      return currentIndex < worstIndex ? result.refinementStatus : worst;
+    }, RefinementStatus.CONVERGED);
+
+    // Construir diagnósticos do rebalanceador
+    const convergenceTimeMs = Math.round(performance.now() - startTime);
+    const diagnostics: RebalancerDiagnostics = {
+      refinementStatus: primaryRefinementStatus,
+      normalization: {
+        normalizationRequired: g10Metadata.g10Status === "ALLOW_REBALANCE",
+        normalizationApplied: anyNormalizationApplied,
+        fatPercentBefore: finalValidation.metrics.fatPercent, // Simplificado
+        fatPercentAfter: finalValidation.metrics.fatPercent,
+        adjustedFoods: [], // Não rastreamos individualmente no momento
+      },
+      totalIterations,
+      convergenceTimeMs,
+      optionsProcessed: optionResults.length,
+    };
+
     const result: RebalanceResult = {
       status,
       objective,
@@ -1893,26 +1925,28 @@ serve(async (req) => {
         original_grams: fc.original_grams,
         new_grams: fc.new_grams,
       })),
-      // Metadados G-10 + Validação Final
+      // Metadados G-10 + Validação Final + Diagnósticos
       meta: {
         g10Status: g10Metadata.g10Status,
         implicitFatRatio: g10Metadata.implicitFatRatio,
         normalizationApplied: anyNormalizationApplied,
         finalValidation,
+        diagnostics,
       },
     };
 
-    // Log de resumo
+    // Log de resumo com diagnósticos
     log.info("Rebalance complete", {
       g10Status: g10Metadata.g10Status,
       normalizationApplied: anyNormalizationApplied,
       finalValidation: finalValidation.status,
-      note: finalValidation.note,
+      refinementStatus: primaryRefinementStatus,
+      convergenceTimeMs,
       optionsCount: optionResults.length,
+      note: finalValidation.note,
     });
 
     // Logar métricas de rebalanceamento para análise
-    const convergenceTimeMs = Math.round(performance.now() - startTime);
     if (userId) {
       // Incrementar uso de ajuste apenas se foi bem-sucedido
       if (status !== "error") {
