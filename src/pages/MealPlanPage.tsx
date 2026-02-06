@@ -373,16 +373,18 @@ export default function MealPlanPage() {
     <div className="min-h-screen bg-background theme-patient">
       {/* Header - hide on print */}
       <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-md border-b border-border print:hidden">
-        <div className="container mx-auto px-4 py-3 flex items-center gap-4">
-          <MobileNav />
-          <Button variant="ghost" size="icon" className="hidden md:flex" onClick={() => navigate(-1)}>
-            <ArrowLeft className="w-4 h-4" />
-          </Button>
-          <div className="flex-1">
-            <h1 className="font-semibold text-foreground">Plano Alimentar Completo</h1>
-            <p className="text-sm text-muted-foreground">Objetivo: {goalText}</p>
+        <div className="container mx-auto px-3 sm:px-4 py-2 sm:py-3 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+            <MobileNav />
+            <Button variant="ghost" size="icon" className="hidden md:flex w-9 h-9" onClick={() => navigate(-1)}>
+              <ArrowLeft className="w-4 h-4" />
+            </Button>
+            <div className="min-w-0">
+              <h1 className="font-semibold text-foreground text-sm sm:text-base truncate">Plano Alimentar</h1>
+              <p className="text-xs sm:text-sm text-muted-foreground truncate">Objetivo: {goalText}</p>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
             <MealPlanPdf />
             <ThemeToggle />
           </div>
