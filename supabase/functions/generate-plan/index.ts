@@ -6,7 +6,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders, CLIENT_ERRORS, getErrorForLogging, createErrorResponse, createSuccessResponse } from "../_shared/security.ts";
 import { getCategoryLimits, getScaleLimits, SNACK_CATEGORY_LIMITS } from "../_shared/category-limits.ts";
-import { validateGeneratedPlan, fatPercentOfCalories, GENERATOR_CONTRACT, type MacroTargets } from "../_shared/nutrition-contracts.ts";
+import { validateGeneratedPlan, fatPercentOfCalories, GENERATOR_CONTRACT, mapGoalToObjective, type MacroTargets, type GeneratorObjective } from "../_shared/nutrition-contracts.ts";
 
 interface Food { id: string; name: string; calories: number; protein: number; carbs: number; fat: number; category: string; is_optional: boolean | null; unit_name: string | null; unit_weight_grams: number | null; unit_increment: number | null; unit_enabled: boolean | null; }
 interface FoodSelection { food: Food; role_name: string; quantity_grams: number; display_quantity: number; display_unit: string; }
@@ -327,8 +327,14 @@ function totalsForOption(mwo: MealWithOptions[], optionIndex: number): MacroTarg
 /**
  * Valida contratos nutricionais para TODAS as opções de refeição
  * Retorna warnings se alguma opção violar os contratos
+ * 
+ * @param objective - Objetivo do perfil para validação de carboidratos (80% bulk, 90% outros)
  */
-function validateNutritionalContracts(mwo: MealWithOptions[], targets: MacroTargets): { isValid: boolean; warnings: string[]; metrics: Record<string, any> } {
+function validateNutritionalContracts(
+  mwo: MealWithOptions[], 
+  targets: MacroTargets,
+  objective: GeneratorObjective = "maintain"
+): { isValid: boolean; warnings: string[]; metrics: Record<string, any> } {
   const warnings: string[] = [];
   const metrics: Record<string, any> = {};
   let isValid = true;
@@ -351,7 +357,8 @@ function validateNutritionalContracts(mwo: MealWithOptions[], targets: MacroTarg
       return opt?.totals.protein || 0;
     });
     
-    const validation = validateGeneratedPlan(optTotals, targets, mealProteinValues, mainMealIndices);
+    // Passa o objetivo para usar threshold de carbs correto
+    const validation = validateGeneratedPlan(optTotals, targets, mealProteinValues, mainMealIndices, objective);
     
     if (!validation.isValid) {
       isValid = false;
@@ -365,7 +372,7 @@ function validateNutritionalContracts(mwo: MealWithOptions[], targets: MacroTarg
   
   // Log estruturado para debugging
   if (warnings.length > 0) {
-    log("NutritionalWarnings", { warnings, metrics });
+    log("NutritionalWarnings", { warnings, metrics, objective });
   }
   
   return { isValid, warnings, metrics };
@@ -597,6 +604,10 @@ serve(async (req) => {
 
     const tgt: MacroTargets = { calories: profile.daily_calories || 2000, protein: profile.protein_target || 100, carbs: profile.carbs_target || 250, fat: profile.fat_target || 65 };
     
+    // Mapear goal do perfil para objetivo do gerador (cut/maintain/bulk)
+    const objective = mapGoalToObjective(profile.goal);
+    log("ObjectiveMapped", { goal: profile.goal, objective });
+    
     // Debug: totais ANTES do scale
     const preScaleTotals = totals(mwo);
     log("PreScaleTotals", { ...preScaleTotals });
@@ -607,12 +618,30 @@ serve(async (req) => {
     const postScaleTotals = totals(mwo);
     log("PostScaleTotals", { ...postScaleTotals, targetCals: tgt.calories });
 
-    // Validar contratos nutricionais ANTES de salvar
-    const validation = validateNutritionalContracts(mwo, tgt);
+    // Validar contratos nutricionais ANTES de salvar (com objetivo para threshold de carbs)
+    const validation = validateNutritionalContracts(mwo, tgt, objective);
+    
+    // C1: BLOQUEAR salvamento se validação falhar
+    if (!validation.isValid) {
+      log("ValidationFailed", { 
+        warnings: validation.warnings, 
+        metrics: validation.metrics,
+        objective 
+      });
+      return createErrorResponse(
+        `Plano não atende aos contratos nutricionais: ${validation.warnings.slice(0, 3).join("; ")}${validation.warnings.length > 3 ? ` (+ ${validation.warnings.length - 3} avisos)` : ""}`,
+        400,
+        cors,
+        { 
+          code: "NUTRITIONAL_VALIDATION_FAILED",
+          validation: validation,
+        }
+      );
+    }
     
     const planId = await save(sb, user.id, mwo);
     await sb.rpc("increment_usage", { _user_id: user.id, _feature: "diet" });
-    log("Done", { planId, valid: validation.isValid, warningsCount: validation.warnings.length });
+    log("Done", { planId, valid: validation.isValid, warningsCount: validation.warnings.length, objective });
 
     const fin = totals(mwo);
     return createSuccessResponse({ 
@@ -626,6 +655,7 @@ serve(async (req) => {
         isValid: validation.isValid,
         warnings: validation.warnings,
         metrics: validation.metrics,
+        objective,
       }
     }, cors);
   } catch (e) {
