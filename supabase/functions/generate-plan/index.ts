@@ -330,6 +330,41 @@ function validateNutritionalContracts(mwo: MealWithOptions[], targets: MacroTarg
   return { isValid, warnings, metrics };
 }
 
+/**
+ * Escalona porções para atingir calorias alvo
+ * Usa 3 iterações para convergir dentro de ±10%
+ */
+function scale(mwo: MealWithOptions[], targetCals: number): void {
+  for (let iter = 0; iter < 3; iter++) {
+    const current = totals(mwo);
+    if (Math.abs(current.calories - targetCals) / targetCals <= 0.1) break;
+    
+    const factor = targetCals / (current.calories || 1);
+    const limits = getScaleLimits();
+    
+    for (const m of mwo) {
+      for (const opt of m.options) {
+        for (const f of opt.foods) {
+          const newQty = Math.round(f.quantity_grams * factor / 5) * 5;
+          const minQty = limits.minPortionGrams;
+          const maxQty = limits.maxPortionGrams;
+          f.quantity_grams = Math.max(minQty, Math.min(maxQty, newQty));
+        }
+        // Recalcular totais da opção
+        let cals = 0, prot = 0, carbs = 0, fat = 0;
+        for (const s of opt.foods) {
+          const m = s.quantity_grams / 100;
+          cals += s.food.calories * m;
+          prot += s.food.protein * m;
+          carbs += s.food.carbs * m;
+          fat += s.food.fat * m;
+        }
+        opt.totals = { calories: Math.round(cals), protein: Math.round(prot * 10) / 10, carbs: Math.round(carbs * 10) / 10, fat: Math.round(fat * 10) / 10 };
+      }
+    }
+  }
+}
+
 async function save(sb: any, uid: string, mwo: MealWithOptions[]): Promise<string> {
   const t = totals(mwo);
   await sb.from("diet_plans").update({ status: "archived" }).eq("user_id", uid).eq("status", "active");
