@@ -53,7 +53,7 @@ export function DashboardHeader({
               Admin
             </span>
           )}
-          {!isAdmin && planType === 'gratuito' && (
+          {!isAdmin && (!planType || planType === 'gratuito') && (
             <FreePlanBadge label="Plano Gratuito" className="hidden sm:inline-flex" />
           )}
         </div>
@@ -95,11 +95,11 @@ export function DashboardHeader({
                       </TooltipTrigger>
                       <TooltipContent>Gerenciar Alunos</TooltipContent>
                     </Tooltip>
-                  </>
+                </>
                 ) : null}
                 
-                {/* Registro Diário - only for paid users */}
-                {planType !== 'gratuito' && (
+                {/* Registro Diário - only for paid users (treat undefined as gratuito) */}
+                {planType && planType !== 'gratuito' && (
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <Link to="/daily-log">
@@ -112,7 +112,7 @@ export function DashboardHeader({
                   </Tooltip>
                 )}
                 
-                {!isProfessional && !isLinkedStudent && planType !== 'gratuito' && (
+                {!isProfessional && !isLinkedStudent && planType && planType !== 'gratuito' && (
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <Link to="/subscription">
@@ -126,7 +126,7 @@ export function DashboardHeader({
                 )}
                 
                 {/* Progress - only for paid users */}
-                {planType !== 'gratuito' && (
+                {planType && planType !== 'gratuito' && (
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <Link to="/progress">
@@ -148,7 +148,7 @@ export function DashboardHeader({
                   </TooltipTrigger>
                   <TooltipContent>Meu Perfil</TooltipContent>
                 </Tooltip>
-                {planType !== 'gratuito' && (
+                {planType && planType !== 'gratuito' && (
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <Link to="/chat">

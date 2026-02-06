@@ -59,7 +59,8 @@ export function MobileNav() {
   const { isProfessional, isAdmin, loading: roleLoading } = useUserRole();
   const { accountType, isSubscribed } = useSubscription();
   const permissions = useAccountPermissions();
-  const isPaidUser = permissions.plan_name.toLowerCase() !== 'gratuito';
+  const planName = permissions.plan_name?.toLowerCase() || 'gratuito';
+  const isPaidUser = planName !== 'gratuito';
 
   const showProfessionalLinks = 
     (isSubscribed && accountType === 'professional') || 
