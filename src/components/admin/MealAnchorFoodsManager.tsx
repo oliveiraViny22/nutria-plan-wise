@@ -401,6 +401,7 @@ export function MealAnchorFoodsManager() {
                             <TableHead>Alimento</TableHead>
                             <TableHead>Papel</TableHead>
                             <TableHead>Opção</TableHead>
+                            <TableHead>Objetivo</TableHead>
                             <TableHead>Qtd</TableHead>
                             <TableHead>Ativo</TableHead>
                             <TableHead className="w-[100px]">Ações</TableHead>

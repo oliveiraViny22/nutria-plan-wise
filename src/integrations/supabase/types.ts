@@ -473,6 +473,7 @@ export type Database = {
           created_at: string
           default_quantity_grams: number
           food_id: string
+          goal_type: string | null
           id: string
           is_active: boolean
           meal_type: string
@@ -485,6 +486,7 @@ export type Database = {
           created_at?: string
           default_quantity_grams?: number
           food_id: string
+          goal_type?: string | null
           id?: string
           is_active?: boolean
           meal_type: string
@@ -497,6 +499,7 @@ export type Database = {
           created_at?: string
           default_quantity_grams?: number
           food_id?: string
+          goal_type?: string | null
           id?: string
           is_active?: boolean
           meal_type?: string
