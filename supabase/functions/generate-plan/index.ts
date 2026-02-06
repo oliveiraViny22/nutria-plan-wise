@@ -277,15 +277,33 @@ function filterFoods(all: Food[], avoided: string[], restrictions: string[]): Fo
   });
 }
 
-async function loadData(sb: any) {
+/**
+ * v5.18: loadData agora aceita goal do usuário para filtrar âncoras
+ * Âncoras com goal_type NULL são universais (aplicam a qualquer objetivo)
+ * Âncoras com goal_type específico só aplicam para aquele objetivo
+ */
+async function loadData(sb: any, userGoal?: string) {
+  // Mapear goal do perfil para goal_type do banco
+  const goalTypeMap: Record<string, string> = {
+    "gain_muscle": "bulk",
+    "lose_weight": "cut",
+    "maintain": "maintain",
+  };
+  const mappedGoalType = userGoal ? goalTypeMap[userGoal] || null : null;
+  
   const [{ data: templates }, { data: roles }, { data: cats }, { data: anchors }] = await Promise.all([
     sb.from("meal_templates").select("*").eq("is_active", true),
     sb.from("meal_template_roles").select("*").order("sort_order"),
     sb.from("meal_role_food_categories").select("role_id, category"),
-    sb.from("meal_anchor_foods").select("*, food:foods(id, name, calories, protein, carbs, fat, category, is_optional, unit_name, unit_weight_grams, unit_increment, unit_enabled)").eq("is_active", true).order("sort_order"),
+    // v5.18: Filtrar âncoras por goal_type (null = universal, aplica a todos)
+    sb.from("meal_anchor_foods")
+      .select("*, food:foods(id, name, calories, protein, carbs, fat, category, is_optional, unit_name, unit_weight_grams, unit_increment, unit_enabled)")
+      .eq("is_active", true)
+      .or(mappedGoalType ? `goal_type.is.null,goal_type.eq.${mappedGoalType}` : "goal_type.is.null")
+      .order("sort_order"),
   ]);
 
-  // normalizeCategory agora é global (linha ~48)
+  log("AnchorFilter", { userGoal, mappedGoalType, anchorsLoaded: anchors?.length || 0 });
 
   const catMap = new Map<string, string[]>();
   for (const c of cats || []) {
@@ -1396,7 +1414,9 @@ serve(async (req) => {
 
     const optLim = planLim?.[0]?.meal_options_limit ?? 1;
     const mTypes = MEAL_TYPES[profile.meals_per_day || 4] || MEAL_TYPES[4];
-    const { tplMap, ancMap } = await loadData(sb);
+    
+    // v5.18: Passar goal do perfil para filtrar âncoras pelo objetivo
+    const { tplMap, ancMap } = await loadData(sb, profile.goal);
     const foods = filterFoods(allFoods as Food[] || [], profile.avoided_foods || [], profile.restrictions || []);
     log("Data", { foods: foods.length, meals: mTypes.length });
 
