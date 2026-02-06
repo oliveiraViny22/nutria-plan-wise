@@ -183,7 +183,7 @@ export default function Dashboard() {
     setGeneratingV5(true);
     triggerStartFeedback();
     try {
-      const response = await supabase.functions.invoke('generate-meal-plan-v5', {
+      const response = await supabase.functions.invoke('generate-plan', {
         body: {
           profile: {
             daily_calories: profile?.daily_calories,
