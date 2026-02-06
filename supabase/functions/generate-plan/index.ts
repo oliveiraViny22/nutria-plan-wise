@@ -33,7 +33,7 @@ const SIMILAR_FOOD_GROUPS: string[][] = [
 ];
 
 // =====================================================
-// REGRAS DE BLOQUEIO DE ALIMENTOS GORDOS (v5.8.2)
+// REGRAS DE BLOQUEIO DE ALIMENTOS (v5.13)
 // Aplicado tanto em âncoras quanto em seleção aleatória
 // =====================================================
 const FATTY_FOOD_RULES = {
@@ -44,6 +44,18 @@ const FATTY_FOOD_RULES = {
   BLOCKED_KEYWORDS: ["oleaginosa", "castanha", "amendoim", "nozes", "amêndoa", "linhaça", "chia", "coco", "queijo amarelo", "queijo prato", "queijo mussarela", "queijo cheddar", "queijo parmesão", "queijo gorgonzola", "bacon", "linguiça"],
   // Categoria gorduras tem limite próprio de quantidade, não de bloqueio
   BLOCKED_CATEGORIES_AS_RANDOM: ["gorduras"], // Não selecionar aleatoriamente
+};
+
+// =====================================================
+// REGRAS CONTEXTUAIS DE ALIMENTOS (v5.13)
+// Alimentos bloqueados em tipos específicos de refeição
+// =====================================================
+const CONTEXTUAL_BLOCK_RULES = {
+  // Alimentos NÃO permitidos em lanches (muito pesados para snacks)
+  BLOCKED_IN_SNACKS: ["sobrecoxa", "coxa de frango", "coxinha", "pernil", "costela", "picanha", "cupim"],
+  
+  // Palavras-chave que indicam RECEITAS (não são alimentos simples)
+  RECIPE_KEYWORDS: ["mingau", "vitamina de", "shake de", "smoothie", "sanduíche", "wrap", "tapioca recheada", "crepioca", "omelete", "panqueca", "pizza", "lasanha", "escondidinho", "estrogonofe", "moqueca", "feijoada", "risoto"],
 };
 
 /**
@@ -133,6 +145,22 @@ function isFattyForRandomSelection(f: Food): boolean {
 }
 
 /**
+ * Verifica se um alimento deve ser bloqueado para um tipo específico de refeição.
+ * Ex: Sobrecoxa é pesada demais para lanches
+ */
+function isBlockedForMealType(f: Food, mealType: string): boolean {
+  const name = f.name.toLowerCase();
+  const isSnack = SNACK_MEALS.includes(mealType);
+  
+  // Alimentos pesados bloqueados em lanches
+  if (isSnack && CONTEXTUAL_BLOCK_RULES.BLOCKED_IN_SNACKS.some(kw => name.includes(kw))) {
+    return true;
+  }
+  
+  return false;
+}
+
+/**
  * Verifica se dois alimentos são "similares" (mesma família)
  * para evitar duplicação (ex: dois tipos de iogurte)
  */
@@ -203,6 +231,11 @@ function filterFoods(all: Food[], avoided: string[], restrictions: string[]): Fo
     // Filtros base
     if (!CANONICAL_CATS.includes(c) || c === "suplementos" || f.is_optional) return false;
     if (av.has(n) || [...av].some(a => n.includes(a))) return false;
+    
+    // BLOQUEIO DE RECEITAS (v5.13): o sistema não sugere receitas prontas
+    if (CONTEXTUAL_BLOCK_RULES.RECIPE_KEYWORDS.some(kw => n.includes(kw))) {
+      return false;
+    }
     
     // Low Carb: bloquear alimentos com >15g carbs/100g
     if (hasLowCarb && f.carbs > 15) return false;
@@ -305,12 +338,13 @@ function buildMeal(mt: string, opt: number, roles: any[], foods: Food[], anchors
   // Anchors first - aplicar filtro de âncoras gordas (v5.8.1) + detecção de duplicados
   for (const [rn, ancs] of anchors.entries()) {
     if (filled.has(rn.split("_")[0])) continue;
-    // Filtrar âncoras: excluir usadas + gordas + similares já usadas
+    // Filtrar âncoras: excluir usadas + gordas + similares já usadas + bloqueio contextual
     const avail = ancs.filter(a => 
       !combined.has(a.food.id) && 
       (a.option_number === 0 || a.option_number === opt) &&
       !isFattyAnchor(a.food) &&
-      !hasSimilarFood(a.food.name, usedGroups)
+      !hasSimilarFood(a.food.name, usedGroups) &&
+      !isBlockedForMealType(a.food, mt)
     );
     const anc = avail.find(a => a.option_number === opt) || avail[0];
     if (anc?.food) {
@@ -322,16 +356,17 @@ function buildMeal(mt: string, opt: number, roles: any[], foods: Food[], anchors
     }
   }
   
-  // Required roles - aplicar filtro de gordura (v5.8.2) + detecção de duplicados
+  // Required roles - aplicar filtro de gordura (v5.8.2) + detecção de duplicados + bloqueio contextual
   for (const r of roles.filter((r: any) => r.is_required && !filled.has(r.role_name.split("_")[0]))) {
     const roleCats: string[] = r.categories ?? [];
-    // Filtrar: excluir usados + gordos + similares já usados
+    // Filtrar: excluir usados + gordos + similares já usados + bloqueio por tipo de refeição
     const cands = foods.filter(f => 
       !combined.has(f.id) && 
       !usedM.has(f.id) && 
       roleCats.includes(normalizeCategory(f.category)) &&
       !isFattyForRandomSelection(f) &&
-      !hasSimilarFood(f.name, usedGroups)
+      !hasSimilarFood(f.name, usedGroups) &&
+      !isBlockedForMealType(f, mt)
     );
     if (cands.length === 0) {
       log("NoCandidates", { mealType: mt, roleName: r.role_name, roleCats, usedMCount: usedM.size });
@@ -349,22 +384,23 @@ function buildMeal(mt: string, opt: number, roles: any[], foods: Food[], anchors
     }
   }
   
-  // Optional roles to fill target - aplicar filtro de gordura (v5.8.2) + detecção de duplicados
+  // Optional roles to fill target - aplicar filtro de gordura (v5.8.2) + detecção de duplicados + bloqueio contextual
   const tgt = ITEM_COUNTS[mt] || { min: 2, max: 4 }, need = Math.max(0, (Math.floor(Math.random() * (tgt.max - tgt.min + 1)) + tgt.min) - sel.length);
   const optRoles = roles.filter((r: any) => !r.is_required && !filled.has(r.role_name.split("_")[0])).sort(() => Math.random() - 0.5);
   for (let i = 0; i < Math.min(optRoles.length, need); i++) {
     const r = optRoles[i];
     const roleCats: string[] = r.categories ?? [];
-    // Filtrar: excluir usados + gordos + similares já usados
+    // Filtrar: excluir usados + gordos + similares já usados + bloqueio por tipo de refeição
     const cands = foods.filter(f => 
       !combined.has(f.id) && 
       !usedM.has(f.id) && 
       roleCats.includes(normalizeCategory(f.category)) &&
       !isFattyForRandomSelection(f) &&
-      !hasSimilarFood(f.name, usedGroups)
+      !hasSimilarFood(f.name, usedGroups) &&
+      !isBlockedForMealType(f, mt)
     );
     const f = cands[Math.floor(Math.random() * cands.length)];
-    if (f) { 
+    if (f) {
       const baseQty = Math.round(((r.min_quantity_grams + r.max_quantity_grams) / 2) / 5) * 5;
       const qty = applyQuantityLimits(f, baseQty);
       const cv = unitConv(f, qty); 
