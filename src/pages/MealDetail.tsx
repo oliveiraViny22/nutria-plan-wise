@@ -27,6 +27,7 @@ import { useUsageLimits } from '@/hooks/useUsageLimits';
 import { useAuth } from '@/contexts/AuthContext';
 import { Meal, Food, MEAL_NAMES, MealType, MealOption, MealOptionFood, DietPlan } from '@/lib/types';
 import { getCategoryLabel, getCategoryColor, isValidCategory, getCategoryDisplayOrder } from '@/lib/food-categories';
+import { getMealFoodDisplay } from '@/lib/unit-display';
 import { toast } from 'sonner';
 import { SubstitutionModal } from '@/components/SubstitutionModal';
 import { UpgradeDialog } from '@/components/UpgradeDialog';
@@ -611,7 +612,9 @@ export default function MealDetail() {
                             </div>
                             {isPlanSaved ? (
                               <>
-                                <p className="text-xs text-muted-foreground mt-0.5">{qty}{getUnit(food.serving_size)}</p>
+                                <p className="text-xs text-muted-foreground mt-0.5">
+                                  {getMealFoodDisplay(optionFood)}
+                                </p>
                                 <div className="flex flex-wrap gap-2 mt-2">
                                   <Badge variant="outline" className="text-[10px]">{nutrients.calories} kcal</Badge>
                                   <Badge variant="outline" className="text-[10px]">P: {nutrients.protein}g</Badge>
