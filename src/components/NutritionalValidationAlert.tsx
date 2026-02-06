@@ -105,8 +105,9 @@ export function NutritionalValidationAlert({
                     <div className="font-medium flex items-center gap-2">
                       <span>{getFieldLabel(issue.field)}</span>
                       <Badge variant="secondary" className="text-xs">
-                        {issue.currentValue} → {issue.recommendedValue}
-                        {issue.field === 'calories' ? ' kcal' : 'g'}
+                        {issue.currentValue}{issue.field === 'calories' || issue.field === 'macro_sum' ? ' kcal' : 'g'}
+                        {' → '}
+                        {issue.recommendedValue}{issue.field === 'calories' || issue.field === 'macro_sum' ? ' kcal' : 'g'}
                       </Badge>
                     </div>
                     <p className="text-muted-foreground mt-1">{issue.message}</p>
