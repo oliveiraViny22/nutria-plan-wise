@@ -22,21 +22,20 @@ export function DashboardGamification({
 
   return (
     <>
-      {/* Daily Log CTA - only for paid users with a plan */}
-      {isPaidUser && (
-        <motion.section
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.12 }}
-        >
-          <DailyLogCTA 
-            mealsLogged={mealsLogged}
-            totalMeals={totalMeals}
-          />
-        </motion.section>
-      )}
+      {/* Daily Log CTA - shown for all users, locked for free */}
+      <motion.section
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.12 }}
+      >
+        <DailyLogCTA 
+          mealsLogged={mealsLogged}
+          totalMeals={totalMeals}
+          locked={!isPaidUser}
+        />
+      </motion.section>
 
-      {/* Gamification Section */}
+      {/* Gamification Section - shown for all users */}
       <motion.section
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
