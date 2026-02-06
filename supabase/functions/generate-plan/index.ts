@@ -380,28 +380,29 @@ function validateNutritionalContracts(
 
 /**
  * Escalona porções para atingir calorias alvo
- * v5.10: ESCALONAMENTO INTELIGENTE com proteção robusta de proteína
+ * v5.11: ESCALONAMENTO COM PROTEÇÃO PREVENTIVA
  * 
  * Estratégia:
- *   1. Se proteína já está acima de 100% da meta, NÃO escalar alimentos proteicos
- *   2. Escalar apenas alimentos com baixa densidade proteica (carbs, gorduras, vegetais)
- *   3. Usar ratio proteína/calorias para determinar qual escalar
+ *   1. Calcular quanto de proteína resultaria do scaling proporcional
+ *   2. Se proteína resultante excederia 110% da meta, escalar apenas não-proteicos
+ *   3. Usar ratio proteína/calorias para classificar alimentos
  */
 function scale(mwo: MealWithOptions[], targetCals: number, targetProtein?: number): void {
-  const PROTEIN_CAP_PERCENT = 1.05; // Proteína não deve exceder 105% da meta
+  const PROTEIN_MAX_PERCENT = 1.10; // Proteína máxima permitida: 110% da meta
+  const PROTEIN_DENSE_RATIO = 0.25; // Alimento é "proteico" se >25% das calorias vêm de proteína
   
   for (let iter = 0; iter < 5; iter++) {
     const current = totals(mwo);
-    const proteinPercent = targetProtein ? (current.protein / targetProtein) * 100 : 0;
+    const proteinPercent = targetProtein ? (current.protein / targetProtein) : 0;
     
     log("ScaleIter", { 
       iter, 
       currentCals: current.calories, 
-      currentProtein: current.protein,
+      currentProtein: Math.round(current.protein * 10) / 10,
       targetCals, 
       targetProtein,
-      proteinPercent: Math.round(proteinPercent),
-      diff: Math.abs(current.calories - targetCals) / targetCals 
+      proteinPercent: Math.round(proteinPercent * 100),
+      diff: Math.round(Math.abs(current.calories - targetCals) / targetCals * 1000) / 10
     });
     
     if (!current.calories || isNaN(current.calories)) {
@@ -409,22 +410,54 @@ function scale(mwo: MealWithOptions[], targetCals: number, targetProtein?: numbe
       return;
     }
     
-    // Se calorias estão dentro de ±10%, parar
-    if (Math.abs(current.calories - targetCals) / targetCals <= 0.1) break;
+    // Se calorias estão dentro de ±8%, parar (margem mais apertada)
+    if (Math.abs(current.calories - targetCals) / targetCals <= 0.08) break;
     
     const calorieDeficit = current.calories < targetCals;
     const overallFactor = targetCals / (current.calories || 1);
     const limits = getScaleLimits(undefined);
     
-    // Proteína já está saturada? (acima de 105% da meta)
-    const proteinSaturated = targetProtein && current.protein >= targetProtein * PROTEIN_CAP_PERCENT;
+    // PROTEÇÃO PREVENTIVA: calcular proteína resultante se escalássemos tudo
+    const projectedProtein = current.protein * overallFactor;
+    const wouldExceedProtein = targetProtein && projectedProtein > targetProtein * PROTEIN_MAX_PERCENT;
     
-    if (proteinSaturated) {
-      log("ScaleProteinSaturated", { 
-        currentProtein: current.protein, 
-        cap: targetProtein * PROTEIN_CAP_PERCENT 
+    if (wouldExceedProtein) {
+      log("ScaleProteinPreventive", { 
+        currentProtein: Math.round(current.protein),
+        projectedProtein: Math.round(projectedProtein),
+        maxAllowed: Math.round(targetProtein! * PROTEIN_MAX_PERCENT),
+        action: "protect_protein_foods"
       });
     }
+    
+    // Separar alimentos por densidade proteica
+    let carbCaloriesTotal = 0;
+    let proteinFoodsCount = 0;
+    
+    for (const m of mwo) {
+      for (const opt of m.options) {
+        if (!opt || !opt.foods) continue;
+        for (const f of opt.foods) {
+          if (!f || typeof f.quantity_grams !== 'number') continue;
+          const proteinRatio = f.food.calories > 0 
+            ? (f.food.protein * 4) / f.food.calories
+            : 0;
+          if (proteinRatio <= PROTEIN_DENSE_RATIO) {
+            carbCaloriesTotal += (f.quantity_grams / 100) * f.food.calories;
+          } else {
+            proteinFoodsCount++;
+          }
+        }
+      }
+    }
+    
+    // Calcular fator de compensação para alimentos não-proteicos
+    // Se precisamos adicionar X calorias mas não podemos escalar proteína,
+    // os carbs/gorduras precisam compensar proporcionalmente mais
+    const calorieGap = targetCals - current.calories;
+    const carbCompensationFactor = carbCaloriesTotal > 0 
+      ? Math.min(2.5, 1 + (calorieGap / carbCaloriesTotal))
+      : overallFactor;
     
     for (const m of mwo) {
       for (const opt of m.options) {
@@ -434,41 +467,41 @@ function scale(mwo: MealWithOptions[], targetCals: number, targetProtein?: numbe
           if (!f || typeof f.quantity_grams !== 'number') continue;
           
           // Calcular ratio proteína/calorias do alimento
-          // Alto ratio = alimento denso em proteína (ex: frango, peixe, whey)
-          // Baixo ratio = alimento denso em carbs/gordura (ex: arroz, azeite)
           const proteinRatio = f.food.calories > 0 
-            ? (f.food.protein * 4) / f.food.calories  // proteína contribui 4 kcal/g
+            ? (f.food.protein * 4) / f.food.calories
             : 0;
-          
-          // Alimento é "proteico" se >30% das calorias vêm de proteína
-          const isProteinDense = proteinRatio > 0.30;
+          const isProteinDense = proteinRatio > PROTEIN_DENSE_RATIO;
           
           let itemFactor = overallFactor;
           
-          if (proteinSaturated && calorieDeficit) {
-            // Precisamos adicionar calorias MAS sem adicionar proteína
+          if (wouldExceedProtein && calorieDeficit) {
+            // Precisamos adicionar calorias MAS proteger proteína
             if (isProteinDense) {
               itemFactor = 1.0; // NÃO escalar alimentos proteicos
             } else {
-              // Escalar alimentos não-proteicos mais agressivamente
-              itemFactor = Math.min(overallFactor * 1.5, 2.5);
-            }
-          } else if (proteinSaturated && !calorieDeficit) {
-            // Precisamos reduzir calorias - reduzir tudo exceto proteína pura
-            if (isProteinDense) {
-              itemFactor = 1.0; // Manter proteína intacta
+              // Compensar com alimentos não-proteicos
+              itemFactor = carbCompensationFactor;
             }
           }
           
+          const cat = (f.food.category || "").toLowerCase();
+          const catLimits = getCategoryLimits(cat, SNACK_MEALS.includes(m.mealType));
+          
           const newQty = Math.round(f.quantity_grams * itemFactor / 5) * 5;
-          const minQty = limits.min;
-          const maxQty = limits.max;
-          f.quantity_grams = Math.max(minQty, Math.min(maxQty, newQty));
+          f.quantity_grams = Math.max(catLimits.min, Math.min(catLimits.max, newQty));
         }
         recalcOptionTotals(opt);
       }
     }
   }
+  
+  // Log final
+  const finalTotals = totals(mwo);
+  log("ScaleFinal", {
+    calories: finalTotals.calories,
+    protein: Math.round(finalTotals.protein * 10) / 10,
+    proteinPercent: targetProtein ? Math.round((finalTotals.protein / targetProtein) * 100) : null
+  });
 }
 
 /**
