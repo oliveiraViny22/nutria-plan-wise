@@ -97,7 +97,7 @@ export function DashboardMeals({
     );
   }
 
-  const isPaidUser = planType !== 'gratuito';
+  const isPaidUser = planType && planType !== 'gratuito';
 
   return (
     <motion.section
