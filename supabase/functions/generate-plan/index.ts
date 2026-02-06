@@ -878,6 +878,95 @@ function scale(mwo: MealWithOptions[], targetCals: number, targetProtein?: numbe
     }
   }
   
+  // =====================================================
+  // v5.16: FALLBACK DE INJEÇÃO CALÓRICA
+  // Se após scaling o plano ainda está abaixo de 90% das calorias,
+  // E a proteína está bloqueando (>110%), escalar AGRESSIVAMENTE
+  // apenas carboidratos e leguminosas sem limite de max
+  // =====================================================
+  const postScaleTotals = totals(mwo);
+  const postScaleCaloriePercent = postScaleTotals.calories / targetCals;
+  const postScaleProteinPercent = targetProtein ? (postScaleTotals.protein / targetProtein) : 0;
+  
+  // Detectar situação de travamento: calorias baixas + proteína alta
+  const isStalled = postScaleCaloriePercent < 0.90 && postScaleProteinPercent > 1.05;
+  
+  if (isStalled && isBulk) {
+    log("ScaleStalledDetected", {
+      caloriePercent: Math.round(postScaleCaloriePercent * 100),
+      proteinPercent: Math.round(postScaleProteinPercent * 100),
+      calorieDeficit: Math.round(targetCals - postScaleTotals.calories),
+      action: "aggressive_carb_injection"
+    });
+    
+    const calorieDeficit = targetCals - postScaleTotals.calories;
+    const CARB_KCAL_PER_GRAM = 4;
+    // Estimativa: precisamos adicionar X gramas de carbs para cobrir Y kcal
+    // (assumindo alimentos com ~30% de carbs e ~100 kcal/100g)
+    const estimatedCarbGramsNeeded = (calorieDeficit / 1.0) * 0.8; // 80% para margem
+    
+    let carbsInjected = 0;
+    const maxCarbsToInject = estimatedCarbGramsNeeded;
+    
+    // Escalar carboidratos além do limite normal
+    for (const m of mwo) {
+      if (carbsInjected >= maxCarbsToInject) break;
+      
+      for (const opt of m.options) {
+        if (!opt?.foods || carbsInjected >= maxCarbsToInject) continue;
+        
+        for (const f of opt.foods) {
+          if (carbsInjected >= maxCarbsToInject) break;
+          
+          const cat = (f.food.category || "").toLowerCase();
+          if (cat !== "carboidratos" && cat !== "leguminosas") continue;
+          
+          // Para injeção agressiva, usar limite expandido de 2x o normal
+          const isSnack = SNACK_MEALS.includes(m.mealType);
+          const catLimits = getCategoryLimits(cat, isSnack);
+          const aggressiveMax = Math.round(catLimits.max * 2.0); // Dobrar limite
+          
+          const currentQty = f.quantity_grams;
+          if (currentQty >= aggressiveMax) continue;
+          
+          const carbsPer100g = f.food.carbs || 0;
+          if (carbsPer100g < 15) continue; // Só alimentos carb-ricos
+          
+          const remainingCarbs = maxCarbsToInject - carbsInjected;
+          const gramsToAdd = Math.min(
+            aggressiveMax - currentQty,
+            (remainingCarbs / carbsPer100g) * 100,
+            100 // Máximo de 100g de aumento por item
+          );
+          
+          if (gramsToAdd >= 10) {
+            const newQty = Math.round((currentQty + gramsToAdd) / 5) * 5;
+            const actualIncrease = newQty - currentQty;
+            const carbsAdded = (actualIncrease / 100) * carbsPer100g;
+            
+            f.quantity_grams = newQty;
+            carbsInjected += actualIncrease;
+            
+            log("StalledCarbInjection", {
+              food: f.food.name,
+              oldQty: currentQty,
+              newQty,
+              carbsAdded: Math.round(carbsAdded)
+            });
+          }
+        }
+        recalcOptionTotals(opt);
+      }
+    }
+    
+    const afterInjection = totals(mwo);
+    log("StalledInjectionEnd", {
+      carbsInjected: Math.round(carbsInjected),
+      newCalories: afterInjection.calories,
+      newCaloriePercent: Math.round((afterInjection.calories / targetCals) * 100)
+    });
+  }
+  
   // Log final
   const finalTotals = totals(mwo);
   log("ScaleFinal", {
