@@ -14,6 +14,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Loader2, Plus, Trash2, Edit2, LayoutTemplate, ChevronDown, ChevronRight, Save, GripVertical, Coffee, Apple, Sun, Moon } from "lucide-react";
 import { CANONICAL_CATEGORIES, CATEGORY_LABELS, type FoodCategory } from "@/lib/food-categories";
 
@@ -532,8 +533,9 @@ export function MealTemplatesManager() {
                       <p className="text-sm">Nenhum template para {tab.label.toLowerCase()}</p>
                     </div>
                   ) : (
-                    <div className="space-y-3">
-                      {tabTemplates.map((template) => (
+                    <ScrollArea className="max-h-[400px]">
+                      <div className="space-y-3 pr-3">
+                        {tabTemplates.map((template) => (
                         <Collapsible
                           key={template.id}
                           open={expandedTemplates.has(template.id)}
@@ -701,8 +703,9 @@ export function MealTemplatesManager() {
                             </CollapsibleContent>
                           </div>
                         </Collapsible>
-                      ))}
-                    </div>
+                        ))}
+                      </div>
+                    </ScrollArea>
                   )}
                 </TabsContent>
               );
