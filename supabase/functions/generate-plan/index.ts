@@ -170,12 +170,41 @@ async function loadData(sb: any) {
     sb.from("meal_role_food_categories").select("role_id, category"),
     sb.from("meal_anchor_foods").select("*, food:foods(id, name, calories, protein, carbs, fat, category, is_optional, unit_name, unit_weight_grams, unit_increment, unit_enabled)").eq("is_active", true).order("sort_order"),
   ]);
+
+  const normalizeCategory = (v: unknown): string =>
+    String(v ?? "")
+      .toLowerCase()
+      .trim()
+      // remove acentos/diacríticos (ex: "laticínios" -> "laticinios")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "");
+
   const catMap = new Map<string, string[]>();
-  for (const c of cats || []) { if (!catMap.has(c.role_id)) catMap.set(c.role_id, []); catMap.get(c.role_id)!.push(c.category); }
+  for (const c of cats || []) {
+    const cat = normalizeCategory((c as any).category);
+    if (!cat) continue;
+    if (!catMap.has((c as any).role_id)) catMap.set((c as any).role_id, []);
+    catMap.get((c as any).role_id)!.push(cat);
+  }
+
   const tplMap = new Map<string, { roles: any[] }>();
-  for (const t of templates || []) tplMap.set(t.meal_type, { roles: (roles || []).filter((r: any) => r.template_id === t.id).map((r: any) => ({ ...r, categories: catMap.get(r.id) || [] })) });
+  for (const t of templates || []) {
+    tplMap.set((t as any).meal_type, {
+      roles: (roles || [])
+        .filter((r: any) => r.template_id === (t as any).id)
+        .map((r: any) => ({ ...r, categories: catMap.get(r.id) || [] })),
+    });
+  }
+
   const ancMap = new Map<string, Map<string, AnchorFood[]>>();
-  for (const a of anchors || []) { if (!a.food) continue; if (!ancMap.has(a.meal_type)) ancMap.set(a.meal_type, new Map()); const rm = ancMap.get(a.meal_type)!; if (!rm.has(a.role_name)) rm.set(a.role_name, []); rm.get(a.role_name)!.push(a); }
+  for (const a of anchors || []) {
+    if (!(a as any).food) continue;
+    if (!ancMap.has((a as any).meal_type)) ancMap.set((a as any).meal_type, new Map());
+    const rm = ancMap.get((a as any).meal_type)!;
+    if (!rm.has((a as any).role_name)) rm.set((a as any).role_name, []);
+    rm.get((a as any).role_name)!.push(a as any);
+  }
+
   return { tplMap, ancMap };
 }
 
