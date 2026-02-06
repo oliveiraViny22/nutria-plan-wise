@@ -380,22 +380,35 @@ function validateNutritionalContracts(
 
 /**
  * Escalona porções para atingir calorias alvo
- * Usa 3 iterações para convergir dentro de ±10%
+ * v5.9: ESCALONAMENTO INTELIGENTE que prioriza carbs/gorduras e protege proteína
+ * 
+ * O problema anterior: scaling proporcional dobrava a proteína junto com tudo.
+ * Solução: 
+ *   1. Identificar alimentos por macro primário (carb-rich vs protein-rich)
+ *   2. Escalar carb-rich mais agressivamente
+ *   3. Proteger protein-rich de escalonamento excessivo
  */
-function scale(mwo: MealWithOptions[], targetCals: number): void {
+function scale(mwo: MealWithOptions[], targetCals: number, targetProtein?: number): void {
+  const PROTEIN_CAP_PERCENT = 1.15; // Proteína não deve exceder 115% da meta
+  const CARB_RICH_THRESHOLD = 15; // g carbs per 100g = carb-rich food
+  const PROTEIN_RICH_THRESHOLD = 15; // g protein per 100g = protein-rich food
+  
   for (let iter = 0; iter < 3; iter++) {
     const current = totals(mwo);
     log("ScaleIter", { iter, currentCals: current.calories, targetCals, diff: Math.abs(current.calories - targetCals) / targetCals });
     
     if (!current.calories || isNaN(current.calories)) {
       log("ScaleAbortNaN", { iter, current });
-      return; // Evitar divisão por 0/NaN
+      return;
     }
     
     if (Math.abs(current.calories - targetCals) / targetCals <= 0.1) break;
     
-    const factor = targetCals / (current.calories || 1);
-    const limits = getScaleLimits(undefined); // Default limits
+    const overallFactor = targetCals / (current.calories || 1);
+    const limits = getScaleLimits(undefined);
+    
+    // Determinar se proteína já está alta demais para escalar
+    const proteinCapped = targetProtein && current.protein >= targetProtein * PROTEIN_CAP_PERCENT;
     
     for (const m of mwo) {
       for (const opt of m.options) {
@@ -408,7 +421,21 @@ function scale(mwo: MealWithOptions[], targetCals: number): void {
             log("ScaleSkipBadFood", { f: !!f, qty: f?.quantity_grams });
             continue;
           }
-          const newQty = Math.round(f.quantity_grams * factor / 5) * 5;
+          
+          const isProteinRich = f.food.protein >= PROTEIN_RICH_THRESHOLD;
+          const isCarbRich = f.food.carbs >= CARB_RICH_THRESHOLD;
+          
+          let itemFactor = overallFactor;
+          
+          // Se proteína está saturada, não escalar alimentos proteicos
+          if (proteinCapped && isProteinRich && !isCarbRich) {
+            itemFactor = 1.0; // Manter proteína como está
+          } else if (proteinCapped && isCarbRich && !isProteinRich) {
+            // Compensar escalando carbs mais agressivamente
+            itemFactor = Math.min(overallFactor * 1.3, 2.0);
+          }
+          
+          const newQty = Math.round(f.quantity_grams * itemFactor / 5) * 5;
           const minQty = limits.min;
           const maxQty = limits.max;
           f.quantity_grams = Math.max(minQty, Math.min(maxQty, newQty));
@@ -848,7 +875,7 @@ serve(async (req) => {
     const preScaleTotals = totals(mwo);
     log("PreScaleTotals", { ...preScaleTotals });
     
-    scale(mwo, tgt.calories);
+    scale(mwo, tgt.calories, tgt.protein);
     
     // Debug: totais APÓS o scale
     const postScaleTotals = totals(mwo);
