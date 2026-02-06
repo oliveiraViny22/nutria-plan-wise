@@ -1,134 +1,80 @@
-import { motion } from 'framer-motion';
 import { 
   Pill, 
-  Sun, 
-  Moon,
-  Dumbbell,
+  Lock,
   Sparkles,
-  AlertTriangle,
+  ChevronRight,
 } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { LockedFeaturePreview } from './LockedFeaturePreview';
-
-/**
- * Mock/preview version of Supplements section for free users
- * Shows what the feature looks like with blur overlay
- */
-function MockSupplementsContent() {
-  const mockSupplements = [
-    {
-      period: 'Manhã',
-      icon: Sun,
-      iconColor: 'text-amber-500',
-      supplements: [
-        { name: 'Whey Protein Isolado', portion: '30g', purpose: 'Síntese proteica' },
-        { name: 'Creatina Monohidratada', portion: '3-5g', purpose: 'Força e potência' },
-      ],
-    },
-    {
-      period: 'Pré-Treino',
-      icon: Dumbbell,
-      iconColor: 'text-blue-500',
-      supplements: [
-        { name: 'Cafeína Anidra', portion: '200mg', purpose: 'Energia e foco' },
-        { name: 'Beta-Alanina', portion: '3g', purpose: 'Resistência muscular' },
-      ],
-    },
-    {
-      period: 'Noite',
-      icon: Moon,
-      iconColor: 'text-indigo-500',
-      supplements: [
-        { name: 'Caseína Micelar', portion: '30g', purpose: 'Proteína de absorção lenta' },
-        { name: 'ZMA', portion: '1 cápsula', purpose: 'Recuperação e sono' },
-      ],
-    },
-  ];
-
-  return (
-    <div className="space-y-4">
-      {/* Gap Analysis Card */}
-      <Card className="border-amber-500/30 bg-amber-500/5">
-        <CardHeader className="pb-2">
-          <CardTitle className="flex items-center gap-2 text-base">
-            <AlertTriangle className="w-4 h-4 text-amber-500" />
-            Análise de Lacunas Nutricionais
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          <div className="flex items-center justify-between text-sm">
-            <span>Proteína</span>
-            <Badge variant="outline" className="bg-blue-500/10">92% da meta</Badge>
-          </div>
-          <div className="flex items-center justify-between text-sm">
-            <span>Carboidratos</span>
-            <Badge variant="outline" className="bg-green-500/10">100% da meta</Badge>
-          </div>
-          <div className="flex items-center justify-between text-sm">
-            <span>Gordura</span>
-            <Badge variant="outline" className="bg-amber-500/10">85% da meta</Badge>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Supplements by Period */}
-      <div className="grid gap-4 md:grid-cols-3">
-        {mockSupplements.map((period) => (
-          <Card key={period.period} className="border-primary/20">
-            <CardHeader className="pb-2">
-              <CardTitle className="flex items-center gap-2 text-sm">
-                <period.icon className={`w-4 h-4 ${period.iconColor}`} />
-                {period.period}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              {period.supplements.map((supp, i) => (
-                <div 
-                  key={i}
-                  className="p-2 rounded-lg bg-muted/30 border border-border/50"
-                >
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs font-medium">{supp.name}</span>
-                    <Badge variant="secondary" className="text-[10px]">
-                      {supp.portion}
-                    </Badge>
-                  </div>
-                  <p className="text-[10px] text-muted-foreground">
-                    {supp.purpose}
-                  </p>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      {/* Personalized recommendation badge */}
-      <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
-        <Sparkles className="w-3 h-3 text-primary" />
-        <span>Recomendações personalizadas baseadas no seu objetivo</span>
-      </div>
-    </div>
-  );
-}
+import { Button } from '@/components/ui/button';
+import { useNavigate } from 'react-router-dom';
 
 interface SupplementsPreviewProps {
   isLocked: boolean;
 }
 
+/**
+ * Compact locked preview for supplementation feature
+ * Shows minimal teaser without taking too much space
+ */
 export function SupplementsPreview({ isLocked }: SupplementsPreviewProps) {
+  const navigate = useNavigate();
+
   if (!isLocked) {
     return null;
   }
 
   return (
-    <LockedFeaturePreview
-      featureName="Suplementação Personalizada"
-      featureKey="supplementation"
-      description="Recomendações baseadas no seu objetivo e lacunas nutricionais"
-    >
-      <MockSupplementsContent />
-    </LockedFeaturePreview>
+    <div className="relative overflow-hidden rounded-lg border border-purple-500/30 bg-gradient-to-r from-purple-500/5 via-background to-purple-500/5">
+      <div className="flex items-center justify-between gap-3 px-4 py-3">
+        {/* Left: Icon + Info */}
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="relative shrink-0">
+            <div className="w-9 h-9 rounded-full bg-purple-500/10 flex items-center justify-center">
+              <Pill className="w-4 h-4 text-purple-400" />
+            </div>
+            <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-background border border-purple-500/50 flex items-center justify-center">
+              <Lock className="w-2.5 h-2.5 text-purple-400" />
+            </div>
+          </div>
+          
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium text-foreground truncate">
+                Suplementação Personalizada
+              </span>
+              <Badge 
+                variant="outline" 
+                className="shrink-0 text-[10px] px-1.5 py-0 h-4 border-purple-500/50 text-purple-400 bg-purple-500/10"
+              >
+                Pro
+              </Badge>
+            </div>
+            <p className="text-xs text-muted-foreground truncate">
+              Recomendações baseadas nas suas lacunas nutricionais
+            </p>
+          </div>
+        </div>
+
+        {/* Right: CTA */}
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => navigate('/pricing')}
+          className="shrink-0 gap-1 text-xs text-purple-400 hover:text-purple-300 hover:bg-purple-500/10"
+        >
+          <Sparkles className="w-3 h-3" />
+          <span className="hidden sm:inline">Desbloquear</span>
+          <ChevronRight className="w-3 h-3" />
+        </Button>
+      </div>
+
+      {/* Subtle animated glow */}
+      <div className="absolute inset-0 pointer-events-none overflow-hidden">
+        <div 
+          className="absolute -top-1/2 -left-1/2 w-full h-full bg-gradient-to-br from-purple-500/10 via-transparent to-transparent opacity-50 animate-pulse" 
+          style={{ animationDuration: '3s' }}
+        />
+      </div>
+    </div>
   );
 }
