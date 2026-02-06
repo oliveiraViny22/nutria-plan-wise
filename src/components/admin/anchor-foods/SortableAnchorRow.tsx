@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { TableCell, TableRow } from "@/components/ui/table";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { GripVertical, Edit2, Trash2 } from "lucide-react";
-import { AnchorFood, getRoleLabel, ROLE_COLORS } from "./types";
+import { AnchorFood, getRoleLabel, getGoalLabel, ROLE_COLORS, GOAL_COLORS } from "./types";
 
 interface SortableAnchorRowProps {
   anchor: AnchorFood;
@@ -32,6 +32,7 @@ export function SortableAnchorRow({ anchor, onEdit, onToggle, onDelete }: Sortab
   };
 
   const roleColor = ROLE_COLORS[anchor.role_name] || "bg-gray-100 text-gray-800";
+  const goalColor = anchor.goal_type ? GOAL_COLORS[anchor.goal_type] || "bg-gray-100 text-gray-800" : "bg-slate-100 text-slate-600";
 
   return (
     <TableRow ref={setNodeRef} style={style}>
@@ -57,7 +58,12 @@ export function SortableAnchorRow({ anchor, onEdit, onToggle, onDelete }: Sortab
       </TableCell>
       <TableCell>
         <Badge variant={anchor.option_number === 0 ? "default" : "secondary"}>
-          {anchor.option_number === 0 ? "Todas" : `Opção ${anchor.option_number}`}
+          {anchor.option_number === 0 ? "Todas" : `#${anchor.option_number}`}
+        </Badge>
+      </TableCell>
+      <TableCell>
+        <Badge variant="outline" className={goalColor}>
+          {getGoalLabel(anchor.goal_type)}
         </Badge>
       </TableCell>
       <TableCell>{anchor.default_quantity_grams}g</TableCell>

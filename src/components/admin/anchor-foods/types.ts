@@ -8,6 +8,7 @@ export interface AnchorFood {
   sort_order: number;
   is_active: boolean;
   created_at: string;
+  goal_type?: string | null; // bulk, cut, maintain, or null for universal
   food?: {
     id: string;
     name: string;
@@ -53,3 +54,18 @@ export const ROLE_COLORS: Record<string, string> = {
   fruta: "bg-pink-100 text-pink-800 dark:bg-pink-900/30 dark:text-pink-300",
   laticinios: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300",
 };
+
+export const GOAL_LABELS: Record<string, string> = {
+  bulk: "Hipertrofia",
+  cut: "Cutting",
+  maintain: "Manutenção",
+};
+
+export const GOAL_COLORS: Record<string, string> = {
+  bulk: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300",
+  cut: "bg-rose-100 text-rose-800 dark:bg-rose-900/30 dark:text-rose-300",
+  maintain: "bg-sky-100 text-sky-800 dark:bg-sky-900/30 dark:text-sky-300",
+};
+
+export const getGoalLabel = (goal: string | null | undefined) =>
+  goal ? GOAL_LABELS[goal] || goal : "Universal";
