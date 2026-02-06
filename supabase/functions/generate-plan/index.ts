@@ -54,12 +54,15 @@ const FATTY_FOOD_RULES = {
 };
 
 // =====================================================
-// REGRAS CONTEXTUAIS DE ALIMENTOS (v5.13)
+// REGRAS CONTEXTUAIS DE ALIMENTOS (v5.16)
 // Alimentos bloqueados em tipos específicos de refeição
 // =====================================================
 const CONTEXTUAL_BLOCK_RULES = {
   // Alimentos NÃO permitidos em lanches (muito pesados para snacks)
   BLOCKED_IN_SNACKS: ["sobrecoxa", "coxa de frango", "coxinha", "pernil", "costela", "picanha", "cupim"],
+  
+  // Alimentos NÃO permitidos no café da manhã (proteínas de almoço/jantar)
+  BLOCKED_IN_BREAKFAST: ["seitan", "tempeh", "tofu", "carne bovina", "carne suína", "patinho", "acém", "alcatra", "fraldinha", "peixe branco", "salmão", "tilápia", "atum", "bacalhau", "camarão", "lentilha", "grão-de-bico", "feijão"],
   
   // Palavras-chave que indicam RECEITAS (não são alimentos simples)
   RECIPE_KEYWORDS: ["mingau", "vitamina de", "shake de", "smoothie", "sanduíche", "wrap", "tapioca recheada", "crepioca", "omelete", "panqueca", "pizza", "lasanha", "escondidinho", "estrogonofe", "moqueca", "feijoada", "risoto"],
@@ -153,14 +156,20 @@ function isFattyForRandomSelection(f: Food): boolean {
 
 /**
  * Verifica se um alimento deve ser bloqueado para um tipo específico de refeição.
- * Ex: Sobrecoxa é pesada demais para lanches
+ * Ex: Sobrecoxa é pesada demais para lanches; Seitan é inadequado para café
  */
 function isBlockedForMealType(f: Food, mealType: string): boolean {
   const name = f.name.toLowerCase();
   const isSnack = SNACK_MEALS.includes(mealType);
+  const isBreakfast = mealType === "breakfast";
   
   // Alimentos pesados bloqueados em lanches
   if (isSnack && CONTEXTUAL_BLOCK_RULES.BLOCKED_IN_SNACKS.some(kw => name.includes(kw))) {
+    return true;
+  }
+  
+  // Proteínas de almoço/jantar bloqueadas no café da manhã (v5.16)
+  if (isBreakfast && CONTEXTUAL_BLOCK_RULES.BLOCKED_IN_BREAKFAST.some(kw => name.includes(kw))) {
     return true;
   }
   
@@ -543,12 +552,14 @@ function buildMeal(mt: string, opt: number, roles: any[], foods: Food[], anchors
       }
     } else if (!isSnack) {
       // Se não há alimento proteico e é refeição principal, tentar adicionar um
+      // v5.16: Respeitar bloqueio contextual (ex: não usar Seitan no café)
       const proteinCands = foods.filter(f => 
         !combined.has(f.id) && 
         !usedM.has(f.id) && 
         f.protein >= 20 && // Alta densidade proteica
         !isFattyForRandomSelection(f) &&
-        !hasSimilarFood(f.name, usedGroups)
+        !hasSimilarFood(f.name, usedGroups) &&
+        !isBlockedForMealType(f, mt) // v5.16: Bloqueio contextual
       );
       
       if (proteinCands.length > 0) {
