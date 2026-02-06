@@ -221,14 +221,18 @@ function buildMeal(mt: string, opt: number, roles: any[], foods: Food[], anchors
   
   // Required roles - aplicar filtro de gordura (v5.8.2) + detecção de duplicados
   for (const r of roles.filter((r: any) => r.is_required && !filled.has(r.role_name.split("_")[0]))) {
+    const roleCats: string[] = r.categories ?? [];
     // Filtrar: excluir usados + gordos + similares já usados
     const cands = foods.filter(f => 
       !combined.has(f.id) && 
       !usedM.has(f.id) && 
-      r.categories.includes((f.category || "").toLowerCase()) &&
+      roleCats.includes((f.category || "").toLowerCase()) &&
       !isFattyForRandomSelection(f) &&
       !hasSimilarFood(f.name, usedGroups)
     );
+    if (cands.length === 0) {
+      log("NoCandidates", { mealType: mt, roleName: r.role_name, roleCats, usedMCount: usedM.size });
+    }
     const pCands = cands.filter(f => [...prefSet].some(p => f.name.toLowerCase().includes(p)));
     const pool = pCands.length > 0 && Math.random() < 0.8 ? pCands : cands;
     const f = pool[Math.floor(Math.random() * pool.length)];
@@ -247,11 +251,12 @@ function buildMeal(mt: string, opt: number, roles: any[], foods: Food[], anchors
   const optRoles = roles.filter((r: any) => !r.is_required && !filled.has(r.role_name.split("_")[0])).sort(() => Math.random() - 0.5);
   for (let i = 0; i < Math.min(optRoles.length, need); i++) {
     const r = optRoles[i];
+    const roleCats: string[] = r.categories ?? [];
     // Filtrar: excluir usados + gordos + similares já usados
     const cands = foods.filter(f => 
       !combined.has(f.id) && 
       !usedM.has(f.id) && 
-      r.categories.includes((f.category || "").toLowerCase()) &&
+      roleCats.includes((f.category || "").toLowerCase()) &&
       !isFattyForRandomSelection(f) &&
       !hasSimilarFood(f.name, usedGroups)
     );
