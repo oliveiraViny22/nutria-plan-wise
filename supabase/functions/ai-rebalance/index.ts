@@ -289,11 +289,8 @@ const DEFAULT_OPTIMIZER_SETTINGS: OptimizerSettings = {
   calories_weight: 1.5,
 };
 
-// Variável global para configurações carregadas
-let loadedSettings: OptimizerSettings | null = null;
-
+// Configurações carregadas por request (sem cache global para evitar dados stale em serverless)
 async function loadOptimizerSettings(supabase: any): Promise<OptimizerSettings> {
-  if (loadedSettings) return loadedSettings;
 
   try {
     const { data, error } = await supabase
@@ -1047,8 +1044,6 @@ function runCorrectionPipeline(
       normalizationApplied = true;
       console.log(`[ETAPA 4.5] Iniciando normalização de gordura implícita`);
       console.log(`[ETAPA 4.5] G-10 Status: ${g10Metadata.g10Status}, Ratio: ${g10Metadata.implicitFatRatio}`);
-      console.log(`[ETAPA 4.5] Estado atual: Gordura ${preNormalizationPercents.fat.toFixed(1)}%, Calorias ${preNormalizationPercents.calories.toFixed(1)}%`);
-      console.log(`[ETAPA 4.5] Iniciando normalização de gordura implícita`);
       console.log(`[ETAPA 4.5] Estado atual: Gordura ${preNormalizationPercents.fat.toFixed(1)}%, Calorias ${preNormalizationPercents.calories.toFixed(1)}%`);
       
       // Identificar fontes mistas de alta densidade lipídica
