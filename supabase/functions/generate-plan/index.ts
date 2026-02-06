@@ -20,13 +20,17 @@ const CANONICAL_CATS = ["carboidratos", "proteinas", "gorduras", "vegetais", "fr
 const SCALE_LIMITS: Record<string, { min: number; max: number }> = { proteinas: { min: 50, max: 350 }, carboidratos: { min: 50, max: 400 }, leguminosas: { min: 40, max: 250 }, vegetais: { min: 30, max: 300 }, frutas: { min: 50, max: 300 }, laticinios: { min: 30, max: 250 }, gorduras: { min: 5, max: 30 } };
 
 // =====================================================
-// REGRAS DE BLOQUEIO DE ÂNCORAS GORDAS (v5.8.1)
+// REGRAS DE BLOQUEIO DE ALIMENTOS GORDOS (v5.8.2)
+// Aplicado tanto em âncoras quanto em seleção aleatória
 // =====================================================
-const FATTY_ANCHOR_RULES = {
+const FATTY_FOOD_RULES = {
   MAX_FAT_PROTEIN: 8,      // Proteínas com >8g gordura/100g → bloqueadas
-  MAX_FAT_DAIRY: 8,        // Laticínios com >8g gordura/100g → bloqueadas
+  MAX_FAT_DAIRY: 8,        // Laticínios com >8g gordura/100g → bloqueadas  
   MAX_FAT_CARBS: 5,        // Carboidratos com >5g gordura/100g → bloqueadas
-  BLOCKED_KEYWORDS: ["oleaginosa", "castanha", "amendoim", "nozes", "amêndoa", "linhaça", "chia", "coco", "queijo amarelo", "queijo prato", "queijo mussarela", "queijo cheddar"],
+  MAX_FAT_GENERIC: 15,     // Qualquer alimento >15g gordura/100g → bloqueado (exceto categoria gorduras)
+  BLOCKED_KEYWORDS: ["oleaginosa", "castanha", "amendoim", "nozes", "amêndoa", "linhaça", "chia", "coco", "queijo amarelo", "queijo prato", "queijo mussarela", "queijo cheddar", "queijo parmesão", "queijo gorgonzola", "bacon", "linguiça"],
+  // Categoria gorduras tem limite próprio de quantidade, não de bloqueio
+  BLOCKED_CATEGORIES_AS_RANDOM: ["gorduras"], // Não selecionar aleatoriamente
 };
 
 /**
@@ -37,23 +41,65 @@ function isFattyAnchor(f: Food): boolean {
   const cat = (f.category || "").toLowerCase();
   const name = f.name.toLowerCase();
   
-  // Regra 1: Palavras-chave bloqueadas (oleaginosas, sementes gordas, etc.)
-  if (FATTY_ANCHOR_RULES.BLOCKED_KEYWORDS.some(kw => name.includes(kw))) {
+  // Regra 1: Palavras-chave bloqueadas (oleaginosas, queijos gordos, etc.)
+  if (FATTY_FOOD_RULES.BLOCKED_KEYWORDS.some(kw => name.includes(kw))) {
     return true;
   }
   
   // Regra 2: Proteínas com >8g gordura/100g
-  if (cat === "proteinas" && f.fat > FATTY_ANCHOR_RULES.MAX_FAT_PROTEIN) {
+  if (cat === "proteinas" && f.fat > FATTY_FOOD_RULES.MAX_FAT_PROTEIN) {
     return true;
   }
   
   // Regra 3: Laticínios com >8g gordura/100g
-  if (cat === "laticinios" && f.fat > FATTY_ANCHOR_RULES.MAX_FAT_DAIRY) {
+  if (cat === "laticinios" && f.fat > FATTY_FOOD_RULES.MAX_FAT_DAIRY) {
     return true;
   }
   
   // Regra 4: Carboidratos com >5g gordura/100g
-  if (cat === "carboidratos" && f.fat > FATTY_ANCHOR_RULES.MAX_FAT_CARBS) {
+  if (cat === "carboidratos" && f.fat > FATTY_FOOD_RULES.MAX_FAT_CARBS) {
+    return true;
+  }
+  
+  return false;
+}
+
+/**
+ * Verifica se um alimento deve ser bloqueado na seleção ALEATÓRIA
+ * (regras mais rigorosas que âncoras - evita gorduras não-intencionais)
+ */
+function isFattyForRandomSelection(f: Food): boolean {
+  const cat = (f.category || "").toLowerCase();
+  const name = f.name.toLowerCase();
+  
+  // Regra 1: Bloquear categoria gorduras na seleção aleatória
+  // (gorduras devem vir apenas de âncoras ou fontes controladas)
+  if (FATTY_FOOD_RULES.BLOCKED_CATEGORIES_AS_RANDOM.includes(cat)) {
+    return true;
+  }
+  
+  // Regra 2: Mesmas palavras-chave das âncoras
+  if (FATTY_FOOD_RULES.BLOCKED_KEYWORDS.some(kw => name.includes(kw))) {
+    return true;
+  }
+  
+  // Regra 3: Proteínas com gordura excessiva
+  if (cat === "proteinas" && f.fat > FATTY_FOOD_RULES.MAX_FAT_PROTEIN) {
+    return true;
+  }
+  
+  // Regra 4: Laticínios com gordura excessiva
+  if (cat === "laticinios" && f.fat > FATTY_FOOD_RULES.MAX_FAT_DAIRY) {
+    return true;
+  }
+  
+  // Regra 5: Carboidratos com gordura excessiva
+  if (cat === "carboidratos" && f.fat > FATTY_FOOD_RULES.MAX_FAT_CARBS) {
+    return true;
+  }
+  
+  // Regra 6: Qualquer alimento genérico com >15g gordura/100g
+  if (f.fat > FATTY_FOOD_RULES.MAX_FAT_GENERIC) {
     return true;
   }
   
@@ -120,19 +166,32 @@ function buildMeal(mt: string, opt: number, roles: any[], foods: Food[], anchors
       usedM.add(anc.food.id); filled.add(rn.split("_")[0]);
     }
   }
-  // Required roles
+  // Required roles - aplicar filtro de gordura (v5.8.2)
   for (const r of roles.filter((r: any) => r.is_required && !filled.has(r.role_name.split("_")[0]))) {
-    const cands = foods.filter(f => !combined.has(f.id) && !usedM.has(f.id) && r.categories.includes((f.category || "").toLowerCase()));
+    // Filtrar: excluir usados + excluir alimentos gordos na seleção aleatória
+    const cands = foods.filter(f => 
+      !combined.has(f.id) && 
+      !usedM.has(f.id) && 
+      r.categories.includes((f.category || "").toLowerCase()) &&
+      !isFattyForRandomSelection(f)
+    );
     const pCands = cands.filter(f => [...prefSet].some(p => f.name.toLowerCase().includes(p)));
-    const f = (pCands.length > 0 && Math.random() < 0.8 ? pCands : cands)[Math.floor(Math.random() * (pCands.length > 0 && Math.random() < 0.8 ? pCands : cands).length)];
+    const pool = pCands.length > 0 && Math.random() < 0.8 ? pCands : cands;
+    const f = pool[Math.floor(Math.random() * pool.length)];
     if (f) { const q = Math.round(((r.min_quantity_grams + r.max_quantity_grams) / 2) / 5) * 5, cv = unitConv(f, q); sel.push({ food: f, role_name: r.role_name, quantity_grams: cv.calculated_grams, display_quantity: cv.display_quantity, display_unit: cv.display_unit }); usedM.add(f.id); }
   }
-  // Optional roles to fill target
+  // Optional roles to fill target - aplicar filtro de gordura (v5.8.2)
   const tgt = ITEM_COUNTS[mt] || { min: 2, max: 4 }, need = Math.max(0, (Math.floor(Math.random() * (tgt.max - tgt.min + 1)) + tgt.min) - sel.length);
   const optRoles = roles.filter((r: any) => !r.is_required && !filled.has(r.role_name.split("_")[0])).sort(() => Math.random() - 0.5);
   for (let i = 0; i < Math.min(optRoles.length, need); i++) {
     const r = optRoles[i];
-    const cands = foods.filter(f => !combined.has(f.id) && !usedM.has(f.id) && r.categories.includes((f.category || "").toLowerCase()));
+    // Filtrar: excluir usados + excluir alimentos gordos na seleção aleatória
+    const cands = foods.filter(f => 
+      !combined.has(f.id) && 
+      !usedM.has(f.id) && 
+      r.categories.includes((f.category || "").toLowerCase()) &&
+      !isFattyForRandomSelection(f)
+    );
     const f = cands[Math.floor(Math.random() * cands.length)];
     if (f) { const q = Math.round(((r.min_quantity_grams + r.max_quantity_grams) / 2) / 5) * 5, cv = unitConv(f, q); sel.push({ food: f, role_name: r.role_name, quantity_grams: cv.calculated_grams, display_quantity: cv.display_quantity, display_unit: cv.display_unit }); usedM.add(f.id); }
   }
