@@ -235,13 +235,8 @@ export default function MealDetail() {
     fetchAllFoods();
   }, [mealId]);
 
-  // Redirect to dashboard if plan is not saved (gate protection)
-  useEffect(() => {
-    if (!loading && dietPlan && !dietPlan.is_saved) {
-      toast.error('Salve o plano primeiro para ver os detalhes da refeição');
-      navigate('/');
-    }
-  }, [loading, dietPlan, navigate]);
+  // Pré-salvar: permitir visualização simplificada e substituição
+  // Pós-salvar: mostrar quantidades e macros detalhados
 
   const visibleMealOptions = useMemo(() => {
     if (!meal_options_limit || meal_options_limit <= 0) return mealOptions;
@@ -631,8 +626,8 @@ export default function MealDetail() {
                               </>
                             )}
                           </div>
-                          {isPlanSaved && (
-                            <div className="flex flex-col gap-1">
+                          {/* Ações de substituição - sempre disponíveis para personalização */}
+                          <div className="flex flex-col gap-1">
                             {/* Botão de substituição para alimentos substituíveis */}
                             {canSub && (
                               <TooltipProvider>
@@ -707,7 +702,6 @@ export default function MealDetail() {
                               </TooltipProvider>
                             )}
                           </div>
-                          )}
                         </div>
                       </div>
                     );
