@@ -69,24 +69,24 @@ export function SupplementToggle({ initialValue = false, onToggle, compact = fal
         <div 
           className={`
             inline-flex items-center gap-3 px-5 py-3 rounded-xl
-            transition-all duration-200
+            transition-all duration-300
             ${locked 
               ? 'bg-muted/50 border border-border cursor-not-allowed' 
-              : 'bg-gradient-to-r from-purple-500/10 to-violet-500/10 border border-purple-500/30 hover:border-purple-500/50 hover:shadow-lg hover:shadow-purple-500/10 hover:scale-[1.02] cursor-pointer'
+              : 'bg-gradient-to-r from-purple-600/20 via-violet-500/20 to-purple-600/20 border-2 border-purple-500/50 shadow-[0_0_20px_rgba(147,51,234,0.3)] hover:shadow-[0_0_30px_rgba(147,51,234,0.5)] hover:border-purple-400 hover:scale-[1.03] active:scale-[0.98]'
             }
           `}
         >
           <div className={`
-            w-8 h-8 rounded-full flex items-center justify-center
+            w-9 h-9 rounded-full flex items-center justify-center
             ${locked 
               ? 'bg-muted' 
-              : 'bg-gradient-to-br from-purple-500 to-violet-600 shadow-md shadow-purple-500/30'
+              : 'bg-gradient-to-br from-purple-500 via-violet-500 to-purple-600 shadow-lg shadow-purple-500/50'
             }
           `}>
-            <Pill className={`h-4 w-4 ${locked ? 'text-muted-foreground' : 'text-white'}`} />
+            <Pill className={`h-4 w-4 ${locked ? 'text-muted-foreground' : 'text-white drop-shadow-sm'}`} />
           </div>
           <div className="flex items-center gap-2">
-            <span className={`text-sm font-medium ${locked ? 'text-muted-foreground' : 'text-foreground'}`}>
+            <span className={`text-sm font-semibold ${locked ? 'text-muted-foreground' : 'text-purple-700 dark:text-purple-300'}`}>
               Suplementação
             </span>
             {locked ? (
@@ -98,7 +98,7 @@ export function SupplementToggle({ initialValue = false, onToggle, compact = fal
               <TooltipProvider delayDuration={200}>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <Info className="h-3.5 w-3.5 text-purple-500/70 cursor-help" />
+                    <Info className="h-3.5 w-3.5 text-purple-500 cursor-help" />
                   </TooltipTrigger>
                   <TooltipContent side="bottom" className="max-w-xs p-3">
                     <p className="text-sm font-medium mb-1">Como funciona?</p>
@@ -120,7 +120,7 @@ export function SupplementToggle({ initialValue = false, onToggle, compact = fal
               checked={enabled}
               onCheckedChange={handleToggle}
               disabled={saving}
-              className="ml-2 data-[state=checked]:bg-purple-600"
+              className="ml-2 data-[state=checked]:bg-gradient-to-r data-[state=checked]:from-purple-500 data-[state=checked]:to-violet-600"
             />
           )}
         </div>
