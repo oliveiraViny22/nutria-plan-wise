@@ -37,8 +37,9 @@ import { SortableAnchorRow } from "./anchor-foods/SortableAnchorRow";
 const TAB_CONFIG = [
   { key: "breakfast", label: "Café da Manhã", icon: Coffee, mealTypes: ["breakfast"] },
   { key: "snacks", label: "Lanches", icon: Apple, mealTypes: ["morning_snack", "afternoon_snack"] },
-  { key: "lunch_dinner", label: "Almoço + Jantar", icon: Sun, mealTypes: ["lunch", "dinner"] },
-  { key: "supper", label: "Ceia", icon: Moon, mealTypes: ["supper"] },
+  { key: "lunch", label: "Almoço", icon: Sun, mealTypes: ["lunch"] },
+  { key: "dinner", label: "Jantar", icon: Moon, mealTypes: ["dinner"] },
+  { key: "supper", label: "Ceia", icon: Coffee, mealTypes: ["supper"] },
 ];
 
 export function MealAnchorFoodsManager() {
@@ -370,7 +371,7 @@ export function MealAnchorFoodsManager() {
           </div>
         ) : (
           <Tabs defaultValue="breakfast" className="w-full">
-            <TabsList className="grid w-full grid-cols-4 mb-4">
+            <TabsList className="grid w-full grid-cols-5 mb-4">
               {TAB_CONFIG.map((tab) => {
                 const Icon = tab.icon;
                 const count = groupedAnchors[tab.key]?.length || 0;
