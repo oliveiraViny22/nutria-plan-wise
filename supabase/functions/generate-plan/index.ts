@@ -466,6 +466,20 @@ serve(async (req) => {
     const foods = filterFoods(allFoods as Food[] || [], profile.avoided_foods || [], profile.restrictions || []);
     log("Data", { foods: foods.length, meals: mTypes.length });
 
+    // Se o filtro removeu tudo (restrições/evitados/catálogo vazio), não adianta seguir.
+    if (foods.length === 0) {
+      log("NoFoodsAvailable", {
+        avoidedCount: (profile.avoided_foods || []).length,
+        restrictions: profile.restrictions || [],
+      });
+      return createErrorResponse(
+        "Não há alimentos disponíveis para gerar seu plano. Revise restrições/alimentos evitados e tente novamente.",
+        400,
+        cors,
+        { code: "NO_FOODS_AVAILABLE" },
+      );
+    }
+
     const mwo: MealWithOptions[] = [], usedG = new Set<string>();
     for (const mt of mTypes) {
       const tpl = tplMap.get(mt);
@@ -479,6 +493,29 @@ serve(async (req) => {
       }
       mwo.push({ mealType: mt, options: opts });
       if (opts[0]) for (const f of opts[0].foods) usedG.add(f.food.id);
+    }
+
+    // Se nenhum template/meal gerou itens, retorne erro de cliente (não 500).
+    if (mwo.length === 0 || mwo.every(m => !(m.options?.[0]?.foods?.length))) {
+      log("NoMealsGenerated", { mwoCount: mwo.length, mealsPerDay: profile.meals_per_day || 4 });
+      return createErrorResponse(
+        "Não foi possível montar refeições para o seu plano no momento. Tente novamente mais tarde.",
+        400,
+        cors,
+        { code: "NO_MEALS_GENERATED" },
+      );
+    }
+
+    // Validação prévia: evita cair em save() com calorias 0/NaN (que vira 500 no catch).
+    const preTotals = totals(mwo);
+    if (!preTotals.calories || isNaN(preTotals.calories)) {
+      log("InvalidPreTotals", { preTotals });
+      return createErrorResponse(
+        "Falha ao calcular o total do plano. Ajuste preferências/restrições e tente novamente.",
+        400,
+        cors,
+        { code: "INVALID_PLAN_TOTALS" },
+      );
     }
 
     const tgt: MacroTargets = { calories: profile.daily_calories || 2000, protein: profile.protein_target || 100, carbs: profile.carbs_target || 250, fat: profile.fat_target || 65 };
@@ -505,5 +542,20 @@ serve(async (req) => {
         metrics: validation.metrics,
       }
     }, cors);
-  } catch (e) { log("Err", { e: getErrorForLogging(e) }); return createErrorResponse(CLIENT_ERRORS.SERVER_ERROR, 500, cors); }
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    log("Err", { e: getErrorForLogging(e), msg });
+
+    // Erros “esperados” de geração (não devem virar 500 / tela em branco)
+    if (msg.includes("Invalid totals calculated - no calories")) {
+      return createErrorResponse(
+        "Não foi possível gerar o plano com os dados atuais. Revise restrições/alimentos evitados e tente novamente.",
+        400,
+        cors,
+        { code: "INVALID_PLAN_TOTALS" },
+      );
+    }
+
+    return createErrorResponse(CLIENT_ERRORS.SERVER_ERROR, 500, cors);
+  }
 });

@@ -212,6 +212,20 @@ export default function Dashboard() {
       console.error('Error generating plan:', error);
       const status = error?.context?.status;
 
+      // Tenta extrair mensagem JSON retornada pelo backend (quando houver)
+      let backendMessage: string | null = null;
+      try {
+        const body = error?.context?.body;
+        if (typeof body === 'string') {
+          const parsed = JSON.parse(body);
+          if (parsed?.error && typeof parsed.error === 'string') backendMessage = parsed.error;
+        } else if (body?.error && typeof body.error === 'string') {
+          backendMessage = body.error;
+        }
+      } catch {
+        // ignore
+      }
+
       if (status === 401) {
         toast.error('Sua sessão expirou. Faça login novamente para gerar o plano.');
         navigate('/login');
@@ -221,6 +235,8 @@ export default function Dashboard() {
         setUpgradeFeature('diet');
       } else if (status === 404) {
         toast.error('Serviço de geração indisponível no momento. Atualize a página e tente novamente.');
+      } else if (status === 400) {
+        toast.error(backendMessage || error?.message || 'Não foi possível gerar o plano com os dados atuais.');
       } else {
         toast.error('Erro ao gerar plano alimentar');
       }
