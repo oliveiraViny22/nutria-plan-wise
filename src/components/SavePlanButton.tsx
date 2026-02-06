@@ -71,11 +71,11 @@ export function SavePlanButton({ planId, isSaved, onSave, compact = false }: Sav
         disabled={saving}
         size={compact ? 'default' : 'lg'}
         className={`
-          w-full gap-2 relative overflow-hidden
+          gap-2 relative overflow-hidden
           gradient-primary
           text-primary-foreground font-semibold tracking-wide
           glow-success
-          ${compact ? 'h-10' : 'h-12'}
+          ${compact ? 'h-10 px-6' : 'w-full h-12'}
         `}
       >
         {/* Shimmer effect */}
