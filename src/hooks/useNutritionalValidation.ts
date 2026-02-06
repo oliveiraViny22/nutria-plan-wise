@@ -15,7 +15,7 @@ interface ProfileData {
 }
 
 export interface ValidationIssue {
-  field: 'calories' | 'protein' | 'carbs' | 'fat';
+  field: 'calories' | 'protein' | 'carbs' | 'fat' | 'macro_sum';
   severity: 'warning' | 'error';
   message: string;
   currentValue: number;
@@ -45,6 +45,7 @@ const TOLERANCE = {
   protein: { warning: 15, error: 30 },  // ±15% warning, ±30% error
   carbs: { warning: 20, error: 40 },    // ±20% warning, ±40% error
   fat: { warning: 20, error: 40 },      // ±20% warning, ±40% error
+  macroSum: { warning: 5, error: 15 },  // Soma de macros vs calorias
 };
 
 // Limites absolutos de segurança
@@ -59,6 +60,7 @@ const FIELD_LABELS: Record<string, string> = {
   protein: 'Proteína',
   carbs: 'Carboidratos',
   fat: 'Gordura',
+  macro_sum: 'Soma dos Macros',
 };
 
 /**
@@ -235,6 +237,37 @@ export function useNutritionalValidation(profile: ProfileData | null): Nutrition
           currentValue: profile.fat_target,
           recommendedValue: metabolicData.fat,
           deviationPercent: fatDeviation,
+        });
+      }
+    }
+
+    // 5. Validar soma dos macros vs calorias (consistência interna)
+    if (profile.daily_calories && profile.protein_target && profile.carbs_target && profile.fat_target) {
+      const proteinKcal = profile.protein_target * 4;
+      const carbsKcal = profile.carbs_target * 4;
+      const fatKcal = profile.fat_target * 9;
+      const calculatedCalories = proteinKcal + carbsKcal + fatKcal;
+      
+      const macroSumDeviation = calculateDeviation(calculatedCalories, profile.daily_calories);
+      const absDeviation = Math.abs(macroSumDeviation);
+      
+      if (absDeviation > TOLERANCE.macroSum.error) {
+        issues.push({
+          field: 'macro_sum',
+          severity: 'error',
+          message: `Macros somam ${calculatedCalories} kcal (${macroSumDeviation > 0 ? '+' : ''}${macroSumDeviation.toFixed(0)}% da meta de ${profile.daily_calories} kcal). Os targets estão desbalanceados.`,
+          currentValue: calculatedCalories,
+          recommendedValue: profile.daily_calories,
+          deviationPercent: macroSumDeviation,
+        });
+      } else if (absDeviation > TOLERANCE.macroSum.warning) {
+        issues.push({
+          field: 'macro_sum',
+          severity: 'warning',
+          message: `Macros somam ${calculatedCalories} kcal (${macroSumDeviation > 0 ? '+' : ''}${macroSumDeviation.toFixed(0)}% da meta). Pequena inconsistência nos targets.`,
+          currentValue: calculatedCalories,
+          recommendedValue: profile.daily_calories,
+          deviationPercent: macroSumDeviation,
         });
       }
     }
