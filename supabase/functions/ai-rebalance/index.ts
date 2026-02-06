@@ -1154,11 +1154,15 @@ function runCorrectionPipeline(
         
         console.log(`[ETAPA 4.5] Resultado: Gordura ${afterNormPercents.fat.toFixed(1)}%, Calorias ${afterNormPercents.calories.toFixed(1)}%`);
         
-        // VALIDAÇÃO CRÍTICA: Se ainda excede limites, INTERROMPER FLUXO
-        if (afterNormPercents.fat > 110 || afterNormPercents.calories > 105) {
+        // VALIDAÇÃO CRÍTICA: Se ainda excede limites SEVEROS (tolerância clínica), INTERROMPER FLUXO
+        // Usa FAT_MAX_TOLERANCE (115%) em vez de FAT_MAX_STANDARD (110%) para evitar falsos positivos
+        const fatTolerancePercent = VALIDATION_CONSTANTS.FAT_MAX_TOLERANCE * 100; // 115%
+        const caloriesTolerancePercent = VALIDATION_CONSTANTS.HARD_FAIL_CALORIES * 100; // 110%
+        
+        if (afterNormPercents.fat > fatTolerancePercent || afterNormPercents.calories > caloriesTolerancePercent) {
           console.error(`[ETAPA 4.5] ❌ STRUCTURALLY_INVALID - Fluxo interrompido`);
-          console.error(`[ETAPA 4.5] Gordura: ${afterNormPercents.fat.toFixed(1)}% (limite: 110%)`);
-          console.error(`[ETAPA 4.5] Calorias: ${afterNormPercents.calories.toFixed(1)}% (limite: 105%)`);
+          console.error(`[ETAPA 4.5] Gordura: ${afterNormPercents.fat.toFixed(1)}% (limite tolerância: ${fatTolerancePercent}%)`);
+          console.error(`[ETAPA 4.5] Calorias: ${afterNormPercents.calories.toFixed(1)}% (limite: ${caloriesTolerancePercent}%)`);
           console.error(`[ETAPA 4.5] ACTION: Regenerar plano com fontes proteicas mais magras`);
           
           // RETORNAR IMEDIATAMENTE - NÃO VALIDAR, NÃO EXIBIR COMO GERADO
