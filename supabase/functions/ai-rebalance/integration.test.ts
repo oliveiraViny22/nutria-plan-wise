@@ -15,7 +15,7 @@ import { assertEquals, assert, assertExists } from "https://deno.land/std@0.224.
 const SUPABASE_URL = Deno.env.get("VITE_SUPABASE_URL")!;
 const SUPABASE_ANON_KEY = Deno.env.get("VITE_SUPABASE_PUBLISHABLE_KEY")!;
 
-const GENERATOR_URL = `${SUPABASE_URL}/functions/v1/generate-meal-plan-v5`;
+const GENERATOR_URL = `${SUPABASE_URL}/functions/v1/generate-plan`;
 const REBALANCER_URL = `${SUPABASE_URL}/functions/v1/ai-rebalance`;
 
 // =====================================================
