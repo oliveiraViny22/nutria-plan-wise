@@ -110,15 +110,42 @@ export interface GeneratorValidationResult {
   };
 }
 
+// Tipo de objetivo para validação específica
+export type GeneratorObjective = "cut" | "maintain" | "bulk";
+
+// Mapeamento de goal do perfil para objetivo do gerador
+export function mapGoalToObjective(goal: string | null | undefined): GeneratorObjective {
+  switch ((goal || "").toLowerCase()) {
+    case "lose_weight":
+    case "emagrecer":
+      return "cut";
+    case "gain_muscle":
+    case "ganhar_massa":
+      return "bulk";
+    default:
+      return "maintain";
+  }
+}
+
+// Limites de carboidratos por objetivo no gerador
+const GENERATOR_CARBS_MIN_BY_OBJECTIVE: Record<GeneratorObjective, number> = {
+  cut: 90,      // 90%
+  maintain: 90, // 90%
+  bulk: 80,     // 80% - Bulk tem piso menor de carbs
+};
+
 /**
  * Valida se um plano gerado atende TODOS os contratos.
  * Se retornar false, o plano NÃO pode ser salvo.
+ * 
+ * @param objective - Objetivo do perfil (cut/maintain/bulk) para ajuste de carboidratos
  */
 export function validateGeneratedPlan(
   totals: MacroTargets,
   targets: MacroTargets,
   mealProteinValues: number[],
-  mainMealIndices: number[]
+  mainMealIndices: number[],
+  objective: GeneratorObjective = "maintain"
 ): GeneratorValidationResult {
   const errors: string[] = [];
   
@@ -126,6 +153,9 @@ export function validateGeneratedPlan(
   const proteinPercent = targets.protein > 0 ? (totals.protein / targets.protein) * 100 : 0;
   const carbsPercent = targets.carbs > 0 ? (totals.carbs / targets.carbs) * 100 : 0;
   const fatPercentOfCals = fatPercentOfCalories(totals.fat, totals.calories);
+  
+  // Obter limite de carbs baseado no objetivo
+  const carbsMinThreshold = GENERATOR_CARBS_MIN_BY_OBJECTIVE[objective];
   
   // CONTRATO 1: Calorias dentro de ±10%
   const calorieDiff = Math.abs(caloriePercent - 100);
@@ -147,11 +177,11 @@ export function validateGeneratedPlan(
     }
   }
   
-  // CONTRATO 3: Carboidratos como base energética (≥90%)
-  if (carbsPercent < GENERATOR_CONTRACT.MIN_CARBS_PERCENT) {
+  // CONTRATO 3: Carboidratos como base energética (threshold baseado no objetivo)
+  if (carbsPercent < carbsMinThreshold) {
     errors.push(
       `[G7] Carboidratos insuficientes: ${Math.round(totals.carbs)}g ` +
-      `(${carbsPercent.toFixed(1)}% da meta, mínimo: ${GENERATOR_CONTRACT.MIN_CARBS_PERCENT}%)`
+      `(${carbsPercent.toFixed(1)}% da meta, mínimo: ${carbsMinThreshold}% para ${objective})`
     );
   }
   
