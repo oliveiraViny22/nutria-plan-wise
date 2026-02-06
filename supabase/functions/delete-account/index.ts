@@ -190,6 +190,16 @@ Deno.serve(async (req) => {
       supabaseAdmin.from("conversion_events").delete().eq("user_id", userId)
     );
     
+    // 12. Delete weight_logs
+    await safeDelete("weight_logs", () => 
+      supabaseAdmin.from("weight_logs").delete().eq("user_id", userId)
+    );
+    
+    // 13. Delete body_measurements
+    await safeDelete("body_measurements", () => 
+      supabaseAdmin.from("body_measurements").delete().eq("user_id", userId)
+    );
+    
     // 12. Delete profile (CRITICAL - must succeed before auth deletion)
     const { error: profileError } = await supabaseAdmin
       .from("profiles")
