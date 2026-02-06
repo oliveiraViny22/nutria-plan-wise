@@ -18,6 +18,14 @@ import { createLogger, logAIUsage, type RebalanceMetrics } from "../_shared/logg
 import { getCorsHeaders } from "../_shared/security.ts";
 import { getFeatureFlag, FLAGS } from "../_shared/feature-flags.ts";
 import { checkRateLimit, createRateLimitResponse, RATE_LIMITS } from "../_shared/rate-limit.ts";
+import { 
+  StructuralFailureReason, 
+  RefinementStatus, 
+  validateGeneratorOutputContract,
+  createInitialRebalancerDiagnostics,
+  type RebalancerDiagnostics,
+  type NormalizationDiagnostic,
+} from "../_shared/diagnostics.ts";
 
 const log = createLogger('ai-rebalance');
 
@@ -129,6 +137,8 @@ interface RebalanceResult {
     fat_percent: number;
     calories_percent: number;
     action: string;
+    /** Motivo tipado para falha estrutural */
+    failureReason?: StructuralFailureReason;
   };
   food_changes?: Array<{
     food_id: string;
@@ -142,6 +152,8 @@ interface RebalanceResult {
     implicitFatRatio: number;
     normalizationApplied: boolean;
     finalValidation?: FinalValidationResult;
+    /** Diagnósticos detalhados do rebalanceador */
+    diagnostics?: RebalancerDiagnostics;
   };
 }
 
@@ -567,7 +579,7 @@ function runFinalRefinement(
   targets: MacroTargets,
   contributions: Map<string, MacroTargets>,
   maxIterations: number = 200
-): { quantities: Map<string, number>; iterations: number; converged: boolean } {
+): { quantities: Map<string, number>; iterations: number; converged: boolean; refinementStatus: RefinementStatus } {
   // ============================================
   // RANGE HARD: CONVERGÊNCIA MULTI-OBJETIVO
   // ============================================
@@ -612,7 +624,7 @@ function runFinalRefinement(
     if (converged) {
       console.log(`[HARD] Convergência completa em ${iterations} iterações`);
       console.log(`[HARD] Finais: cal=${totals.calories}, prot=${totals.protein}g, carb=${totals.carbs}g, fat=${totals.fat}g`);
-      return { quantities, iterations, converged: true };
+      return { quantities, iterations, converged: true, refinementStatus: RefinementStatus.CONVERGED };
     }
 
     // Calcular erro total ponderado
@@ -622,12 +634,12 @@ function runFinalRefinement(
       Math.abs(errors.carbs) / targets.carbs * WEIGHTS.carbs +
       Math.abs(errors.fat) / targets.fat * WEIGHTS.fat;
 
-    // Detectar se estamos presos
+    // Detectar se estamos presos (mínimo local)
     if (Math.abs(totalError - lastError) < 0.0001) {
       stuckCounter++;
       if (stuckCounter > 10) {
-        console.log(`[HARD] Algoritmo preso após ${iterations} iterações`);
-        break;
+        console.log(`[HARD] Algoritmo preso após ${iterations} iterações (mínimo local)`);
+        return { quantities, iterations, converged: false, refinementStatus: RefinementStatus.LOCAL_MINIMUM };
       }
     } else {
       stuckCounter = 0;
@@ -711,7 +723,13 @@ function runFinalRefinement(
   console.log(`[HARD] Finais após ${iterations} iterações: cal=${finalTotals.calories}, prot=${finalTotals.protein}g, carb=${finalTotals.carbs}g, fat=${finalTotals.fat}g`);
   console.log(`[HARD] Metas: cal=${targets.calories}, prot=${targets.protein}g, carb=${targets.carbs}g, fat=${targets.fat}g`);
   
-  return { quantities, iterations, converged: false };
+  // Se chegou ao fim do loop sem convergir, pode ter sido por limite de iterações
+  return { 
+    quantities, 
+    iterations, 
+    converged: false, 
+    refinementStatus: iterations >= maxIterations ? RefinementStatus.MAX_ITERATIONS_REACHED : RefinementStatus.STOPPED_BY_LIMIT 
+  };
 }
 
 interface CorrectionPipelineResult {
@@ -725,6 +743,8 @@ interface CorrectionPipelineResult {
     fat_percent: number;
     calories_percent: number;
     action: string;
+    /** Motivo tipado para falha estrutural */
+    failureReason?: StructuralFailureReason;
   };
 }
 
@@ -1183,6 +1203,12 @@ function runCorrectionPipeline(
               fat_percent: Math.round(afterNormPercents.fat * 10) / 10,
               calories_percent: Math.round(afterNormPercents.calories * 10) / 10,
               action: "Regenerar plano com fontes proteicas mais magras (ex: peito de frango, tilápia, clara de ovo)",
+              // =====================================================
+              // DIAGNÓSTICO: Motivo tipado para falha estrutural
+              // =====================================================
+              failureReason: afterNormPercents.fat > fatTolerancePercent 
+                ? StructuralFailureReason.IMPLICIT_FAT_OVERLOAD 
+                : StructuralFailureReason.CALORIC_OVERFLOW,
             },
           };
         }

@@ -7,6 +7,13 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders, CLIENT_ERRORS, getErrorForLogging, createErrorResponse, createSuccessResponse } from "../_shared/security.ts";
 import { getCategoryLimits, getScaleLimits, SNACK_CATEGORY_LIMITS } from "../_shared/category-limits.ts";
 import { validateGeneratedPlan, fatPercentOfCalories, GENERATOR_CONTRACT, mapGoalToObjective, type MacroTargets, type GeneratorObjective } from "../_shared/nutrition-contracts.ts";
+import { 
+  GenerationState, 
+  LimitStatus, 
+  createInitialGeneratorDiagnostics, 
+  type GeneratorDiagnostics, 
+  type FoodGenerationDiagnostic 
+} from "../_shared/diagnostics.ts";
 
 interface Food { id: string; name: string; calories: number; protein: number; carbs: number; fat: number; category: string; is_optional: boolean | null; unit_name: string | null; unit_weight_grams: number | null; unit_increment: number | null; unit_enabled: boolean | null; }
 interface FoodSelection { food: Food; role_name: string; quantity_grams: number; display_quantity: number; display_unit: string; }
@@ -651,7 +658,7 @@ function validateNutritionalContracts(
  *   2. Se proteína resultante excederia 110% da meta, escalar apenas não-proteicos
  *   3. Para bulk com alta demanda calórica, usar limites expandidos e mais iterações
  */
-function scale(mwo: MealWithOptions[], targetCals: number, targetProtein?: number, objective: GeneratorObjective = "maintain"): void {
+function scale(mwo: MealWithOptions[], targetCals: number, targetProtein?: number, objective: GeneratorObjective = "maintain", generatorDiagnostics: GeneratorDiagnostics = createInitialGeneratorDiagnostics()): void {
   const PROTEIN_MAX_PERCENT = 1.10; // Proteína máxima permitida: 110% da meta
   const PROTEIN_DENSE_RATIO = 0.25; // Alimento é "proteico" se >25% das calorias vêm de proteína
   
@@ -663,6 +670,9 @@ function scale(mwo: MealWithOptions[], targetCals: number, targetProtein?: numbe
   const MAX_ITERATIONS = isBulk && isHighDemand ? 8 : 5;
   const MAX_CARB_COMPENSATION = isBulk && isHighDemand ? 4.0 : 2.5;
   const CONVERGENCE_THRESHOLD = isBulk ? 0.12 : 0.08; // 12% tolerância para bulk durante scaling
+  
+  // Inicializar contagem de iterações no diagnóstico
+  generatorDiagnostics.scaleIterations = 0;
   
   // =====================================================
   // v5.15: REDUÇÃO ATIVA DE PROTEÍNA (ANTES DO SCALING)
@@ -770,6 +780,9 @@ function scale(mwo: MealWithOptions[], targetCals: number, targetProtein?: numbe
   }
   
   for (let iter = 0; iter < MAX_ITERATIONS; iter++) {
+    // Atualizar diagnóstico de iterações
+    generatorDiagnostics.scaleIterations = iter + 1;
+    
     const current = totals(mwo);
     const proteinPercent = targetProtein ? (current.protein / targetProtein) : 0;
     
@@ -901,12 +914,23 @@ function scale(mwo: MealWithOptions[], targetCals: number, targetProtein?: numbe
   // Condição relaxada: proteína > 98% já indica que não podemos escalar proteínas
   const isStalled = postScaleCaloriePercent < 0.88 && postScaleProteinPercent > 0.98;
   
+  // =====================================================
+  // DIAGNÓSTICO: Atualizar estado de geração
+  // =====================================================
+  if (isStalled) {
+    generatorDiagnostics.generationState = GenerationState.STALL_DETECTED;
+    generatorDiagnostics.stallFallbackTriggered = true;
+    generatorDiagnostics.postScaleCaloriePercent = Math.round(postScaleCaloriePercent * 100);
+    generatorDiagnostics.postScaleProteinPercent = Math.round(postScaleProteinPercent * 100);
+  }
+  
   if (isStalled && isBulk) {
     log("ScaleStalledDetected", {
       caloriePercent: Math.round(postScaleCaloriePercent * 100),
       proteinPercent: Math.round(postScaleProteinPercent * 100),
       calorieDeficit: Math.round(targetCals - postScaleTotals.calories),
-      action: "aggressive_carb_injection"
+      action: "aggressive_carb_injection",
+      generationState: generatorDiagnostics.generationState
     });
     
     const calorieDeficit = targetCals - postScaleTotals.calories;
@@ -957,11 +981,32 @@ function scale(mwo: MealWithOptions[], targetCals: number, targetProtein?: numbe
             f.quantity_grams = newQty;
             carbsInjected += actualIncrease;
             
+            // =====================================================
+            // DIAGNÓSTICO: Marcar injeção forçada de carboidratos
+            // =====================================================
+            generatorDiagnostics.generationState = GenerationState.FORCED_CARB_INJECTION;
+            generatorDiagnostics.carbInjectionApplied = true;
+            generatorDiagnostics.carbsInjectedGrams += actualIncrease;
+            
+            // Registrar alimento com limite expandido
+            const normalLimits = getCategoryLimits(cat, isSnack);
+            generatorDiagnostics.expandedLimitFoods.push({
+              foodId: f.food.id,
+              foodName: f.food.name,
+              originalGrams: currentQty,
+              finalGrams: newQty,
+              limitStatus: LimitStatus.EXPANDED,
+              categoryLimitNormal: normalLimits.max,
+              categoryLimitExpanded: aggressiveMax,
+            });
+            generatorDiagnostics.limitsExpanded = true;
+            
             log("StalledCarbInjection", {
               food: f.food.name,
               oldQty: currentQty,
               newQty,
-              carbsAdded: Math.round(carbsAdded)
+              carbsAdded: Math.round(carbsAdded),
+              limitStatus: LimitStatus.EXPANDED
             });
           }
         }
@@ -1424,11 +1469,16 @@ serve(async (req) => {
 
     const tgt: MacroTargets = { calories: profile.daily_calories || 2000, protein: profile.protein_target || 100, carbs: profile.carbs_target || 250, fat: profile.fat_target || 65 };
     
+    // =====================================================
+    // DIAGNÓSTICO: Inicializar diagnóstico do gerador
+    // =====================================================
+    const generatorDiagnostics = createInitialGeneratorDiagnostics();
+    
     // Debug: totais ANTES do scale
     const preScaleTotals = totals(mwo);
     log("PreScaleTotals", { ...preScaleTotals });
     
-    scale(mwo, tgt.calories, tgt.protein, objective);
+    scale(mwo, tgt.calories, tgt.protein, objective, generatorDiagnostics);
     
     // Debug: totais APÓS o scale
     const postScaleTotals = totals(mwo);
@@ -1450,7 +1500,8 @@ serve(async (req) => {
       log("ValidationFailed", { 
         warnings: validation.warnings, 
         metrics: validation.metrics,
-        objective 
+        objective,
+        diagnostics: generatorDiagnostics
       });
       return createErrorResponse(
         `Plano não atende aos contratos nutricionais: ${validation.warnings.slice(0, 3).join("; ")}${validation.warnings.length > 3 ? ` (+ ${validation.warnings.length - 3} avisos)` : ""}`,
@@ -1459,13 +1510,26 @@ serve(async (req) => {
         { 
           code: "NUTRITIONAL_VALIDATION_FAILED",
           validation: validation,
+          diagnostics: generatorDiagnostics,
         }
       );
     }
     
     const planId = await save(sb, user.id, mwo);
     await sb.rpc("increment_usage", { _user_id: user.id, _feature: "diet" });
-    log("Done", { planId, valid: validation.isValid, warningsCount: validation.warnings.length, objective });
+    log("Done", { 
+      planId, 
+      valid: validation.isValid, 
+      warningsCount: validation.warnings.length, 
+      objective,
+      diagnostics: {
+        generationState: generatorDiagnostics.generationState,
+        stallFallbackTriggered: generatorDiagnostics.stallFallbackTriggered,
+        carbInjectionApplied: generatorDiagnostics.carbInjectionApplied,
+        limitsExpanded: generatorDiagnostics.limitsExpanded,
+        scaleIterations: generatorDiagnostics.scaleIterations,
+      }
+    });
 
     const fin = totals(mwo);
     return createSuccessResponse({ 
@@ -1480,6 +1544,18 @@ serve(async (req) => {
         warnings: validation.warnings,
         metrics: validation.metrics,
         objective,
+      },
+      // =====================================================
+      // DIAGNÓSTICO: Expor no output para observabilidade
+      // =====================================================
+      diagnostics: {
+        generationState: generatorDiagnostics.generationState,
+        limitsExpanded: generatorDiagnostics.limitsExpanded,
+        carbInjectionApplied: generatorDiagnostics.carbInjectionApplied,
+        stallFallbackTriggered: generatorDiagnostics.stallFallbackTriggered,
+        carbsInjectedGrams: generatorDiagnostics.carbsInjectedGrams,
+        scaleIterations: generatorDiagnostics.scaleIterations,
+        expandedLimitFoodsCount: generatorDiagnostics.expandedLimitFoods.length,
       }
     }, cors);
   } catch (e) {
