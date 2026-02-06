@@ -70,6 +70,9 @@ export default function Progress() {
   const { isLinkedStudent, professionalId } = useLinkedStudent();
   const isPaidUser = permissions.plan_name.toLowerCase() !== 'gratuito';
   
+  // Access control: Only paid users, professionals, or linked students can access
+  const hasAccess = isPaidUser || isProfessional || isLinkedStudent;
+  
   // Can access body measurements if professional or linked student
   const canAccessMeasurements = isProfessional || isLinkedStudent;
   
@@ -79,10 +82,12 @@ export default function Progress() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (user) {
+    if (user && hasAccess) {
       fetchData();
+    } else if (user && !hasAccess && !roleLoading) {
+      setLoading(false);
     }
-  }, [user]);
+  }, [user, hasAccess, roleLoading]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -177,10 +182,67 @@ export default function Progress() {
     }
   };
 
-  if (loading) {
+  if (loading || roleLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+      </div>
+    );
+  }
+
+  // Access denied for free users
+  if (!hasAccess) {
+    return (
+      <div className="min-h-screen bg-background overflow-x-hidden theme-patient">
+        {/* Header */}
+        <header className="sticky top-0 z-50 glass border-b">
+          <div className="container mx-auto px-3 sm:px-4 py-2 sm:py-3 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <MobileNav />
+              <Button variant="ghost" size="icon" className="hidden md:flex w-9 h-9 sm:w-10 sm:h-10" onClick={() => navigate('/dashboard')}>
+                <ArrowLeft className="h-4 w-4 sm:h-5 sm:w-5" />
+              </Button>
+              <Logo size="sm" />
+            </div>
+            <h1 className="text-base sm:text-lg font-semibold">Progresso</h1>
+            <ThemeToggle />
+          </div>
+        </header>
+
+        <main className="container mx-auto px-3 sm:px-4 py-8 sm:py-12">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="max-w-md mx-auto text-center"
+          >
+            <Card className="backdrop-blur-md bg-card/80 border-border/40 shadow-lg">
+              <CardContent className="py-8 sm:py-12 px-6">
+                <div className="w-16 h-16 mx-auto mb-6 rounded-full bg-primary/10 flex items-center justify-center">
+                  <TrendingUp className="h-8 w-8 text-primary" />
+                </div>
+                <h2 className="text-xl sm:text-2xl font-bold mb-3">Recurso Premium</h2>
+                <p className="text-muted-foreground mb-6">
+                  O acompanhamento de progresso está disponível apenas para usuários dos planos pagos, profissionais e alunos vinculados.
+                </p>
+                <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                  <Button 
+                    onClick={() => navigate('/pricing')}
+                    className="gap-2"
+                  >
+                    <Scale className="h-4 w-4" />
+                    Ver Planos
+                  </Button>
+                  <Button 
+                    variant="outline"
+                    onClick={() => navigate('/dashboard')}
+                  >
+                    Voltar ao Dashboard
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        </main>
       </div>
     );
   }
