@@ -474,9 +474,9 @@ export function AIRebalancer({
         className="flex justify-center"
       >
         <Button
-          variant="outline"
+          variant="secondary"
           size="lg"
-          className="gap-2 px-6"
+          className="gap-2 px-6 border border-border/50"
           onClick={handleOptimize}
           disabled={loading || isLimitReached}
         >
