@@ -249,14 +249,13 @@ export function MealAnchorFoodsManager() {
     });
   };
 
-  // Group anchors by tab categories
+  // Group anchors by tab categories (no deduplication - each anchor is unique)
   const groupedAnchors = anchors?.reduce((acc, anchor) => {
     const tab = TAB_CONFIG.find((t) => t.mealTypes.includes(anchor.meal_type));
     if (!tab) return acc;
     const key = tab.key;
     if (!acc[key]) acc[key] = [];
-    const exists = acc[key].some((a) => a.role_name === anchor.role_name && a.food_id === anchor.food_id);
-    if (!exists) acc[key].push(anchor);
+    acc[key].push(anchor);
     return acc;
   }, {} as Record<string, AnchorFood[]>) || {};
 
