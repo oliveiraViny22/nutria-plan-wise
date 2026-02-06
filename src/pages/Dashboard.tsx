@@ -285,7 +285,7 @@ export default function Dashboard() {
               isPlanSaved={currentDietPlan?.is_saved || false}
               pendingMeals={meals.length - todayMealsLogged}
               totalMeals={meals.length}
-              isPaidUser={subscriptionPlan?.type !== 'gratuito'}
+              isPaidUser={!!subscriptionPlan?.type && subscriptionPlan.type !== 'gratuito'}
               canGeneratePlan={permissions.can_create_plan && !isLimitReached('diet')}
               canOptimize={permissions.can_adjust && !isLimitReached('adjustment')}
               isGenerating={generatingV5}
