@@ -5,6 +5,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders, CLIENT_ERRORS, getErrorForLogging, createErrorResponse, createSuccessResponse } from "../_shared/security.ts";
+import { getCategoryLimits, getScaleLimits, SNACK_CATEGORY_LIMITS } from "../_shared/category-limits.ts";
 
 interface Food { id: string; name: string; calories: number; protein: number; carbs: number; fat: number; category: string; is_optional: boolean | null; unit_name: string | null; unit_weight_grams: number | null; unit_increment: number | null; unit_enabled: boolean | null; }
 interface FoodSelection { food: Food; role_name: string; quantity_grams: number; display_quantity: number; display_unit: string; }
@@ -16,8 +17,19 @@ const MEAL_NAMES: Record<string, string> = { breakfast: "Café da Manhã", morni
 const MEAL_TYPES: Record<number, string[]> = { 2: ["lunch", "dinner"], 3: ["breakfast", "lunch", "dinner"], 4: ["breakfast", "lunch", "afternoon_snack", "dinner"], 5: ["breakfast", "morning_snack", "lunch", "afternoon_snack", "dinner"], 6: ["breakfast", "morning_snack", "lunch", "afternoon_snack", "dinner", "supper"] };
 const ITEM_COUNTS: Record<string, { min: number; max: number }> = { breakfast: { min: 2, max: 4 }, morning_snack: { min: 2, max: 3 }, lunch: { min: 4, max: 6 }, afternoon_snack: { min: 2, max: 3 }, dinner: { min: 4, max: 6 }, supper: { min: 2, max: 3 } };
 const MAIN_MEALS = ["breakfast", "lunch", "dinner"];
+const SNACK_MEALS = ["morning_snack", "afternoon_snack", "supper"];
 const CANONICAL_CATS = ["carboidratos", "proteinas", "gorduras", "vegetais", "frutas", "laticinios", "leguminosas", "mistos"];
-const SCALE_LIMITS: Record<string, { min: number; max: number }> = { proteinas: { min: 50, max: 350 }, carboidratos: { min: 50, max: 400 }, leguminosas: { min: 40, max: 250 }, vegetais: { min: 30, max: 300 }, frutas: { min: 50, max: 300 }, laticinios: { min: 30, max: 250 }, gorduras: { min: 5, max: 30 } };
+// Palavras-chave para detectar alimentos similares (evitar duplicação)
+const SIMILAR_FOOD_GROUPS: string[][] = [
+  ["iogurte", "yogurt"],
+  ["leite"],
+  ["queijo"],
+  ["frango", "peito de frango"],
+  ["arroz"],
+  ["feijão", "feijao"],
+  ["banana"],
+  ["maçã", "maca"],
+];
 
 // =====================================================
 // REGRAS DE BLOQUEIO DE ALIMENTOS GORDOS (v5.8.2)
@@ -106,6 +118,25 @@ function isFattyForRandomSelection(f: Food): boolean {
   return false;
 }
 
+/**
+ * Verifica se dois alimentos são "similares" (mesma família)
+ * para evitar duplicação (ex: dois tipos de iogurte)
+ */
+function getFoodGroup(name: string): string | null {
+  const n = name.toLowerCase();
+  for (const group of SIMILAR_FOOD_GROUPS) {
+    if (group.some(kw => n.includes(kw))) {
+      return group[0]; // Retorna o identificador do grupo
+    }
+  }
+  return null;
+}
+
+function hasSimilarFood(name: string, usedGroups: Set<string>): boolean {
+  const group = getFoodGroup(name);
+  return group !== null && usedGroups.has(group);
+}
+
 const log = (m: string, d?: unknown) => console.log(JSON.stringify({ ts: new Date().toISOString(), m, ...(d && typeof d === "object" ? d : {}) }));
 
 function unitConv(f: Food, g: number): { display_quantity: number; display_unit: string; calculated_grams: number } {
@@ -149,51 +180,89 @@ async function loadData(sb: any) {
 
 function buildMeal(mt: string, opt: number, roles: any[], foods: Food[], anchors: Map<string, AnchorFood[]>, usedG: Set<string>, usedP: Set<string>, pref: string[]): MealResult {
   const sel: FoodSelection[] = [], usedM = new Set<string>(), filled = new Set<string>(), combined = new Set([...usedG, ...usedP]);
+  const usedGroups = new Set<string>(); // Rastrear grupos similares (ex: iogurte)
   const prefSet = new Set(pref.map(p => p.toLowerCase()));
-  // Anchors first - aplicar filtro de âncoras gordas (v5.8.1)
+  const isSnack = SNACK_MEALS.includes(mt);
+  
+  // Helper para aplicar limites de quantidade baseado no tipo de refeição
+  const applyQuantityLimits = (food: Food, baseQty: number): number => {
+    const cat = (food.category || "").toLowerCase();
+    const limits = getCategoryLimits(cat, isSnack);
+    const clampedQty = Math.max(limits.min, Math.min(limits.max, baseQty));
+    return Math.round(clampedQty / 5) * 5; // Arredondar para múltiplo de 5
+  };
+  
+  // Helper para registrar grupo de alimento usado
+  const registerFoodGroup = (food: Food) => {
+    const group = getFoodGroup(food.name);
+    if (group) usedGroups.add(group);
+  };
+  
+  // Anchors first - aplicar filtro de âncoras gordas (v5.8.1) + detecção de duplicados
   for (const [rn, ancs] of anchors.entries()) {
     if (filled.has(rn.split("_")[0])) continue;
-    // Filtrar âncoras: excluir usadas + excluir gordas demais para papel primário
+    // Filtrar âncoras: excluir usadas + gordas + similares já usadas
     const avail = ancs.filter(a => 
       !combined.has(a.food.id) && 
       (a.option_number === 0 || a.option_number === opt) &&
-      !isFattyAnchor(a.food)
+      !isFattyAnchor(a.food) &&
+      !hasSimilarFood(a.food.name, usedGroups)
     );
     const anc = avail.find(a => a.option_number === opt) || avail[0];
     if (anc?.food) {
-      const cv = unitConv(anc.food, anc.default_quantity_grams);
+      const qty = applyQuantityLimits(anc.food, anc.default_quantity_grams);
+      const cv = unitConv(anc.food, qty);
       sel.push({ food: anc.food, role_name: rn, quantity_grams: cv.calculated_grams, display_quantity: cv.display_quantity, display_unit: cv.display_unit });
       usedM.add(anc.food.id); filled.add(rn.split("_")[0]);
+      registerFoodGroup(anc.food);
     }
   }
-  // Required roles - aplicar filtro de gordura (v5.8.2)
+  
+  // Required roles - aplicar filtro de gordura (v5.8.2) + detecção de duplicados
   for (const r of roles.filter((r: any) => r.is_required && !filled.has(r.role_name.split("_")[0]))) {
-    // Filtrar: excluir usados + excluir alimentos gordos na seleção aleatória
+    // Filtrar: excluir usados + gordos + similares já usados
     const cands = foods.filter(f => 
       !combined.has(f.id) && 
       !usedM.has(f.id) && 
       r.categories.includes((f.category || "").toLowerCase()) &&
-      !isFattyForRandomSelection(f)
+      !isFattyForRandomSelection(f) &&
+      !hasSimilarFood(f.name, usedGroups)
     );
     const pCands = cands.filter(f => [...prefSet].some(p => f.name.toLowerCase().includes(p)));
     const pool = pCands.length > 0 && Math.random() < 0.8 ? pCands : cands;
     const f = pool[Math.floor(Math.random() * pool.length)];
-    if (f) { const q = Math.round(((r.min_quantity_grams + r.max_quantity_grams) / 2) / 5) * 5, cv = unitConv(f, q); sel.push({ food: f, role_name: r.role_name, quantity_grams: cv.calculated_grams, display_quantity: cv.display_quantity, display_unit: cv.display_unit }); usedM.add(f.id); }
+    if (f) { 
+      const baseQty = Math.round(((r.min_quantity_grams + r.max_quantity_grams) / 2) / 5) * 5;
+      const qty = applyQuantityLimits(f, baseQty);
+      const cv = unitConv(f, qty); 
+      sel.push({ food: f, role_name: r.role_name, quantity_grams: cv.calculated_grams, display_quantity: cv.display_quantity, display_unit: cv.display_unit }); 
+      usedM.add(f.id);
+      registerFoodGroup(f);
+    }
   }
-  // Optional roles to fill target - aplicar filtro de gordura (v5.8.2)
+  
+  // Optional roles to fill target - aplicar filtro de gordura (v5.8.2) + detecção de duplicados
   const tgt = ITEM_COUNTS[mt] || { min: 2, max: 4 }, need = Math.max(0, (Math.floor(Math.random() * (tgt.max - tgt.min + 1)) + tgt.min) - sel.length);
   const optRoles = roles.filter((r: any) => !r.is_required && !filled.has(r.role_name.split("_")[0])).sort(() => Math.random() - 0.5);
   for (let i = 0; i < Math.min(optRoles.length, need); i++) {
     const r = optRoles[i];
-    // Filtrar: excluir usados + excluir alimentos gordos na seleção aleatória
+    // Filtrar: excluir usados + gordos + similares já usados
     const cands = foods.filter(f => 
       !combined.has(f.id) && 
       !usedM.has(f.id) && 
       r.categories.includes((f.category || "").toLowerCase()) &&
-      !isFattyForRandomSelection(f)
+      !isFattyForRandomSelection(f) &&
+      !hasSimilarFood(f.name, usedGroups)
     );
     const f = cands[Math.floor(Math.random() * cands.length)];
-    if (f) { const q = Math.round(((r.min_quantity_grams + r.max_quantity_grams) / 2) / 5) * 5, cv = unitConv(f, q); sel.push({ food: f, role_name: r.role_name, quantity_grams: cv.calculated_grams, display_quantity: cv.display_quantity, display_unit: cv.display_unit }); usedM.add(f.id); }
+    if (f) { 
+      const baseQty = Math.round(((r.min_quantity_grams + r.max_quantity_grams) / 2) / 5) * 5;
+      const qty = applyQuantityLimits(f, baseQty);
+      const cv = unitConv(f, qty); 
+      sel.push({ food: f, role_name: r.role_name, quantity_grams: cv.calculated_grams, display_quantity: cv.display_quantity, display_unit: cv.display_unit }); 
+      usedM.add(f.id);
+      registerFoodGroup(f);
+    }
   }
   let cals = 0, prot = 0, carbs = 0, fat = 0;
   for (const s of sel) { const m = s.quantity_grams / 100; cals += s.food.calories * m; prot += s.food.protein * m; carbs += s.food.carbs * m; fat += s.food.fat * m; }
@@ -211,12 +280,18 @@ function scale(mwo: MealWithOptions[], tgt: number): number {
     const cur = totals(mwo).calories;
     if (Math.abs(cur - tgt) / tgt <= 0.1) return 1;
     const sf = tgt / cur;
-    for (const md of mwo) for (const o of md.options) for (const fs of o.foods) {
-      const lim = SCALE_LIMITS[(fs.food.category || "").toLowerCase()] || { min: 20, max: 500 };
-      let ng = Math.round((fs.quantity_grams * sf) / 5) * 5;
-      ng = Math.max(lim.min, Math.min(lim.max, ng));
-      const cv = unitConv(fs.food, ng);
-      fs.quantity_grams = cv.calculated_grams; fs.display_quantity = cv.display_quantity; fs.display_unit = cv.display_unit;
+    for (const md of mwo) {
+      const isSnack = SNACK_MEALS.includes(md.mealType);
+      for (const o of md.options) for (const fs of o.foods) {
+        // Usar limites centralizados - aplicar limites de lanche se for lanche
+        const lim = isSnack 
+          ? getCategoryLimits((fs.food.category || "").toLowerCase(), true)
+          : getScaleLimits((fs.food.category || "").toLowerCase());
+        let ng = Math.round((fs.quantity_grams * sf) / 5) * 5;
+        ng = Math.max(lim.min, Math.min(lim.max, ng));
+        const cv = unitConv(fs.food, ng);
+        fs.quantity_grams = cv.calculated_grams; fs.display_quantity = cv.display_quantity; fs.display_unit = cv.display_unit;
+      }
     }
     for (const md of mwo) for (const o of md.options) {
       let c = 0, p = 0, cb = 0, f = 0;
