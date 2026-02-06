@@ -125,16 +125,19 @@ export function DashboardHeader({
                   </Tooltip>
                 )}
                 
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Link to="/progress">
-                      <Button variant="ghost" size="icon" className="w-10 h-10">
-                        <TrendingUp className="w-5 h-5" />
-                      </Button>
-                    </Link>
-                  </TooltipTrigger>
-                  <TooltipContent>Progresso</TooltipContent>
-                </Tooltip>
+                {/* Progress - only for paid users */}
+                {planType !== 'gratuito' && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Link to="/progress">
+                        <Button variant="ghost" size="icon" className="w-10 h-10">
+                          <TrendingUp className="w-5 h-5" />
+                        </Button>
+                      </Link>
+                    </TooltipTrigger>
+                    <TooltipContent>Progresso</TooltipContent>
+                  </Tooltip>
+                )}
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Link to="/profile">
