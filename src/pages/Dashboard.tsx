@@ -214,13 +214,16 @@ export default function Dashboard() {
 
       // Tenta extrair mensagem JSON retornada pelo backend (quando houver)
       let backendMessage: string | null = null;
+      let errorCode: string | null = null;
       try {
         const body = error?.context?.body;
         if (typeof body === 'string') {
           const parsed = JSON.parse(body);
           if (parsed?.error && typeof parsed.error === 'string') backendMessage = parsed.error;
+          if (parsed?.code && typeof parsed.code === 'string') errorCode = parsed.code;
         } else if (body?.error && typeof body.error === 'string') {
           backendMessage = body.error;
+          if (body?.code && typeof body.code === 'string') errorCode = body.code;
         }
       } catch {
         // ignore
@@ -235,6 +238,12 @@ export default function Dashboard() {
         setUpgradeFeature('diet');
       } else if (status === 404) {
         toast.error('Serviço de geração indisponível no momento. Atualize a página e tente novamente.');
+      } else if (status === 400 && errorCode === 'NUTRITIONAL_VALIDATION_FAILED') {
+        // Validação nutricional falhou - mensagem explicativa
+        toast.error('Não foi possível gerar um plano que atenda suas metas nutricionais', {
+          description: 'Tente ajustar suas preferências alimentares ou metas no perfil e gere novamente.',
+          duration: 8000,
+        });
       } else if (status === 400) {
         toast.error(backendMessage || error?.message || 'Não foi possível gerar o plano com os dados atuais.');
       } else {
