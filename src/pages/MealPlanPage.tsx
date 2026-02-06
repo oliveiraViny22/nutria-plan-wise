@@ -34,6 +34,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useCachedUserData } from '@/hooks/useCachedUserData';
 import { toast } from 'sonner';
 import { MEAL_NAMES, MealType, Food, MealOption } from '@/lib/types';
+import { getCategoryDisplayOrder, getCategoryLabel, getCategoryColor } from '@/lib/food-categories';
 import { 
   generateSupplementRecommendations, 
   getPriorityBadge,
@@ -536,16 +537,40 @@ export default function MealPlanPage() {
                               <MacroBadge macro="fat" value={option.total_fat || 0} size="sm" variant="pill" />
                             </div>
 
-                            {/* Foods list */}
+                            {/* Foods list - ordenado por categoria */}
                             <div className="space-y-1.5">
-                              {option.meal_option_foods.map(mof => (
-                                <div key={mof.id} className="flex items-center justify-between py-1 border-b border-border/30 last:border-0">
-                                  <span className="text-xs font-medium truncate flex-1 mr-2">{mof.food.name}</span>
-                                  <span className="text-xs text-muted-foreground whitespace-nowrap">
-                                    {formatQuantity(mof.quantity_grams, mof.display_quantity, mof.display_unit)}
-                                  </span>
-                                </div>
-                              ))}
+                              {[...option.meal_option_foods]
+                                .sort((a, b) => getCategoryDisplayOrder(a.food?.category) - getCategoryDisplayOrder(b.food?.category))
+                                .map(mof => {
+                                  // Calculate macros for this food item
+                                  const qty = mof.quantity_grams;
+                                  const food = mof.food;
+                                  const itemCals = Math.round((food.calories * qty) / 100);
+                                  const itemProtein = Math.round((food.protein * qty) / 100);
+                                  const itemCarbs = Math.round((food.carbs * qty) / 100);
+                                  const itemFat = Math.round((food.fat * qty) / 100);
+                                  
+                                  return (
+                                    <div key={mof.id} className="py-1.5 border-b border-border/30 last:border-0">
+                                      <div className="flex items-center justify-between gap-2">
+                                        <div className="flex items-center gap-2 min-w-0 flex-1">
+                                          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${getCategoryColor(food.category)}`} />
+                                          <span className="text-xs font-medium truncate">{food.name}</span>
+                                        </div>
+                                        <span className="text-xs text-muted-foreground whitespace-nowrap shrink-0">
+                                          {formatQuantity(qty, mof.display_quantity, mof.display_unit)}
+                                        </span>
+                                      </div>
+                                      {/* Macros do alimento */}
+                                      <div className="flex items-center gap-2 mt-1 ml-3.5">
+                                        <span className="text-[10px] text-muted-foreground">{itemCals} kcal</span>
+                                        <span className="text-[10px] text-red-500/80">P {itemProtein}g</span>
+                                        <span className="text-[10px] text-amber-500/80">C {itemCarbs}g</span>
+                                        <span className="text-[10px] text-blue-500/80">G {itemFat}g</span>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
                             </div>
                           </div>
                         ))}
