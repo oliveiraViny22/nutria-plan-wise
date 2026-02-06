@@ -1,0 +1,530 @@
+================================================================================
+                    REBALANCEADOR AUTOMÁTICO NutriaPlan
+                              DOCUMENTAÇÃO v2
+================================================================================
+
+Este documento contém a documentação técnica completa do motor de 
+rebalanceamento de macros do NutriaPlan, incluindo contratos, regras 
+operacionais e código fonte.
+
+================================================================================
+                            ÍNDICE
+================================================================================
+
+1. VISÃO GERAL
+2. CONTRATOS NUTRICIONAIS
+3. REGRAS POR OBJETIVO
+4. PIPELINE DE CORREÇÃO
+5. VALIDAÇÃO FINAL
+6. CÓDIGO FONTE COMPLETO
+
+================================================================================
+                         1. VISÃO GERAL
+================================================================================
+
+O Rebalanceador v2 é responsável por ajustar planos alimentares existentes
+para atingir metas nutricionais específicas. Utiliza uma pipeline de 5 etapas
+com precisão de ±1g e threshold de otimização de 3%.
+
+FLUXO PRINCIPAL:
+  Pipeline de Correção → Refinamento Final → Validação G-10 → Persistência
+
+CARACTERÍSTICAS:
+  - Processamento de múltiplas opções (1, 2, 3)
+  - Proteção de alimentos proteicos
+  - Normalização de gordura implícita
+  - Convergência multi-objetivo
+  - Tolerância clínica para casos extremos
+
+================================================================================
+                    2. CONTRATOS NUTRICIONAIS
+================================================================================
+
+Os contratos do rebalanceador definem tolerâncias para validação final.
+
+FONTE: supabase/functions/_shared/nutrition-contracts.ts
+
+--------------------------------------------------------------------------------
+CONTRATO DO REBALANCEADOR (REBALANCER_CONTRACT)
+--------------------------------------------------------------------------------
+
+  CALORIAS:
+    CALORIE_MIN_PERCENT: 95    → Mínimo 95% da meta
+    CALORIE_MAX_PERCENT: 105   → Máximo 105% da meta
+
+  PROTEÍNA:
+    PROTEIN_MIN_PERCENT_CUT: 95     → Mínimo 95% para cut
+    PROTEIN_MIN_PERCENT_DEFAULT: 90 → Mínimo 90% para outros
+
+  CARBOIDRATOS:
+    CARBS_MIN_PERCENT: 90       → Mínimo 90% (padrão)
+    CARBS_MIN_PERCENT_BULK: 80  → Mínimo 80% para bulk
+
+  GORDURA:
+    FAT_MAX_PERCENT_STANDARD: 110  → Máximo 110% (padrão)
+    FAT_MAX_PERCENT_TOLERANCE: 115 → Máximo 115% (tolerância clínica)
+    FAT_HARD_FAIL_PERCENT: 120     → Limite absoluto 120%
+
+  QUANTIDADE:
+    MIN_QUANTITY_GRAMS: 5   → Mínimo 5g por item
+    MAX_QUANTITY_GRAMS: 600 → Máximo 600g por item
+
+--------------------------------------------------------------------------------
+CONSTANTES DE VALIDAÇÃO (VALIDATION_CONSTANTS)
+--------------------------------------------------------------------------------
+
+  CALORIES_MAX: 1.05      → 105%
+  PROTEIN_MIN: 0.95       → 95%
+  CARBS_MIN: 0.90         → 90%
+
+  FAT_MAX_STANDARD: 1.10  → 110% (regra padrão)
+  FAT_MAX_TOLERANCE: 1.15 → 115% (tolerância clínica)
+
+  HARD_FAIL_CALORIES: 1.10 → 110% (falha absoluta)
+  HARD_FAIL_FAT: 1.20      → 120% (falha absoluta)
+
+--------------------------------------------------------------------------------
+LIMITES DE CARBOIDRATOS POR OBJETIVO
+--------------------------------------------------------------------------------
+
+  CARBS_MIN_BY_OBJECTIVE = {
+    cut:      0.90,  // 90%
+    maintain: 0.90,  // 90%
+    bulk:     0.80,  // 80% - Bulk tem piso menor
+  }
+
+================================================================================
+                     3. REGRAS POR OBJETIVO
+================================================================================
+
+As regras são carregadas dinamicamente do banco (system_settings) com fallback
+para valores padrão.
+
+--------------------------------------------------------------------------------
+CONFIGURAÇÕES DO ADMIN (OptimizerSettings)
+--------------------------------------------------------------------------------
+
+  protein_floor: 95      → Piso de proteína
+  protein_ceiling: 120   → Teto de proteína
+  carbs_floor: 80        → Piso de carboidratos
+  carbs_ceiling: 120     → Teto de carboidratos
+  fat_floor: 80          → Piso de gordura
+  fat_ceiling: 120       → Teto de gordura
+  calories_tolerance: 5  → Tolerância calórica (±5%)
+  protein_weight: 3.0    → Peso para priorização
+  carbs_weight: 1.0      → Peso para priorização
+  fat_weight: 1.0        → Peso para priorização
+  calories_weight: 1.5   → Peso para priorização
+
+--------------------------------------------------------------------------------
+REGRAS POR OBJETIVO (ObjectiveRules)
+--------------------------------------------------------------------------------
+
+CUT (Emagrecimento):
+  calories: { min: 95, max: 100 }
+  protein:  { min: protein_floor }
+  fat:      { max: fat_ceiling }
+
+BULK (Ganho de Massa):
+  calories: { min: 95, max: 105 }
+  protein:  { min: protein_floor - 5 }  (mínimo 85%)
+  carbs:    { min: carbs_floor }
+  fat:      { max: fat_ceiling + 10 }
+
+MAINTAIN (Manutenção):
+  calories: { min: 95, max: 105 }
+  protein:  { min: protein_floor - 10 } (mínimo 80%)
+  fat:      { max: fat_ceiling + 5 }
+
+================================================================================
+                     4. PIPELINE DE CORREÇÃO
+================================================================================
+
+A pipeline executa até 3 ciclos de correção, cada um com 5 etapas.
+
+--------------------------------------------------------------------------------
+ETAPA 1: CALORIAS
+--------------------------------------------------------------------------------
+
+  Objetivo: Ajustar calorias totais para range permitido
+
+  REGRA CRÍTICA: NUNCA reduzir proteína para cortar calorias
+
+  SE calorias > max:
+    → Reduzir gorduras primeiro
+    → Depois reduzir carboidratos
+    → NUNCA reduzir alimentos proteicos
+
+  SE calorias < min:
+    → Aumentar carboidratos primeiro
+    → Depois aumentar proteína
+
+--------------------------------------------------------------------------------
+ETAPA 2: PROTEÍNA
+--------------------------------------------------------------------------------
+
+  Objetivo: Garantir proteína mínima
+
+  SE proteína < protein.min:
+    → Identificar alimentos proteicos (contrib.protein >= 15g/100g)
+    → Ordenar por ratio proteína/gordura (maior primeiro)
+    → Aumentar porções até atingir mínimo
+    → Para CUT: limitar impacto calórico (max 50kcal)
+
+--------------------------------------------------------------------------------
+ETAPA 3: CARBOIDRATOS (apenas bulk)
+--------------------------------------------------------------------------------
+
+  Objetivo: Garantir carboidratos mínimos para bulk
+
+  SE objective === "bulk" E carbs < carbs.min:
+    → Identificar alimentos ricos em carbs (contrib.carbs >= 20g/100g)
+    → Aumentar porções respeitando limites de categoria
+
+--------------------------------------------------------------------------------
+ETAPA 4: GORDURA
+--------------------------------------------------------------------------------
+
+  Objetivo: Reduzir gordura se acima do máximo
+
+  REGRA CRÍTICA: Apenas reduzir gorduras PURAS
+
+  GORDURAS PURAS (podem ser reduzidas):
+    → Baixa proteína (<10g/100g) E alta gordura (>20g/100g)
+    → Categoria inclui: gordura, oleaginosa, azeite, óleo
+
+  PROTEÇÃO DE PROTEÍNA (v5.5):
+    → SE contrib.protein >= 10 E contrib.fat < contrib.protein
+    → NÃO REDUZIR (proteína domina gordura)
+    
+    → SE contrib.fat >= contrib.protein (gordura domina)
+    → PODE REDUZIR (ex: oleaginosas, pastas)
+
+--------------------------------------------------------------------------------
+ETAPA 4.5: NORMALIZAÇÃO DE GORDURA IMPLÍCITA
+--------------------------------------------------------------------------------
+
+  Objetivo: Corrigir excesso de gordura de fontes mistas
+
+  CONDIÇÕES PARA EXECUTAR:
+    1. G-10 status === "ALLOW_REBALANCE" (obrigatório)
+    2. OU gordura > 110%
+    3. OU calorias > 105%
+    4. OU (proteína >= 95% E carbs 90-110% E gordura > 100%)
+
+  FONTES MISTAS:
+    → fat >= 8g/100g E protein >= 15g/100g
+    → OU (fat >= protein E fat >= 20g/100g E oleaginosa)
+
+  ESTRATÉGIA A - Redução de Porção:
+    → Ordenar por densidade de gordura
+    → Priorizar onde gordura domina proteína
+    → Reduzir até 70% para gordura dominante, 40% para outros
+    → PROTEÇÃO: Não reduzir se proteína cairia abaixo de 95%
+                (90% se gordura domina)
+
+  VALIDAÇÃO CRÍTICA:
+    SE após normalização: gordura > 115% OU calorias > 110%
+    → STRUCTURALLY_INVALID
+    → Retornar imediatamente
+    → Ação: "Regenerar plano com fontes proteicas mais magras"
+
+--------------------------------------------------------------------------------
+ETAPA 4.6: CARB-FIRST LOGIC (apenas bulk)
+--------------------------------------------------------------------------------
+
+  Objetivo: Calorias extras devem vir de carboidratos primeiro
+
+  REGRA CANÔNICA: Em bulk, quem cresce é o carbo
+
+  SE objective === "bulk":
+    SE calorias < 95% E carbs < 100%:
+      → Calcular calorias faltantes
+      → Converter para gramas de carbs (4 kcal/g)
+      → Adicionar sem ultrapassar 110% de carbs
+      → Gordura só entra quando carbs >= 100%
+
+--------------------------------------------------------------------------------
+ETAPA 5: GORDURA - ADICIONAR (opcional, não-cut)
+--------------------------------------------------------------------------------
+
+  Objetivo: Completar calorias com gordura se necessário
+
+  APENAS SE: objective !== "cut" E calorias < 95% E carbs >= 100%
+
+  → Adicionar gordura de fontes puras (azeite, oleaginosas)
+  → Respeitar limite máximo de gordura
+
+--------------------------------------------------------------------------------
+REFINAMENTO FINAL (±1g)
+--------------------------------------------------------------------------------
+
+  Após pipeline, executa refinamento de precisão:
+
+  PRECISION = {
+    calories: 5,   // ±5 kcal
+    protein: 1,    // ±1g
+    carbs: 1,      // ±1g
+    fat: 1,        // ±1g
+  }
+
+  WEIGHTS (priorização):
+    calories: 1.0
+    protein: 3.0   // Proteína tem peso 3x
+    carbs: 1.0
+    fat: 1.0
+
+  ALGORITMO:
+    → Calcular erro total ponderado
+    → Testar ajustes de -5g a +5g por alimento
+    → Escolher ajuste que mais reduz erro total
+    → Bônus de 50% para ajustes que melhoram proteína em déficit
+    → Proteção: não reduzir proteicos se proteína <= 2g acima da meta
+    → Máximo 200 iterações
+
+================================================================================
+                     5. VALIDAÇÃO FINAL
+================================================================================
+
+A validação final é a ÚNICA fonte da verdade para status do plano.
+
+--------------------------------------------------------------------------------
+TIPOS DE STATUS
+--------------------------------------------------------------------------------
+
+  VALIDATED:
+    → Plano atende todos os critérios
+    → G-10 PASS ou ALLOW_REBALANCE com normalização
+
+  VALIDATED_WITH_TOLERANCE:
+    → Plano atende critérios sob tolerância clínica
+    → Gordura entre 110% e 115%
+
+  STRUCTURALLY_INVALID:
+    → Plano não pode ser corrigido
+    → Hard fail absoluto OU critérios não atendidos
+
+--------------------------------------------------------------------------------
+FLUXO DE VALIDAÇÃO
+--------------------------------------------------------------------------------
+
+  1. HARD FAIL ABSOLUTO:
+     SE calorias > 110% OU gordura > 120%
+     → STRUCTURALLY_INVALID
+
+  2. CASO NORMAL (G-10 PASS):
+     SE calorias <= 105% 
+        E proteína >= 95%
+        E carbs >= threshold_por_objetivo
+        E gordura <= 110%
+     → VALIDATED
+
+  3. CASO AJUSTÁVEL (G-10 ALLOW_REBALANCE):
+     SE normalização foi aplicada:
+       SE critérios atendidos com gordura <= 115%:
+         SE gordura > 110%: VALIDATED_WITH_TOLERANCE
+         SENÃO: VALIDATED
+       SENÃO: STRUCTURALLY_INVALID
+     SENÃO: STRUCTURALLY_INVALID (normalização era obrigatória)
+
+  4. FALHA PADRÃO:
+     → STRUCTURALLY_INVALID com razões específicas
+
+--------------------------------------------------------------------------------
+STATUS DE RETORNO
+--------------------------------------------------------------------------------
+
+  valid:
+    → Plano validado E todas opções convergiram
+
+  valid_with_alert:
+    → Plano validado com tolerância
+    → OU algumas opções não convergiram
+
+  error:
+    → Plano estruturalmente inválido
+    → OU validação final falhou
+
+  structurally_invalid:
+    → Plano precisa ser regenerado
+    → Contém structural_issue com detalhes
+
+================================================================================
+                    6. CÓDIGO FONTE COMPLETO
+================================================================================
+
+Arquivo: supabase/functions/ai-rebalance/index.ts
+Versão: v2
+Linhas: ~1973
+
+--------------------------------------------------------------------------------
+IMPORTS E TIPOS
+--------------------------------------------------------------------------------
+
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { KCAL_PER_GRAM, REBALANCER_CONTRACT } from "../_shared/nutrition-contracts.ts";
+import { createLogger, logAIUsage, type RebalanceMetrics } from "../_shared/logger.ts";
+import { getCorsHeaders } from "../_shared/security.ts";
+import { getFeatureFlag, FLAGS } from "../_shared/feature-flags.ts";
+import { checkRateLimit, createRateLimitResponse, RATE_LIMITS } from "../_shared/rate-limit.ts";
+import { getCategoryLimits } from "../_shared/category-limits.ts";
+
+type Objective = "cut" | "maintain" | "bulk";
+type G10Status = "PASS" | "ALLOW_REBALANCE";
+type FinalValidationStatus = "VALIDATED" | "VALIDATED_WITH_TOLERANCE" | "STRUCTURALLY_INVALID";
+
+interface MacroTargets {
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+}
+
+interface G10Metadata {
+  g10Status: G10Status;
+  implicitFatRatio: number;
+  implicitFatWarning?: string;
+}
+
+interface MealOptionFood {
+  id: string;
+  meal_option_id: string;
+  food_id: string;
+  quantity_grams: number;
+  food: {
+    id: string;
+    name: string;
+    calories: number;
+    protein: number;
+    carbs: number;
+    fat: number;
+    serving_size: string | null;
+    category: string | null;
+  };
+}
+
+interface FoodWithMeta extends MealOptionFood {
+  mealName: string;
+  mealId: string;
+  optionId: string;
+}
+
+interface Adjustment {
+  nutrient: "calories" | "protein" | "carbs" | "fat" | "structure";
+  action: "increase" | "decrease" | "implicit_reduction" | "warning";
+  delta: string;
+}
+
+interface RebalanceResult {
+  status: "valid" | "valid_with_alert" | "error" | "structurally_invalid";
+  objective: Objective;
+  iterations: number;
+  final_totals: MacroTargets;
+  adjustments: Adjustment[];
+  structural_issue?: { reason, fat_percent, calories_percent, action };
+  food_changes?: Array<{ food_id, food_name, original_grams, new_grams }>;
+  meta?: {
+    g10Status: G10Status;
+    implicitFatRatio: number;
+    normalizationApplied: boolean;
+    finalValidation?: FinalValidationResult;
+  };
+}
+
+--------------------------------------------------------------------------------
+FUNÇÕES PRINCIPAIS
+--------------------------------------------------------------------------------
+
+// Carregar configurações do admin
+async function loadOptimizerSettings(supabase): Promise<OptimizerSettings> { ... }
+
+// Obter regras por objetivo
+function getObjectiveRules(objective: Objective, settings: OptimizerSettings): ObjectiveRules { ... }
+
+// Logging estruturado
+function logProfileRules(objective, rules, settings): void { ... }
+function logPipelineStage(stage, name, before, after, targets): void { ... }
+function logFinalResult(objective, totals, targets, iterations, converged): void { ... }
+
+// Parsing e cálculos
+function parseServingGrams(servingSize: string | null): number { ... }
+function getFoodContributionPer100g(food): MacroTargets { ... }
+function calculateTotals(foods, quantities): MacroTargets { ... }
+function calculatePercents(totals, targets): { calories, protein, carbs, fat } { ... }
+
+// Validação
+function validatePlan(totals, targets, objective, settings): { valid, errors } { ... }
+function validateFinalPlan(totals, targets, meta?): FinalValidationResult { ... }
+
+// Pipeline de correção
+function runCorrectionPipeline(foods, quantities, targets, objective, settings, g10Metadata, maxCycles): CorrectionPipelineResult { ... }
+
+// Refinamento final
+function runFinalRefinement(foods, quantities, targets, contributions, maxIterations): { quantities, iterations, converged } { ... }
+
+--------------------------------------------------------------------------------
+HANDLER HTTP
+--------------------------------------------------------------------------------
+
+serve(async (req) => {
+  // 1. Validar rate limit e limites de ajuste
+  // 2. Carregar configurações do admin
+  // 3. Mapear objetivo e construir metadados G-10
+  // 4. Buscar refeições do plano
+  // 5. Processar cada opção (1, 2, 3)
+  // 6. Executar pipeline de correção
+  // 7. Executar refinamento final
+  // 8. Validar com validateFinalPlan
+  // 9. Persistir mudanças ou retornar erro
+});
+
+--------------------------------------------------------------------------------
+ESTRUTURA DE RESPOSTA
+--------------------------------------------------------------------------------
+
+{
+  success: boolean,
+  result: RebalanceResult,
+  currentMacros: MacroTargets,
+  targetMacros: MacroTargets,
+  proposedMacros: MacroTargets,
+  g10Meta: { g10Status, implicitFatRatio, normalizationApplied },
+  finalValidation: FinalValidationResult,
+  optionResults: Array<{ optionNumber, converged, iterations, finalTotals, foodChanges, normalizationApplied }>,
+  adjustments: Array<{ mealOptionFoodId, mealId, mealOptionId, mealName, foodName, foodId, originalGrams, newGrams, reason }>,
+  explanation: string,
+  warnings: string[],
+}
+
+================================================================================
+                         TABELA DE REFERÊNCIA RÁPIDA
+================================================================================
+
+TOLERÂNCIAS POR OBJETIVO:
+
+  | Objetivo | Calorias   | Proteína | Carboidratos | Gordura   |
+  |----------|------------|----------|--------------|-----------|
+  | Cut      | 95-100%    | ≥95%     | ≥90%         | ≤110-115% |
+  | Maintain | 95-105%    | ≥90%     | ≥90%         | ≤115-120% |
+  | Bulk     | 95-105%    | ≥85%     | ≥80%         | ≤120-130% |
+
+PRIORIDADE DE AJUSTE:
+
+  Para REDUZIR calorias:
+    1. Gorduras puras (azeite, oleaginosas)
+    2. Carboidratos
+    3. NUNCA proteínas
+
+  Para AUMENTAR calorias:
+    1. Carboidratos
+    2. Proteínas
+    3. Gorduras (último recurso, não para cut)
+
+================================================================================
+                         FIM DO DOCUMENTO
+================================================================================
+
+Gerado automaticamente pelo NutriaPlan
+Versão do rebalanceador: v2
+Data: 2026-02-06
