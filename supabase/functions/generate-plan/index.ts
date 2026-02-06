@@ -19,6 +19,47 @@ const MAIN_MEALS = ["breakfast", "lunch", "dinner"];
 const CANONICAL_CATS = ["carboidratos", "proteinas", "gorduras", "vegetais", "frutas", "laticinios", "leguminosas", "mistos"];
 const SCALE_LIMITS: Record<string, { min: number; max: number }> = { proteinas: { min: 50, max: 350 }, carboidratos: { min: 50, max: 400 }, leguminosas: { min: 40, max: 250 }, vegetais: { min: 30, max: 300 }, frutas: { min: 50, max: 300 }, laticinios: { min: 30, max: 250 }, gorduras: { min: 5, max: 30 } };
 
+// =====================================================
+// REGRAS DE BLOQUEIO DE ÂNCORAS GORDAS (v5.8.1)
+// =====================================================
+const FATTY_ANCHOR_RULES = {
+  MAX_FAT_PROTEIN: 8,      // Proteínas com >8g gordura/100g → bloqueadas
+  MAX_FAT_DAIRY: 8,        // Laticínios com >8g gordura/100g → bloqueadas
+  MAX_FAT_CARBS: 5,        // Carboidratos com >5g gordura/100g → bloqueadas
+  BLOCKED_KEYWORDS: ["oleaginosa", "castanha", "amendoim", "nozes", "amêndoa", "linhaça", "chia", "coco", "queijo amarelo", "queijo prato", "queijo mussarela", "queijo cheddar"],
+};
+
+/**
+ * Verifica se um alimento deve ser bloqueado como âncora primária
+ * devido ao alto teor de gordura ou tipo problemático.
+ */
+function isFattyAnchor(f: Food): boolean {
+  const cat = (f.category || "").toLowerCase();
+  const name = f.name.toLowerCase();
+  
+  // Regra 1: Palavras-chave bloqueadas (oleaginosas, sementes gordas, etc.)
+  if (FATTY_ANCHOR_RULES.BLOCKED_KEYWORDS.some(kw => name.includes(kw))) {
+    return true;
+  }
+  
+  // Regra 2: Proteínas com >8g gordura/100g
+  if (cat === "proteinas" && f.fat > FATTY_ANCHOR_RULES.MAX_FAT_PROTEIN) {
+    return true;
+  }
+  
+  // Regra 3: Laticínios com >8g gordura/100g
+  if (cat === "laticinios" && f.fat > FATTY_ANCHOR_RULES.MAX_FAT_DAIRY) {
+    return true;
+  }
+  
+  // Regra 4: Carboidratos com >5g gordura/100g
+  if (cat === "carboidratos" && f.fat > FATTY_ANCHOR_RULES.MAX_FAT_CARBS) {
+    return true;
+  }
+  
+  return false;
+}
+
 const log = (m: string, d?: unknown) => console.log(JSON.stringify({ ts: new Date().toISOString(), m, ...(d && typeof d === "object" ? d : {}) }));
 
 function unitConv(f: Food, g: number): { display_quantity: number; display_unit: string; calculated_grams: number } {
@@ -63,10 +104,15 @@ async function loadData(sb: any) {
 function buildMeal(mt: string, opt: number, roles: any[], foods: Food[], anchors: Map<string, AnchorFood[]>, usedG: Set<string>, usedP: Set<string>, pref: string[]): MealResult {
   const sel: FoodSelection[] = [], usedM = new Set<string>(), filled = new Set<string>(), combined = new Set([...usedG, ...usedP]);
   const prefSet = new Set(pref.map(p => p.toLowerCase()));
-  // Anchors first
+  // Anchors first - aplicar filtro de âncoras gordas (v5.8.1)
   for (const [rn, ancs] of anchors.entries()) {
     if (filled.has(rn.split("_")[0])) continue;
-    const avail = ancs.filter(a => !combined.has(a.food.id) && (a.option_number === 0 || a.option_number === opt));
+    // Filtrar âncoras: excluir usadas + excluir gordas demais para papel primário
+    const avail = ancs.filter(a => 
+      !combined.has(a.food.id) && 
+      (a.option_number === 0 || a.option_number === opt) &&
+      !isFattyAnchor(a.food)
+    );
     const anc = avail.find(a => a.option_number === opt) || avail[0];
     if (anc?.food) {
       const cv = unitConv(anc.food, anc.default_quantity_grams);
