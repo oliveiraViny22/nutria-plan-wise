@@ -476,7 +476,7 @@ export function AIRebalancer({
         <Button
           variant="secondary"
           size="lg"
-          className="gap-2 px-6 border border-border/50"
+          className="gap-2 px-6 border border-border/50 transition-all duration-300 hover:border-blue-500/50 hover:bg-blue-500/10 hover:text-blue-600 dark:hover:text-blue-400 hover:shadow-[0_0_20px_rgba(59,130,246,0.3)]"
           onClick={handleOptimize}
           disabled={loading || isLimitReached}
         >

@@ -73,14 +73,12 @@ export function DashboardActions({
         whileTap={{ scale: 0.98 }}
       >
         <Button
-          variant="premium"
+          variant="secondary"
           size="lg"
-          className="gap-2 relative overflow-hidden group px-6"
+          className="gap-2 px-6 border border-border/50 transition-all duration-300 hover:border-emerald-500/50 hover:bg-emerald-500/10 hover:text-emerald-600 dark:hover:text-emerald-400 hover:shadow-[0_0_20px_rgba(16,185,129,0.3)]"
           onClick={onGeneratePlan}
           disabled={generating || generatingV5 || isLimitReachedDiet}
         >
-          <span className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 bg-gradient-to-r from-transparent via-white/20 to-transparent" />
-          
           {generatingV5 ? (
             <>
               <Loader2 className="w-5 h-5 animate-spin" />
@@ -91,7 +89,7 @@ export function DashboardActions({
               <UtensilsCrossed className="w-5 h-5" />
               <span>Gerar Plano</span>
               {usage && !usage.diets.isUnlimited && (
-                <span className="ml-1 px-2 py-0.5 bg-white/20 rounded-full text-xs">
+                <span className="ml-1 px-2 py-0.5 bg-muted rounded-full text-xs">
                   {usage.diets.remaining}/{usage.diets.limit}
                 </span>
               )}
