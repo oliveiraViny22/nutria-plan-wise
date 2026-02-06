@@ -1634,8 +1634,8 @@ serve(async (req) => {
       const fatDelta = Math.abs(percents.fat - 100);
       
       // NOVA LÓGICA: Otimizar mesmo se "válido" mas com desvios significativos
-      // Threshold: Se qualquer macro desviar >5% da meta, aplicar refinamento
-      const OPTIMIZATION_THRESHOLD = 5; // 5% de desvio
+      // Threshold: Se qualquer macro desviar >3% da meta, aplicar refinamento
+      const OPTIMIZATION_THRESHOLD = 3; // 3% de desvio (precisão alta)
       const needsOptimization = 
         calorieDelta > OPTIMIZATION_THRESHOLD ||
         proteinDelta > OPTIMIZATION_THRESHOLD ||
