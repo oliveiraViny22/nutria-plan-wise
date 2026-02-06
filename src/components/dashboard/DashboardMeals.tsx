@@ -136,17 +136,6 @@ export function DashboardMeals({
           locked={!isPaidUser}
         />
       )}
-      
-      {/* Save Plan CTA */}
-      {!isPlanSaved && !isLinkedStudent && planId && (
-        <div id="save-plan-section">
-          <SavePlanButton 
-            planId={planId}
-            isSaved={isPlanSaved}
-            onSave={onPlanSaved}
-          />
-        </div>
-      )}
 
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
         {meals.map((meal, index) => (
@@ -187,6 +176,18 @@ export function DashboardMeals({
           </motion.div>
         ))}
       </div>
+      
+      {/* Save Plan CTA - below meals, centered */}
+      {!isPlanSaved && !isLinkedStudent && planId && (
+        <div id="save-plan-section" className="flex justify-center pt-2">
+          <SavePlanButton 
+            planId={planId}
+            isSaved={isPlanSaved}
+            onSave={onPlanSaved}
+            compact
+          />
+        </div>
+      )}
     </motion.section>
   );
 }
