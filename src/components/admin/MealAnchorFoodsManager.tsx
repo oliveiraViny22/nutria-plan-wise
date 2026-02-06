@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Loader2, Plus, Anchor, UtensilsCrossed, Save, Coffee, Apple, Sun, Moon } from "lucide-react";
 import { MultiFoodSelect } from "@/components/MultiFoodSelect";
 import { 
@@ -392,35 +393,37 @@ export function MealAnchorFoodsManager() {
                       <p className="text-sm">Nenhuma âncora para {tab.label.toLowerCase()}</p>
                     </div>
                   ) : (
-                    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={(e) => handleDragEnd(e, items)}>
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead className="w-10"></TableHead>
-                            <TableHead>Alimento</TableHead>
-                            <TableHead>Papel</TableHead>
-                            <TableHead>Opção</TableHead>
-                            <TableHead>Objetivo</TableHead>
-                            <TableHead>Qtd</TableHead>
-                            <TableHead>Ativo</TableHead>
-                            <TableHead className="w-[100px]">Ações</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          <SortableContext items={items.map((a) => a.id)} strategy={verticalListSortingStrategy}>
-                            {items.map((anchor) => (
-                              <SortableAnchorRow
-                                key={anchor.id}
-                                anchor={anchor}
-                                onEdit={handleEdit}
-                                onToggle={(id, is_active) => toggleMutation.mutate({ id, is_active })}
-                                onDelete={(id) => deleteMutation.mutate(id)}
-                              />
-                            ))}
-                          </SortableContext>
-                        </TableBody>
-                      </Table>
-                    </DndContext>
+                    <ScrollArea className="max-h-[400px]">
+                      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={(e) => handleDragEnd(e, items)}>
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="w-10"></TableHead>
+                              <TableHead>Alimento</TableHead>
+                              <TableHead>Papel</TableHead>
+                              <TableHead>Opção</TableHead>
+                              <TableHead>Objetivo</TableHead>
+                              <TableHead>Qtd</TableHead>
+                              <TableHead>Ativo</TableHead>
+                              <TableHead className="w-[100px]">Ações</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            <SortableContext items={items.map((a) => a.id)} strategy={verticalListSortingStrategy}>
+                              {items.map((anchor) => (
+                                <SortableAnchorRow
+                                  key={anchor.id}
+                                  anchor={anchor}
+                                  onEdit={handleEdit}
+                                  onToggle={(id, is_active) => toggleMutation.mutate({ id, is_active })}
+                                  onDelete={(id) => deleteMutation.mutate(id)}
+                                />
+                              ))}
+                            </SortableContext>
+                          </TableBody>
+                        </Table>
+                      </DndContext>
+                    </ScrollArea>
                   )}
                 </TabsContent>
               );
