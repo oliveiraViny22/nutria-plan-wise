@@ -45,15 +45,15 @@ export function LockedFeaturePreview({
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      className={`relative overflow-hidden rounded-xl h-full min-h-[120px] ${className}`}
+      className={`relative overflow-hidden rounded-xl ${className}`}
     >
       {/* Blurred content - maintains layout flow */}
-      <div className="blur-[6px] select-none pointer-events-none opacity-75 h-full">
+      <div className="blur-[6px] select-none pointer-events-none opacity-75">
         {children}
       </div>
 
       {/* Overlay with CTA - contained within parent bounds */}
-      <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/40 backdrop-blur-[2px] z-10">
+      <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/60 backdrop-blur-[2px] z-10">
         <motion.div
           initial={{ scale: 0.9, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}

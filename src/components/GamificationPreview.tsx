@@ -95,26 +95,22 @@ export function GamificationPreview({ isLocked }: GamificationPreviewProps) {
   }
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4 auto-rows-fr">
-      <div className="min-h-[120px]">
-        <LockedFeaturePreview
-          featureName="Sequência de Adesão"
-          featureKey="gamification_streak"
-          description="Acompanhe sua consistência e ganhe conquistas"
-        >
-          <MockAdherenceStreak />
-        </LockedFeaturePreview>
-      </div>
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4">
+      <LockedFeaturePreview
+        featureName="Sequência de Adesão"
+        featureKey="gamification_streak"
+        description="Acompanhe sua consistência e ganhe conquistas"
+      >
+        <MockAdherenceStreak />
+      </LockedFeaturePreview>
       
-      <div className="min-h-[120px]">
-        <LockedFeaturePreview
-          featureName="Registro de Progresso"
-          featureKey="progress_tracking"
-          description="Acompanhe peso, medidas e evolução corporal"
-        >
-          <MockProgressTracking />
-        </LockedFeaturePreview>
-      </div>
+      <LockedFeaturePreview
+        featureName="Registro de Progresso"
+        featureKey="progress_tracking"
+        description="Acompanhe peso, medidas e evolução corporal"
+      >
+        <MockProgressTracking />
+      </LockedFeaturePreview>
     </div>
   );
 }
