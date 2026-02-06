@@ -160,18 +160,70 @@ function unitConv(f: Food, g: number): { display_quantity: number; display_unit:
   return Math.abs(fg - g) / g <= 0.15 ? { display_quantity: Math.max(f.unit_increment || 1, u), display_unit: f.unit_name, calculated_grams: fg } : { display_quantity: Math.round(g), display_unit: "g", calculated_grams: g };
 }
 
+/**
+ * Normaliza e valida restrições, detectando redundâncias e incompatibilidades.
+ * Ex: Vegano + Lactose é redundante; Vegano + Pescetariano é incompatível.
+ */
+function validateCrossRestrictions(restrictions: string[]): { normalized: string[]; warnings: string[] } {
+  const normalized = restrictions.map(r => r.toLowerCase().trim());
+  const warnings: string[] = [];
+  
+  const has = (kw: string) => normalized.some(r => r.includes(kw));
+  
+  // Redundâncias: Vegano já exclui laticínios
+  if (has("vegano") && has("lactose")) {
+    warnings.push("Vegano já exclui laticínios (redundante com intolerância à lactose)");
+  }
+  
+  // Incompatibilidades
+  if (has("vegano") && has("pescetariano")) {
+    warnings.push("Vegano e Pescetariano são incompatíveis - usando Vegano");
+  }
+  
+  return { normalized, warnings };
+}
+
 function filterFoods(all: Food[], avoided: string[], restrictions: string[]): Food[] {
   const av = new Set(avoided.map(a => a.toLowerCase()));
+  const { normalized: restr, warnings } = validateCrossRestrictions(restrictions);
+  
+  if (warnings.length > 0) {
+    log("RestrictionWarnings", { warnings });
+  }
+  
+  const hasLowCarb = restr.some(r => r.includes("low carb") || r.includes("lowcarb") || r.includes("baixo carb"));
+  const hasVegano = restr.some(r => r.includes("vegano"));
+  const hasPescetariano = restr.some(r => r.includes("pescetariano"));
+  const hasLactose = restr.some(r => r.includes("lactose"));
+  const hasGluten = restr.some(r => r.includes("gluten") || r.includes("glúten"));
+  
   return all.filter(f => {
     const c = (f.category || "").toLowerCase(), n = f.name.toLowerCase();
+    
+    // Filtros base
     if (!CANONICAL_CATS.includes(c) || c === "suplementos" || f.is_optional) return false;
     if (av.has(n) || [...av].some(a => n.includes(a))) return false;
-    for (const r of restrictions) {
-      const rl = r.toLowerCase();
-      if (rl.includes("lactose") && c === "laticinios") return false;
-      if (rl.includes("gluten") && (n.includes("trigo") || n.includes("pão"))) return false;
-      if (rl.includes("vegano") && (c === "proteinas" || c === "laticinios")) return false;
+    
+    // Low Carb: bloquear alimentos com >15g carbs/100g
+    if (hasLowCarb && f.carbs > 15) return false;
+    
+    // Lactose: bloquear laticínios
+    if (hasLactose && c === "laticinios") return false;
+    
+    // Glúten: bloquear trigo, pão, massas
+    if (hasGluten && (n.includes("trigo") || n.includes("pão") || n.includes("pao") || n.includes("massa") || n.includes("macarrão"))) return false;
+    
+    // Vegano: bloquear proteínas animais e laticínios (prevalece sobre pescetariano)
+    if (hasVegano && (c === "proteinas" || c === "laticinios")) return false;
+    
+    // Pescetariano (se não for vegano): bloquear carnes, permitir peixes
+    if (hasPescetariano && !hasVegano && c === "proteinas") {
+      const isPeixe = n.includes("peixe") || n.includes("salmão") || n.includes("salmon") || 
+                      n.includes("atum") || n.includes("tilápia") || n.includes("tilapia") ||
+                      n.includes("sardinha") || n.includes("bacalhau") || n.includes("camarão");
+      if (!isPeixe) return false;
     }
+    
     return true;
   });
 }
@@ -220,6 +272,12 @@ function buildMeal(mt: string, opt: number, roles: any[], foods: Food[], anchors
   const usedGroups = new Set<string>(); // Rastrear grupos similares (ex: iogurte)
   const prefSet = new Set(pref.map(p => p.toLowerCase()));
   const isSnack = SNACK_MEALS.includes(mt);
+  const isMainMeal = MAIN_MEALS.includes(mt);
+  
+  // Contrato: proteína mínima por tipo de refeição
+  const minProteinRequired = isMainMeal 
+    ? GENERATOR_CONTRACT.MIN_PROTEIN_MAIN_MEAL_GRAMS  // 20g
+    : GENERATOR_CONTRACT.MIN_PROTEIN_SNACK_GRAMS;     // 5g
   
   // Helper para aplicar limites de quantidade baseado no tipo de refeição
   const applyQuantityLimits = (food: Food, baseQty: number): number => {
@@ -233,6 +291,15 @@ function buildMeal(mt: string, opt: number, roles: any[], foods: Food[], anchors
   const registerFoodGroup = (food: Food) => {
     const group = getFoodGroup(food.name);
     if (group) usedGroups.add(group);
+  };
+  
+  // Helper para calcular proteína atual da refeição
+  const getCurrentProtein = (): number => {
+    let prot = 0;
+    for (const s of sel) {
+      prot += s.food.protein * (s.quantity_grams / 100);
+    }
+    return prot;
   };
   
   // Anchors first - aplicar filtro de âncoras gordas (v5.8.1) + detecção de duplicados
@@ -306,6 +373,79 @@ function buildMeal(mt: string, opt: number, roles: any[], foods: Food[], anchors
       registerFoodGroup(f);
     }
   }
+  
+  // =====================================================
+  // GARANTIA DE PROTEÍNA MÍNIMA POR REFEIÇÃO (v5.12)
+  // Se a refeição está abaixo do mínimo de proteína, adicionar
+  // ou aumentar alimento proteico
+  // =====================================================
+  let currentProtein = getCurrentProtein();
+  if (currentProtein < minProteinRequired) {
+    const proteinDeficit = minProteinRequired - currentProtein;
+    
+    // Tentar aumentar porção de alimento proteico existente
+    const proteinFoods = sel.filter(s => s.food.protein >= 15); // Alimentos com boa densidade proteica
+    if (proteinFoods.length > 0) {
+      // Ordenar por densidade proteica (maior primeiro)
+      proteinFoods.sort((a, b) => b.food.protein - a.food.protein);
+      const targetFood = proteinFoods[0];
+      
+      // Calcular quanto precisa adicionar
+      const gramsNeeded = (proteinDeficit / targetFood.food.protein) * 100;
+      const cat = (targetFood.food.category || "").toLowerCase();
+      const limits = getCategoryLimits(cat, isSnack);
+      const newQty = Math.min(limits.max, targetFood.quantity_grams + gramsNeeded);
+      const actualIncrease = newQty - targetFood.quantity_grams;
+      
+      if (actualIncrease >= 5) {
+        targetFood.quantity_grams = Math.round(newQty / 5) * 5;
+        const cv = unitConv(targetFood.food, targetFood.quantity_grams);
+        targetFood.display_quantity = cv.display_quantity;
+        targetFood.display_unit = cv.display_unit;
+        
+        log("ProteinBoost", { 
+          mealType: mt,
+          food: targetFood.food.name, 
+          addedGrams: Math.round(actualIncrease),
+          newProtein: Math.round(getCurrentProtein() * 10) / 10,
+          minRequired: minProteinRequired
+        });
+      }
+    } else if (!isSnack) {
+      // Se não há alimento proteico e é refeição principal, tentar adicionar um
+      const proteinCands = foods.filter(f => 
+        !combined.has(f.id) && 
+        !usedM.has(f.id) && 
+        f.protein >= 20 && // Alta densidade proteica
+        !isFattyForRandomSelection(f) &&
+        !hasSimilarFood(f.name, usedGroups)
+      );
+      
+      if (proteinCands.length > 0) {
+        // Priorizar preferidos
+        const pCands = proteinCands.filter(f => [...prefSet].some(p => f.name.toLowerCase().includes(p)));
+        const pool = pCands.length > 0 ? pCands : proteinCands;
+        const f = pool[Math.floor(Math.random() * pool.length)];
+        
+        if (f) {
+          const baseQty = Math.round((proteinDeficit / f.protein) * 100 / 5) * 5;
+          const qty = applyQuantityLimits(f, Math.max(50, baseQty)); // Mínimo 50g
+          const cv = unitConv(f, qty);
+          sel.push({ food: f, role_name: "proteina_boost", quantity_grams: cv.calculated_grams, display_quantity: cv.display_quantity, display_unit: cv.display_unit });
+          usedM.add(f.id);
+          registerFoodGroup(f);
+          
+          log("ProteinFoodAdded", { 
+            mealType: mt,
+            food: f.name, 
+            qty: qty,
+            proteinAdded: Math.round(f.protein * qty / 100 * 10) / 10
+          });
+        }
+      }
+    }
+  }
+  
   let cals = 0, prot = 0, carbs = 0, fat = 0;
   for (const s of sel) { const m = s.quantity_grams / 100; cals += s.food.calories * m; prot += s.food.protein * m; carbs += s.food.carbs * m; fat += s.food.fat * m; }
   return { meal_type: mt, meal_name: MEAL_NAMES[mt] || mt, foods: sel, totals: { calories: Math.round(cals), protein: Math.round(prot * 10) / 10, carbs: Math.round(carbs * 10) / 10, fat: Math.round(fat * 10) / 10 } };
