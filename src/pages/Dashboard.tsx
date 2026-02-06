@@ -319,6 +319,17 @@ export default function Dashboard() {
               tmb={metabolicData?.bmr}
               tdee={metabolicData?.tdee}
               goal={profile?.goal || undefined}
+              canCreatePlan={permissions.can_create_plan && !isLinkedStudent}
+              canAdjust={permissions.can_adjust && !isLinkedStudent}
+              hasPlan={!!currentDietPlan}
+              planId={currentDietPlan?.id}
+              isGenerating={generatingV5}
+              isLimitReachedDiet={isLimitReached('diet')}
+              isLimitReachedAdjustment={isLimitReached('adjustment')}
+              usage={usage ? { diets: usage.diets, adjustments: usage.adjustments } : undefined}
+              userGoal={profile?.goal as 'gain_muscle' | 'lose_weight' | 'maintain' | undefined}
+              onGeneratePlan={generateMealPlanV5}
+              onPlanOptimized={fetchCurrentPlan}
             />
 
             <DashboardGamification
@@ -326,34 +337,6 @@ export default function Dashboard() {
               planType={subscriptionPlan?.type}
               mealsLogged={todayMealsLogged}
               totalMeals={meals.length}
-            />
-
-            <DashboardActions
-              canCreatePlan={permissions.can_create_plan}
-              canAdjust={permissions.can_adjust}
-              isLinkedStudent={isLinkedStudent}
-              hasPlan={!!currentDietPlan}
-              planId={currentDietPlan?.id}
-              generating={generating}
-              generatingV5={generatingV5}
-              isLimitReachedDiet={isLimitReached('diet')}
-              isLimitReachedAdjustment={isLimitReached('adjustment')}
-              usage={usage ? { diets: usage.diets, adjustments: usage.adjustments } : undefined}
-              targets={{
-                protein: profile?.protein_target || 150,
-                carbs: profile?.carbs_target || 250,
-                fat: profile?.fat_target || 65,
-                calories: profile?.daily_calories || 2000,
-              }}
-              currentMacros={{
-                protein: currentProtein,
-                carbs: currentCarbs,
-                fat: currentFat,
-                calories: currentCalories,
-              }}
-              userGoal={profile?.goal as 'gain_muscle' | 'lose_weight' | 'maintain' | undefined}
-              onGeneratePlan={generateMealPlanV5}
-              onPlanOptimized={fetchCurrentPlan}
             />
 
             {/* Linked Student Lock Notice */}
