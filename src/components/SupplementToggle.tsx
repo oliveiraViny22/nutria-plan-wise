@@ -71,7 +71,7 @@ export function SupplementToggle({ initialValue = false, onToggle, compact = fal
             inline-flex items-center gap-3 px-5 py-3 rounded-xl
             transition-all duration-300
             ${locked 
-              ? 'bg-muted/50 border border-border cursor-not-allowed' 
+              ? 'bg-gradient-to-r from-purple-500/5 via-violet-500/10 to-purple-500/5 border border-purple-500/20 shadow-[0_0_15px_rgba(147,51,234,0.15)] hover:shadow-[0_0_20px_rgba(147,51,234,0.25)] hover:border-purple-500/30 cursor-pointer' 
               : 'bg-gradient-to-r from-purple-600/20 via-violet-500/20 to-purple-600/20 border-2 border-purple-500/50 shadow-[0_0_20px_rgba(147,51,234,0.3)] hover:shadow-[0_0_30px_rgba(147,51,234,0.5)] hover:border-purple-400 hover:scale-[1.03] active:scale-[0.98]'
             }
           `}
@@ -79,14 +79,14 @@ export function SupplementToggle({ initialValue = false, onToggle, compact = fal
           <div className={`
             w-9 h-9 rounded-full flex items-center justify-center
             ${locked 
-              ? 'bg-muted' 
+              ? 'bg-gradient-to-br from-purple-400/30 to-violet-500/30 shadow-sm shadow-purple-500/20' 
               : 'bg-gradient-to-br from-purple-500 via-violet-500 to-purple-600 shadow-lg shadow-purple-500/50'
             }
           `}>
-            <Pill className={`h-4 w-4 ${locked ? 'text-muted-foreground' : 'text-white drop-shadow-sm'}`} />
+            <Pill className={`h-4 w-4 ${locked ? 'text-purple-500/70' : 'text-white drop-shadow-sm'}`} />
           </div>
           <div className="flex items-center gap-2">
-            <span className={`text-sm font-semibold ${locked ? 'text-muted-foreground' : 'text-purple-700 dark:text-purple-300'}`}>
+            <span className={`text-sm font-semibold ${locked ? 'text-purple-600/70 dark:text-purple-400/70' : 'text-purple-700 dark:text-purple-300'}`}>
               Suplementação
             </span>
             {locked ? (
