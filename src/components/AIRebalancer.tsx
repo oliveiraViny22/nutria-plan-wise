@@ -656,14 +656,16 @@ export function AIRebalancer({
   };
 
   const hasAdjustments = result && result.adjustments && result.adjustments.length > 0;
-  
-  // Verificar se todas as opções estão validadas (100% convergidas)
-  const allOptionsValid = result?.optionValidations && 
-    result.optionValidations.length > 0 && 
-    result.optionValidations.every(v => v.isValid);
-  
-  // Plano está OK se todas as opções estão válidas (não há mais ajustes necessários)
-  const isPlanFullyValid = allOptionsValid;
+
+  const hasOptionValidations = !!(result?.optionValidations && result.optionValidations.length > 0);
+
+  // Observação importante:
+  // - optionValidations refletem a validação do PLANO PROPOSTO (preview)
+  // - portanto, NÃO podemos concluir "já está otimizado" se existem ajustes a aplicar
+  const allOptionsValid = hasOptionValidations && result!.optionValidations!.every(v => v.isValid);
+
+  // Só é "já otimizado" quando não há ajustes propostos (nada para aplicar)
+  const isAlreadyOptimized = !hasAdjustments && (allOptionsValid || !hasOptionValidations);
 
   return (
     <>
@@ -712,15 +714,15 @@ export function AIRebalancer({
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              {isPlanFullyValid ? (
+              {isAlreadyOptimized ? (
                 <Check className="w-5 h-5 text-primary" />
               ) : (
                 <Sparkles className="w-5 h-5 text-primary" />
               )}
-              {isPlanFullyValid ? 'Metas Atingidas' : 'Validação Nutricional'}
+              {isAlreadyOptimized ? 'Metas Atingidas' : 'Validação Nutricional'}
             </DialogTitle>
             <DialogDescription>
-              {isPlanFullyValid 
+              {isAlreadyOptimized
                 ? 'Seu plano já está alinhado com suas metas'
                 : 'Conferência de metas e ajustes necessários'
               }
@@ -729,8 +731,8 @@ export function AIRebalancer({
 
           {result && (
             <div className="space-y-4">
-              {/* PLAN FULLY VALID - Show celebration and metrics */}
-              {isPlanFullyValid ? (
+              {/* ALREADY OPTIMIZED (sem ajustes) */}
+              {isAlreadyOptimized ? (
                 <>
                   {/* Current percentages display */}
                   {result.currentPercentages && (
@@ -860,26 +862,9 @@ export function AIRebalancer({
                     />
                   )}
 
-                  {/* Full Convergence Celebration */}
-                  {result.optionValidations && 
-                   result.optionValidations.length > 0 && 
-                   result.optionValidations.every(v => v.isValid) && (
+                  {/* Full Convergence Celebration (apenas quando não há ajustes a aplicar) */}
+                  {isAlreadyOptimized && allOptionsValid && (
                     <FullConvergenceCelebration show={true} />
-                  )}
-
-                  {/* No adjustments message */}
-                  {!hasAdjustments && !isPlanFullyValid && (!result.optionValidations || result.optionValidations.length === 0) && (
-                    <div className="flex items-center gap-3 p-4 rounded-xl bg-primary/5 border border-primary/20">
-                      <Check className="w-5 h-5 text-primary shrink-0" />
-                      <div>
-                        <p className="text-sm font-medium text-foreground">
-                          Seu plano já está otimizado!
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          A IA não encontrou ajustes necessários.
-                        </p>
-                      </div>
-                    </div>
                   )}
                 </>
               )}
@@ -887,7 +872,7 @@ export function AIRebalancer({
           )}
 
           <DialogFooter className="gap-2 sm:gap-0">
-            {isPlanFullyValid ? (
+            {isAlreadyOptimized ? (
               <Button onClick={handleCancel} className="w-full sm:w-auto">
                 <Check className="w-4 h-4 mr-2" />
                 Entendido
