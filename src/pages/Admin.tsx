@@ -10,6 +10,7 @@
  */
 
 import { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { 
   Settings, 
@@ -41,7 +42,7 @@ import { useRealtimeSettings } from '@/hooks/useRealtimeSettings';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { FeatureFlagsManager } from '@/components/admin/FeatureFlagsManager';
 import { RateLimitsManager } from '@/components/admin/RateLimitsManager';
-import { AdminCardNav } from '@/components/admin/AdminCardNav';
+import { AdminCardNav, useAdminNavState } from '@/components/admin/AdminCardNav';
 
 // Refactored tab components
 import { AdminMetricsTab, DashboardMetrics, TimeSeriesDataPoint } from '@/components/admin/AdminMetricsTab';
@@ -167,6 +168,9 @@ export default function Admin() {
 
   const [activeTab, setActiveTab] = useState('metrics');
   const [editedSettings, setEditedSettings] = useState<Record<string, unknown>>({});
+  
+  // Navigation state for content visibility
+  const { isExpanded: isNavExpanded, expandedCategoryId, handleExpandedChange } = useAdminNavState();
 
   // Metrics state
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
@@ -174,6 +178,10 @@ export default function Admin() {
   const [timeSeriesData, setTimeSeriesData] = useState<TimeSeriesDataPoint[]>([]);
   const [timeSeriesLoading, setTimeSeriesLoading] = useState(false);
   const [downloadingDoc, setDownloadingDoc] = useState<string | null>(null);
+
+  // Check if active tab belongs to the expanded category
+  const isContentVisible = isNavExpanded && 
+    TAB_CATEGORIES.find(cat => cat.id === expandedCategoryId)?.tabs.some(tab => tab.id === activeTab);
 
   useEffect(() => {
     if (!roleLoading && !isAdmin) {
@@ -462,115 +470,148 @@ export default function Admin() {
               categories={TAB_CATEGORIES}
               activeTab={activeTab}
               onTabChange={setActiveTab}
+              onExpandedChange={handleExpandedChange}
             />
           </div>
 
-          {/* Metrics Tab */}
-          <TabsContent value="metrics">
-            <AdminMetricsTab
-              metrics={metrics}
-              metricsLoading={metricsLoading}
-              timeSeriesData={timeSeriesData}
-              timeSeriesLoading={timeSeriesLoading}
-            />
-          </TabsContent>
+          {/* Content Area - Only visible when category is expanded */}
+          <AnimatePresence mode="wait">
+            {isContentVisible && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                transition={{ duration: 0.2 }}
+                className="max-w-6xl mx-auto"
+              >
+                {/* Metrics Tab */}
+                <TabsContent value="metrics" className="mt-0">
+                  <AdminMetricsTab
+                    metrics={metrics}
+                    metricsLoading={metricsLoading}
+                    timeSeriesData={timeSeriesData}
+                    timeSeriesLoading={timeSeriesLoading}
+                  />
+                </TabsContent>
 
-          {/* Users Tab */}
-          <TabsContent value="users">
-            <AdminUsersTab
-              users={users}
-              usersLoading={usersLoading}
-              usersTotal={usersTotal}
-              savingKeys={savingKeys}
-              fetchUsers={fetchUsers}
-              updateUser={updateUser}
-              toggleUserRole={toggleUserRole}
-              previewDeleteUser={previewDeleteUser}
-              deleteUser={deleteUser}
-              getUserUsage={getUserUsage}
-              updateUserUsage={updateUserUsage}
-            />
-          </TabsContent>
+                {/* Users Tab */}
+                <TabsContent value="users" className="mt-0">
+                  <AdminUsersTab
+                    users={users}
+                    usersLoading={usersLoading}
+                    usersTotal={usersTotal}
+                    savingKeys={savingKeys}
+                    fetchUsers={fetchUsers}
+                    updateUser={updateUser}
+                    toggleUserRole={toggleUserRole}
+                    previewDeleteUser={previewDeleteUser}
+                    deleteUser={deleteUser}
+                    getUserUsage={getUserUsage}
+                    updateUserUsage={updateUserUsage}
+                  />
+                </TabsContent>
 
-          {/* Foods Tab */}
-          <TabsContent value="foods">
-            <AdminFoodsTab
-              foods={foods}
-              foodsLoading={foodsLoading}
-              foodsTotal={foodsTotal}
-              foodImports={foodImports}
-              loading={loading}
-              savingKeys={savingKeys}
-              fetchFoods={fetchFoods}
-              updateFood={updateFood}
-              deleteFood={deleteFood}
-              normalizeFoodNames={normalizeFoodNames}
-              downloadTemplate={downloadTemplate}
-              importFoods={importFoods}
-            />
-          </TabsContent>
+                {/* Foods Tab */}
+                <TabsContent value="foods" className="mt-0">
+                  <AdminFoodsTab
+                    foods={foods}
+                    foodsLoading={foodsLoading}
+                    foodsTotal={foodsTotal}
+                    foodImports={foodImports}
+                    loading={loading}
+                    savingKeys={savingKeys}
+                    fetchFoods={fetchFoods}
+                    updateFood={updateFood}
+                    deleteFood={deleteFood}
+                    normalizeFoodNames={normalizeFoodNames}
+                    downloadTemplate={downloadTemplate}
+                    importFoods={importFoods}
+                  />
+                </TabsContent>
 
-          {/* Settings Tab */}
-          <TabsContent value="settings">
-            <AdminSettingsTab
-              settings={formattedSettings}
-              settingsLoading={settingsLoading}
-              savingKeys={savingKeys}
-              savedKeys={savedKeys}
-              errorKeys={errorKeys}
-              editedSettings={editedSettings}
-              onSettingChange={handleSettingChange}
-              onSaveSetting={handleSaveSetting}
-            />
-          </TabsContent>
+                {/* Settings Tab */}
+                <TabsContent value="settings" className="mt-0">
+                  <AdminSettingsTab
+                    settings={formattedSettings}
+                    settingsLoading={settingsLoading}
+                    savingKeys={savingKeys}
+                    savedKeys={savedKeys}
+                    errorKeys={errorKeys}
+                    editedSettings={editedSettings}
+                    onSettingChange={handleSettingChange}
+                    onSaveSetting={handleSaveSetting}
+                  />
+                </TabsContent>
 
-          {/* Plans Tab */}
-          <TabsContent value="plans">
-            <AdminPlansTab
-              plans={plans}
-              plansLoading={plansLoading}
-              savingKeys={savingKeys}
-              savedKeys={savedKeys}
-              updatePlan={updatePlan}
-            />
-          </TabsContent>
+                {/* Plans Tab */}
+                <TabsContent value="plans" className="mt-0">
+                  <AdminPlansTab
+                    plans={plans}
+                    plansLoading={plansLoading}
+                    savingKeys={savingKeys}
+                    savedKeys={savedKeys}
+                    updatePlan={updatePlan}
+                  />
+                </TabsContent>
 
-          {/* Audit Tab */}
-          <TabsContent value="audit">
-            <SystemAudit
-              auditLogs={auditLogs}
-              auditTotal={auditTotal}
-              loading={loading}
-              fetchAuditLogs={fetchAuditLogs}
-            />
-          </TabsContent>
+                {/* Audit Tab */}
+                <TabsContent value="audit" className="mt-0">
+                  <SystemAudit
+                    auditLogs={auditLogs}
+                    auditTotal={auditTotal}
+                    loading={loading}
+                    fetchAuditLogs={fetchAuditLogs}
+                  />
+                </TabsContent>
 
-          {/* Docs Tab */}
-          <TabsContent value="docs">
-            <AdminDocsTab
-              downloadingDoc={downloadingDoc}
-              onDownloadDocumentation={handleDownloadDocumentation}
-              onDownloadCode={handleDownloadCode}
-            />
-          </TabsContent>
+                {/* Docs Tab */}
+                <TabsContent value="docs" className="mt-0">
+                  <AdminDocsTab
+                    downloadingDoc={downloadingDoc}
+                    onDownloadDocumentation={handleDownloadDocumentation}
+                    onDownloadCode={handleDownloadCode}
+                  />
+                </TabsContent>
 
-          {/* Policies Tab */}
-          <TabsContent value="policies">
-            <AdminPoliciesTab />
-          </TabsContent>
+                {/* Policies Tab */}
+                <TabsContent value="policies" className="mt-0">
+                  <AdminPoliciesTab />
+                </TabsContent>
 
-          {/* Feature Flags Tab */}
-          <TabsContent value="flags">
-            <div className="space-y-6">
-              <FeatureFlagsManager />
-              <RateLimitsManager />
-            </div>
-          </TabsContent>
+                {/* Feature Flags Tab */}
+                <TabsContent value="flags" className="mt-0">
+                  <div className="space-y-6">
+                    <FeatureFlagsManager />
+                    <RateLimitsManager />
+                  </div>
+                </TabsContent>
 
-          {/* Conversion Tab */}
-          <TabsContent value="conversion">
-            <AdminConversionTab />
-          </TabsContent>
+                {/* Conversion Tab */}
+                <TabsContent value="conversion" className="mt-0">
+                  <AdminConversionTab />
+                </TabsContent>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Empty state when no category is expanded */}
+          {!isContentVisible && (
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="flex flex-col items-center justify-center py-16 text-center"
+            >
+              <div className="w-16 h-16 rounded-full bg-muted/50 flex items-center justify-center mb-4">
+                <Database className="h-8 w-8 text-muted-foreground" />
+              </div>
+              <h3 className="text-lg font-medium text-foreground mb-2">
+                Selecione uma categoria
+              </h3>
+              <p className="text-sm text-muted-foreground max-w-md">
+                Clique em um dos cards acima para expandir e acessar as funcionalidades administrativas.
+              </p>
+            </motion.div>
+          )}
         </Tabs>
       </main>
     </div>
