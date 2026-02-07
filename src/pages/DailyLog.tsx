@@ -387,41 +387,50 @@ export default function DailyLog() {
     }
   };
 
+  // Helper to check if a status is "confirmed" (supports both v2 and legacy formats)
+  const isConfirmedStatus = (status?: string) => 
+    ['confirmed', 'late_confirmed', 'CONFIRMADA', 'CONFIRMADA_TARDIA'].includes(status || '');
+  
+  const isSkippedStatus = (status?: string) => 
+    ['skipped', 'PULADA'].includes(status || '');
+  
+  const isOutOfPlanStatus = (status?: string) => 
+    ['out_of_plan', 'FORA_DO_PLANO'].includes(status || '');
+  
+  const isLateConfirmedStatus = (status?: string) => 
+    ['late_confirmed', 'CONFIRMADA_TARDIA'].includes(status || '');
+  
+  const isPendingStatus = (status?: string) => 
+    !status || ['pending', 'PENDENTE'].includes(status);
+
   const getStatusIcon = (status?: string) => {
-    switch (status) {
-      case 'CONFIRMADA':
-      case 'CONFIRMADA_TARDIA':
-        return <CheckCircle2 className="h-5 w-5 text-success" />;
-      case 'PULADA':
-        return <SkipForward className="h-5 w-5 text-warning" />;
-      case 'FORA_DO_PLANO':
-        return <AlertTriangle className="h-5 w-5 text-destructive" />;
-      default:
-        return <Clock className="h-5 w-5 text-muted-foreground" />;
+    if (isConfirmedStatus(status)) {
+      return <CheckCircle2 className="h-5 w-5 text-success" />;
     }
+    if (isSkippedStatus(status)) {
+      return <SkipForward className="h-5 w-5 text-warning" />;
+    }
+    if (isOutOfPlanStatus(status)) {
+      return <AlertTriangle className="h-5 w-5 text-destructive" />;
+    }
+    return <Clock className="h-5 w-5 text-muted-foreground" />;
   };
 
-  // Map legacy status to UI Kit status types
+  // Map legacy/v2 status to UI Kit status types
   const mapStatusToUiKit = (status?: string): 'pending' | 'confirmed' | 'skipped' | 'out_of_plan' | 'late_confirmed' => {
-    switch (status) {
-      case 'CONFIRMADA':
-        return 'confirmed';
-      case 'CONFIRMADA_TARDIA':
-        return 'late_confirmed';
-      case 'PULADA':
-        return 'skipped';
-      case 'FORA_DO_PLANO':
-        return 'out_of_plan';
-      default:
-        return 'pending';
-    }
+    if (isLateConfirmedStatus(status)) return 'late_confirmed';
+    if (isConfirmedStatus(status)) return 'confirmed';
+    if (isSkippedStatus(status)) return 'skipped';
+    if (isOutOfPlanStatus(status)) return 'out_of_plan';
+    return 'pending';
   };
 
   const getStatusBadge = (status?: string) => {
     return <StatusBadge status={mapStatusToUiKit(status)} size="sm" />;
   };
 
-  const completedMeals = meals.filter(m => m.log?.status && m.log.status !== 'PENDENTE').length;
+  // Count completed meals (any status that is not pending)
+  const completedMeals = meals.filter(m => !isPendingStatus(m.log?.status)).length;
   const progress = meals.length > 0 ? (completedMeals / meals.length) * 100 : 0;
 
   return (
@@ -583,7 +592,7 @@ export default function DailyLog() {
                 transition={{ delay: 0.1 + index * 0.05 }}
               >
                 <Card className={`transition-colors ${
-                  meal.log?.status && meal.log.status !== 'PENDENTE'
+                  !isPendingStatus(meal.log?.status)
                     ? 'bg-muted/30 border-muted'
                     : 'hover:border-primary/50'
                 }`}>
@@ -598,14 +607,14 @@ export default function DailyLog() {
                   </CardHeader>
                   <CardContent className="space-y-3">
                     {/* Show confirmed option details if confirmed */}
-                    {meal.log?.status && ['CONFIRMADA', 'CONFIRMADA_TARDIA', 'confirmed', 'late_confirmed'].includes(meal.log.status) && meal.log.confirmed_option_id && (
+                    {isConfirmedStatus(meal.log?.status) && meal.log?.confirmed_option_id && (
                       <div className="p-3 bg-green-50 dark:bg-green-950/30 rounded-lg border border-green-200 dark:border-green-800">
                         <div className="flex items-center gap-2 mb-1">
                           <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
                           <p className="text-sm font-medium text-green-700 dark:text-green-400">
                             {meal.options.find(o => o.id === meal.log?.confirmed_option_id)?.name || `Opção ${meal.options.find(o => o.id === meal.log?.confirmed_option_id)?.option_number}`}
                           </p>
-                          {['CONFIRMADA_TARDIA', 'late_confirmed'].includes(meal.log.status) && (
+                          {isLateConfirmedStatus(meal.log?.status) && (
                             <Badge variant="outline" className="text-[10px] h-5 border-amber-400 text-amber-600">
                               <Clock className="h-3 w-3 mr-0.5" />
                               Tardia
@@ -646,7 +655,7 @@ export default function DailyLog() {
                     )}
 
                     {/* Show exception info if skipped or out of plan */}
-                    {['PULADA', 'skipped'].includes(meal.log?.status || '') && (
+                    {isSkippedStatus(meal.log?.status) && (
                       <div className="p-3 bg-amber-50 dark:bg-amber-950/30 rounded-lg border border-amber-200 dark:border-amber-800">
                         <p className="text-sm text-amber-700 dark:text-amber-400">
                           Refeição pulada
@@ -659,7 +668,7 @@ export default function DailyLog() {
                       </div>
                     )}
 
-                    {['FORA_DO_PLANO', 'out_of_plan'].includes(meal.log?.status || '') && (
+                    {isOutOfPlanStatus(meal.log?.status) && (
                       <div className="p-3 bg-orange-50 dark:bg-orange-950/30 rounded-lg border border-orange-200 dark:border-orange-800">
                         <p className="text-sm text-orange-700 dark:text-orange-400">
                           Comeu fora do plano
@@ -673,7 +682,7 @@ export default function DailyLog() {
                     )}
 
                     {/* Options for pending meals - show all options directly */}
-                    {(!meal.log?.status || ['PENDENTE', 'pending'].includes(meal.log?.status || '')) && (
+                    {isPendingStatus(meal.log?.status) && (
                       <div className="space-y-3">
                         <p className="text-sm font-medium text-muted-foreground">Qual opção você consumiu?</p>
                         <div className="grid gap-2">
