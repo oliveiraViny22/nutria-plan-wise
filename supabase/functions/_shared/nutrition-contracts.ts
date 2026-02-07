@@ -49,6 +49,12 @@ export const GENERATOR_CONTRACT = {
    * Todas as opções devem ter calorias dentro de ±5% da média.
    */
   MAX_OPTION_CALORIE_VARIANCE_PERCENT: 5,
+  
+  /**
+   * Tolerância máxima de variância de gordura entre opções de uma mesma refeição.
+   * Alinhado com a variância calórica para consistência nutricional.
+   */
+  MAX_OPTION_FAT_VARIANCE_PERCENT: 5,
 } as const;
 
 // =====================================================
