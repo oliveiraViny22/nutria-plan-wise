@@ -411,6 +411,7 @@ export function AIRebalancer({
 
       if (error) throw error;
       
+      // Verificar erro explícito na resposta
       if (data.error) {
         toast.error(data.error);
         return;
@@ -419,12 +420,12 @@ export function AIRebalancer({
       // Verificar status no nível raiz ou dentro de result
       const resultStatus = data.status || data.result?.status;
       const structuralIssue = data.structural_issue || data.result?.structural_issue;
+      const isSuccess = data.success !== false; // Tratar ausência como true
 
-      // Tratar caso de plano estruturalmente inválido (v5.1)
-      if (resultStatus === 'structurally_invalid' || resultStatus === 'error') {
+      // Tratar caso de plano estruturalmente inválido
+      if (resultStatus === 'structurally_invalid') {
         console.error('[AIRebalancer] Plano estruturalmente inválido:', structuralIssue);
         
-        // Verificar se há issue estrutural com sugestão de regeneração
         if (structuralIssue?.reason) {
           toast.error('Plano precisa ser regenerado', {
             description: structuralIssue.reason,
@@ -439,11 +440,33 @@ export function AIRebalancer({
         return;
       }
 
+      // Tratar caso de erro genérico (success: false)
+      if (!isSuccess || resultStatus === 'error') {
+        console.warn('[AIRebalancer] Otimização falhou:', data.explanation);
+        
+        // Mostrar warnings se existirem
+        const warnings = data.warnings as string[] | undefined;
+        if (warnings && warnings.length > 0) {
+          toast.warning('Otimização parcial', {
+            description: warnings.slice(0, 2).join(' | '),
+            duration: 8000,
+          });
+        } else {
+          toast.error('Não foi possível otimizar o plano', {
+            description: data.explanation || 'Verifique se as metas são realistas para os alimentos disponíveis.',
+            duration: 8000,
+          });
+        }
+        return;
+      }
+
       setResult(data);
       setShowDialog(true);
     } catch (error: unknown) {
       console.error('AI Rebalance error:', error);
-      toast.error('Erro ao calcular ajustes com IA');
+      toast.error('Erro ao calcular ajustes com IA', {
+        description: error instanceof Error ? error.message : 'Tente novamente mais tarde.',
+      });
     } finally {
       setLoading(false);
     }
