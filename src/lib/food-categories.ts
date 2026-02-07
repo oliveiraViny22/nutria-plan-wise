@@ -165,6 +165,79 @@ export function getCategoryDisplayOrder(category: string | null | undefined): nu
  */
 export const EXCLUDED_FROM_AUTO_PLAN: FoodCategory[] = ['suplementos'];
 
+// =====================================================
+// GRUPOS DE SUBSTITUIÇÃO INTERCAMBIÁVEIS
+// =====================================================
+
+/**
+ * Grupos de categorias que podem ser substituídas entre si.
+ * Fontes de proteína são intercambiáveis para maior flexibilidade.
+ */
+export const SUBSTITUTION_GROUPS: Record<string, FoodCategory[]> = {
+  /** Fontes de proteína animal podem ser trocadas entre si */
+  proteinas_animais: ['proteinas', 'peixes', 'frutos_do_mar', 'ovos'],
+};
+
+/**
+ * Verifica se duas categorias pertencem ao mesmo grupo de substituição
+ */
+export function areCategoriesInterchangeable(
+  categoryA: string | null | undefined,
+  categoryB: string | null | undefined
+): boolean {
+  if (!categoryA || !categoryB) return false;
+  
+  const normalizedA = categoryA.toLowerCase().trim();
+  const normalizedB = categoryB.toLowerCase().trim();
+  
+  // Mesma categoria sempre é intercambiável
+  if (normalizedA === normalizedB) return true;
+  
+  // Verificar se ambas pertencem ao mesmo grupo
+  for (const group of Object.values(SUBSTITUTION_GROUPS)) {
+    const aInGroup = group.includes(normalizedA as FoodCategory);
+    const bInGroup = group.includes(normalizedB as FoodCategory);
+    if (aInGroup && bInGroup) return true;
+  }
+  
+  return false;
+}
+
+/**
+ * Retorna o grupo de substituição de uma categoria, ou null se não pertence a nenhum
+ */
+export function getSubstitutionGroup(category: string | null | undefined): string | null {
+  if (!category) return null;
+  
+  const normalized = category.toLowerCase().trim();
+  
+  for (const [groupName, categories] of Object.entries(SUBSTITUTION_GROUPS)) {
+    if (categories.includes(normalized as FoodCategory)) {
+      return groupName;
+    }
+  }
+  
+  return null;
+}
+
+/**
+ * Retorna todas as categorias do mesmo grupo de substituição
+ */
+export function getInterchangeableCategories(category: string | null | undefined): FoodCategory[] {
+  if (!category) return [];
+  
+  const normalized = category.toLowerCase().trim();
+  
+  for (const categories of Object.values(SUBSTITUTION_GROUPS)) {
+    if (categories.includes(normalized as FoodCategory)) {
+      return categories;
+    }
+  }
+  
+  // Se não pertence a nenhum grupo, retorna só a própria categoria
+  return isValidCategory(normalized) ? [normalized as FoodCategory] : [];
+}
+
 /**
  * Categorias com impacto calórico baixo (flexíveis em quantidade)
  */

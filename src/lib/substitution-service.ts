@@ -11,7 +11,10 @@ import {
   FoodCategory, 
   isValidCategory,
   SUBSTITUTABLE_PROCESSING_LEVELS,
-  ProcessingLevel 
+  ProcessingLevel,
+  areCategoriesInterchangeable,
+  getInterchangeableCategories,
+  CATEGORY_LABELS,
 } from './food-categories';
 import { getCategoryLimitsSync, clampToLimitsSync } from './category-limits-cache';
 
@@ -28,6 +31,8 @@ export interface SubstituteOptions {
   excludeFoodIds?: string[];
   /** Show all foods from category, including ultraprocessed (with warning) */
   showAll?: boolean;
+  /** Include interchangeable protein categories (peixes ↔ proteinas ↔ ovos) */
+  includeProteinGroup?: boolean;
 }
 
 export interface SubstituteCandidate {
@@ -39,8 +44,11 @@ export interface SubstituteCandidate {
   substituteType: SubstituteType;
   /** True if this candidate has processing level warning (ultraprocessed) */
   hasProcessingWarning?: boolean;
+  /** True if this candidate is from a different (but interchangeable) category */
+  isCrossCategory?: boolean;
+  /** The category of this candidate food */
+  category?: string;
 }
-
 export interface DeltaMacros {
   calories: number;
   protein: number;
@@ -456,6 +464,12 @@ export function findSubstituteCandidates(
   // Normalizar categoria do source para comparação case-insensitive
   const normalizedSourceCategory = sourceFood.category?.toLowerCase().trim();
   const showAll = options?.showAll ?? false;
+  const includeProteinGroup = options?.includeProteinGroup ?? false;
+  
+  // Obter categorias intercambiáveis se a opção estiver ativa
+  const interchangeableCategories = includeProteinGroup 
+    ? getInterchangeableCategories(sourceFood.category)
+    : [];
   
   // Filtrar candidatos válidos com logging detalhado
   const validCandidates = availableFoods.filter(food => {
@@ -489,12 +503,24 @@ export function findSubstituteCandidates(
       }
     }
     
-    // Por padrão, mesma categoria é obrigatória (case-insensitive)
+    // Verificar compatibilidade de categoria
+    const normalizedCandidateCategory = food.category?.toLowerCase().trim();
+    
+    // Cross-category geral desativado por padrão
     if (!options?.allowCrossCategory) {
-      const normalizedCandidateCategory = food.category?.toLowerCase().trim();
-      if (normalizedCandidateCategory !== normalizedSourceCategory) {
-        rejectionStats.differentCategory++;
-        return false;
+      // Se includeProteinGroup está ativo, verificar se são categorias intercambiáveis
+      if (includeProteinGroup && interchangeableCategories.length > 0) {
+        const isInterchangeable = interchangeableCategories.includes(normalizedCandidateCategory as FoodCategory);
+        if (!isInterchangeable) {
+          rejectionStats.differentCategory++;
+          return false;
+        }
+      } else {
+        // Comportamento padrão: mesma categoria obrigatória
+        if (normalizedCandidateCategory !== normalizedSourceCategory) {
+          rejectionStats.differentCategory++;
+          return false;
+        }
       }
     }
     
@@ -513,18 +539,29 @@ export function findSubstituteCandidates(
     const processingLevel = candidate.processing_level?.toLowerCase().replace(/\s+/g, '_');
     const hasProcessingWarning = processingLevel === 'ultraprocessado' || processingLevel === 'suplemento';
     
+    // Marcar se é de categoria diferente (mas intercambiável)
+    const normalizedCandidateCategory = candidate.category?.toLowerCase().trim();
+    const isCrossCategory = normalizedCandidateCategory !== normalizedSourceCategory;
+    
     return {
       ...scored,
       hasProcessingWarning,
+      isCrossCategory,
+      category: candidate.category,
     };
   });
   
-  // Ordenar por score decrescente (alimentos com warning vão ao final)
+  // Ordenar: mesma categoria primeiro, depois por score (alimentos com warning vão ao final)
   scoredCandidates.sort((a, b) => {
-    // Primeiro, priorizar alimentos sem warning
+    // 1. Alimentos da mesma categoria vêm primeiro
+    if (!a.isCrossCategory && b.isCrossCategory) return -1;
+    if (a.isCrossCategory && !b.isCrossCategory) return 1;
+    
+    // 2. Priorizar alimentos sem warning de processamento
     if (a.hasProcessingWarning && !b.hasProcessingWarning) return 1;
     if (!a.hasProcessingWarning && b.hasProcessingWarning) return -1;
-    // Depois, ordenar por score
+    
+    // 3. Ordenar por score
     return b.score - a.score;
   });
   

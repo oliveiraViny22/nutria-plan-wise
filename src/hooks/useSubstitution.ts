@@ -36,6 +36,7 @@ export interface UseSubstitutionReturn {
   candidates: SubstituteCandidate[];
   error: SubstituteError | null;
   showAll: boolean;
+  includeProteinGroup: boolean;
   
   // Ações
   findCandidates: (sourceFood: Food, sourceGrams: number, availableFoods: Food[], excludeFoodIds?: string[]) => void;
@@ -43,12 +44,14 @@ export interface UseSubstitutionReturn {
   confirmSubstitution: (mealOptionFoodId: string, optionId: string) => Promise<boolean>;
   reset: () => void;
   setShowAll: (showAll: boolean) => void;
+  setIncludeProteinGroup: (value: boolean) => void;
   
   // Helpers
   canSubstitute: (food: Food) => boolean;
   getProposalMessage: () => string | null;
   getImpact: () => 'low' | 'medium' | 'high' | null;
   requiresRebalance: () => boolean;
+  isProteinCategory: (food: Food) => boolean;
 }
 
 const ERROR_MESSAGES: Record<SubstituteError, string> = {
@@ -72,6 +75,7 @@ export function useSubstitution(options?: UseSubstitutionOptions): UseSubstituti
   const [error, setError] = useState<SubstituteError | null>(null);
   const [sourceData, setSourceData] = useState<{ food: Food; grams: number; availableFoods: Food[]; excludeFoodIds?: string[] } | null>(null);
   const [showAll, setShowAllState] = useState(false);
+  const [includeProteinGroup, setIncludeProteinGroupState] = useState(false);
 
   /**
    * Busca candidatos para substituição
@@ -100,7 +104,9 @@ export function useSubstitution(options?: UseSubstitutionOptions): UseSubstituti
         availableFoods,
         undefined, // targetFoodId - será selecionado pelo usuário
         governanceContext,
-        excludeFoodIds ? { excludeFoodIds, showAll } : { showAll }
+        excludeFoodIds 
+          ? { excludeFoodIds, showAll, includeProteinGroup } 
+          : { showAll, includeProteinGroup }
       );
       
       if (!result.success) {
@@ -123,7 +129,7 @@ export function useSubstitution(options?: UseSubstitutionOptions): UseSubstituti
     } finally {
       setIsLoading(false);
     }
-  }, [can_substitute, options, showAll]);
+  }, [can_substitute, options, showAll, includeProteinGroup]);
 
   /**
    * Seleciona um candidato específico
@@ -273,6 +279,7 @@ export function useSubstitution(options?: UseSubstitutionOptions): UseSubstituti
     setIsLoading(false);
     setIsConfirming(false);
     setShowAllState(false);
+    setIncludeProteinGroupState(false);
   }, []);
 
   /**
@@ -320,10 +327,63 @@ export function useSubstitution(options?: UseSubstitutionOptions): UseSubstituti
   }, [sourceData, can_substitute]);
 
   /**
+   * Alterna modo "incluir grupo de proteínas" e re-busca candidatos
+   */
+  const setIncludeProteinGroup = useCallback((value: boolean) => {
+    setIncludeProteinGroupState(value);
+    
+    // Re-buscar candidatos se temos dados de origem
+    if (sourceData) {
+      setIsLoading(true);
+      setError(null);
+      setProposal(null);
+      
+      try {
+        const governanceContext: GovernanceContext = {
+          planStatus: 'active',
+          userHasPermission: can_substitute,
+        };
+        
+        const result = substituteItem(
+          sourceData.food,
+          sourceData.grams,
+          sourceData.availableFoods,
+          undefined,
+          governanceContext,
+          { excludeFoodIds: sourceData.excludeFoodIds, showAll, includeProteinGroup: value }
+        );
+        
+        if (!result.success) {
+          setError(result.error || 'NO_CANDIDATES');
+          setCandidates([]);
+          return;
+        }
+        
+        setCandidates(result.candidates || []);
+      } catch (err) {
+        console.error('Error finding candidates:', err);
+        setError('NO_CANDIDATES');
+        setCandidates([]);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+  }, [sourceData, can_substitute, showAll]);
+
+  /**
    * Verifica se um alimento pode ser substituído
    */
   const canSubstitute = useCallback((food: Food): boolean => {
     return canBeSubstituted(food);
+  }, []);
+
+  /**
+   * Verifica se um alimento pertence ao grupo de proteínas intercambiáveis
+   */
+  const isProteinCategory = useCallback((food: Food): boolean => {
+    const proteinCategories = ['proteinas', 'peixes', 'frutos_do_mar', 'ovos'];
+    const normalized = food.category?.toLowerCase().trim();
+    return proteinCategories.includes(normalized || '');
   }, []);
 
   /**
@@ -357,12 +417,15 @@ export function useSubstitution(options?: UseSubstitutionOptions): UseSubstituti
     candidates,
     error,
     showAll,
+    includeProteinGroup,
     findCandidates,
     selectCandidate,
     confirmSubstitution,
     reset,
     setShowAll,
+    setIncludeProteinGroup,
     canSubstitute,
+    isProteinCategory,
     getProposalMessage,
     getImpact,
     requiresRebalance,
