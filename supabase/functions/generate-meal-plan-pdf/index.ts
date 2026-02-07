@@ -16,6 +16,25 @@ interface ProfileData {
   protein_target: number | null;
   carbs_target: number | null;
   fat_target: number | null;
+  include_supplements: boolean | null;
+}
+
+interface FoodData {
+  name: string;
+  quantity: string;
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+}
+
+interface OptionData {
+  option_number: number;
+  foods: FoodData[];
+  total_calories?: number;
+  total_protein?: number;
+  total_carbs?: number;
+  total_fat?: number;
 }
 
 interface MealData {
@@ -25,17 +44,7 @@ interface MealData {
   total_protein: number | null;
   total_carbs: number | null;
   total_fat: number | null;
-  options: {
-    option_number: number;
-    foods: {
-      name: string;
-      quantity: string;
-      calories: number;
-      protein: number;
-      carbs: number;
-      fat: number;
-    }[];
-  }[];
+  options: OptionData[];
 }
 
 interface PlanData {
@@ -43,6 +52,23 @@ interface PlanData {
   total_protein: number;
   total_carbs: number;
   total_fat: number;
+}
+
+interface SupplementItem {
+  name: string;
+  quantity: string;
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+  notes?: string;
+}
+
+interface SupplementRecommendation {
+  mealName: string;
+  items: SupplementItem[];
+  totalCalories: number;
+  totalProtein: number;
 }
 
 const GOAL_LABELS: Record<string, string> = {
@@ -78,7 +104,10 @@ const TIPS: Record<string, string[]> = {
   ],
 };
 
-function generateExecutivePdf(
+/**
+ * Gera HTML para Página 1: Plano Alimentar com opções em colunas
+ */
+function generateMealPlanPage(
   profile: ProfileData,
   plan: PlanData,
   meals: MealData[],
@@ -87,70 +116,221 @@ function generateExecutivePdf(
   const goalLabel = GOAL_LABELS[profile.goal || "maintain"] || "Manutenção";
   const tips = TIPS[profile.goal || "maintain"] || TIPS.maintain;
 
-  // Calculate density for font sizing
-  const mealCount = meals.length;
-  const optionCount = meals.reduce((acc, m) => acc + (m.options?.length || 0), 0);
-  const foodRowCount = meals.reduce(
-    (acc, m) => acc + (m.options || []).reduce((acc2, opt) => acc2 + (opt.foods?.length || 0), 0),
-    0
-  );
+  // Determinar número máximo de opções
+  const maxOptions = Math.max(...meals.map(m => m.options?.length || 1), 1);
+  const colCount = Math.min(maxOptions, 3); // Máximo 3 colunas
 
-  // Adaptive font size based on content density
-  const densityScore = foodRowCount + optionCount * 2 + mealCount * 4;
-  
-  let baseFontPt = 8;
-  let tableFontPt = 7;
-  let mealGapPx = 8;
-  let cellPadPx = 3;
-  
-  if (densityScore > 100) {
-    baseFontPt = 6.5;
-    tableFontPt = 6;
-    mealGapPx = 4;
-    cellPadPx = 2;
-  } else if (densityScore > 80) {
-    baseFontPt = 7;
-    tableFontPt = 6.5;
-    mealGapPx = 5;
-    cellPadPx = 2;
-  } else if (densityScore > 60) {
-    baseFontPt = 7.5;
-    tableFontPt = 6.5;
-    mealGapPx = 6;
-    cellPadPx = 3;
-  }
-
-  // Generate meals HTML
+  // Gerar HTML das refeições com opções em colunas
   const mealsHtml = meals
     .sort((a, b) => a.sort_order - b.sort_order)
     .map((meal) => {
       const mealLabel = MEAL_LABELS[meal.name] || meal.name;
-      const optionsHtml = meal.options
-        .map((opt) => {
-          const foodsHtml = opt.foods
-            .map((f) => `<tr><td>${f.name}</td><td class="tc">${f.quantity}</td><td class="tr">${f.calories}</td><td class="tr">${f.protein}g</td><td class="tr">${f.carbs}g</td><td class="tr">${f.fat}g</td></tr>`)
+      
+      // Gerar colunas para cada opção
+      const optionsColumns = [];
+      for (let i = 0; i < colCount; i++) {
+        const opt = meal.options[i];
+        if (opt) {
+          // Calcular totais da opção
+          const optTotals = opt.foods.reduce(
+            (acc, f) => ({
+              calories: acc.calories + f.calories,
+              protein: acc.protein + f.protein,
+              carbs: acc.carbs + f.carbs,
+              fat: acc.fat + f.fat,
+            }),
+            { calories: 0, protein: 0, carbs: 0, fat: 0 }
+          );
+
+          const foodsList = opt.foods
+            .map(f => `<div class="food-item"><span class="food-name">${f.name}</span><span class="food-qty">${f.quantity}</span></div>`)
             .join("");
 
-          return `
-            <div class="opt">
-              ${meal.options.length > 1 ? `<div class="opt-label">Opção ${opt.option_number}</div>` : ''}
-              <table class="foods">
-                <thead><tr><th style="width:38%">Alimento</th><th style="width:17%" class="tc">Qtd</th><th style="width:11%" class="tr">Kcal</th><th style="width:11%" class="tr">P</th><th style="width:11%" class="tr">C</th><th style="width:11%" class="tr">G</th></tr></thead>
-                <tbody>${foodsHtml}</tbody>
-              </table>
-            </div>`;
-        })
-        .join("");
+          optionsColumns.push(`
+            <div class="opt-col">
+              <div class="opt-header">Opção ${opt.option_number}</div>
+              <div class="opt-foods">${foodsList}</div>
+              <div class="opt-totals">
+                <span class="kcal">${optTotals.calories} kcal</span>
+                <span class="macros">P:${optTotals.protein}g C:${optTotals.carbs}g G:${optTotals.fat}g</span>
+              </div>
+            </div>
+          `);
+        } else {
+          // Célula vazia se não há opção
+          optionsColumns.push(`<div class="opt-col opt-empty">—</div>`);
+        }
+      }
 
       return `
-        <div class="meal">
-          <div class="meal-hdr"><span>${mealLabel}</span><span class="kcal">${meal.total_calories || 0} kcal</span></div>
-          <div class="meal-body">${optionsHtml}</div>
+        <div class="meal-row">
+          <div class="meal-name">${mealLabel}</div>
+          <div class="meal-options" style="grid-template-columns: repeat(${colCount}, 1fr);">
+            ${optionsColumns.join("")}
+          </div>
         </div>`;
     })
     .join("");
 
   const tipsHtml = tips.map((tip, i) => `${i + 1}. ${tip}`).join(" · ");
+
+  return `
+    <div class="page page-meal-plan">
+      <div class="header">
+        <h1>🥗 Plano Alimentar</h1>
+        <div class="meta">${generatedAt}<br><span class="brand">NutriAI</span></div>
+      </div>
+      
+      <div class="profile">
+        <div class="profile-card">
+          <div class="profile-label">👤 Usuário</div>
+          <div class="profile-content">
+            <span class="name">${profile.name || "—"}</span>
+            <span class="sep">•</span>
+            <span>${profile.age ? `${profile.age} anos` : "—"}</span>
+            <span class="sep">•</span>
+            <span>${profile.weight ? `${profile.weight} kg` : "—"}</span>
+            <span class="sep">•</span>
+            <span>${profile.height ? `${profile.height} cm` : "—"}</span>
+          </div>
+          <span class="goal-badge">${goalLabel}</span>
+        </div>
+        
+        <div class="profile-card">
+          <div class="profile-label">🎯 Metas Diárias</div>
+          <div><span class="macro-value">${plan.total_calories}</span> <span class="macro-unit">kcal</span></div>
+          <div class="macros-summary">
+            <span class="p">${plan.total_protein}g P</span>
+            <span class="c">${plan.total_carbs}g C</span>
+            <span class="g">${plan.total_fat}g G</span>
+          </div>
+        </div>
+      </div>
+      
+      <div class="meals-section">
+        <div class="meals-header">
+          <div class="meals-title">🍽️ Refeições</div>
+          <div class="options-legend">
+            ${Array.from({ length: colCount }, (_, i) => `<span>Opção ${i + 1}</span>`).join("")}
+          </div>
+        </div>
+        <div class="meals-grid">${mealsHtml}</div>
+      </div>
+      
+      <div class="tips">
+        <div class="tips-title">💡 Dicas</div>
+        <div class="tips-content">${tipsHtml}</div>
+      </div>
+      
+      <div class="footer"><strong>NutriAI</strong> · nutria-plan-wise.lovable.app · Consulte sempre um nutricionista</div>
+    </div>`;
+}
+
+/**
+ * Gera HTML para Página 2: Suplementação Recomendada
+ */
+function generateSupplementPage(
+  profile: ProfileData,
+  supplements: SupplementRecommendation[],
+  generatedAt: string
+): string {
+  const goalLabel = GOAL_LABELS[profile.goal || "maintain"] || "Manutenção";
+
+  const supplementsHtml = supplements
+    .map((supp) => {
+      const itemsHtml = supp.items
+        .map(item => `
+          <tr>
+            <td>${item.name}</td>
+            <td class="tc">${item.quantity}</td>
+            <td class="tr">${item.calories}</td>
+            <td class="tr">${item.protein}g</td>
+            <td class="tr">${item.carbs}g</td>
+            <td class="tr">${item.fat}g</td>
+          </tr>
+        `)
+        .join("");
+
+      return `
+        <div class="supp-card">
+          <div class="supp-header">
+            <span class="supp-meal">${supp.mealName}</span>
+            <span class="supp-totals">${supp.totalCalories} kcal · ${supp.totalProtein}g proteína</span>
+          </div>
+          <table class="supp-table">
+            <thead>
+              <tr>
+                <th style="width:35%">Item</th>
+                <th style="width:20%" class="tc">Quantidade</th>
+                <th style="width:11%" class="tr">Kcal</th>
+                <th style="width:11%" class="tr">P</th>
+                <th style="width:11%" class="tr">C</th>
+                <th style="width:11%" class="tr">G</th>
+              </tr>
+            </thead>
+            <tbody>${itemsHtml}</tbody>
+          </table>
+          <div class="supp-tip">
+            💧 <strong>Preparo:</strong> Misture os suplementos em pó com 150-200ml de água. Consuma em vez da refeição indicada.
+          </div>
+        </div>
+      `;
+    })
+    .join("");
+
+  return `
+    <div class="page page-supplements">
+      <div class="header">
+        <h1>💊 Suplementação Recomendada</h1>
+        <div class="meta">${generatedAt}<br><span class="brand">NutriAI</span></div>
+      </div>
+      
+      <div class="supp-intro">
+        <div class="supp-intro-card">
+          <div class="intro-icon">⚠️</div>
+          <div class="intro-text">
+            <strong>Alternativas de Refeição</strong>
+            <p>Use estas opções EM VEZ da refeição planejada quando não conseguir consumir a refeição original. Os valores nutricionais são equivalentes.</p>
+          </div>
+        </div>
+        <div class="goal-indicator">
+          Objetivo: <span class="goal-badge">${goalLabel}</span>
+        </div>
+      </div>
+      
+      <div class="supp-section">
+        ${supplements.length > 0 ? supplementsHtml : '<p class="no-supp">Nenhuma suplementação configurada para este plano.</p>'}
+      </div>
+      
+      <div class="supp-notes">
+        <div class="note-title">📋 Observações Importantes</div>
+        <ul>
+          <li>Suplementos são <strong>complementos</strong>, não substituem uma alimentação equilibrada.</li>
+          <li>Whey protein: ideal para situações onde não é possível consumir proteína de alimentos sólidos.</li>
+          <li>Aveia: fonte de carboidratos complexos, fibras e energia sustentada.</li>
+          <li>Consulte um profissional antes de iniciar qualquer suplementação.</li>
+        </ul>
+      </div>
+      
+      <div class="footer"><strong>NutriAI</strong> · nutria-plan-wise.lovable.app · Consulte sempre um nutricionista</div>
+    </div>`;
+}
+
+/**
+ * Gera o documento PDF completo (1 ou 2 páginas)
+ */
+function generateExecutivePdf(
+  profile: ProfileData,
+  plan: PlanData,
+  meals: MealData[],
+  supplements: SupplementRecommendation[],
+  generatedAt: string,
+  showSupplements: boolean
+): string {
+  const page1 = generateMealPlanPage(profile, plan, meals, generatedAt);
+  const page2 = showSupplements && supplements.length > 0 
+    ? generateSupplementPage(profile, supplements, generatedAt) 
+    : "";
 
   return `<!DOCTYPE html>
 <html>
@@ -163,29 +343,26 @@ function generateExecutivePdf(
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     html, body { 
-      width: 210mm; 
-      height: 297mm; 
       margin: 0; 
       padding: 0;
-    }
-    body { 
       font-family: 'Segoe UI', -apple-system, sans-serif;
-      font-size: ${baseFontPt}pt;
-      line-height: 1.25;
+      font-size: 8pt;
+      line-height: 1.3;
       color: #1f2937;
       background: #fff;
-      display: flex;
-      justify-content: center;
-      align-items: stretch;
     }
+    
     .page {
-      width: 190mm;
-      height: 287mm;
-      margin: 5mm auto;
-      padding: 0;
+      width: 210mm;
+      min-height: 297mm;
+      padding: 8mm 10mm;
+      page-break-after: always;
       display: flex;
       flex-direction: column;
     }
+    .page:last-child { page-break-after: auto; }
+    
+    /* Header */
     .header { 
       display: flex; 
       justify-content: space-between; 
@@ -193,212 +370,443 @@ function generateExecutivePdf(
       padding-bottom: 6px; 
       margin-bottom: 8px; 
       border-bottom: 2px solid #3b82f6;
-      flex-shrink: 0;
     }
-    .header h1 { font-size: 16pt; font-weight: 700; }
-    .header .meta { text-align: right; font-size: ${baseFontPt}pt; color: #6b7280; }
+    .header h1 { font-size: 14pt; font-weight: 700; }
+    .header .meta { text-align: right; font-size: 7pt; color: #6b7280; }
     .header .brand { font-weight: 600; color: #3b82f6; }
     
+    /* Profile section */
     .profile { 
       display: flex; 
       gap: 8px; 
-      margin-bottom: 10px;
-      flex-shrink: 0;
+      margin-bottom: 8px;
     }
     .profile-card { 
       flex: 1; 
       background: #f8fafc; 
-      border-radius: 6px; 
-      padding: 8px 10px; 
+      border-radius: 5px; 
+      padding: 6px 8px; 
       border: 1px solid #e2e8f0; 
     }
     .profile-label { 
-      font-size: ${baseFontPt - 1}pt; 
+      font-size: 6pt; 
       color: #6b7280; 
       text-transform: uppercase; 
       letter-spacing: 0.03em; 
       font-weight: 600; 
-      margin-bottom: 4px; 
+      margin-bottom: 3px; 
     }
     .profile-content { 
-      font-size: ${baseFontPt}pt; 
+      font-size: 7pt; 
       display: flex; 
       flex-wrap: wrap; 
-      gap: 4px; 
+      gap: 3px; 
       align-items: center; 
     }
-    .profile-content .name { font-weight: 700; font-size: ${baseFontPt + 1}pt; }
+    .profile-content .name { font-weight: 700; font-size: 8pt; }
     .profile-content .sep { color: #cbd5e1; }
     .goal-badge { 
       background: #3b82f6; 
       color: #fff; 
-      padding: 3px 8px; 
-      border-radius: 12px; 
-      font-size: ${baseFontPt - 0.5}pt; 
+      padding: 2px 6px; 
+      border-radius: 10px; 
+      font-size: 6pt; 
       font-weight: 600; 
-      margin-top: 4px; 
       display: inline-block; 
     }
-    .macro-value { font-size: 20pt; font-weight: 800; color: #f59e0b; }
-    .macro-unit { font-size: ${baseFontPt + 1}pt; color: #6b7280; }
-    .macros { display: flex; gap: 10px; font-size: ${baseFontPt}pt; margin-top: 4px; }
-    .macros span { font-weight: 700; }
-    .macros .p { color: #3b82f6; }
-    .macros .c { color: #eab308; }
-    .macros .g { color: #f97316; }
+    .macro-value { font-size: 16pt; font-weight: 800; color: #f59e0b; }
+    .macro-unit { font-size: 8pt; color: #6b7280; }
+    .macros-summary { display: flex; gap: 8px; font-size: 7pt; margin-top: 2px; }
+    .macros-summary span { font-weight: 700; }
+    .macros-summary .p { color: #3b82f6; }
+    .macros-summary .c { color: #eab308; }
+    .macros-summary .g { color: #f97316; }
     
+    /* Meals section - columnar layout */
     .meals-section {
       flex: 1;
       display: flex;
       flex-direction: column;
       min-height: 0;
-      overflow: hidden;
     }
-    .meals-title { 
-      font-size: ${baseFontPt + 2}pt; 
-      font-weight: 700; 
-      margin: 0 0 6px 0; 
-      padding-bottom: 4px; 
+    .meals-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 4px;
+      padding-bottom: 3px;
       border-bottom: 1px solid #e2e8f0;
-      flex-shrink: 0;
+    }
+    .meals-title { font-size: 9pt; font-weight: 700; }
+    .options-legend {
+      display: flex;
+      gap: 20px;
+      font-size: 6pt;
+      color: #6b7280;
+      font-weight: 600;
     }
     .meals-grid { 
       flex: 1;
       display: flex; 
       flex-direction: column; 
-      gap: ${mealGapPx}px;
-      justify-content: space-between;
+      gap: 3px;
     }
-    .meal { 
-      border-radius: 6px; 
-      overflow: hidden; 
+    
+    /* Meal row */
+    .meal-row { 
+      display: flex;
       border: 1px solid #e2e8f0;
+      border-radius: 4px;
+      overflow: hidden;
       flex: 1;
+    }
+    .meal-name { 
+      width: 80px;
+      min-width: 80px;
+      background: linear-gradient(135deg, #3b82f6, #2563eb); 
+      color: #fff; 
+      padding: 4px 6px; 
+      font-size: 7pt; 
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+    }
+    .meal-options {
+      flex: 1;
+      display: grid;
+      gap: 1px;
+      background: #e2e8f0;
+    }
+    
+    /* Option column */
+    .opt-col {
+      background: #fff;
+      padding: 3px 5px;
       display: flex;
       flex-direction: column;
     }
-    .meal-hdr { 
-      display: flex; 
-      justify-content: space-between; 
-      align-items: center; 
-      background: linear-gradient(135deg, #3b82f6, #2563eb); 
-      color: #fff; 
-      padding: 5px 10px; 
-      font-size: ${baseFontPt + 1}pt; 
+    .opt-col.opt-empty {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #cbd5e1;
+      font-size: 7pt;
+    }
+    .opt-header {
+      font-size: 6pt;
+      font-weight: 600;
+      color: #6b7280;
+      margin-bottom: 2px;
+      text-align: center;
+      display: none; /* Hidden since we have legend */
+    }
+    .opt-foods {
+      flex: 1;
+      font-size: 6.5pt;
+    }
+    .food-item {
+      display: flex;
+      justify-content: space-between;
+      gap: 4px;
+      padding: 1px 0;
+      border-bottom: 1px dotted #f1f5f9;
+    }
+    .food-item:last-child { border-bottom: none; }
+    .food-name { 
+      flex: 1;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .food-qty { 
+      color: #6b7280; 
+      font-size: 6pt;
+      white-space: nowrap;
+    }
+    .opt-totals {
+      margin-top: 2px;
+      padding-top: 2px;
+      border-top: 1px solid #e2e8f0;
+      font-size: 6pt;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .opt-totals .kcal {
       font-weight: 700;
-      flex-shrink: 0;
+      color: #f59e0b;
     }
-    .meal-hdr .kcal { 
-      font-size: ${baseFontPt}pt; 
-      background: rgba(255,255,255,0.2); 
-      padding: 2px 8px; 
-      border-radius: 10px; 
-      font-weight: 600; 
+    .opt-totals .macros {
+      color: #6b7280;
+      font-size: 5.5pt;
     }
-    .meal-body { 
-      padding: 6px 8px; 
-      background: #fff;
+    
+    /* Tips */
+    .tips { 
+      background: #fffbeb; 
+      border-radius: 4px; 
+      padding: 5px 8px; 
+      border-left: 3px solid #f59e0b; 
+      margin-top: 6px;
+    }
+    .tips-title { font-weight: 700; color: #92400e; font-size: 7pt; margin-bottom: 2px; }
+    .tips-content { font-size: 6pt; color: #78350f; line-height: 1.4; }
+    
+    /* Footer */
+    .footer { 
+      text-align: center; 
+      padding-top: 6px; 
+      margin-top: 6px;
+      border-top: 1px solid #e2e8f0; 
+      font-size: 6pt; 
+      color: #9ca3af;
+    }
+    
+    /* ============ PAGE 2: SUPPLEMENTS ============ */
+    .page-supplements {
+      background: linear-gradient(180deg, #faf5ff 0%, #fff 100%);
+    }
+    .page-supplements .header {
+      border-bottom-color: #8b5cf6;
+    }
+    .page-supplements .header h1 { color: #7c3aed; }
+    
+    .supp-intro {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+    .supp-intro-card {
+      flex: 1;
+      display: flex;
+      gap: 8px;
+      background: #fef3c7;
+      border: 1px solid #fcd34d;
+      border-radius: 6px;
+      padding: 8px 10px;
+    }
+    .intro-icon { font-size: 16pt; }
+    .intro-text strong { font-size: 8pt; color: #92400e; }
+    .intro-text p { font-size: 7pt; color: #78350f; margin-top: 2px; }
+    .goal-indicator {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 7pt;
+      color: #6b7280;
+    }
+    .goal-indicator .goal-badge {
+      background: #8b5cf6;
+    }
+    
+    .supp-section {
       flex: 1;
     }
-    .opt { margin-bottom: 4px; }
-    .opt:last-child { margin-bottom: 0; }
-    .opt-label { font-size: ${tableFontPt}pt; color: #6b7280; font-weight: 600; margin-bottom: 3px; }
+    .supp-card {
+      background: #fff;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      margin-bottom: 8px;
+      overflow: hidden;
+    }
+    .supp-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+      color: #fff;
+      padding: 6px 10px;
+    }
+    .supp-meal { font-weight: 700; font-size: 8pt; }
+    .supp-totals { font-size: 7pt; opacity: 0.9; }
     
-    .foods { 
-      width: 100%; 
-      border-collapse: collapse; 
-      font-size: ${tableFontPt}pt; 
-      table-layout: fixed; 
+    .supp-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 7pt;
     }
-    .foods thead tr { background: #f1f5f9; }
-    .foods th { 
-      padding: ${cellPadPx}px 4px; 
-      text-align: left; 
-      font-weight: 600; 
-      font-size: ${tableFontPt - 0.5}pt; 
-      text-transform: uppercase; 
+    .supp-table thead tr { background: #f8fafc; }
+    .supp-table th {
+      padding: 4px 6px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 6pt;
+      text-transform: uppercase;
+      color: #6b7280;
     }
-    .foods td { 
-      padding: ${cellPadPx}px 4px; 
-      border-bottom: 1px solid #f1f5f9; 
+    .supp-table td {
+      padding: 4px 6px;
+      border-bottom: 1px solid #f1f5f9;
     }
     .tc { text-align: center; }
     .tr { text-align: right; }
     
-    .tips { 
-      background: #fffbeb; 
-      border-radius: 6px; 
-      padding: 6px 10px; 
-      border-left: 3px solid #f59e0b; 
-      margin-top: 10px;
-      flex-shrink: 0;
+    .supp-tip {
+      padding: 6px 10px;
+      background: #f0fdf4;
+      border-top: 1px solid #bbf7d0;
+      font-size: 6.5pt;
+      color: #166534;
     }
-    .tips-title { font-weight: 700; color: #92400e; font-size: ${baseFontPt}pt; margin-bottom: 3px; }
-    .tips-content { font-size: ${baseFontPt - 0.5}pt; color: #78350f; line-height: 1.4; }
     
-    .footer { 
-      text-align: center; 
-      padding-top: 8px; 
+    .supp-notes {
+      background: #f8fafc;
+      border-radius: 6px;
+      padding: 10px 12px;
       margin-top: 10px;
-      border-top: 1px solid #e2e8f0; 
-      font-size: ${baseFontPt - 1}pt; 
+    }
+    .note-title { font-weight: 700; font-size: 8pt; margin-bottom: 6px; }
+    .supp-notes ul {
+      list-style: none;
+      font-size: 7pt;
+      color: #4b5563;
+    }
+    .supp-notes li {
+      padding: 2px 0;
+      padding-left: 12px;
+      position: relative;
+    }
+    .supp-notes li::before {
+      content: "•";
+      position: absolute;
+      left: 0;
+      color: #8b5cf6;
+    }
+    
+    .no-supp {
+      text-align: center;
+      padding: 40px;
       color: #9ca3af;
-      flex-shrink: 0;
+      font-size: 9pt;
     }
     
     @media print {
-      html, body { width: 210mm; height: 297mm; }
+      html, body { width: 210mm; }
       body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     }
   </style>
 </head>
 <body>
-  <div class="page">
-    <div class="header">
-      <h1>🥗 Plano Alimentar</h1>
-      <div class="meta">${generatedAt}<br><span class="brand">NutriAI</span></div>
-    </div>
-    
-    <div class="profile">
-      <div class="profile-card">
-        <div class="profile-label">👤 Usuário</div>
-        <div class="profile-content">
-          <span class="name">${profile.name || "—"}</span>
-          <span class="sep">•</span>
-          <span>${profile.age ? `${profile.age} anos` : "—"}</span>
-          <span class="sep">•</span>
-          <span>${profile.weight ? `${profile.weight} kg` : "—"}</span>
-          <span class="sep">•</span>
-          <span>${profile.height ? `${profile.height} cm` : "—"}</span>
-        </div>
-        <span class="goal-badge">${goalLabel}</span>
-      </div>
-      
-      <div class="profile-card">
-        <div class="profile-label">🎯 Metas Diárias</div>
-        <div><span class="macro-value">${plan.total_calories}</span> <span class="macro-unit">kcal</span></div>
-        <div class="macros">
-          <span class="p">${plan.total_protein}g P</span>
-          <span class="c">${plan.total_carbs}g C</span>
-          <span class="g">${plan.total_fat}g G</span>
-        </div>
-      </div>
-    </div>
-    
-    <div class="meals-section">
-      <div class="meals-title">🍽️ Refeições</div>
-      <div class="meals-grid">${mealsHtml}</div>
-    </div>
-    
-    <div class="tips">
-      <div class="tips-title">💡 Dicas</div>
-      <div class="tips-content">${tipsHtml}</div>
-    </div>
-    
-    <div class="footer"><strong>NutriAI</strong> · nutria-plan-wise.lovable.app · Consulte sempre um nutricionista</div>
-  </div>
+  ${page1}
+  ${page2}
 </body>
 </html>`;
+}
+
+/**
+ * Calcula suplementação recomendada para cada refeição
+ * Usa lógica simplificada baseada nos macros da refeição
+ */
+function calculateSupplementRecommendations(
+  meals: MealData[],
+  goal: string
+): SupplementRecommendation[] {
+  const recommendations: SupplementRecommendation[] = [];
+
+  for (const meal of meals) {
+    const mealLabel = MEAL_LABELS[meal.name] || meal.name;
+    const targetCalories = meal.total_calories || 0;
+    const targetProtein = meal.total_protein || 0;
+
+    // Só gerar suplementação para refeições com calorias significativas
+    if (targetCalories < 150) continue;
+
+    const items: SupplementItem[] = [];
+    let totalCal = 0;
+    let totalProt = 0;
+
+    // 1. Whey protein para atingir meta proteica
+    if (targetProtein >= 15) {
+      const wheyType = goal === 'lose_weight' ? 'Whey Protein Isolado' : 'Whey Protein Concentrado';
+      const wheyProtein = goal === 'lose_weight' ? 25 : 24;
+      const wheyCal = goal === 'lose_weight' ? 120 : 130;
+      
+      // Calcular porções (máx 1.5 scoops)
+      const scoopsNeeded = Math.min(1.5, Math.max(0.5, targetProtein * 0.9 / wheyProtein));
+      const roundedScoops = Math.round(scoopsNeeded * 2) / 2;
+      const grams = Math.round(30 * roundedScoops);
+      
+      items.push({
+        name: wheyType,
+        quantity: `${grams}g`,
+        calories: Math.round(wheyCal * roundedScoops),
+        protein: Math.round(wheyProtein * roundedScoops),
+        carbs: goal === 'lose_weight' ? Math.round(2 * roundedScoops) : Math.round(4 * roundedScoops),
+        fat: goal === 'lose_weight' ? Math.round(1 * roundedScoops) : Math.round(2 * roundedScoops),
+      });
+      totalCal += Math.round(wheyCal * roundedScoops);
+      totalProt += Math.round(wheyProtein * roundedScoops);
+    }
+
+    // 2. Aveia para carboidratos
+    const targetCarbs = meal.total_carbs || 0;
+    if (targetCarbs >= 20 && totalCal < targetCalories * 0.9) {
+      const oatScale = Math.min(1.5, (targetCalories - totalCal) / 150);
+      if (oatScale >= 0.5) {
+        const roundedScale = Math.round(oatScale * 2) / 2;
+        const grams = Math.round(40 * roundedScale);
+        items.push({
+          name: 'Aveia em Flocos',
+          quantity: `${grams}g`,
+          calories: Math.round(150 * roundedScale),
+          protein: Math.round(5 * roundedScale),
+          carbs: Math.round(27 * roundedScale),
+          fat: Math.round(3 * roundedScale),
+        });
+        totalCal += Math.round(150 * roundedScale);
+        totalProt += Math.round(5 * roundedScale);
+      }
+    }
+
+    // 3. Banana para completar calorias
+    if (totalCal < targetCalories * 0.85) {
+      const bananaScale = Math.min(2, (targetCalories - totalCal) / 90);
+      if (bananaScale >= 0.5) {
+        const roundedScale = Math.round(bananaScale * 2) / 2;
+        let qty = '';
+        if (roundedScale === 0.5) qty = '½ banana (50g)';
+        else if (roundedScale === 1) qty = '1 banana (100g)';
+        else if (roundedScale === 1.5) qty = '1½ banana (150g)';
+        else qty = `${roundedScale} bananas (${Math.round(100 * roundedScale)}g)`;
+        
+        items.push({
+          name: 'Banana',
+          quantity: qty,
+          calories: Math.round(90 * roundedScale),
+          protein: Math.round(1 * roundedScale),
+          carbs: Math.round(23 * roundedScale),
+          fat: 0,
+        });
+        totalCal += Math.round(90 * roundedScale);
+      }
+    }
+
+    // 4. Água (sempre adicionar se tem suplementos)
+    if (items.length > 0) {
+      items.push({
+        name: 'Água',
+        quantity: '150-200ml',
+        calories: 0,
+        protein: 0,
+        carbs: 0,
+        fat: 0,
+        notes: 'Base para shake',
+      });
+    }
+
+    if (items.length > 0) {
+      recommendations.push({
+        mealName: mealLabel,
+        items,
+        totalCalories: totalCal,
+        totalProtein: totalProt,
+      });
+    }
+  }
+
+  return recommendations;
 }
 
 serve(async (req) => {
@@ -449,9 +857,10 @@ serve(async (req) => {
       }
     }
 
+    // Buscar perfil com flag de suplementos
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
-      .select("name, age, weight, height, goal, daily_calories, protein_target, carbs_target, fat_target")
+      .select("name, age, weight, height, goal, daily_calories, protein_target, carbs_target, fat_target, include_supplements")
       .eq("user_id", targetUserId)
       .single();
 
@@ -461,6 +870,10 @@ serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    // Verificar se usuário é pago
+    const { data: userPlan } = await supabase.rpc("get_user_plan", { _user_id: targetUserId });
+    const isPaidUser = userPlan?.[0]?.plan_type && userPlan[0].plan_type !== 'gratuito';
 
     let planId = dietPlanId;
     if (!planId) {
@@ -540,34 +953,40 @@ serve(async (req) => {
       total_protein: meal.total_protein,
       total_carbs: meal.total_carbs,
       total_fat: meal.total_fat,
-      options: (meal.meal_options || []).map((opt: any) => ({
-        option_number: opt.option_number,
-        foods: (opt.meal_option_foods || []).map((mof: any) => {
-          const food = mof.food;
-          const grams = mof.quantity_grams || 0;
-          const factor = grams / 100;
-          
-          let quantity = `${Math.round(grams)}g`;
-          if (mof.display_quantity && mof.display_unit) {
-            // Formato dual: unidades + gramas para clareza
-            const displayQty = Number.isInteger(mof.display_quantity) 
-              ? mof.display_quantity 
-              : Number(mof.display_quantity).toFixed(1);
-            const unitPlural = mof.display_quantity === 1 ? mof.display_unit : mof.display_unit;
-            quantity = `${displayQty} ${unitPlural} (${Math.round(grams)}g)`;
-          }
+      options: (meal.meal_options || [])
+        .sort((a: any, b: any) => a.option_number - b.option_number)
+        .map((opt: any) => ({
+          option_number: opt.option_number,
+          foods: (opt.meal_option_foods || []).map((mof: any) => {
+            const food = mof.food;
+            const grams = mof.quantity_grams || 0;
+            const factor = grams / 100;
+            
+            let quantity = `${Math.round(grams)}g`;
+            if (mof.display_quantity && mof.display_unit) {
+              const displayQty = Number.isInteger(mof.display_quantity) 
+                ? mof.display_quantity 
+                : Number(mof.display_quantity).toFixed(1);
+              quantity = `${displayQty} ${mof.display_unit} (${Math.round(grams)}g)`;
+            }
 
-          return {
-            name: food?.name || "Alimento",
-            quantity,
-            calories: Math.round((food?.calories || 0) * factor),
-            protein: Math.round((food?.protein || 0) * factor),
-            carbs: Math.round((food?.carbs || 0) * factor),
-            fat: Math.round((food?.fat || 0) * factor),
-          };
-        }),
-      })),
+            return {
+              name: food?.name || "Alimento",
+              quantity,
+              calories: Math.round((food?.calories || 0) * factor),
+              protein: Math.round((food?.protein || 0) * factor),
+              carbs: Math.round((food?.carbs || 0) * factor),
+              fat: Math.round((food?.fat || 0) * factor),
+            };
+          }),
+        })),
     }));
+
+    // Gerar recomendações de suplementação
+    const showSupplements = isPaidUser && profile.include_supplements === true;
+    const supplements = showSupplements 
+      ? calculateSupplementRecommendations(meals, profile.goal || 'maintain')
+      : [];
 
     const generatedAt = new Date().toLocaleDateString("pt-BR", {
       day: "2-digit",
@@ -577,7 +996,7 @@ serve(async (req) => {
       minute: "2-digit",
     });
 
-    const html = generateExecutivePdf(profile, plan, meals, generatedAt);
+    const html = generateExecutivePdf(profile, plan, meals, supplements, generatedAt, showSupplements);
 
     return new Response(JSON.stringify({ html }), {
       status: 200,
