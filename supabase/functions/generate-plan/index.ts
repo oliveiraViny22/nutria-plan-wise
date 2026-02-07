@@ -54,7 +54,7 @@ const FATTY_FOOD_RULES = {
 };
 
 // =====================================================
-// REGRAS CONTEXTUAIS DE ALIMENTOS (v5.16)
+// REGRAS CONTEXTUAIS DE ALIMENTOS (v5.20)
 // Alimentos bloqueados em tipos específicos de refeição
 // =====================================================
 const CONTEXTUAL_BLOCK_RULES = {
@@ -62,7 +62,7 @@ const CONTEXTUAL_BLOCK_RULES = {
   BLOCKED_IN_SNACKS: ["sobrecoxa", "coxa de frango", "coxinha", "pernil", "costela", "picanha", "cupim"],
   
   // Alimentos NÃO permitidos no café da manhã (proteínas de almoço/jantar)
-  // v5.19: Expandido para incluir peixes e frutos do mar
+  // v5.20: Expandido para incluir peixes, frutos do mar e arroz
   BLOCKED_IN_BREAKFAST: [
     // Carnes
     "seitan", "tempeh", "tofu", "carne bovina", "carne suína", "patinho", "acém", "alcatra", "fraldinha",
@@ -71,7 +71,19 @@ const CONTEXTUAL_BLOCK_RULES = {
     "lula", "polvo", "ostra", "mexilhão", "lagosta", "caranguejo", "siri", "vieira", "dourado", "pescada",
     "namorado", "linguado", "corvina", "anchova", "badejo", "cherne", "garoupa", "tainha",
     // Leguminosas (mais adequadas para almoço/jantar)
-    "lentilha", "grão-de-bico", "feijão"
+    "lentilha", "grão-de-bico", "feijão",
+    // Arroz (não é típico de café da manhã brasileiro)
+    "arroz"
+  ],
+  
+  // Alimentos NÃO permitidos no lanche da manhã (v5.20)
+  // Mesmos critérios do café da manhã
+  BLOCKED_IN_MORNING_SNACK: [
+    // Peixes e frutos do mar
+    "peixe branco", "salmão", "tilápia", "atum", "bacalhau", "camarão", "robalo", "sardinha", "merluza",
+    "lula", "polvo", "ostra", "mexilhão", "lagosta", "caranguejo", "siri", "vieira", "dourado", "pescada",
+    // Leguminosas e arroz
+    "lentilha", "grão-de-bico", "feijão", "arroz"
   ],
   
   // Palavras-chave que indicam RECEITAS (não são alimentos simples)
@@ -167,11 +179,13 @@ function isFattyForRandomSelection(f: Food): boolean {
 /**
  * Verifica se um alimento deve ser bloqueado para um tipo específico de refeição.
  * Ex: Sobrecoxa é pesada demais para lanches; Seitan é inadequado para café
+ * v5.20: Expandido para bloquear arroz e frutos do mar no café e lanche da manhã
  */
 function isBlockedForMealType(f: Food, mealType: string): boolean {
   const name = f.name.toLowerCase();
   const isSnack = SNACK_MEALS.includes(mealType);
   const isBreakfast = mealType === "breakfast";
+  const isMorningSnack = mealType === "morning_snack";
   
   // Alimentos pesados bloqueados em lanches
   if (isSnack && CONTEXTUAL_BLOCK_RULES.BLOCKED_IN_SNACKS.some(kw => name.includes(kw))) {
@@ -180,6 +194,11 @@ function isBlockedForMealType(f: Food, mealType: string): boolean {
   
   // Proteínas de almoço/jantar bloqueadas no café da manhã (v5.16)
   if (isBreakfast && CONTEXTUAL_BLOCK_RULES.BLOCKED_IN_BREAKFAST.some(kw => name.includes(kw))) {
+    return true;
+  }
+  
+  // v5.20: Frutos do mar, arroz e leguminosas bloqueados no lanche da manhã também
+  if (isMorningSnack && CONTEXTUAL_BLOCK_RULES.BLOCKED_IN_MORNING_SNACK.some(kw => name.includes(kw))) {
     return true;
   }
   
