@@ -19,9 +19,6 @@ import {
   REBALANCER_CONTRACT,
   GENERATOR_CONTRACT,
 } from "../_shared/nutrition-contracts.ts";
-
-// Usar constante centralizada do contrato do gerador para variância de gordura
-const MAX_FAT_VARIANCE_PERCENT_FROM_CONTRACT = GENERATOR_CONTRACT.MAX_OPTION_FAT_VARIANCE_PERCENT;
 import { createLogger, logAIUsage, type RebalanceMetrics } from "../_shared/logger.ts";
 import { getCorsHeaders } from "../_shared/security.ts";
 import { getFeatureFlag, FLAGS } from "../_shared/feature-flags.ts";
@@ -730,7 +727,7 @@ interface FatBalancingResult {
   }>;
 }
 
-const MAX_FAT_VARIANCE_PERCENT = MAX_FAT_VARIANCE_PERCENT_FROM_CONTRACT; // Agora ±5% (alinhado com calorias)
+const MAX_FAT_VARIANCE_PERCENT = GENERATOR_CONTRACT.MAX_OPTION_FAT_VARIANCE_PERCENT; // ±5% (alinhado com calorias)
 
 /**
  * Balanceia a gordura entre opções do plano.
