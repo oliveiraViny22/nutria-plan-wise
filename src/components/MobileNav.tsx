@@ -60,7 +60,8 @@ export function MobileNav() {
   const { accountType, isSubscribed } = useSubscription();
   const permissions = useAccountPermissions();
   const planName = permissions.plan_name?.toLowerCase() || 'gratuito';
-  const isPaidUser = planName !== 'gratuito';
+  // ADMIN BYPASS: Admins sempre são tratados como usuários pagos
+  const isPaidUser = isAdmin || planName !== 'gratuito';
 
   const showProfessionalLinks = 
     (isSubscribed && accountType === 'professional') || 
@@ -72,12 +73,42 @@ export function MobileNav() {
     navigate('/login');
   };
 
-  // Admin vê apenas opções administrativas
+  // Admin vê navegação expandida (todas as funcionalidades + painel admin)
   const adminNavItems: NavItem[] = [
+    {
+      label: 'Dashboard',
+      href: '/dashboard',
+      icon: <Home className="h-5 w-5" />,
+      show: true,
+    },
     {
       label: 'Painel Admin',
       href: '/admin',
       icon: <Shield className="h-5 w-5" />,
+      show: true,
+    },
+    {
+      label: 'Registro Diário',
+      href: '/daily-log',
+      icon: <ClipboardCheck className="h-5 w-5" />,
+      show: true,
+    },
+    {
+      label: 'Progresso',
+      href: '/progress',
+      icon: <TrendingUp className="h-5 w-5" />,
+      show: true,
+    },
+    {
+      label: 'Meu Perfil',
+      href: '/profile',
+      icon: <User className="h-5 w-5" />,
+      show: true,
+    },
+    {
+      label: 'Chat IA',
+      href: '/chat',
+      icon: <MessageCircle className="h-5 w-5" />,
       show: true,
     },
   ];

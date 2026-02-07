@@ -307,10 +307,10 @@ export default function Dashboard() {
             {/* Quick Actions Bar - Enhanced */}
             <EnhancedQuickActions
               hasPlan={!!currentDietPlan}
-              isPlanSaved={currentDietPlan?.is_saved || false}
+              isPlanSaved={isAdmin || (currentDietPlan?.is_saved || false)}
               pendingMeals={meals.length - todayMealsLogged}
               totalMeals={meals.length}
-              isPaidUser={!!subscriptionPlan?.type && subscriptionPlan.type !== 'gratuito'}
+              isPaidUser={isAdmin || (!!subscriptionPlan?.type && subscriptionPlan.type !== 'gratuito')}
               canGeneratePlan={permissions.can_create_plan && !isLimitReached('diet')}
               canOptimize={permissions.can_adjust && !isLimitReached('adjustment')}
               isGenerating={generatingV5}
@@ -386,7 +386,7 @@ export default function Dashboard() {
 
             <DashboardMeals
               hasPlan={!!currentDietPlan}
-              isPlanSaved={currentDietPlan?.is_saved || false}
+              isPlanSaved={isAdmin || (currentDietPlan?.is_saved || false)}
               planId={currentDietPlan?.id}
               meals={meals}
               planType={subscriptionPlan?.type}

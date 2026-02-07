@@ -62,7 +62,17 @@ const CONTEXTUAL_BLOCK_RULES = {
   BLOCKED_IN_SNACKS: ["sobrecoxa", "coxa de frango", "coxinha", "pernil", "costela", "picanha", "cupim"],
   
   // Alimentos NÃO permitidos no café da manhã (proteínas de almoço/jantar)
-  BLOCKED_IN_BREAKFAST: ["seitan", "tempeh", "tofu", "carne bovina", "carne suína", "patinho", "acém", "alcatra", "fraldinha", "peixe branco", "salmão", "tilápia", "atum", "bacalhau", "camarão", "lentilha", "grão-de-bico", "feijão"],
+  // v5.19: Expandido para incluir peixes e frutos do mar
+  BLOCKED_IN_BREAKFAST: [
+    // Carnes
+    "seitan", "tempeh", "tofu", "carne bovina", "carne suína", "patinho", "acém", "alcatra", "fraldinha",
+    // Peixes e frutos do mar (não são típicos de café da manhã brasileiro)
+    "peixe branco", "salmão", "tilápia", "atum", "bacalhau", "camarão", "robalo", "sardinha", "merluza",
+    "lula", "polvo", "ostra", "mexilhão", "lagosta", "caranguejo", "siri", "vieira", "dourado", "pescada",
+    "namorado", "linguado", "corvina", "anchova", "badejo", "cherne", "garoupa", "tainha",
+    // Leguminosas (mais adequadas para almoço/jantar)
+    "lentilha", "grão-de-bico", "feijão"
+  ],
   
   // Palavras-chave que indicam RECEITAS (não são alimentos simples)
   RECIPE_KEYWORDS: ["mingau", "vitamina de", "shake de", "smoothie", "sanduíche", "wrap", "tapioca recheada", "crepioca", "omelete", "panqueca", "pizza", "lasanha", "escondidinho", "estrogonofe", "moqueca", "feijoada", "risoto"],
