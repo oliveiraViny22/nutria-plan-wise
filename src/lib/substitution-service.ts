@@ -551,7 +551,10 @@ export function findSubstituteCandidates(
     };
   });
   
-  // Ordenar: mesma categoria primeiro, sem warning, depois alfabeticamente
+  // Ordenar: mesma categoria primeiro, alimentos similares, sem warning, alfabeticamente
+  // Extrair primeira palavra do nome do alimento de origem para agrupar similares
+  const sourceFirstWord = sourceFood.name.split(/\s+/)[0].toLowerCase();
+  
   scoredCandidates.sort((a, b) => {
     // 1. Alimentos da mesma categoria vêm primeiro
     if (!a.isCrossCategory && b.isCrossCategory) return -1;
@@ -561,7 +564,19 @@ export function findSubstituteCandidates(
     if (a.hasProcessingWarning && !b.hasProcessingWarning) return 1;
     if (!a.hasProcessingWarning && b.hasProcessingWarning) return -1;
     
-    // 3. Ordenar alfabeticamente pelo nome do alimento
+    // 3. Priorizar alimentos com nome similar (mesma primeira palavra)
+    // Ex: "Ovo Cozido" -> priorizar "Ovo Mexido", "Ovo Frito"
+    const aFirstWord = a.food.name.split(/\s+/)[0].toLowerCase();
+    const bFirstWord = b.food.name.split(/\s+/)[0].toLowerCase();
+    const aSimilar = aFirstWord === sourceFirstWord;
+    const bSimilar = bFirstWord === sourceFirstWord;
+    if (aSimilar && !bSimilar) return -1;
+    if (!aSimilar && bSimilar) return 1;
+    
+    // 4. Ordenar por score (melhor score primeiro)
+    if (b.score !== a.score) return b.score - a.score;
+    
+    // 5. Ordenar alfabeticamente pelo nome do alimento
     return a.food.name.localeCompare(b.food.name, 'pt-BR');
   });
   
