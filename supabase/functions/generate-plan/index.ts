@@ -360,11 +360,17 @@ function filterFoods(all: Food[], avoided: string[], restrictions: string[]): Fo
 }
 
 /**
- * v5.18: loadData agora aceita goal do usuário para filtrar âncoras
- * Âncoras com goal_type NULL são universais (aplicam a qualquer objetivo)
- * Âncoras com goal_type específico só aplicam para aquele objetivo
+ * v5.24: loadData agora aceita goal E restrições do usuário para filtrar âncoras
+ * - goal_type: NULL = universal, específico = só para aquele objetivo
+ * - dietary_profile: NULL = universal, específico = só para aquele perfil dietético
+ * 
+ * Lógica de perfil dietético:
+ * - Usuário sem restrições especiais: apenas âncoras 'standard' ou NULL
+ * - Usuário vegetariano: âncoras 'vegetarian', 'vegan', ou NULL
+ * - Usuário vegano: apenas âncoras 'vegan' ou NULL
+ * - Usuário pescetariano: âncoras 'pescatarian', 'standard', ou NULL
  */
-async function loadData(sb: any, userGoal?: string) {
+async function loadData(sb: any, userGoal?: string, restrictions?: string[]) {
   // Mapear goal do perfil para goal_type do banco
   const goalTypeMap: Record<string, string> = {
     "gain_muscle": "bulk",
@@ -373,19 +379,48 @@ async function loadData(sb: any, userGoal?: string) {
   };
   const mappedGoalType = userGoal ? goalTypeMap[userGoal] || null : null;
   
+  // v5.24: Determinar perfil dietético baseado nas restrições
+  const restr = (restrictions || []).map(r => r.toLowerCase().trim());
+  const isVegan = restr.some(r => r.includes("vegano"));
+  const isVegetarian = restr.some(r => r.includes("vegetariano"));
+  const isPescatarian = restr.some(r => r.includes("pescetariano"));
+  
+  // Construir filtro de dietary_profile
+  // NULL = universal (sempre incluído)
+  let dietaryProfileFilter: string;
+  if (isVegan) {
+    // Veganos: apenas âncoras veganas ou universais
+    dietaryProfileFilter = "dietary_profile.is.null,dietary_profile.eq.vegan";
+  } else if (isVegetarian) {
+    // Vegetarianos: âncoras vegetarianas, veganas ou universais
+    dietaryProfileFilter = "dietary_profile.is.null,dietary_profile.eq.vegetarian,dietary_profile.eq.vegan";
+  } else if (isPescatarian) {
+    // Pescetarianos: âncoras pescetarianas, standard ou universais
+    dietaryProfileFilter = "dietary_profile.is.null,dietary_profile.eq.pescatarian,dietary_profile.eq.standard";
+  } else {
+    // Usuários padrão: apenas âncoras standard ou universais (EXCLUI vegano, vegetariano, pescetariano)
+    dietaryProfileFilter = "dietary_profile.is.null,dietary_profile.eq.standard";
+  }
+  
   const [{ data: templates }, { data: roles }, { data: cats }, { data: anchors }] = await Promise.all([
     sb.from("meal_templates").select("*").eq("is_active", true),
     sb.from("meal_template_roles").select("*").order("sort_order"),
     sb.from("meal_role_food_categories").select("role_id, category"),
-    // v5.18: Filtrar âncoras por goal_type (null = universal, aplica a todos)
+    // v5.24: Filtrar âncoras por goal_type E dietary_profile
     sb.from("meal_anchor_foods")
       .select("*, food:foods(id, name, calories, protein, carbs, fat, category, is_optional, unit_name, unit_weight_grams, unit_increment, unit_enabled)")
       .eq("is_active", true)
       .or(mappedGoalType ? `goal_type.is.null,goal_type.eq.${mappedGoalType}` : "goal_type.is.null")
+      .or(dietaryProfileFilter)
       .order("sort_order"),
   ]);
 
-  log("AnchorFilter", { userGoal, mappedGoalType, anchorsLoaded: anchors?.length || 0 });
+  log("AnchorFilter", { 
+    userGoal, 
+    mappedGoalType, 
+    dietaryProfile: isVegan ? "vegan" : isVegetarian ? "vegetarian" : isPescatarian ? "pescatarian" : "standard",
+    anchorsLoaded: anchors?.length || 0 
+  });
 
   const catMap = new Map<string, string[]>();
   for (const c of cats || []) {
@@ -1681,8 +1716,8 @@ serve(async (req) => {
     const optLim = planLim?.[0]?.meal_options_limit ?? 1;
     const mTypes = MEAL_TYPES[profile.meals_per_day || 4] || MEAL_TYPES[4];
     
-    // v5.18: Passar goal do perfil para filtrar âncoras pelo objetivo
-    const { tplMap, ancMap } = await loadData(sb, profile.goal);
+    // v5.24: Passar goal E restrições do perfil para filtrar âncoras por objetivo e perfil dietético
+    const { tplMap, ancMap } = await loadData(sb, profile.goal, profile.restrictions || []);
     const foods = filterFoods(allFoods as Food[] || [], profile.avoided_foods || [], profile.restrictions || []);
     log("Data", { foods: foods.length, meals: mTypes.length });
 

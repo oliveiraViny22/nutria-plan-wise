@@ -472,6 +472,7 @@ export type Database = {
         Row: {
           created_at: string
           default_quantity_grams: number
+          dietary_profile: string | null
           food_id: string
           goal_type: string | null
           id: string
@@ -485,6 +486,7 @@ export type Database = {
         Insert: {
           created_at?: string
           default_quantity_grams?: number
+          dietary_profile?: string | null
           food_id: string
           goal_type?: string | null
           id?: string
@@ -498,6 +500,7 @@ export type Database = {
         Update: {
           created_at?: string
           default_quantity_grams?: number
+          dietary_profile?: string | null
           food_id?: string
           goal_type?: string | null
           id?: string
