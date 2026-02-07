@@ -385,6 +385,7 @@ export type Database = {
           created_at: string
           created_by_id: string | null
           created_by_type: string | null
+          dietary_profile: string | null
           fat: number
           id: string
           is_active: boolean | null
@@ -415,6 +416,7 @@ export type Database = {
           created_at?: string
           created_by_id?: string | null
           created_by_type?: string | null
+          dietary_profile?: string | null
           fat: number
           id?: string
           is_active?: boolean | null
@@ -445,6 +447,7 @@ export type Database = {
           created_at?: string
           created_by_id?: string | null
           created_by_type?: string | null
+          dietary_profile?: string | null
           fat?: number
           id?: string
           is_active?: boolean | null
@@ -1424,6 +1427,7 @@ export type Database = {
           created_at: string
           created_by_id: string | null
           created_by_type: string | null
+          dietary_profile: string | null
           fat: number
           id: string
           is_active: boolean | null
