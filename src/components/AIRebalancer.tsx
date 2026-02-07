@@ -215,54 +215,7 @@ function MacroComparisonCard({
     </div>
   );
 }
-
-function AdjustmentItem({ adjustment, index }: { adjustment: AdjustmentProposal; index: number }) {
-  const isIncrease = adjustment.newGrams > adjustment.originalGrams;
-  const originalRounded = Math.round(adjustment.originalGrams);
-  const newRounded = Math.round(adjustment.newGrams);
-  const diff = newRounded - originalRounded;
-
-  return (
-    <motion.div 
-      initial={{ opacity: 0, x: -10 }}
-      animate={{ opacity: 1, x: 0 }}
-      transition={{ duration: 0.2, delay: index * 0.03 }}
-      className="py-3 px-3 rounded-lg hover:bg-muted/50 transition-colors border-b border-border/30 last:border-0"
-    >
-      <div className="flex items-start gap-3">
-        <div className={`p-2 rounded-lg shrink-0 ${
-          isIncrease ? 'bg-primary/10' : 'bg-amber-500/10'
-        }`}>
-          {isIncrease ? (
-            <ChevronUp className="w-3.5 h-3.5 text-primary" />
-          ) : (
-            <ChevronDown className="w-3.5 h-3.5 text-amber-500" />
-          )}
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium text-foreground truncate">{adjustment.foodName}</p>
-          <p className="text-xs text-muted-foreground">{adjustment.mealName}</p>
-          <p className="text-xs text-muted-foreground/80 mt-1 italic">{adjustment.reason}</p>
-        </div>
-        <div className="text-right shrink-0">
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground line-through">{originalRounded}g</span>
-            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-sm font-semibold ${
-              isIncrease 
-                ? 'bg-primary/15 text-primary' 
-                : 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
-            }`}>
-              {newRounded}g
-              <span className="text-xs opacity-80">
-                ({diff > 0 ? '+' : ''}{diff})
-              </span>
-            </span>
-          </div>
-        </div>
-      </div>
-    </motion.div>
-  );
-}
+// AdjustmentItem removido - não há mais listagem de ajustes propostos
 
 // Componente para exibir status de validação por opção (v2.5)
 function OptionValidationStatus({ validations, meta }: { 
@@ -440,7 +393,6 @@ export function AIRebalancer({
   const { user } = useAuth();
   const { playSuccessSound, triggerStartFeedback } = useSuccessSound();
   const [showDialog, setShowDialog] = useState(false);
-  const [showDetails, setShowDetails] = useState(false);
   const [loading, setLoading] = useState(false);
   const [applying, setApplying] = useState(false);
   const [result, setResult] = useState<AIRebalanceResult | null>(null);
@@ -670,7 +622,6 @@ export function AIRebalancer({
   const handleCancel = () => {
     setShowDialog(false);
     setResult(null);
-    setShowDetails(false);
   };
 
   const hasAdjustments = result && result.adjustments && result.adjustments.length > 0;
@@ -835,42 +786,6 @@ export function AIRebalancer({
                     </div>
                   )}
 
-
-                  {/* Adjustments List */}
-                  {hasAdjustments && result.adjustments && (
-                    <div className="space-y-3">
-                      <button
-                        onClick={() => setShowDetails(!showDetails)}
-                        className="w-full flex items-center justify-between p-3 rounded-xl bg-muted/50 hover:bg-muted transition-colors"
-                      >
-                        <span className="text-sm font-medium text-foreground">
-                          {result.adjustments.length} ajustes propostos
-                        </span>
-                        {showDetails ? (
-                          <ChevronUp className="w-4 h-4 text-muted-foreground" />
-                        ) : (
-                          <ChevronDown className="w-4 h-4 text-muted-foreground" />
-                        )}
-                      </button>
-
-                      <AnimatePresence>
-                        {showDetails && (
-                          <motion.div
-                            initial={{ height: 0, opacity: 0 }}
-                            animate={{ height: 'auto', opacity: 1 }}
-                            exit={{ height: 0, opacity: 0 }}
-                            className="overflow-hidden"
-                          >
-                            <div className="bg-card rounded-xl border border-border/50">
-                              {result.adjustments.map((adj, i) => (
-                                <AdjustmentItem key={adj.mealOptionFoodId} adjustment={adj} index={i} />
-                              ))}
-                            </div>
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
-                    </div>
-                  )}
 
                   {/* Option Validations (v2.5) */}
                   {result.optionValidations && result.optionValidations.length > 0 && (
