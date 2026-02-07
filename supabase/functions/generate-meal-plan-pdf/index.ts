@@ -650,6 +650,8 @@ function generateExecutivePdf(
     /* ============ PAGE 2: SUPPLEMENTS ============ */
     .page-supplements {
       background: linear-gradient(180deg, #faf5ff 0%, #fff 100%);
+      max-height: 297mm;
+      overflow: hidden;
     }
     .page-supplements .header {
       border-bottom-color: #8b5cf6;
@@ -658,26 +660,26 @@ function generateExecutivePdf(
     
     .supp-intro {
       display: flex;
-      gap: 10px;
-      margin-bottom: 10px;
+      gap: 8px;
+      margin-bottom: 6px;
     }
     .supp-intro-card {
       flex: 1;
       display: flex;
-      gap: 8px;
+      gap: 6px;
       background: #fef3c7;
       border: 1px solid #fcd34d;
-      border-radius: 6px;
-      padding: 8px 10px;
+      border-radius: 5px;
+      padding: 5px 8px;
     }
-    .intro-icon { font-size: 16pt; }
-    .intro-text strong { font-size: 8pt; color: #92400e; }
-    .intro-text p { font-size: 7pt; color: #78350f; margin-top: 2px; }
+    .intro-icon { font-size: 12pt; }
+    .intro-text strong { font-size: 7pt; color: #92400e; }
+    .intro-text p { font-size: 6pt; color: #78350f; margin-top: 1px; line-height: 1.2; }
     .goal-indicator {
       display: flex;
       align-items: center;
-      gap: 6px;
-      font-size: 7pt;
+      gap: 5px;
+      font-size: 6pt;
       color: #6b7280;
     }
     .goal-indicator .goal-badge {
@@ -686,12 +688,14 @@ function generateExecutivePdf(
     
     .supp-section {
       flex: 1;
+      min-height: 0;
+      overflow: hidden;
     }
     .supp-card {
       background: #fff;
       border: 1px solid #e2e8f0;
-      border-radius: 6px;
-      margin-bottom: 8px;
+      border-radius: 5px;
+      margin-bottom: 5px;
       overflow: hidden;
     }
     .supp-header {
@@ -700,56 +704,59 @@ function generateExecutivePdf(
       align-items: center;
       background: linear-gradient(135deg, #8b5cf6, #7c3aed);
       color: #fff;
-      padding: 6px 10px;
+      padding: 4px 8px;
     }
-    .supp-meal { font-weight: 700; font-size: 8pt; }
-    .supp-totals { font-size: 7pt; opacity: 0.9; }
+    .supp-meal { font-weight: 700; font-size: 7pt; }
+    .supp-totals { font-size: 6pt; opacity: 0.9; }
     
     .supp-table {
       width: 100%;
       border-collapse: collapse;
-      font-size: 7pt;
+      font-size: 6pt;
     }
     .supp-table thead tr { background: #f8fafc; }
     .supp-table th {
-      padding: 4px 6px;
+      padding: 2px 4px;
       text-align: left;
       font-weight: 600;
-      font-size: 6pt;
+      font-size: 5.5pt;
       text-transform: uppercase;
       color: #6b7280;
     }
     .supp-table td {
-      padding: 4px 6px;
+      padding: 2px 4px;
       border-bottom: 1px solid #f1f5f9;
     }
     .tc { text-align: center; }
     .tr { text-align: right; }
     
     .supp-tip {
-      padding: 6px 10px;
+      padding: 3px 6px;
       background: #f0fdf4;
       border-top: 1px solid #bbf7d0;
-      font-size: 6.5pt;
+      font-size: 5.5pt;
       color: #166534;
     }
     
     .supp-notes {
       background: #f8fafc;
-      border-radius: 6px;
-      padding: 10px 12px;
-      margin-top: 10px;
+      border-radius: 5px;
+      padding: 6px 8px;
+      margin-top: 6px;
     }
-    .note-title { font-weight: 700; font-size: 8pt; margin-bottom: 6px; }
+    .note-title { font-weight: 700; font-size: 7pt; margin-bottom: 3px; }
     .supp-notes ul {
       list-style: none;
-      font-size: 7pt;
+      font-size: 6pt;
       color: #4b5563;
+      columns: 2;
+      column-gap: 12px;
     }
     .supp-notes li {
-      padding: 2px 0;
-      padding-left: 12px;
+      padding: 1px 0;
+      padding-left: 10px;
       position: relative;
+      break-inside: avoid;
     }
     .supp-notes li::before {
       content: "•";
@@ -760,118 +767,119 @@ function generateExecutivePdf(
     
     .no-supp {
       text-align: center;
-      padding: 20px;
+      padding: 12px;
       color: #9ca3af;
-      font-size: 9pt;
+      font-size: 8pt;
     }
     
-    /* Micronutrientes */
+    /* Micronutrientes - Compacto */
     .micro-section {
-      margin-top: 12px;
-      margin-bottom: 10px;
+      margin-top: 6px;
+      margin-bottom: 6px;
     }
     .micro-title {
-      font-size: 9pt;
+      font-size: 8pt;
       font-weight: 700;
       color: #7c3aed;
-      margin-bottom: 8px;
+      margin-bottom: 4px;
       text-align: center;
     }
     .micro-grid {
       display: grid;
       grid-template-columns: repeat(4, 1fr);
-      gap: 8px;
+      gap: 5px;
     }
     .micro-card {
       background: #fff;
       border: 1px solid #e2e8f0;
-      border-radius: 6px;
-      padding: 8px;
+      border-radius: 4px;
+      padding: 4px 5px;
       text-align: center;
     }
     .micro-header {
-      font-size: 7pt;
+      font-size: 6pt;
       font-weight: 700;
       color: #374151;
-      margin-bottom: 4px;
-    }
-    .micro-dose {
-      font-size: 10pt;
-      font-weight: 800;
-      color: #8b5cf6;
       margin-bottom: 2px;
     }
+    .micro-dose {
+      font-size: 8pt;
+      font-weight: 800;
+      color: #8b5cf6;
+      margin-bottom: 1px;
+    }
     .micro-timing {
-      font-size: 6pt;
+      font-size: 5pt;
       color: #6b7280;
-      margin-bottom: 4px;
+      margin-bottom: 2px;
     }
     .micro-benefit {
-      font-size: 6pt;
+      font-size: 5pt;
       color: #059669;
       background: #ecfdf5;
-      padding: 2px 4px;
-      border-radius: 3px;
+      padding: 1px 3px;
+      border-radius: 2px;
     }
     
-    /* Suporte por objetivo */
+    /* Suporte por objetivo - Compacto */
     .support-section {
-      margin-top: 10px;
-      margin-bottom: 10px;
+      margin-top: 6px;
+      margin-bottom: 6px;
     }
     .support-title {
-      font-size: 9pt;
+      font-size: 8pt;
       font-weight: 700;
       color: #7c3aed;
-      margin-bottom: 8px;
+      margin-bottom: 4px;
       text-align: center;
     }
     .support-grid {
       display: flex;
       justify-content: center;
-      gap: 10px;
+      gap: 8px;
       flex-wrap: wrap;
     }
     .support-card {
       background: linear-gradient(135deg, #f3e8ff, #fff);
       border: 1px solid #c4b5fd;
-      border-radius: 6px;
-      padding: 8px 12px;
-      min-width: 140px;
+      border-radius: 4px;
+      padding: 5px 8px;
+      min-width: 120px;
       text-align: center;
     }
     .support-name {
-      font-size: 8pt;
+      font-size: 6.5pt;
       font-weight: 700;
       color: #6d28d9;
-      margin-bottom: 4px;
+      margin-bottom: 2px;
     }
     .support-details {
       display: flex;
       flex-direction: column;
-      gap: 2px;
-      margin-bottom: 4px;
+      gap: 1px;
+      margin-bottom: 2px;
     }
     .support-dose {
-      font-size: 9pt;
+      font-size: 7pt;
       font-weight: 800;
       color: #7c3aed;
     }
     .support-timing {
-      font-size: 6pt;
+      font-size: 5pt;
       color: #6b7280;
     }
     .support-benefit {
-      font-size: 6pt;
+      font-size: 5pt;
       color: #059669;
       background: #ecfdf5;
-      padding: 2px 6px;
-      border-radius: 3px;
+      padding: 1px 4px;
+      border-radius: 2px;
     }
     
     @media print {
       html, body { width: 210mm; }
       body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      .page { overflow: hidden; }
     }
   </style>
 </head>
