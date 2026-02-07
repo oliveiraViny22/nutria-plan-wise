@@ -48,6 +48,28 @@ interface AdjustmentProposal {
   reason: string;
 }
 
+interface OptionValidation {
+  optionNumber: number;
+  status: 'VALIDATED' | 'VALIDATED_WITH_TOLERANCE' | 'STRUCTURALLY_INVALID';
+  metrics: {
+    caloriePercent: number;
+    proteinPercent: number;
+    carbPercent: number;
+    fatPercent: number;
+  };
+  isValid: boolean;
+  isHardFail?: boolean;
+  retriesUsed?: number;
+}
+
+interface RebalanceMeta {
+  totalRetriesPerformed: number;
+  maxRetriesPerOption: number;
+  maxTotalRetries: number;
+  retriesPerOption: Record<number, number>;
+  hardFailOptions: number[];
+}
+
 interface AIRebalanceResult {
   success: boolean;
   alreadyOptimized?: boolean;
@@ -65,6 +87,9 @@ interface AIRebalanceResult {
     carbs: number;
     fat: number;
   };
+  // v2.5: Validações por opção
+  optionValidations?: OptionValidation[];
+  meta?: RebalanceMeta;
 }
 
 interface UsageLimitInfo {
@@ -235,6 +260,169 @@ function AdjustmentItem({ adjustment, index }: { adjustment: AdjustmentProposal;
           </div>
         </div>
       </div>
+    </motion.div>
+  );
+}
+
+// Componente para exibir status de validação por opção (v2.5)
+function OptionValidationStatus({ validations, meta }: { 
+  validations: OptionValidation[]; 
+  meta?: RebalanceMeta;
+}) {
+  const allValid = validations.every(v => v.isValid);
+  const validCount = validations.filter(v => v.isValid).length;
+  
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="space-y-3"
+    >
+      <div className="flex items-center justify-between">
+        <span className="text-sm font-medium text-foreground">Validação por Opção</span>
+        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+          allValid 
+            ? 'bg-primary/15 text-primary' 
+            : 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
+        }`}>
+          {validCount}/{validations.length} válidas
+        </span>
+      </div>
+      
+      <div className="grid grid-cols-3 gap-2">
+        {validations.map((validation, idx) => {
+          const isValid = validation.isValid;
+          const isHardFail = validation.isHardFail;
+          const retriesUsed = validation.retriesUsed || 0;
+          
+          return (
+            <motion.div
+              key={validation.optionNumber}
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: idx * 0.1 }}
+              className={`p-3 rounded-xl border text-center transition-all ${
+                isValid
+                  ? 'bg-primary/5 border-primary/30'
+                  : isHardFail
+                  ? 'bg-destructive/10 border-destructive/30'
+                  : 'bg-amber-500/10 border-amber-500/30'
+              }`}
+            >
+              <div className="flex items-center justify-center gap-1 mb-1">
+                {isValid ? (
+                  <Check className="w-4 h-4 text-primary" />
+                ) : isHardFail ? (
+                  <X className="w-4 h-4 text-destructive" />
+                ) : (
+                  <AlertTriangle className="w-4 h-4 text-amber-500" />
+                )}
+                <span className="text-sm font-semibold">Opção {validation.optionNumber}</span>
+              </div>
+              
+              <div className="text-[10px] text-muted-foreground space-y-0.5">
+                <div>Cal: {validation.metrics.caloriePercent.toFixed(0)}%</div>
+                <div>Prot: {validation.metrics.proteinPercent.toFixed(0)}%</div>
+                <div>Gord: {validation.metrics.fatPercent.toFixed(0)}%</div>
+              </div>
+              
+              {retriesUsed > 0 && (
+                <div className="mt-1 text-[10px] text-muted-foreground/70">
+                  {retriesUsed} retry{retriesUsed > 1 ? 's' : ''}
+                </div>
+              )}
+            </motion.div>
+          );
+        })}
+      </div>
+      
+      {meta && meta.totalRetriesPerformed > 0 && (
+        <div className="text-xs text-muted-foreground text-center">
+          Total: {meta.totalRetriesPerformed} retries automáticos executados
+        </div>
+      )}
+    </motion.div>
+  );
+}
+
+// Componente de celebração para plano totalmente validado
+function FullConvergenceCelebration({ show }: { show: boolean }) {
+  if (!show) return null;
+  
+  const confettiColors = [
+    'hsl(var(--primary))',
+    'hsl(142, 76%, 36%)', // green
+    'hsl(45, 93%, 47%)',  // gold
+    'hsl(217, 91%, 60%)', // blue
+    'hsl(280, 87%, 65%)', // purple
+  ];
+  
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.8 }}
+      animate={{ opacity: 1, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.8 }}
+      className="p-6 rounded-2xl bg-gradient-to-br from-primary/20 via-primary/10 to-transparent border border-primary/30 text-center relative overflow-hidden"
+    >
+      {/* Confetti burst */}
+      {Array.from({ length: 20 }).map((_, i) => (
+        <motion.div
+          key={i}
+          className="absolute w-2 h-2 rounded-full"
+          style={{ 
+            backgroundColor: confettiColors[i % confettiColors.length],
+            left: '50%',
+            top: '50%',
+          }}
+          initial={{ opacity: 0, x: 0, y: 0, scale: 0 }}
+          animate={{
+            opacity: [0, 1, 1, 0],
+            x: (Math.random() - 0.5) * 200,
+            y: (Math.random() - 0.5) * 200,
+            scale: [0, 1, 0.5, 0],
+            rotate: Math.random() * 720,
+          }}
+          transition={{
+            duration: 1.5,
+            delay: 0.1 + (i * 0.03),
+            ease: 'easeOut',
+          }}
+        />
+      ))}
+      
+      <motion.div
+        initial={{ scale: 0 }}
+        animate={{ scale: 1 }}
+        transition={{ type: 'spring', stiffness: 300, damping: 15, delay: 0.2 }}
+      >
+        <div className="w-16 h-16 mx-auto mb-3 rounded-full bg-primary/20 flex items-center justify-center">
+          <motion.div
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ delay: 0.4, type: 'spring' }}
+          >
+            <Check className="w-8 h-8 text-primary" />
+          </motion.div>
+        </div>
+      </motion.div>
+      
+      <motion.h3
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.5 }}
+        className="text-lg font-bold text-foreground mb-1"
+      >
+        🎉 Plano 100% Validado!
+      </motion.h3>
+      
+      <motion.p
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.6 }}
+        className="text-sm text-muted-foreground"
+      >
+        Todas as opções estão dentro das metas nutricionais
+      </motion.p>
     </motion.div>
   );
 }
@@ -668,8 +856,23 @@ export function AIRebalancer({
                     </div>
                   )}
 
+                  {/* Option Validations (v2.5) */}
+                  {result.optionValidations && result.optionValidations.length > 0 && (
+                    <OptionValidationStatus 
+                      validations={result.optionValidations} 
+                      meta={result.meta}
+                    />
+                  )}
+
+                  {/* Full Convergence Celebration */}
+                  {result.optionValidations && 
+                   result.optionValidations.length > 0 && 
+                   result.optionValidations.every(v => v.isValid) && (
+                    <FullConvergenceCelebration show={true} />
+                  )}
+
                   {/* No adjustments message */}
-                  {!hasAdjustments && !isAlreadyOptimized && (
+                  {!hasAdjustments && !isAlreadyOptimized && (!result.optionValidations || result.optionValidations.length === 0) && (
                     <div className="flex items-center gap-3 p-4 rounded-xl bg-primary/5 border border-primary/20">
                       <Check className="w-5 h-5 text-primary shrink-0" />
                       <div>
