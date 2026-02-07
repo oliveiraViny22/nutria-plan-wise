@@ -523,32 +523,41 @@ export function AIRebalancer({
     setApplying(true);
     try {
       // ===============================================================
-      // ESTRATÉGIA: Aplicar ajustes em batch e usar proposedMacros do backend
+      // ESTRATÉGIA: Aplicar ajustes em batches para evitar timeout
       // ===============================================================
       
-      // FASE 1: Aplicar todos os ajustes de porção (meal_option_foods)
-      console.log('[handleConfirm] Phase 1: Applying adjustments in batch...');
+      // FASE 1: Aplicar ajustes em batches de 10 para evitar sobrecarga no banco
+      console.log('[handleConfirm] Phase 1: Applying adjustments in batches...');
       
-      // Processar ajustes em paralelo para velocidade
-      const updatePromises = result.adjustments.map(async (adj) => {
-        const { error } = await supabase
-          .from('meal_option_foods')
-          .update({ quantity_grams: adj.newGrams })
-          .eq('id', adj.mealOptionFoodId);
+      const BATCH_SIZE = 10;
+      const adjustments = result.adjustments;
+      let updatedCount = 0;
+      
+      for (let i = 0; i < adjustments.length; i += BATCH_SIZE) {
+        const batch = adjustments.slice(i, i + BATCH_SIZE);
         
-        if (error) {
-          console.error(`[handleConfirm] Error updating ${adj.foodName}:`, error);
-          throw error;
-        }
-        console.log(`[handleConfirm] Updated ${adj.foodName}: ${adj.originalGrams}g → ${adj.newGrams}g`);
-        return adj;
-      });
+        const batchPromises = batch.map(async (adj) => {
+          const { error } = await supabase
+            .from('meal_option_foods')
+            .update({ quantity_grams: adj.newGrams })
+            .eq('id', adj.mealOptionFoodId);
+          
+          if (error) {
+            console.error(`[handleConfirm] Error updating ${adj.foodName}:`, error);
+            throw new Error(`Falha ao atualizar ${adj.foodName}: ${error.message || error.code}`);
+          }
+          console.log(`[handleConfirm] Updated ${adj.foodName}: ${adj.originalGrams}g → ${adj.newGrams}g`);
+          return adj;
+        });
+        
+        await Promise.all(batchPromises);
+        updatedCount += batch.length;
+        console.log(`[handleConfirm] Batch ${Math.floor(i / BATCH_SIZE) + 1} complete: ${updatedCount}/${adjustments.length} foods updated`);
+      }
       
-      await Promise.all(updatePromises);
-      console.log(`[handleConfirm] Phase 1 complete: ${result.adjustments.length} foods updated`);
+      console.log(`[handleConfirm] Phase 1 complete: ${adjustments.length} foods updated`);
       
       // FASE 2: Atualizar totais do plano com proposedMacros do backend
-      // O backend já calculou os totais corretos - usamos diretamente
       console.log('[handleConfirm] Phase 2: Updating plan totals from proposedMacros...');
       
       const proposedMacros = result.proposedMacros || result.currentMacros;
@@ -565,7 +574,7 @@ export function AIRebalancer({
 
       if (planUpdateErr) {
         console.error('[handleConfirm] Error updating plan:', planUpdateErr);
-        throw planUpdateErr;
+        throw new Error(`Falha ao atualizar totais do plano: ${planUpdateErr.message || planUpdateErr.code}`);
       }
 
       console.log(`[handleConfirm] ✅ Plan totals updated: ${Math.round(proposedMacros.calories)} kcal, P:${Math.round(proposedMacros.protein)}g, C:${Math.round(proposedMacros.carbs)}g, F:${Math.round(proposedMacros.fat)}g`);
@@ -585,8 +594,13 @@ export function AIRebalancer({
       onComplete();
     } catch (error: unknown) {
       console.error('[handleConfirm] Error applying adjustments:', error);
+      const errorMessage = error instanceof Error 
+        ? error.message 
+        : typeof error === 'object' && error !== null && 'message' in error
+          ? String((error as { message: unknown }).message)
+          : 'Erro desconhecido. Tente novamente.';
       toast.error('Erro ao aplicar ajustes', {
-        description: error instanceof Error ? error.message : 'Verifique os logs para mais detalhes.'
+        description: errorMessage
       });
     } finally {
       setApplying(false);
