@@ -82,12 +82,12 @@ export default function Progress() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (user && hasAccess) {
+    if (user && hasAccess && profile) {
       fetchData();
     } else if (user && !hasAccess && !roleLoading) {
       setLoading(false);
     }
-  }, [user, hasAccess, roleLoading]);
+  }, [user, hasAccess, roleLoading, profile]);
 
   const fetchData = async () => {
     setLoading(true);
