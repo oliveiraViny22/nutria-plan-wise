@@ -1156,6 +1156,124 @@ function recalcOptionTotals(opt: MealResult): void {
   };
 }
 
+// =====================================================
+// EQUALIZAÇÃO CALÓRICA ENTRE OPÇÕES v5.30
+// =====================================================
+// Garante que todas as opções de uma refeição tenham
+// calorias dentro de ±5% (GENERATOR_CONTRACT.MAX_OPTION_CALORIE_VARIANCE_PERCENT)
+// =====================================================
+
+/**
+ * Equaliza as calorias entre todas as opções de cada refeição.
+ * Usa a Opção 1 como referência e ajusta as demais proporcionalmente.
+ * 
+ * Estratégia:
+ * 1. Para cada refeição, calcula a média calórica das opções
+ * 2. Identifica opções fora da tolerância de ±5%
+ * 3. Escala proporcionalmente os alimentos dessas opções
+ */
+function equalizeOptionCalories(mwo: MealWithOptions[]): { adjusted: number; warnings: string[] } {
+  const MAX_VARIANCE = GENERATOR_CONTRACT.MAX_OPTION_CALORIE_VARIANCE_PERCENT / 100; // 0.05
+  const warnings: string[] = [];
+  let totalAdjusted = 0;
+  
+  for (const meal of mwo) {
+    if (meal.options.length <= 1) continue; // Nada a equalizar
+    
+    // Usar Opção 1 como referência (é a que foi mais otimizada)
+    const referenceCalories = meal.options[0]?.totals.calories;
+    if (!referenceCalories || referenceCalories <= 0) continue;
+    
+    for (let optIdx = 1; optIdx < meal.options.length; optIdx++) {
+      const opt = meal.options[optIdx];
+      if (!opt?.foods || opt.foods.length === 0) continue;
+      
+      const currentCalories = opt.totals.calories;
+      const variance = Math.abs(currentCalories - referenceCalories) / referenceCalories;
+      
+      // Se já está dentro da tolerância, pular
+      if (variance <= MAX_VARIANCE) continue;
+      
+      // Calcular fator de escala para atingir as calorias de referência
+      const scaleFactor = referenceCalories / currentCalories;
+      
+      log("OptionCalorieEqualization", {
+        mealType: meal.mealType,
+        option: optIdx + 1,
+        currentCals: currentCalories,
+        targetCals: referenceCalories,
+        variance: Math.round(variance * 100),
+        scaleFactor: Math.round(scaleFactor * 100) / 100,
+      });
+      
+      // Aplicar escala proporcional a todos os alimentos da opção
+      for (const f of opt.foods) {
+        const isSnack = SNACK_MEALS.includes(meal.mealType);
+        const cat = (f.food.category || "").toLowerCase();
+        const limits = getCategoryLimits(cat, isSnack);
+        
+        const newQty = Math.round(f.quantity_grams * scaleFactor / 5) * 5;
+        f.quantity_grams = Math.max(limits.min, Math.min(limits.max, newQty));
+      }
+      
+      recalcOptionTotals(opt);
+      totalAdjusted++;
+      
+      // Verificar se ficou dentro da tolerância após ajuste
+      const newVariance = Math.abs(opt.totals.calories - referenceCalories) / referenceCalories;
+      if (newVariance > MAX_VARIANCE) {
+        warnings.push(
+          `[${MEAL_NAMES[meal.mealType] || meal.mealType}] Opção ${optIdx + 1} não pôde ser equalizada: ` +
+          `${opt.totals.calories} kcal vs ${referenceCalories} kcal (${Math.round(newVariance * 100)}% variância)`
+        );
+      }
+      
+      log("OptionCalorieEqualizationResult", {
+        mealType: meal.mealType,
+        option: optIdx + 1,
+        newCals: opt.totals.calories,
+        newVariance: Math.round(newVariance * 100),
+        withinTolerance: newVariance <= MAX_VARIANCE,
+      });
+    }
+  }
+  
+  if (totalAdjusted > 0) {
+    log("EqualizationComplete", { optionsAdjusted: totalAdjusted, warnings: warnings.length });
+  }
+  
+  return { adjusted: totalAdjusted, warnings };
+}
+
+/**
+ * Valida se todas as opções de cada refeição têm calorias equivalentes (±5%)
+ */
+function validateOptionCalorieEquivalence(mwo: MealWithOptions[]): { isValid: boolean; warnings: string[] } {
+  const MAX_VARIANCE = GENERATOR_CONTRACT.MAX_OPTION_CALORIE_VARIANCE_PERCENT / 100;
+  const warnings: string[] = [];
+  
+  for (const meal of mwo) {
+    if (meal.options.length <= 1) continue;
+    
+    const optionCalories = meal.options.map(opt => opt.totals.calories);
+    const avgCalories = optionCalories.reduce((a, b) => a + b, 0) / optionCalories.length;
+    
+    for (let optIdx = 0; optIdx < meal.options.length; optIdx++) {
+      const cals = optionCalories[optIdx];
+      const variance = Math.abs(cals - avgCalories) / avgCalories;
+      
+      if (variance > MAX_VARIANCE) {
+        warnings.push(
+          `[${MEAL_NAMES[meal.mealType] || meal.mealType}] Opção ${optIdx + 1} com ${cals} kcal ` +
+          `(${Math.round(variance * 100)}% de variância da média ${Math.round(avgCalories)} kcal, máximo: ${GENERATOR_CONTRACT.MAX_OPTION_CALORIE_VARIANCE_PERCENT}%)`
+        );
+      }
+    }
+  }
+  
+  return { isValid: warnings.length === 0, warnings };
+}
+
 /**
  * Boost de carboidratos: aumenta porções de alimentos ricos em carbs
  * quando o plano está abaixo do threshold mínimo.
@@ -1778,10 +1896,36 @@ serve(async (req) => {
     const postFatFillerTotals = totals(mwo);
     log("PostFatFillerTotals", { ...postFatFillerTotals });
 
+    // =====================================================
+    // v5.30: EQUALIZAÇÃO CALÓRICA ENTRE OPÇÕES
+    // Garante que todas as opções de cada refeição tenham ±5% de variância
+    // =====================================================
+    const equalization = equalizeOptionCalories(mwo);
+    if (equalization.adjusted > 0) {
+      log("CalorieEqualizationApplied", { 
+        optionsAdjusted: equalization.adjusted, 
+        warnings: equalization.warnings 
+      });
+    }
+    
+    // Debug: totais APÓS a equalização
+    const postEqualizationTotals = totals(mwo);
+    log("PostEqualizationTotals", { ...postEqualizationTotals });
+
     // Validar contratos nutricionais ANTES de salvar (com objetivo para threshold de carbs)
     const validation = validateNutritionalContracts(mwo, tgt, objective);
     
-    // C1: BLOQUEAR salvamento se validação falhar
+    // v5.30: Validar equivalência calórica entre opções
+    const optionEquivalence = validateOptionCalorieEquivalence(mwo);
+    
+    // Adicionar warnings de equivalência à validação principal
+    if (!optionEquivalence.isValid) {
+      validation.warnings.push(...optionEquivalence.warnings);
+      // Nota: Não bloqueia o salvamento, apenas adiciona warnings
+      log("OptionEquivalenceWarnings", { warnings: optionEquivalence.warnings });
+    }
+    
+    // C1: BLOQUEAR salvamento se validação principal falhar
     if (!validation.isValid) {
       log("ValidationFailed", { 
         warnings: validation.warnings, 
@@ -1830,6 +1974,11 @@ serve(async (req) => {
         warnings: validation.warnings,
         metrics: validation.metrics,
         objective,
+        // v5.30: Incluir status de equivalência calórica entre opções
+        optionEquivalence: {
+          isValid: optionEquivalence.isValid,
+          optionsEqualized: equalization.adjusted,
+        },
       },
       // =====================================================
       // DIAGNÓSTICO: Expor no output para observabilidade
@@ -1842,6 +1991,9 @@ serve(async (req) => {
         carbsInjectedGrams: generatorDiagnostics.carbsInjectedGrams,
         scaleIterations: generatorDiagnostics.scaleIterations,
         expandedLimitFoodsCount: generatorDiagnostics.expandedLimitFoods.length,
+        // v5.30: Diagnóstico de equalização
+        optionsEqualized: equalization.adjusted,
+        equalizationWarnings: equalization.warnings.length,
       }
     }, cors);
   } catch (e) {
