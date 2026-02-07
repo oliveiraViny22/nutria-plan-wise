@@ -356,21 +356,23 @@ interface ObjectiveRules {
 
 function getObjectiveRules(objective: Objective, settings: OptimizerSettings): ObjectiveRules {
   // Usar configurações do admin para definir regras por objetivo
+  // IMPORTANTE: Proteína mínima de 95% para TODOS os perfis (alinhado com gerador)
   let rules: ObjectiveRules;
   
   switch (objective) {
     case "cut":
       rules = {
-        calories: { min: 100 - settings.calories_tolerance, max: 100 },
-        protein: { min: settings.protein_floor },
+        calories: { min: 90, max: 100 }, // Piso de 90% para segurança nutricional
+        protein: { min: 95 }, // Alinhado com GENERATOR_CONTRACT.MIN_PROTEIN_PERCENT
+        carbs: { min: 90 }, // Carboidratos também validados para Cut
         fat: { max: settings.fat_ceiling },
       };
       break;
     case "bulk":
       rules = {
         calories: { min: 100 - settings.calories_tolerance, max: 100 + settings.calories_tolerance },
-        protein: { min: Math.max(settings.protein_floor - 5, 85) }, // Bulk pode ter piso um pouco menor
-        carbs: { min: settings.carbs_floor },
+        protein: { min: 90 }, // Bulk pode ter piso um pouco menor
+        carbs: { min: 80 }, // Bulk tem piso menor de carbs
         fat: { max: settings.fat_ceiling + 10 }, // Bulk permite mais gordura
       };
       break;
@@ -378,7 +380,8 @@ function getObjectiveRules(objective: Objective, settings: OptimizerSettings): O
     default:
       rules = {
         calories: { min: 100 - settings.calories_tolerance, max: 100 + settings.calories_tolerance },
-        protein: { min: Math.max(settings.protein_floor - 10, 80) },
+        protein: { min: 95 }, // Alinhado com GENERATOR_CONTRACT.MIN_PROTEIN_PERCENT
+        carbs: { min: 90 }, // Carboidratos também validados para Maintain
         fat: { max: settings.fat_ceiling + 5 }, // Manutenção também tem limite de gordura
       };
       break;
@@ -538,29 +541,34 @@ function validatePlan(
   const percents = calculatePercents(totals, targets);
   const errors: string[] = [];
 
+  // Tolerância EPSILON para evitar falsos negativos por arredondamento
+  const VALIDATION_EPSILON = 0.05;
+
   // CALORIAS - regra HARD (fora = plano INVÁLIDO)
-  if (percents.calories < rules.calories.min || percents.calories > rules.calories.max) {
+  if (percents.calories < rules.calories.min - VALIDATION_EPSILON || percents.calories > rules.calories.max + VALIDATION_EPSILON) {
     errors.push(
       `Calorias em ${percents.calories.toFixed(1)}% - fora do range [${rules.calories.min}%, ${rules.calories.max}%]`
     );
   }
 
   // PROTEÍNA - mínimo obrigatório
-  if (percents.protein < rules.protein.min) {
+  if (percents.protein < rules.protein.min - VALIDATION_EPSILON) {
     errors.push(
       `Proteína em ${percents.protein.toFixed(1)}% - abaixo do mínimo ${rules.protein.min}%`
     );
   }
 
-  // CARBOIDRATOS - apenas para bulk
-  if (rules.carbs && percents.carbs < rules.carbs.min) {
+  // CARBOIDRATOS - para todos os perfis (threshold baseado no objetivo)
+  // Cut/Maintain: 90%, Bulk: 80%
+  const carbsMinThreshold = rules.carbs?.min || 90;
+  if (percents.carbs < carbsMinThreshold - VALIDATION_EPSILON) {
     errors.push(
-      `Carboidratos em ${percents.carbs.toFixed(1)}% - abaixo do mínimo ${rules.carbs.min}%`
+      `Carboidratos em ${percents.carbs.toFixed(1)}% - abaixo do mínimo ${carbsMinThreshold}%`
     );
   }
 
   // GORDURA - máximo
-  if (rules.fat && percents.fat > rules.fat.max) {
+  if (rules.fat && percents.fat > rules.fat.max + VALIDATION_EPSILON) {
     errors.push(
       `Gordura em ${percents.fat.toFixed(1)}% - acima do máximo ${rules.fat.max}%`
     );
@@ -582,7 +590,8 @@ function runFinalRefinement(
   quantities: Map<string, number>,
   targets: MacroTargets,
   contributions: Map<string, MacroTargets>,
-  maxIterations: number = 200
+  maxIterations: number = 200,
+  objective: Objective = "maintain" // NOVO: objetivo para pesos dinâmicos
 ): { quantities: Map<string, number>; iterations: number; converged: boolean; refinementStatus: RefinementStatus } {
   // ============================================
   // RANGE HARD: CONVERGÊNCIA MULTI-OBJETIVO
@@ -595,13 +604,15 @@ function runFinalRefinement(
     fat: 1,        // ±1g
   };
 
-  // Pesos para priorização (proteína é mais importante)
-  const WEIGHTS = {
-    calories: 1.0,
-    protein: 3.0,  // Proteína tem peso 3x
-    carbs: 1.0,
-    fat: 1.0,
-  };
+  // CORREÇÃO: Pesos dinâmicos baseados no objetivo
+  // Bulk prioriza carboidratos, Cut prioriza proteína
+  const WEIGHTS = objective === "bulk" 
+    ? { calories: 1.0, protein: 2.0, carbs: 2.5, fat: 0.5 }  // Bulk prioriza carbs
+    : objective === "cut"
+    ? { calories: 1.5, protein: 3.0, carbs: 1.0, fat: 0.5 }  // Cut prioriza proteína
+    : { calories: 1.0, protein: 3.0, carbs: 1.0, fat: 1.0 }; // Maintain
+
+  console.log(`[REFINAMENTO] Pesos para ${objective}: Cal=${WEIGHTS.calories}, Prot=${WEIGHTS.protein}, Carb=${WEIGHTS.carbs}, Fat=${WEIGHTS.fat}`);
 
   let iterations = 0;
   let lastError = Infinity;
@@ -955,8 +966,10 @@ function runCorrectionPipeline(
       const carbsNeeded = (targets.carbs * carbsMinThreshold / 100) - afterProtein.carbs;
 
       if (carbsNeeded > 5) {
+        let remainingCarbsNeeded = carbsNeeded;
+        
         for (const food of carbFoods) {
-          if (carbsNeeded <= 0) break;
+          if (remainingCarbsNeeded <= 0) break;
 
           const contrib = contributions.get(food.id)!;
           if (contrib.carbs <= 0) continue;
@@ -965,13 +978,19 @@ function runCorrectionPipeline(
           // CORREÇÃO: Usar getScaleLimits para carboidratos (maior headroom para bulk)
           const limits = getScaleLimits(food.food.category);
 
-          const gramsNeeded = (carbsNeeded * 100) / contrib.carbs;
+          const gramsNeeded = (remainingCarbsNeeded * 100) / contrib.carbs;
           const gramsToAdd = Math.min(gramsNeeded, limits.max - currentGrams);
 
           if (gramsToAdd < 10) continue;
 
           const newGrams = Math.min(limits.max, currentGrams + gramsToAdd);
+          const actualGramsAdded = newGrams - currentGrams;
           quantities.set(food.id, Math.round(newGrams));
+          
+          // CORREÇÃO: Atualizar carbsNeeded a cada iteração
+          const carbsAdded = (actualGramsAdded / 100) * contrib.carbs;
+          remainingCarbsNeeded -= carbsAdded;
+          console.log(`Etapa 3: +${Math.round(actualGramsAdded)}g ${food.food.name} (+${carbsAdded.toFixed(1)}g carbs)`);
         }
 
         adjustments.push({
@@ -1138,7 +1157,8 @@ function runCorrectionPipeline(
           
           const contrib = contributions.get(food.id)!;
           const currentGrams = quantities.get(food.id) || food.quantity_grams;
-          const limits = getCategoryLimits(food.food.category);
+          // CORREÇÃO: Usar getScaleLimits para consistência com outras etapas
+          const limits = getScaleLimits(food.food.category);
           
           // v5.5: Permitir redução mais agressiva para alimentos onde gordura domina
           const fatDominant = contrib.fat >= contrib.protein;
@@ -1768,7 +1788,8 @@ serve(async (req) => {
         pipelineResult.quantities,
         targets,
         contributions,
-        150 // Mais iterações para garantir range hard
+        150, // Mais iterações para garantir range hard
+        objective // CORREÇÃO: Passar objetivo para pesos dinâmicos
       );
 
       // Calcular totais finais
