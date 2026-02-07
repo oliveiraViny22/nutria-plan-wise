@@ -1,8 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Settings2,
   ChevronDown,
   ChevronUp,
   Check,
@@ -12,9 +11,7 @@ import {
   AlertTriangle,
   Lightbulb,
   Sparkles,
-  Zap,
 } from 'lucide-react';
-import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -29,6 +26,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSuccessSound } from '@/hooks/useSuccessSound';
 import { SuccessAnimation } from '@/components/SuccessAnimation';
+import { GenerationProgressDialog } from '@/components/GenerationProgressDialog';
 import { toast } from 'sonner';
 
 interface MacroTargets {
@@ -343,84 +341,6 @@ function OptionValidationStatus({ validations, meta }: {
           Total: {meta.totalRetriesPerformed} retries automáticos executados
         </div>
       )}
-    </motion.div>
-  );
-}
-
-// Componente de barra de progresso animada durante otimização
-function OptimizationProgressBar({ isActive }: { isActive: boolean }) {
-  const [progress, setProgress] = useState(0);
-  const [stage, setStage] = useState(0);
-  
-  const stages = [
-    { label: 'Analisando plano atual...', icon: '📊' },
-    { label: 'Calculando ajustes...', icon: '🔢' },
-    { label: 'Validando opções...', icon: '✅' },
-    { label: 'Finalizando...', icon: '🎯' },
-  ];
-  
-  // Simular progresso durante loading
-  useEffect(() => {
-    if (!isActive) {
-      setProgress(0);
-      setStage(0);
-      return;
-    }
-    
-    const interval = setInterval(() => {
-      setProgress(prev => {
-        if (prev >= 95) return 95; // Não completar até resposta real
-        const increment = Math.random() * 15 + 5;
-        return Math.min(prev + increment, 95);
-      });
-    }, 400);
-    
-    return () => clearInterval(interval);
-  }, [isActive]);
-  
-  // Avançar estágios baseado no progresso
-  useEffect(() => {
-    if (progress < 25) setStage(0);
-    else if (progress < 50) setStage(1);
-    else if (progress < 75) setStage(2);
-    else setStage(3);
-  }, [progress]);
-  
-  if (!isActive) return null;
-  
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: -10 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -10 }}
-      className="space-y-3 p-4 rounded-xl bg-muted/50 border border-border/50"
-    >
-      <div className="flex items-center gap-2">
-        <motion.div
-          animate={{ rotate: 360 }}
-          transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
-        >
-          <Zap className="w-4 h-4 text-primary" />
-        </motion.div>
-        <span className="text-sm font-medium text-foreground">
-          {stages[stage].icon} {stages[stage].label}
-        </span>
-      </div>
-      
-      <div className="relative">
-        <Progress value={progress} className="h-2" />
-        <motion.div
-          className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent"
-          animate={{ x: ['-100%', '200%'] }}
-          transition={{ duration: 1.5, repeat: Infinity, ease: 'linear' }}
-          style={{ width: '50%' }}
-        />
-      </div>
-      
-      <div className="flex justify-between text-xs text-muted-foreground">
-        <span>Processando com IA</span>
-        <span>{Math.round(progress)}%</span>
-      </div>
     </motion.div>
   );
 }
@@ -741,20 +661,7 @@ export function AIRebalancer({
   return (
     <>
       {/* Loading Progress Dialog */}
-      <Dialog open={loading} onOpenChange={() => {}}>
-        <DialogContent className="max-w-sm" onPointerDownOutside={(e) => e.preventDefault()}>
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Sparkles className="w-5 h-5 text-primary animate-pulse" />
-              Otimizando Plano
-            </DialogTitle>
-            <DialogDescription>
-              A IA está analisando e ajustando seu plano nutricional
-            </DialogDescription>
-          </DialogHeader>
-          <OptimizationProgressBar isActive={loading} />
-        </DialogContent>
-      </Dialog>
+      <GenerationProgressDialog isOpen={loading} type="optimize" />
 
       {/* Success Animation Overlay */}
       {showSuccessAnimation && (

@@ -21,6 +21,7 @@ import { DashboardSkeleton } from '@/components/DashboardSkeleton';
 import { SuccessAnimation } from '@/components/SuccessAnimation';
 import { CollapsibleMetrics } from '@/components/CollapsibleMetrics';
 import { NutritionalValidationAlert } from '@/components/NutritionalValidationAlert';
+import { GenerationProgressDialog } from '@/components/GenerationProgressDialog';
 
 import { useTutorial } from '@/hooks/useTutorial';
 import { useAuth } from '@/contexts/AuthContext';
@@ -283,6 +284,12 @@ export default function Dashboard() {
           onSkip={closeTutorial} 
         />
       )}
+
+      {/* Generation Progress Dialog */}
+      <GenerationProgressDialog 
+        isOpen={generatingV5} 
+        type="generate" 
+      />
 
       {/* Success Animation Overlay */}
       {showSuccessAnimation && (
