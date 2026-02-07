@@ -136,9 +136,10 @@ export function WeightProgressCard({
         return isWithinInterval(logDate, { start: weekStart, end: weekEnd });
       });
 
-      // Use the last log of the week (most recent) or null
-      const weekLog = logsInWeek.length > 0 
-        ? logsInWeek[logsInWeek.length - 1] 
+      // Keep the very first point visible (onboarding/first record) when aggregating,
+      // otherwise the first week may show only the last log and hide the initial weight.
+      const weekLog = logsInWeek.length > 0
+        ? (index === 0 ? logsInWeek[0] : logsInWeek[logsInWeek.length - 1])
         : null;
 
       return {
@@ -487,74 +488,74 @@ export function WeightProgressCard({
               )}
             </div>
 
-            {logs.length >= 2 ? (
-              <div className="h-44 sm:h-52">
-                <ResponsiveContainer width="100%" height="100%">
-                  <ComposedChart data={chartData} margin={{ top: 5, right: 5, left: -15, bottom: 0 }}>
-                    <defs>
-                      <linearGradient id="weightGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3}/>
-                        <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
-                      </linearGradient>
-                    </defs>
-                    <XAxis 
-                      dataKey="dateLabel" 
-                      stroke="hsl(var(--muted-foreground))"
-                      fontSize={10}
-                      tickLine={false}
-                      axisLine={false}
+            <div className="h-44 sm:h-52">
+              <ResponsiveContainer width="100%" height="100%">
+                <ComposedChart data={chartData} margin={{ top: 5, right: 5, left: -15, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="weightGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3}/>
+                      <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <XAxis 
+                    dataKey="dateLabel" 
+                    stroke="hsl(var(--muted-foreground))"
+                    fontSize={10}
+                    tickLine={false}
+                    axisLine={false}
+                  />
+                  <YAxis 
+                    stroke="hsl(var(--muted-foreground))"
+                    fontSize={10}
+                    tickLine={false}
+                    axisLine={false}
+                    domain={['dataMin - 1', 'dataMax + 1']}
+                    width={35}
+                    tickFormatter={(value) => `${value}`}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: 'hsl(var(--card))',
+                      border: '1px solid hsl(var(--border))',
+                      borderRadius: '6px',
+                      fontSize: '12px',
+                      padding: '6px 10px',
+                    }}
+                    formatter={(value: number) => [`${value.toFixed(1)} kg`, 'Peso']}
+                    labelFormatter={(label, payload) => payload[0]?.payload?.fullDate || label}
+                  />
+                  {goal && (
+                    <ReferenceLine 
+                      y={targetWeight} 
+                      stroke="hsl(var(--accent))" 
+                      strokeDasharray="4 4"
+                      strokeOpacity={0.7}
                     />
-                    <YAxis 
-                      stroke="hsl(var(--muted-foreground))"
-                      fontSize={10}
-                      tickLine={false}
-                      axisLine={false}
-                      domain={['dataMin - 1', 'dataMax + 1']}
-                      width={35}
-                      tickFormatter={(value) => `${value}`}
-                    />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: 'hsl(var(--card))',
-                        border: '1px solid hsl(var(--border))',
-                        borderRadius: '6px',
-                        fontSize: '12px',
-                        padding: '6px 10px',
-                      }}
-                      formatter={(value: number) => [`${value.toFixed(1)} kg`, 'Peso']}
-                      labelFormatter={(label, payload) => payload[0]?.payload?.fullDate || label}
-                    />
-                    {goal && (
-                      <ReferenceLine 
-                        y={targetWeight} 
-                        stroke="hsl(var(--accent))" 
-                        strokeDasharray="4 4"
-                        strokeOpacity={0.7}
-                      />
-                    )}
-                    <Area
-                      type="monotone"
-                      dataKey="weight"
-                      stroke="transparent"
-                      fill="url(#weightGradient)"
-                      connectNulls
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="weight"
-                      stroke="hsl(var(--primary))"
-                      strokeWidth={2}
-                      dot={{ fill: 'hsl(var(--primary))', strokeWidth: 0, r: 3 }}
-                      activeDot={{ r: 5, strokeWidth: 0 }}
-                      connectNulls
-                    />
-                  </ComposedChart>
-                </ResponsiveContainer>
-              </div>
-            ) : (
-              <div className="h-20 flex flex-col items-center justify-center text-center">
+                  )}
+                  <Area
+                    type="monotone"
+                    dataKey="weight"
+                    stroke="transparent"
+                    fill="url(#weightGradient)"
+                    connectNulls
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="weight"
+                    stroke="hsl(var(--primary))"
+                    strokeWidth={2}
+                    dot={{ fill: 'hsl(var(--primary))', strokeWidth: 0, r: 4 }}
+                    activeDot={{ r: 6, strokeWidth: 0 }}
+                    connectNulls
+                  />
+                </ComposedChart>
+              </ResponsiveContainer>
+            </div>
+
+            {logs.length === 1 && (
+              <div className="mt-2 text-center">
                 <p className="text-xs text-muted-foreground">
-                  Registre mais pesos para ver o gráfico
+                  <span className="font-medium">Primeiro registro!</span> Registre mais pesos em datas diferentes para ver a evolução ao longo do tempo.
                 </p>
               </div>
             )}
