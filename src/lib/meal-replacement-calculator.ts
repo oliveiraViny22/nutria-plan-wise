@@ -311,18 +311,8 @@ function scaleMacros(macros: MacroTarget, scale: number): MacroTarget {
  * - Valores em gramas: arredondar para inteiros
  */
 function formatQuantity(originalPortion: string, scale: number, itemName?: string): string {
-  if (scale === 1) {
-    // Para whey, remover referência a scoop e mostrar só gramas
-    if (itemName && (itemName.includes('Whey') || itemName.includes('Caseína') || itemName.includes('Albumina'))) {
-      const gramsMatch = originalPortion.match(/^(\d+)g/);
-      if (gramsMatch) {
-        return `${gramsMatch[1]}g`;
-      }
-    }
-    return originalPortion;
-  }
-  
-  // Para BANANA: usar incrementos naturais (0.5, 1, 1.5, 2...)
+  // Para BANANA: SEMPRE usar incrementos naturais (0.5, 1, 1.5, 2...)
+  // mesmo quando scale === 1
   if (itemName === 'Banana') {
     const roundedScale = Math.round(scale * 2) / 2; // Arredondar para 0.5
     const gramsMatch = originalPortion.match(/\((\d+)g\)/);
@@ -344,7 +334,7 @@ function formatQuantity(originalPortion: string, scale: number, itemName?: strin
     }
   }
   
-  // Para WHEY e suplementos em pó: mostrar apenas gramatura
+  // Para WHEY e suplementos em pó: SEMPRE mostrar apenas gramatura
   if (itemName && (itemName.includes('Whey') || itemName.includes('Caseína') || itemName.includes('Albumina') || 
                    itemName.includes('Maltodextrina') || itemName.includes('Dextrose'))) {
     const gramsMatch = originalPortion.match(/^(\d+)g/);
@@ -354,6 +344,8 @@ function formatQuantity(originalPortion: string, scale: number, itemName?: strin
       return `${newGrams}g`;
     }
   }
+  
+  if (scale === 1) return originalPortion;
   
   // Extrai a quantidade numérica da porção
   const match = originalPortion.match(/^(\d+(?:,\d+)?(?:\.\d+)?)\s*(.*)$/);
@@ -397,6 +389,64 @@ function formatQuantity(originalPortion: string, scale: number, itemName?: strin
   }
   
   return `${scale}x ${originalPortion}`;
+}
+
+/**
+ * Ordenação lógica dos itens de suplementação
+ * Ordem: Proteína > Carboidrato complexo > Carboidrato simples > Gorduras > Líquido
+ */
+function getSupplementItemOrder(itemName: string): number {
+  // 1. Proteínas (suplementos em pó)
+  if (itemName.includes('Whey') || itemName.includes('Caseína') || itemName.includes('Albumina')) {
+    return 1;
+  }
+  
+  // 2. Proteínas (alimentos)
+  if (itemName.includes('Iogurte') || itemName.includes('Cottage') || 
+      itemName.includes('Ricota') || itemName.includes('Ovo')) {
+    return 2;
+  }
+  
+  // 3. Carboidratos complexos
+  if (itemName.includes('Aveia')) {
+    return 3;
+  }
+  
+  // 4. Carboidratos de rápida absorção
+  if (itemName === 'Banana' || itemName.includes('Maltodextrina') || itemName.includes('Dextrose')) {
+    return 4;
+  }
+  
+  // 5. Carboidratos simples (adoçantes naturais)
+  if (itemName === 'Mel') {
+    return 5;
+  }
+  
+  // 6. Gorduras saudáveis (oleaginosas e pastas)
+  if (itemName.includes('Amendoim') || itemName.includes('Castanha') || 
+      itemName.includes('Nozes') || itemName.includes('Amêndoas') || 
+      itemName.includes('Abacate')) {
+    return 6;
+  }
+  
+  // 7. Líquidos (base do shake - sempre por último)
+  if (itemName === 'Água') {
+    return 99;
+  }
+  
+  // 8. Outros itens
+  return 50;
+}
+
+/**
+ * Ordena os itens de suplementação em ordem lógica de preparo/consumo
+ */
+function sortSupplementItems(items: ReplacementItem[]): ReplacementItem[] {
+  return [...items].sort((a, b) => {
+    const orderA = getSupplementItemOrder(a.name);
+    const orderB = getSupplementItemOrder(b.name);
+    return orderA - orderB;
+  });
 }
 
 /**
@@ -810,7 +860,7 @@ export function calculateMealReplacement(
     
     items[itemIndex] = {
       ...item,
-      quantity: formatQuantity(catalogItem.portion, clampedScale),
+      quantity: formatQuantity(catalogItem.portion, clampedScale, item.name),
       macros: newMacros,
     };
     
@@ -1020,9 +1070,15 @@ export function calculateMealReplacement(
     tips.push('🥜 Consuma as oleaginosas como snack ou adicione ao iogurte/aveia.');
   }
 
+  // =====================================================
+  // 9. ORDENAÇÃO LÓGICA DOS ITENS
+  // =====================================================
+  // Ordem: Proteína > Carboidrato complexo > Carboidrato simples > Gorduras > Líquido
+  const sortedItems = sortSupplementItems(items);
+
   return {
     originalMealMacros: targetMacros,
-    items,
+    items: sortedItems,
     totalMacros,
     accuracy,
     tips,

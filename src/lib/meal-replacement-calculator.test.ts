@@ -390,4 +390,101 @@ describe('meal-replacement-calculator', () => {
       }
     });
   });
+
+  describe('Ordenação dos Itens', () => {
+    it('deve ordenar itens na sequência lógica: Proteína > Carboidrato > Gordura > Água', () => {
+      const target: MacroTarget = { calories: 500, protein: 30, carbs: 50, fat: 15 };
+      const result = calculateMealReplacement(target, 'maintain');
+      
+      // Encontrar posições de cada categoria
+      const getPosition = (predicate: (name: string) => boolean): number => {
+        const idx = result.items.findIndex(i => predicate(i.name));
+        return idx === -1 ? 999 : idx;
+      };
+      
+      const proteinPos = getPosition(n => n.includes('Whey') || n.includes('Caseína'));
+      const oatsPos = getPosition(n => n.includes('Aveia'));
+      const bananaPos = getPosition(n => n === 'Banana');
+      const fatPos = getPosition(n => n.includes('Amendoim') || n.includes('Castanha'));
+      const waterPos = getPosition(n => n === 'Água');
+      
+      // Proteína deve vir antes de carboidratos
+      if (proteinPos < 999 && oatsPos < 999) {
+        expect(proteinPos).toBeLessThan(oatsPos);
+      }
+      
+      // Aveia deve vir antes ou junto da banana
+      if (oatsPos < 999 && bananaPos < 999) {
+        expect(oatsPos).toBeLessThanOrEqual(bananaPos);
+      }
+      
+      // Gorduras depois de carboidratos
+      if (bananaPos < 999 && fatPos < 999) {
+        expect(bananaPos).toBeLessThan(fatPos);
+      }
+      
+      // Água sempre por último
+      if (waterPos < 999) {
+        expect(waterPos).toBe(result.items.length - 1);
+      }
+    });
+
+    it('deve exibir Whey antes de Banana e Mel', () => {
+      const target: MacroTarget = { calories: 400, protein: 25, carbs: 45, fat: 10 };
+      const result = calculateMealReplacement(target, 'gain_muscle');
+      
+      const wheyIdx = result.items.findIndex(i => i.name.includes('Whey'));
+      const bananaIdx = result.items.findIndex(i => i.name === 'Banana');
+      const melIdx = result.items.findIndex(i => i.name === 'Mel');
+      
+      if (wheyIdx !== -1 && bananaIdx !== -1) {
+        expect(wheyIdx).toBeLessThan(bananaIdx);
+      }
+      
+      if (wheyIdx !== -1 && melIdx !== -1) {
+        expect(wheyIdx).toBeLessThan(melIdx);
+      }
+    });
+  });
+
+  describe('Formatação de Quantidades', () => {
+    it('deve formatar banana em incrementos naturais (½, 1, 1½, 2)', () => {
+      const target: MacroTarget = { calories: 500, protein: 25, carbs: 60, fat: 12 };
+      const result = calculateMealReplacement(target, 'maintain');
+      
+      const banana = result.items.find(i => i.name === 'Banana');
+      if (banana) {
+        // Deve usar símbolos de fração ou números inteiros, nunca decimais como "0.3"
+        expect(banana.quantity).toMatch(/^(½|1|1½|2|2½|\d+) banana/);
+      }
+    });
+
+    it('deve formatar Whey em gramatura sem mencionar scoops', () => {
+      const target: MacroTarget = { calories: 400, protein: 30, carbs: 40, fat: 10 };
+      const result = calculateMealReplacement(target, 'gain_muscle');
+      
+      const whey = result.items.find(i => i.name.includes('Whey'));
+      if (whey) {
+        // Deve mostrar apenas gramas, sem "scoop"
+        expect(whey.quantity).toMatch(/^\d+g$/);
+        expect(whey.quantity).not.toContain('scoop');
+      }
+    });
+  });
+
+  describe('Inclusão de Água', () => {
+    it('deve incluir água quando há Aveia mesmo sem Whey', () => {
+      // Refeição que pode ter aveia mas não whey
+      const target: MacroTarget = { calories: 200, protein: 8, carbs: 35, fat: 5 };
+      const result = calculateMealReplacement(target, 'maintain');
+      
+      const hasOatmeal = result.items.some(i => i.name.includes('Aveia'));
+      const hasWater = result.items.some(i => i.name === 'Água');
+      
+      // Se tem aveia, deve ter água para preparo
+      if (hasOatmeal) {
+        expect(hasWater).toBe(true);
+      }
+    });
+  });
 });
