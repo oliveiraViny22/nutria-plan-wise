@@ -1157,6 +1157,11 @@ function recalcOptionTotals(opt: MealResult): void {
  * @param targetCals - Meta de calorias (para não exceder)
  * @param objective - Objetivo do perfil (bulk/maintain/cut)
  */
+/**
+ * Boost de carboidratos: aumenta porções de alimentos ricos em carbs
+ * quando o plano está abaixo do threshold mínimo.
+ * v5.22: Aplica boost POR OPÇÃO, não apenas na agregação geral
+ */
 function boostCarbs(
   mwo: MealWithOptions[],
   targetCarbs: number,
@@ -1164,109 +1169,131 @@ function boostCarbs(
   targetCals: number,
   objective: GeneratorObjective = "maintain"
 ): void {
-  const current = totals(mwo);
-  const carbPercent = current.carbs / targetCarbs;
-
-  // Só aplicar boost se carbs estiverem abaixo do threshold
-  if (carbPercent >= minCarbPercent) {
-    log("CarbBoostSkip", { carbPercent: Math.round(carbPercent * 100), threshold: minCarbPercent * 100 });
-    return;
-  }
-
   const isBulk = objective === "bulk";
+  const maxOptions = Math.max(...mwo.map(m => m.options.length), 1);
+  
+  // v5.22: Verificar e aplicar boost para CADA opção individualmente
+  for (let optIdx = 0; optIdx < maxOptions; optIdx++) {
+    const optTotals = totalsForOption(mwo, optIdx);
+    const carbPercent = optTotals.carbs / targetCarbs;
+    
+    // Só aplicar boost se carbs desta opção estiverem abaixo do threshold
+    if (carbPercent >= minCarbPercent) {
+      if (optIdx === 0) {
+        log("CarbBoostSkip", { option: optIdx + 1, carbPercent: Math.round(carbPercent * 100), threshold: minCarbPercent * 100 });
+      }
+      continue;
+    }
+    
+    log("CarbBoostOptionStart", { 
+      option: optIdx + 1, 
+      carbPercent: Math.round(carbPercent * 100), 
+      threshold: minCarbPercent * 100,
+      currentCarbs: Math.round(optTotals.carbs)
+    });
+    
+    boostCarbsForOption(mwo, optIdx, targetCarbs, minCarbPercent, targetCals, objective);
+  }
+}
+
+/**
+ * v5.22: Boost de carboidratos para uma opção específica
+ */
+function boostCarbsForOption(
+  mwo: MealWithOptions[],
+  optIdx: number,
+  targetCarbs: number,
+  minCarbPercent: number,
+  targetCals: number,
+  objective: GeneratorObjective
+): void {
+  const isBulk = objective === "bulk";
+  const optTotals = totalsForOption(mwo, optIdx);
+  const carbPercent = optTotals.carbs / targetCarbs;
   const isHighDemand = carbPercent < 0.70; // <70% de carbs = alta demanda
   
   const carbFloorGrams = targetCarbs * minCarbPercent;
-  const carbDeficit = carbFloorGrams - current.carbs;
-  log("CarbBoostStart", {
-    currentCarbs: current.carbs,
-    targetCarbs,
-    carbPercent: Math.round(carbPercent * 100),
-    deficit: Math.round(carbDeficit),
-    isBulk,
-    isHighDemand,
-  });
-
+  const carbDeficit = carbFloorGrams - optTotals.carbs;
+  
   // Para bulk com alta demanda, usar parâmetros mais agressivos
   const CARB_RICH_THRESHOLD = 15; // g carbs per 100g
-  const MAX_BOOST_PERCENT = isBulk && isHighDemand ? 2.5 : 1.5; // 150% mais agressivo para bulk
-  const LIMIT_MULTIPLIER = isBulk && isHighDemand ? 1.5 : 1.0; // Expandir limites de categoria
+  const MAX_BOOST_PERCENT = isBulk && isHighDemand ? 2.5 : 1.5;
+  const LIMIT_MULTIPLIER = isBulk && isHighDemand ? 1.5 : 1.0;
 
   let totalCarbsAdded = 0;
   const maxCarbsToAdd = carbDeficit * 1.2; // Permite overshoot de 20%
 
   // ==========================================
-  // PASSO 1: BOOST INICIAL (cap em 50% por item)
+  // PASSO 1: BOOST INICIAL - Apenas para a opção específica
   // ==========================================
   for (const m of mwo) {
     if (totalCarbsAdded >= maxCarbsToAdd) break;
 
-    for (const opt of m.options) {
-      if (!opt?.foods || totalCarbsAdded >= maxCarbsToAdd) continue;
+    // v5.22: Operar apenas na opção específica (optIdx)
+    const opt = m.options[optIdx];
+    if (!opt?.foods) continue;
 
-      const carbFoods = opt.foods
-        .filter((f) => f.food.carbs >= CARB_RICH_THRESHOLD)
-        .sort((a, b) => b.food.carbs - a.food.carbs);
+    const carbFoods = opt.foods
+      .filter((f) => f.food.carbs >= CARB_RICH_THRESHOLD)
+      .sort((a, b) => b.food.carbs - a.food.carbs);
 
-      for (const f of carbFoods) {
-        if (totalCarbsAdded >= maxCarbsToAdd) break;
+    for (const f of carbFoods) {
+      if (totalCarbsAdded >= maxCarbsToAdd) break;
 
-        const cat = (f.food.category || "").toLowerCase();
-        const limits = getCategoryLimits(cat, SNACK_MEALS.includes(m.mealType));
-        const currentQty = f.quantity_grams;
-        // Expandir limite máximo para bulk com alta demanda
-        const expandedMax = Math.round(limits.max * LIMIT_MULTIPLIER);
-        const maxAllowedQty = Math.min(expandedMax, currentQty * MAX_BOOST_PERCENT);
+      const cat = (f.food.category || "").toLowerCase();
+      const limits = getCategoryLimits(cat, SNACK_MEALS.includes(m.mealType));
+      const currentQty = f.quantity_grams;
+      const expandedMax = Math.round(limits.max * LIMIT_MULTIPLIER);
+      const maxAllowedQty = Math.min(expandedMax, currentQty * MAX_BOOST_PERCENT);
 
-        const carbsPer100g = f.food.carbs;
-        const remainingCarbs = maxCarbsToAdd - totalCarbsAdded;
-        const gramsNeeded = (remainingCarbs / carbsPer100g) * 100;
-        const newQty = Math.min(maxAllowedQty, currentQty + gramsNeeded);
-        const actualIncrease = newQty - currentQty;
+      const carbsPer100g = f.food.carbs;
+      const remainingCarbs = maxCarbsToAdd - totalCarbsAdded;
+      const gramsNeeded = (remainingCarbs / carbsPer100g) * 100;
+      const newQty = Math.min(maxAllowedQty, currentQty + gramsNeeded);
+      const actualIncrease = newQty - currentQty;
 
-        if (actualIncrease >= 10) {
-          f.quantity_grams = Math.round(newQty / 5) * 5;
-          const carbsAdded = (actualIncrease / 100) * carbsPer100g;
-          totalCarbsAdded += carbsAdded;
+      if (actualIncrease >= 10) {
+        f.quantity_grams = Math.round(newQty / 5) * 5;
+        const carbsAdded = (actualIncrease / 100) * carbsPer100g;
+        totalCarbsAdded += carbsAdded;
 
-          log("CarbBoostFood", {
-            food: f.food.name,
-            oldQty: currentQty,
-            newQty: f.quantity_grams,
-            carbsAdded: Math.round(carbsAdded),
-          });
-        }
+        log("CarbBoostFood", {
+          option: optIdx + 1,
+          food: f.food.name,
+          oldQty: currentQty,
+          newQty: f.quantity_grams,
+          carbsAdded: Math.round(carbsAdded),
+        });
       }
-
-      recalcOptionTotals(opt);
     }
+
+    recalcOptionTotals(opt);
   }
 
   // ==========================================
-  // PASSO 2: GARANTIR PISO DE CARBS SEM "ESCALAR TUDO"
+  // PASSO 2: GARANTIR PISO DE CARBS (v5.22: para a opção específica)
   // ==========================================
-  const MAX_CAL_OVERSHOOT = 1.10; // alinhado ao contrato (±10%)
-  const CARB_FLOOR_EPS = 0.5; // tolerância em gramas para rounding
+  const MAX_CAL_OVERSHOOT = 1.10;
+  const CARB_FLOOR_EPS = 0.5;
 
-  // Helpers operam na Opção 1 do plano (mesmo referencial de totals())
-  const getOption1Foods = () =>
+  // v5.22: Helpers operam na opção específica (optIdx)
+  const getOptionFoods = () =>
     mwo.flatMap((m) => {
-      const opt1 = m.options[0];
-      if (!opt1?.foods) return [] as Array<{ mealType: string; foodSel: FoodSelection }>;
-      return opt1.foods.map((foodSel) => ({ mealType: m.mealType, foodSel }));
+      const opt = m.options[optIdx];
+      if (!opt?.foods) return [] as Array<{ mealType: string; foodSel: FoodSelection }>;
+      return opt.foods.map((foodSel) => ({ mealType: m.mealType, foodSel }));
     });
 
-  const recalcOption1Totals = () => {
+  const recalcOptionTotalsForIdx = () => {
     for (const m of mwo) {
-      const opt1 = m.options[0];
-      if (opt1) recalcOptionTotals(opt1);
+      const opt = m.options[optIdx];
+      if (opt) recalcOptionTotals(opt);
     }
   };
 
   const reduceCaloriesPreferNonCarb = (excessCalories: number) => {
-    // Ordenar por: menor "carb por kcal" (corta primeiro o que preserva carbs)
-    const items = getOption1Foods()
-      .filter(({ foodSel }) => foodSel.food.carbs < CARB_RICH_THRESHOLD) // não reduzir itens carb-ricos
+    const items = getOptionFoods()
+      .filter(({ foodSel }) => foodSel.food.carbs < CARB_RICH_THRESHOLD)
       .sort((a, b) => {
         const aCals = a.foodSel.food.calories || 0;
         const bCals = b.foodSel.food.calories || 0;
@@ -1275,7 +1302,7 @@ function boostCarbs(
         const aRatio = aCals > 0 ? aCarb / aCals : 0;
         const bRatio = bCals > 0 ? bCarb / bCals : 0;
         if (aRatio !== bRatio) return aRatio - bRatio;
-        return bCals - aCals; // mais calórico primeiro
+        return bCals - aCals;
       });
 
     let remaining = excessCalories;
@@ -1292,7 +1319,6 @@ function boostCarbs(
       const calsPer100g = foodSel.food.calories || 0;
       if (calsPer100g <= 0) continue;
 
-      // Reduzir em passos de 5g para manter realismo
       const step = 5;
       const maxReducible = currentQty - minQty;
       const gramsToRemove = Math.min(maxReducible, Math.max(step, Math.ceil(((remaining * 100) / calsPer100g) / step) * step));
@@ -1300,22 +1326,16 @@ function boostCarbs(
       if (gramsToRemove <= 0) continue;
 
       foodSel.quantity_grams = Math.round((currentQty - gramsToRemove) / 5) * 5;
-
       const calsRemoved = (gramsToRemove / 100) * calsPer100g;
       remaining -= calsRemoved;
-
-      log("CarbBoostCalorieTrim", {
-        food: foodSel.food.name,
-        removedGrams: gramsToRemove,
-        approxCalsRemoved: Math.round(calsRemoved),
-      });
     }
 
-    recalcOption1Totals();
+    recalcOptionTotalsForIdx();
   };
 
   const topUpCarbsToFloor = (neededCarbs: number) => {
-    const items = getOption1Foods()
+    const expandedMax = isBulk && isHighDemand ? 1.5 : 1.0;
+    const items = getOptionFoods()
       .filter(({ foodSel }) => foodSel.food.carbs >= CARB_RICH_THRESHOLD)
       .sort((a, b) => b.foodSel.food.carbs - a.foodSel.food.carbs);
 
@@ -1327,7 +1347,7 @@ function boostCarbs(
       const cat = (foodSel.food.category || "").toLowerCase();
       const limits = getCategoryLimits(cat, SNACK_MEALS.includes(mealType));
       const currentQty = foodSel.quantity_grams;
-      const maxQty = limits.max;
+      const maxQty = Math.round(limits.max * expandedMax); // v5.22: Usar limite expandido para bulk
       if (currentQty >= maxQty) continue;
 
       const carbsPer100g = foodSel.food.carbs || 0;
@@ -1342,18 +1362,19 @@ function boostCarbs(
       remainingCarbs -= carbsAdded;
 
       log("CarbBoostTopUp", {
+        option: optIdx + 1,
         food: foodSel.food.name,
         addedGrams: gramsToAdd,
         approxCarbsAdded: Math.round(carbsAdded),
       });
     }
 
-    recalcOption1Totals();
+    recalcOptionTotalsForIdx();
   };
 
-  // Loop curto para convergir piso de carbs dentro do teto calórico
+  // Loop para convergir piso de carbs
   for (let attempt = 0; attempt < 5; attempt++) {
-    const t = totals(mwo);
+    const t = totalsForOption(mwo, optIdx);
     const maxAllowedCals = targetCals * MAX_CAL_OVERSHOOT;
 
     const carbsOk = t.carbs + CARB_FLOOR_EPS >= carbFloorGrams;
@@ -1366,19 +1387,16 @@ function boostCarbs(
       continue;
     }
 
-    // Temos calorias ok, mas carbs ainda abaixo do piso: completar (usando limites máximos da categoria)
     const needed = Math.max(0, carbFloorGrams - t.carbs);
     topUpCarbsToFloor(needed);
   }
 
-  const afterBoost = totals(mwo);
-  const calOvershoot = afterBoost.calories / targetCals;
-
-  log("CarbBoostEnd", {
+  const afterBoost = totalsForOption(mwo, optIdx);
+  log("CarbBoostOptionEnd", {
+    option: optIdx + 1,
     carbsAdded: Math.round(totalCarbsAdded),
     newCarbs: afterBoost.carbs,
     newCarbPercent: Math.round((afterBoost.carbs / targetCarbs) * 100),
-    caloriePercent: Math.round(calOvershoot * 100),
   });
 }
 
@@ -1402,11 +1420,11 @@ const FAT_FILLER_CONFIG = {
  * Escolhe automaticamente entre azeite (para gaps pequenos) e abacate (gaps maiores).
  * Adiciona apenas em refeições principais (almoço/jantar).
  */
-function fillFat(
+async function fillFat(
   mwo: MealWithOptions[],
   targetFat: number,
-  allFoods: Food[]
-): void {
+  sb: any
+): Promise<void> {
   const current = totals(mwo);
   const fatPercent = current.fat / targetFat;
   
@@ -1418,12 +1436,19 @@ function fillFat(
   
   const fatDeficit = (targetFat * FAT_FILLER_CONFIG.MIN_FAT_THRESHOLD) - current.fat;
   
-  // Buscar alimentos coringa do catálogo
-  const azeite = allFoods.find(f => f.id === FAT_FILLER_CONFIG.AZEITE_ID);
-  const abacate = allFoods.find(f => f.id === FAT_FILLER_CONFIG.ABACATE_ID);
+  // v5.22: Buscar alimentos coringa DIRETAMENTE do banco (não da lista filtrada)
+  // Isso garante que azeite/abacate estejam disponíveis mesmo com restrições
+  const { data: fatFoods } = await sb
+    .from("foods")
+    .select("id, name, calories, protein, carbs, fat, category, is_optional, unit_name, unit_weight_grams, unit_increment, unit_enabled")
+    .in("id", [FAT_FILLER_CONFIG.AZEITE_ID, FAT_FILLER_CONFIG.ABACATE_ID])
+    .eq("is_active", true);
+  
+  const azeite = (fatFoods as Food[] || []).find(f => f.id === FAT_FILLER_CONFIG.AZEITE_ID);
+  const abacate = (fatFoods as Food[] || []).find(f => f.id === FAT_FILLER_CONFIG.ABACATE_ID);
   
   if (!azeite && !abacate) {
-    log("FatFillerNoFoods", { azeiteId: FAT_FILLER_CONFIG.AZEITE_ID, abacateId: FAT_FILLER_CONFIG.ABACATE_ID });
+    log("FatFillerNoFoods", { azeiteId: FAT_FILLER_CONFIG.AZEITE_ID, abacateId: FAT_FILLER_CONFIG.ABACATE_ID, found: fatFoods?.length || 0 });
     return;
   }
   
@@ -1735,8 +1760,8 @@ serve(async (req) => {
     const postBoostTotals = totals(mwo);
     log("PostBoostTotals", { ...postBoostTotals, objective });
     
-    // v5.20: Fat Filler - Injetar gordura quando abaixo da meta
-    fillFat(mwo, tgt.fat, foods);
+    // v5.22: Fat Filler - Injetar gordura quando abaixo da meta (busca direta do banco)
+    await fillFat(mwo, tgt.fat, sb);
     
     // Debug: totais APÓS o fat filler
     const postFatFillerTotals = totals(mwo);
