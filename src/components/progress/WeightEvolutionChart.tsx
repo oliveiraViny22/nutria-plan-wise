@@ -145,77 +145,73 @@ export function WeightEvolutionChart({ logs, targetWeight, goal }: WeightEvoluti
           </div>
         </CardHeader>
         <CardContent>
-          {chartData.length > 1 ? (
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <ComposedChart data={chartData}>
-                  <defs>
-                    <linearGradient id="weightGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.2}/>
-                      <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
-                    </linearGradient>
-                  </defs>
-                  <XAxis 
-                    dataKey="date" 
-                    stroke="hsl(var(--muted-foreground))"
-                    fontSize={12}
-                    tickLine={false}
+          {/* Always show chart if there's at least 1 record */}
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <ComposedChart data={chartData}>
+                <defs>
+                  <linearGradient id="weightGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.2}/>
+                    <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <XAxis 
+                  dataKey="date" 
+                  stroke="hsl(var(--muted-foreground))"
+                  fontSize={12}
+                  tickLine={false}
+                />
+                <YAxis 
+                  stroke="hsl(var(--muted-foreground))"
+                  fontSize={12}
+                  tickLine={false}
+                  domain={['dataMin - 2', 'dataMax + 2']}
+                  width={45}
+                  tickFormatter={(value) => `${value}`}
+                />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: 'hsl(var(--card))',
+                    border: '1px solid hsl(var(--border))',
+                    borderRadius: '8px',
+                  }}
+                  formatter={(value: number) => [`${value.toFixed(1)} kg`, 'Peso']}
+                  labelFormatter={(_, payload) => payload?.[0]?.payload?.fullDate || ''}
+                />
+                {targetWeight && (
+                  <ReferenceLine 
+                    y={targetWeight} 
+                    stroke="hsl(var(--accent))" 
+                    strokeDasharray="5 5"
+                    label={{ value: 'Meta', position: 'right', fill: 'hsl(var(--accent))' }}
                   />
-                  <YAxis 
-                    stroke="hsl(var(--muted-foreground))"
-                    fontSize={12}
-                    tickLine={false}
-                    domain={['dataMin - 2', 'dataMax + 2']}
-                    width={45}
-                    tickFormatter={(value) => `${value}`}
-                  />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: 'hsl(var(--card))',
-                      border: '1px solid hsl(var(--border))',
-                      borderRadius: '8px',
-                    }}
-                    formatter={(value: number) => [`${value.toFixed(1)} kg`, 'Peso']}
-                    labelFormatter={(_, payload) => payload?.[0]?.payload?.fullDate || ''}
-                  />
-                  {targetWeight && (
-                    <ReferenceLine 
-                      y={targetWeight} 
-                      stroke="hsl(var(--accent))" 
-                      strokeDasharray="5 5"
-                      label={{ value: 'Meta', position: 'right', fill: 'hsl(var(--accent))' }}
-                    />
-                  )}
-                  <Area
-                    type="monotone"
-                    dataKey="weight"
-                    stroke="transparent"
-                    fill="url(#weightGradient)"
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="weight"
-                    stroke="hsl(var(--primary))"
-                    strokeWidth={2}
-                    dot={{ fill: 'hsl(var(--primary))', strokeWidth: 2, r: 4 }}
-                    activeDot={{ r: 6, fill: 'hsl(var(--primary))' }}
-                  />
-                </ComposedChart>
-              </ResponsiveContainer>
-            </div>
-          ) : (
-            <div className="text-center py-8 space-y-4">
-              <Alert className="bg-primary/5 border-primary/20 text-left">
-                <Info className="h-4 w-4 text-primary" />
-                <AlertDescription className="text-sm">
-                  <strong>Quase lá!</strong> Você tem <strong>1 registro</strong> de peso. 
-                  Para visualizar o gráfico de evolução, registre seu peso em pelo menos <strong>mais uma data diferente</strong>.
-                </AlertDescription>
-              </Alert>
-              <p className="text-muted-foreground text-xs">
-                O acompanhamento regular do peso ajuda a visualizar seu progresso ao longo do tempo.
-              </p>
-            </div>
+                )}
+                <Area
+                  type="monotone"
+                  dataKey="weight"
+                  stroke="transparent"
+                  fill="url(#weightGradient)"
+                />
+                <Line
+                  type="monotone"
+                  dataKey="weight"
+                  stroke="hsl(var(--primary))"
+                  strokeWidth={2}
+                  dot={{ fill: 'hsl(var(--primary))', strokeWidth: 2, r: 5 }}
+                  activeDot={{ r: 7, fill: 'hsl(var(--primary))' }}
+                />
+              </ComposedChart>
+            </ResponsiveContainer>
+          </div>
+          
+          {/* Hint for single record */}
+          {chartData.length === 1 && (
+            <Alert className="mt-4 bg-primary/5 border-primary/20">
+              <Info className="h-4 w-4 text-primary" />
+              <AlertDescription className="text-sm">
+                <strong>Primeiro registro!</strong> Continue acompanhando seu peso para visualizar a evolução ao longo do tempo.
+              </AlertDescription>
+            </Alert>
           )}
           
           {/* Before/After comparison */}
