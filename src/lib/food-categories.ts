@@ -10,6 +10,7 @@
  * NUNCA adicione categorias fora desta lista.
  */
 export const CANONICAL_CATEGORIES = [
+  // Categorias base
   'carboidratos',
   'proteinas',
   'gorduras',
@@ -19,6 +20,21 @@ export const CANONICAL_CATEGORIES = [
   'leguminosas',
   'suplementos',
   'mistos',
+  // Categorias expandidas
+  'peixes',
+  'frutos_do_mar',
+  'tuberculos',
+  'cereais',
+  'graos',
+  'oleaginosas',
+  'ovos',
+  'cogumelos',
+  'queijos',
+  'sementes',
+  'bebidas',
+  'condimentos',
+  'veganos',
+  'receitas',
 ] as const;
 
 export type FoodCategory = typeof CANONICAL_CATEGORIES[number];
@@ -27,6 +43,7 @@ export type FoodCategory = typeof CANONICAL_CATEGORIES[number];
  * Labels legíveis para UI
  */
 export const CATEGORY_LABELS: Record<FoodCategory, string> = {
+  // Base
   carboidratos: 'Carboidratos',
   proteinas: 'Proteínas',
   gorduras: 'Gorduras',
@@ -36,12 +53,28 @@ export const CATEGORY_LABELS: Record<FoodCategory, string> = {
   leguminosas: 'Leguminosas',
   suplementos: 'Suplementos',
   mistos: 'Mistos',
+  // Expandidas
+  peixes: 'Peixes',
+  frutos_do_mar: 'Frutos do Mar',
+  tuberculos: 'Tubérculos',
+  cereais: 'Cereais',
+  graos: 'Grãos',
+  oleaginosas: 'Oleaginosas',
+  ovos: 'Ovos',
+  cogumelos: 'Cogumelos',
+  queijos: 'Queijos',
+  sementes: 'Sementes',
+  bebidas: 'Bebidas',
+  condimentos: 'Condimentos',
+  veganos: 'Veganos',
+  receitas: 'Receitas',
 };
 
 /**
  * Cores por categoria para badges e charts
  */
 export const CATEGORY_COLORS: Record<FoodCategory, string> = {
+  // Base
   carboidratos: 'bg-amber-500',
   proteinas: 'bg-red-500',
   gorduras: 'bg-yellow-500',
@@ -51,6 +84,21 @@ export const CATEGORY_COLORS: Record<FoodCategory, string> = {
   leguminosas: 'bg-emerald-600',
   suplementos: 'bg-purple-500',
   mistos: 'bg-gray-500',
+  // Expandidas
+  peixes: 'bg-cyan-500',
+  frutos_do_mar: 'bg-teal-500',
+  tuberculos: 'bg-amber-600',
+  cereais: 'bg-yellow-600',
+  graos: 'bg-lime-600',
+  oleaginosas: 'bg-amber-700',
+  ovos: 'bg-orange-400',
+  cogumelos: 'bg-stone-500',
+  queijos: 'bg-sky-400',
+  sementes: 'bg-lime-500',
+  bebidas: 'bg-indigo-400',
+  condimentos: 'bg-rose-400',
+  veganos: 'bg-green-600',
+  receitas: 'bg-violet-500',
 };
 
 /**
@@ -78,12 +126,26 @@ export const MEAL_CATEGORY_PRIORITIES: Record<string, FoodCategory[]> = {
  */
 export const CATEGORY_DISPLAY_ORDER: FoodCategory[] = [
   'carboidratos',
+  'tuberculos',
+  'cereais',
+  'graos',
   'proteinas',
+  'peixes',
+  'frutos_do_mar',
+  'ovos',
   'leguminosas',
   'vegetais',
+  'cogumelos',
   'laticinios',
+  'queijos',
   'frutas',
   'gorduras',
+  'oleaginosas',
+  'sementes',
+  'bebidas',
+  'condimentos',
+  'veganos',
+  'receitas',
   'mistos',
   'suplementos',
 ];

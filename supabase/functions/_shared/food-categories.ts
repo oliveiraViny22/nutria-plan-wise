@@ -10,6 +10,7 @@
  * NUNCA adicione categorias fora desta lista.
  */
 export const CANONICAL_CATEGORIES = [
+  // Categorias base
   'carboidratos',
   'proteinas',
   'gorduras',
@@ -19,6 +20,21 @@ export const CANONICAL_CATEGORIES = [
   'leguminosas',
   'suplementos',
   'mistos',
+  // Categorias expandidas
+  'peixes',
+  'frutos_do_mar',
+  'tuberculos',
+  'cereais',
+  'graos',
+  'oleaginosas',
+  'ovos',
+  'cogumelos',
+  'queijos',
+  'sementes',
+  'bebidas',
+  'condimentos',
+  'veganos',
+  'receitas',
 ] as const;
 
 export type FoodCategory = typeof CANONICAL_CATEGORIES[number];
@@ -27,6 +43,7 @@ export type FoodCategory = typeof CANONICAL_CATEGORIES[number];
  * Labels legíveis para logs e mensagens
  */
 export const CATEGORY_LABELS: Record<FoodCategory, string> = {
+  // Base
   carboidratos: 'Carboidratos',
   proteinas: 'Proteínas',
   gorduras: 'Gorduras',
@@ -36,6 +53,21 @@ export const CATEGORY_LABELS: Record<FoodCategory, string> = {
   leguminosas: 'Leguminosas',
   suplementos: 'Suplementos',
   mistos: 'Mistos',
+  // Expandidas
+  peixes: 'Peixes',
+  frutos_do_mar: 'Frutos do Mar',
+  tuberculos: 'Tubérculos',
+  cereais: 'Cereais',
+  graos: 'Grãos',
+  oleaginosas: 'Oleaginosas',
+  ovos: 'Ovos',
+  cogumelos: 'Cogumelos',
+  queijos: 'Queijos',
+  sementes: 'Sementes',
+  bebidas: 'Bebidas',
+  condimentos: 'Condimentos',
+  veganos: 'Veganos',
+  receitas: 'Receitas',
 };
 
 /**
@@ -132,15 +164,33 @@ export function isSubstitutableLevel(level: string | null | undefined): boolean 
 export const AI_CATEGORY_PROMPT = `
 CATEGORIAS DE ALIMENTOS OBRIGATÓRIAS:
 Você DEVE usar EXCLUSIVAMENTE estas categorias:
-- carboidratos (arroz, pão, massas, tubérculos, cereais)
-- proteinas (carnes, peixes, ovos, frango)
-- gorduras (óleos, azeites, oleaginosas, castanhas)
+
+CATEGORIAS BASE:
+- carboidratos (arroz, pão, massas)
+- proteinas (carnes, frango)
+- gorduras (óleos, azeites, manteiga)
 - vegetais (folhas, verduras, legumes)
 - frutas (frutas frescas e secas)
-- laticinios (leite, queijos, iogurtes)
+- laticinios (leite, iogurtes)
 - leguminosas (feijões, lentilha, grão-de-bico, soja)
 - suplementos (whey, creatina, vitaminas)
 - mistos (preparações mistas, pratos prontos)
+
+CATEGORIAS EXPANDIDAS (use quando apropriado):
+- peixes (salmão, tilápia, atum, sardinha)
+- frutos_do_mar (camarão, lula, polvo)
+- tuberculos (batata doce, mandioca, inhame)
+- cereais (aveia, quinoa, granola)
+- graos (arroz integral, cevada)
+- oleaginosas (castanhas, nozes, amêndoas, amendoim)
+- ovos (ovo inteiro, clara, gema)
+- cogumelos (champignon, shiitake, portobello)
+- queijos (queijo cottage, queijo minas, parmesão)
+- sementes (chia, linhaça, gergelim)
+- bebidas (sucos, chás, café)
+- condimentos (temperos, molhos, especiarias)
+- veganos (tofu, seitan, tempeh)
+- receitas (preparações caseiras, pratos compostos)
 
 Qualquer outra categoria é INVÁLIDA e será rejeitada.
 NÃO use: proteinas_animais, cereais_tuberculos, hortalicas_folhosas, oleos_oleaginosas, etc.
