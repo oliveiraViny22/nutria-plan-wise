@@ -656,15 +656,14 @@ export function AIRebalancer({
   };
 
   const hasAdjustments = result && result.adjustments && result.adjustments.length > 0;
-  const isAlreadyOptimized = result && result.alreadyOptimized;
   
   // Verificar se todas as opções estão validadas (100% convergidas)
   const allOptionsValid = result?.optionValidations && 
     result.optionValidations.length > 0 && 
     result.optionValidations.every(v => v.isValid);
   
-  // Plano está OK se já otimizado OU se todas as opções estão válidas
-  const isPlanFullyValid = isAlreadyOptimized || allOptionsValid;
+  // Plano está OK se todas as opções estão válidas (não há mais ajustes necessários)
+  const isPlanFullyValid = allOptionsValid;
 
   return (
     <>
@@ -713,15 +712,15 @@ export function AIRebalancer({
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              {isAlreadyOptimized ? (
+              {isPlanFullyValid ? (
                 <Check className="w-5 h-5 text-primary" />
               ) : (
                 <Sparkles className="w-5 h-5 text-primary" />
               )}
-              {isAlreadyOptimized ? 'Metas Atingidas' : 'Validação Nutricional'}
+              {isPlanFullyValid ? 'Metas Atingidas' : 'Validação Nutricional'}
             </DialogTitle>
             <DialogDescription>
-              {isAlreadyOptimized 
+              {isPlanFullyValid 
                 ? 'Seu plano já está alinhado com suas metas'
                 : 'Conferência de metas e ajustes necessários'
               }
@@ -730,8 +729,8 @@ export function AIRebalancer({
 
           {result && (
             <div className="space-y-4">
-              {/* ALREADY OPTIMIZED - Show special message */}
-              {isAlreadyOptimized ? (
+              {/* PLAN FULLY VALID - Show celebration and metrics */}
+              {isPlanFullyValid ? (
                 <>
                   {/* Current percentages display */}
                   {result.currentPercentages && (
@@ -869,7 +868,7 @@ export function AIRebalancer({
                   )}
 
                   {/* No adjustments message */}
-                  {!hasAdjustments && !isAlreadyOptimized && (!result.optionValidations || result.optionValidations.length === 0) && (
+                  {!hasAdjustments && !isPlanFullyValid && (!result.optionValidations || result.optionValidations.length === 0) && (
                     <div className="flex items-center gap-3 p-4 rounded-xl bg-primary/5 border border-primary/20">
                       <Check className="w-5 h-5 text-primary shrink-0" />
                       <div>
