@@ -179,8 +179,13 @@ describe('Meal Plan Generator - Canonical Spec', () => {
   describe('Canonical Categories (Spec Lines 90-130)', () => {
     it('should only use canonical food categories', async () => {
       const CANONICAL_CATEGORIES = [
+        // Base
         'carboidratos', 'proteinas', 'gorduras', 'vegetais',
-        'frutas', 'laticinios', 'leguminosas', 'suplementos', 'mistos'
+        'frutas', 'laticinios', 'leguminosas', 'suplementos', 'mistos',
+        // Expandidas
+        'peixes', 'frutos_do_mar', 'tuberculos', 'cereais', 'graos',
+        'oleaginosas', 'ovos', 'cogumelos', 'queijos', 'sementes',
+        'bebidas', 'condimentos', 'veganos', 'receitas'
       ];
 
       const mockMealPlan = {
@@ -443,7 +448,7 @@ describe('Meal Plan Generator - Canonical Spec', () => {
 
       const lunch = result.data.meals.find((m: { name: string }) => m.name === 'Almoço');
       const hasProtein = lunch?.options?.[0]?.foods?.some(
-        (f: { food: { category: string } }) => f.food.category === 'proteinas'
+        (f: { food: { category: string } }) => f.food.category === 'proteinas' || f.food.category === 'peixes'
       );
       expect(hasProtein).toBe(true);
     });
@@ -478,7 +483,7 @@ describe('Meal Plan Generator - Canonical Spec', () => {
 
       const dinner = result.data.meals.find((m: { name: string }) => m.name === 'Jantar');
       const hasProtein = dinner?.options?.[0]?.foods?.some(
-        (f: { food: { category: string } }) => f.food.category === 'proteinas'
+        (f: { food: { category: string } }) => f.food.category === 'proteinas' || f.food.category === 'peixes'
       );
       expect(hasProtein).toBe(true);
     });
@@ -908,6 +913,7 @@ describe('Structural Rules v2 - Malformed Plans', () => {
         const hasProtein = meal.options?.[0]?.foods?.some(
           (f: { food: { category: string; protein?: number } }) => 
             f.food.category === 'proteinas' || 
+            f.food.category === 'peixes' ||
             (f.food.category === 'laticinios' && (f.food.protein || 0) >= 5)
         );
         expect(hasProtein).toBe(true);
@@ -1102,6 +1108,7 @@ describe('Structural Rules v2 - Malformed Plans', () => {
         const hasProtein = meal.options?.[0]?.foods?.some(
           (f: { food: { category: string; protein?: number } }) => 
             f.food.category === 'proteinas' || 
+            f.food.category === 'peixes' ||
             (f.food.category === 'laticinios' && (f.food.protein || 0) >= 3)
         );
         expect(hasProtein).toBe(true);

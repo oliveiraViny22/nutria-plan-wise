@@ -105,19 +105,19 @@ export const CATEGORY_COLORS: Record<FoodCategory, string> = {
  * Prioridades de categoria por tipo de refeição
  */
 export const MEAL_CATEGORY_PRIORITIES: Record<string, FoodCategory[]> = {
-  breakfast: ['carboidratos', 'frutas', 'laticinios', 'gorduras'],
-  morning_snack: ['frutas', 'gorduras', 'laticinios'],
-  lunch: ['proteinas', 'carboidratos', 'leguminosas', 'vegetais'],
-  afternoon_snack: ['frutas', 'laticinios', 'gorduras'],
-  dinner: ['proteinas', 'vegetais', 'carboidratos'],
-  supper: ['laticinios', 'frutas', 'gorduras'],
+  breakfast: ['carboidratos', 'tuberculos', 'cereais', 'frutas', 'laticinios', 'ovos', 'oleaginosas'],
+  morning_snack: ['frutas', 'oleaginosas', 'laticinios', 'sementes'],
+  lunch: ['proteinas', 'peixes', 'carboidratos', 'tuberculos', 'leguminosas', 'vegetais', 'cogumelos'],
+  afternoon_snack: ['frutas', 'laticinios', 'oleaginosas', 'sementes'],
+  dinner: ['proteinas', 'peixes', 'vegetais', 'carboidratos', 'tuberculos', 'cogumelos'],
+  supper: ['laticinios', 'queijos', 'frutas', 'oleaginosas'],
   // Nomes em PT para generate-meal-plan-v2
-  'Café da Manhã': ['carboidratos', 'frutas', 'laticinios', 'gorduras'],
-  'Lanche da Manhã': ['frutas', 'gorduras', 'laticinios'],
-  'Almoço': ['proteinas', 'carboidratos', 'leguminosas', 'vegetais'],
-  'Lanche da Tarde': ['frutas', 'laticinios', 'gorduras'],
-  'Jantar': ['proteinas', 'vegetais', 'carboidratos'],
-  'Ceia': ['laticinios', 'frutas', 'gorduras'],
+  'Café da Manhã': ['carboidratos', 'tuberculos', 'cereais', 'frutas', 'laticinios', 'ovos', 'oleaginosas'],
+  'Lanche da Manhã': ['frutas', 'oleaginosas', 'laticinios', 'sementes'],
+  'Almoço': ['proteinas', 'peixes', 'carboidratos', 'tuberculos', 'leguminosas', 'vegetais', 'cogumelos'],
+  'Lanche da Tarde': ['frutas', 'laticinios', 'oleaginosas', 'sementes'],
+  'Jantar': ['proteinas', 'peixes', 'vegetais', 'carboidratos', 'tuberculos', 'cogumelos'],
+  'Ceia': ['laticinios', 'queijos', 'frutas', 'oleaginosas'],
 };
 
 /**
