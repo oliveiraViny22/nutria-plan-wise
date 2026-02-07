@@ -15,7 +15,7 @@ import {
   type FoodGenerationDiagnostic 
 } from "../_shared/diagnostics.ts";
 
-interface Food { id: string; name: string; calories: number; protein: number; carbs: number; fat: number; category: string; is_optional: boolean | null; unit_name: string | null; unit_weight_grams: number | null; unit_increment: number | null; unit_enabled: boolean | null; }
+interface Food { id: string; name: string; calories: number; protein: number; carbs: number; fat: number; category: string; is_optional: boolean | null; unit_name: string | null; unit_weight_grams: number | null; unit_increment: number | null; unit_enabled: boolean | null; dietary_profile: string | null; }
 interface FoodSelection { food: Food; role_name: string; quantity_grams: number; display_quantity: number; display_unit: string; }
 interface MealResult { meal_type: string; meal_name: string; foods: FoodSelection[]; totals: { calories: number; protein: number; carbs: number; fat: number; }; }
 interface MealWithOptions { mealType: string; options: MealResult[]; }
@@ -315,9 +315,42 @@ function filterFoods(all: Food[], avoided: string[], restrictions: string[]): Fo
   
   const hasLowCarb = restr.some(r => r.includes("low carb") || r.includes("lowcarb") || r.includes("baixo carb"));
   const hasVegano = restr.some(r => r.includes("vegano"));
+  const hasVegetariano = restr.some(r => r.includes("vegetariano"));
   const hasPescetariano = restr.some(r => r.includes("pescetariano"));
   const hasLactose = restr.some(r => r.includes("lactose"));
   const hasGluten = restr.some(r => r.includes("gluten") || r.includes("glúten"));
+  
+  // v5.27: Filtrar alimentos por dietary_profile
+  // Alimentos com dietary_profile específico só aparecem para usuários compatíveis
+  const isProfileCompatible = (foodProfile: string | null): boolean => {
+    // NULL = universal, sempre compatível
+    if (!foodProfile) return true;
+    
+    const fp = foodProfile.toLowerCase();
+    
+    // Alimentos veganos/vegetarianos: apenas para usuários com essas restrições
+    if (fp === "vegetarian" || fp === "vegan") {
+      return hasVegano || hasVegetariano;
+    }
+    
+    // Alimentos lactose_free: para usuários com intolerância à lactose OU veganos/vegetarianos
+    if (fp === "lactose_free") {
+      return hasLactose || hasVegano || hasVegetariano;
+    }
+    
+    // Alimentos pescatarian: para pescetarianos
+    if (fp === "pescatarian") {
+      return hasPescetariano;
+    }
+    
+    // Alimentos low_carb: para usuários low carb
+    if (fp === "low_carb") {
+      return hasLowCarb;
+    }
+    
+    // 'standard' ou outros: compatíveis com todos
+    return true;
+  };
   
   return all.filter(f => {
     const c = (f.category || "").toLowerCase(), n = f.name.toLowerCase();
@@ -325,6 +358,9 @@ function filterFoods(all: Food[], avoided: string[], restrictions: string[]): Fo
     // Filtros base
     if (!CANONICAL_CATS.includes(c) || c === "suplementos" || f.is_optional) return false;
     if (av.has(n) || [...av].some(a => n.includes(a))) return false;
+    
+    // v5.27: Filtrar por dietary_profile do alimento
+    if (!isProfileCompatible(f.dietary_profile)) return false;
     
     // BLOQUEIO DE RECEITAS (v5.13): o sistema não sugere receitas prontas
     if (CONTEXTUAL_BLOCK_RULES.RECIPE_KEYWORDS.some(kw => n.includes(kw))) {
@@ -407,8 +443,9 @@ async function loadData(sb: any, userGoal?: string, restrictions?: string[]) {
     sb.from("meal_template_roles").select("*").order("sort_order"),
     sb.from("meal_role_food_categories").select("role_id, category"),
     // v5.24: Filtrar âncoras por goal_type E dietary_profile
+    // v5.27: Incluir dietary_profile do food para consistência
     sb.from("meal_anchor_foods")
-      .select("*, food:foods(id, name, calories, protein, carbs, fat, category, is_optional, unit_name, unit_weight_grams, unit_increment, unit_enabled)")
+      .select("*, food:foods(id, name, calories, protein, carbs, fat, category, is_optional, unit_name, unit_weight_grams, unit_increment, unit_enabled, dietary_profile)")
       .eq("is_active", true)
       .or(mappedGoalType ? `goal_type.is.null,goal_type.eq.${mappedGoalType}` : "goal_type.is.null")
       .or(dietaryProfileFilter)
@@ -1708,7 +1745,7 @@ serve(async (req) => {
       sb.from("profiles").select("*").eq("user_id", user.id).single(),
       sb.rpc("get_user_plan", { _user_id: user.id }),
       sb.rpc("can_use_feature", { _user_id: user.id, _feature: "diet" }),
-      sb.from("foods").select("id, name, calories, protein, carbs, fat, category, is_optional, unit_name, unit_weight_grams, unit_increment, unit_enabled").eq("review_status", "approved").eq("is_active", true),
+      sb.from("foods").select("id, name, calories, protein, carbs, fat, category, is_optional, unit_name, unit_weight_grams, unit_increment, unit_enabled, dietary_profile").eq("review_status", "approved").eq("is_active", true),
     ]);
     if (!profile?.onboarding_completed) return createErrorResponse("Complete o onboarding", 400, cors);
     if (!canUse) return createErrorResponse(`Limite de dietas atingido`, 403, cors, { code: "DIET_LIMIT_REACHED", upgradeRequired: true });
