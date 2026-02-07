@@ -1,5 +1,5 @@
 // ============================================
-// REBALANCEADOR AUTOMÁTICO NUTRIAPLAN v2.7
+// REBALANCEADOR AUTOMÁTICO NUTRIAPLAN v2.8
 // ============================================
 // Implementação conforme especificação:
 // - Validação por objetivo (cut/maintain/bulk)
@@ -10,6 +10,7 @@
 // - EQUALIZAÇÃO CALÓRICA entre opções (v2.5)
 // - VERIFICAÇÃO UPFRONT de plano já otimizado (v2.6)
 // - BALANCEAMENTO DE GORDURA entre opções (v2.7)
+// - FAT BOOST: Injeção de azeite quando gordura < 90% (v2.8)
 // ============================================
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
@@ -55,6 +56,16 @@ const VALIDATION_CONSTANTS = {
 
 // Status de validação final
 type FinalValidationStatus = "VALIDATED" | "VALIDATED_WITH_TOLERANCE" | "STRUCTURALLY_INVALID";
+
+// ============================================
+// FAT BOOST CONFIG (v2.8) - Injetar azeite quando gordura < 90%
+// ============================================
+const FAT_BOOST_CONFIG = {
+  AZEITE_ID: "58de144e-5581-4da6-84b9-6854e24358d3",
+  MIN_FAT_THRESHOLD: 0.90, // 90% da meta
+  AZEITE_PORTION: { min: 5, max: 15, default: 10 }, // 10g ≈ 10g gordura
+  ELIGIBLE_MEALS: ["almoço", "jantar"], // Apenas refeições principais
+};
 
 interface FinalValidationResult {
   status: FinalValidationStatus;
@@ -923,6 +934,183 @@ function balanceFatBetweenOptions(
   }
 
   return { adjusted: totalAdjusted, warnings, adjustments };
+}
+
+// ============================================
+// FAT BOOST v2.8: Injetar azeite quando gordura < 90%
+// Apenas em refeições de almoço/jantar
+// ============================================
+
+interface FatBoostResult {
+  boosted: number;
+  warnings: string[];
+  injections: Array<{
+    optionNumber: number;
+    mealName: string;
+    mealId: string;
+    optionId: string;
+    foodId: string;
+    foodName: string;
+    grams: number;
+    fatAdded: number;
+  }>;
+}
+
+async function boostFatWithOliveOil(
+  optionResults: Array<{
+    optionNumber: number;
+    foods: FoodWithMeta[];
+    finalQuantities: Map<string, number>;
+    finalTotals: MacroTargets;
+  }>,
+  targets: MacroTargets,
+  meals: Meal[],
+  supabase: any
+): Promise<FatBoostResult> {
+  const warnings: string[] = [];
+  const injections: FatBoostResult['injections'] = [];
+  let totalBoosted = 0;
+
+  console.log(`\n╔══════════════════════════════════════════════════════════════╗`);
+  console.log(`║  FAT BOOST v2.8 - Injeção de Azeite                          ║`);
+  console.log(`╠══════════════════════════════════════════════════════════════╣`);
+  console.log(`║  Meta de Gordura: ${targets.fat.toFixed(1)}g`.padEnd(63) + `║`);
+  console.log(`║  Threshold: ${FAT_BOOST_CONFIG.MIN_FAT_THRESHOLD * 100}% (${(targets.fat * FAT_BOOST_CONFIG.MIN_FAT_THRESHOLD).toFixed(1)}g)`.padEnd(63) + `║`);
+  console.log(`╚══════════════════════════════════════════════════════════════╝\n`);
+
+  // Buscar azeite diretamente do banco (como o gerador faz)
+  const { data: azeiteData, error: azeiteError } = await supabase
+    .from("foods")
+    .select("id, name, calories, protein, carbs, fat, category, serving_size")
+    .eq("id", FAT_BOOST_CONFIG.AZEITE_ID)
+    .eq("is_active", true)
+    .maybeSingle();
+
+  if (azeiteError || !azeiteData) {
+    console.log(`[FAT BOOST] ⚠️ Azeite não encontrado no banco (ID: ${FAT_BOOST_CONFIG.AZEITE_ID})`);
+    warnings.push("Azeite não disponível para injeção");
+    return { boosted: 0, warnings, injections };
+  }
+
+  const azeite = azeiteData as {
+    id: string;
+    name: string;
+    calories: number;
+    protein: number;
+    carbs: number;
+    fat: number;
+    category: string;
+    serving_size: string;
+  };
+
+  console.log(`[FAT BOOST] Azeite encontrado: ${azeite.name} (${azeite.fat}g gordura/100g)`);
+
+  // Identificar refeições elegíveis (almoço/jantar)
+  const eligibleMeals = meals.filter(m => {
+    const mealNameLower = m.name.toLowerCase();
+    return FAT_BOOST_CONFIG.ELIGIBLE_MEALS.some(eligible => 
+      mealNameLower.includes(eligible.toLowerCase())
+    );
+  });
+
+  if (eligibleMeals.length === 0) {
+    console.log(`[FAT BOOST] Nenhuma refeição elegível (almoço/jantar) encontrada`);
+    return { boosted: 0, warnings, injections };
+  }
+
+  console.log(`[FAT BOOST] Refeições elegíveis: ${eligibleMeals.map(m => m.name).join(", ")}`);
+
+  // Processar cada opção
+  for (const optionResult of optionResults) {
+    const currentFat = optionResult.finalTotals.fat;
+    const fatPercent = currentFat / targets.fat;
+
+    // Só aplicar boost se gordura estiver abaixo do threshold
+    if (fatPercent >= FAT_BOOST_CONFIG.MIN_FAT_THRESHOLD) {
+      console.log(`[FAT BOOST] Opção ${optionResult.optionNumber}: ${currentFat.toFixed(1)}g (${(fatPercent * 100).toFixed(1)}%) ✓ OK`);
+      continue;
+    }
+
+    const fatDeficit = (targets.fat * FAT_BOOST_CONFIG.MIN_FAT_THRESHOLD) - currentFat;
+    console.log(`[FAT BOOST] Opção ${optionResult.optionNumber}: ${currentFat.toFixed(1)}g (${(fatPercent * 100).toFixed(1)}%) → precisa +${fatDeficit.toFixed(1)}g`);
+
+    // Verificar se já existe azeite nesta opção
+    const hasAzeite = optionResult.foods.some(f => f.food_id === FAT_BOOST_CONFIG.AZEITE_ID);
+    if (hasAzeite) {
+      // Se já tem azeite, aumentar a quantidade ao invés de adicionar novo
+      const azeiteFood = optionResult.foods.find(f => f.food_id === FAT_BOOST_CONFIG.AZEITE_ID);
+      if (azeiteFood) {
+        const currentGrams = optionResult.finalQuantities.get(azeiteFood.id) || azeiteFood.quantity_grams;
+        const gramsToAdd = Math.min(
+          FAT_BOOST_CONFIG.AZEITE_PORTION.max - currentGrams,
+          Math.round((fatDeficit / azeite.fat) * 100)
+        );
+
+        if (gramsToAdd >= 2) {
+          const newGrams = currentGrams + gramsToAdd;
+          optionResult.finalQuantities.set(azeiteFood.id, newGrams);
+          
+          const fatAdded = (gramsToAdd / 100) * azeite.fat;
+          optionResult.finalTotals.fat += fatAdded;
+          optionResult.finalTotals.calories += (gramsToAdd / 100) * azeite.calories;
+
+          console.log(`[FAT BOOST] Opção ${optionResult.optionNumber}: Azeite existente ${currentGrams}g → ${newGrams}g (+${fatAdded.toFixed(1)}g gordura)`);
+          totalBoosted++;
+        }
+      }
+      continue;
+    }
+
+    // Encontrar uma refeição elegível para injetar o azeite
+    for (const meal of eligibleMeals) {
+      const option = meal.meal_options.find(o => o.option_number === optionResult.optionNumber);
+      if (!option) continue;
+
+      // Verificar se esta opção da refeição já tem azeite
+      const optionHasAzeite = option.meal_option_foods.some(f => f.food_id === FAT_BOOST_CONFIG.AZEITE_ID);
+      if (optionHasAzeite) continue;
+
+      // Calcular quantidade de azeite necessária
+      const gramsNeeded = Math.min(
+        FAT_BOOST_CONFIG.AZEITE_PORTION.max,
+        Math.max(
+          FAT_BOOST_CONFIG.AZEITE_PORTION.min,
+          Math.round((fatDeficit / azeite.fat) * 100)
+        )
+      );
+
+      const fatFromAzeite = (gramsNeeded / 100) * azeite.fat;
+      const caloriesFromAzeite = (gramsNeeded / 100) * azeite.calories;
+
+      // Registrar injeção (será aplicada pelo frontend)
+      injections.push({
+        optionNumber: optionResult.optionNumber,
+        mealName: meal.name,
+        mealId: meal.id,
+        optionId: option.id,
+        foodId: azeite.id,
+        foodName: azeite.name,
+        grams: gramsNeeded,
+        fatAdded: fatFromAzeite,
+      });
+
+      // Atualizar totais projetados
+      optionResult.finalTotals.fat += fatFromAzeite;
+      optionResult.finalTotals.calories += caloriesFromAzeite;
+
+      console.log(`[FAT BOOST] Opção ${optionResult.optionNumber}: +${gramsNeeded}g ${azeite.name} em ${meal.name} (+${fatFromAzeite.toFixed(1)}g gordura)`);
+      totalBoosted++;
+      break; // Só injetar em uma refeição por opção
+    }
+  }
+
+  if (totalBoosted > 0) {
+    console.log(`\n[FAT BOOST] Concluído: ${totalBoosted} opção(ões) com boost de gordura\n`);
+  } else {
+    console.log(`\n[FAT BOOST] Nenhum boost necessário\n`);
+  }
+
+  return { boosted: totalBoosted, warnings, injections };
 }
 
 /**
@@ -2614,6 +2802,30 @@ serve(async (req) => {
       }
     }
     
+    // ============================================
+    // FAT BOOST v2.8: Injetar azeite quando gordura < 90%
+    // ============================================
+    let fatBoostResult: FatBoostResult = { boosted: 0, warnings: [], injections: [] };
+    
+    // Só aplicar boost se g10Status não for ALLOW_REBALANCE (não há excesso de gordura)
+    if (g10Metadata.g10Status !== "ALLOW_REBALANCE") {
+      fatBoostResult = await boostFatWithOliveOil(optionResults, targets, typedMeals, supabase);
+      
+      if (fatBoostResult.boosted > 0) {
+        log.info("FatBoostApplied", {
+          optionsBoosted: fatBoostResult.boosted,
+          injections: fatBoostResult.injections.length,
+          warnings: fatBoostResult.warnings.length,
+        });
+        
+        // Re-validar opções após boost de gordura
+        optionValidations = validateOptions();
+        console.log(`[FAT BOOST] Re-validação após boost concluída`);
+      }
+    } else {
+      console.log(`[FAT BOOST] Bloqueado - g10Status é ALLOW_REBALANCE (já há excesso de gordura)`);
+    }
+    
     // Usar opção 1 como referência principal para compatibilidade
     const primaryResult = optionResults.find(r => r.optionNumber === 1) || optionResults[0];
     const primaryValidation = optionValidations.find(v => v.optionNumber === primaryResult.optionNumber)?.validation 
@@ -2742,6 +2954,12 @@ serve(async (req) => {
         optionsAdjusted: fatBalancingResult.adjusted,
         warnings: fatBalancingResult.warnings,
         adjustments: fatBalancingResult.adjustments,
+      },
+      // v2.8: Diagnóstico de boost de gordura
+      fatBoost: {
+        optionsBoosted: fatBoostResult.boosted,
+        warnings: fatBoostResult.warnings,
+        injections: fatBoostResult.injections,
       },
     };
 
@@ -2881,6 +3099,18 @@ serve(async (req) => {
         originalGrams: fc.original_grams,
         newGrams: fc.new_grams,
         reason: `Ajuste para ${objective === "cut" ? "emagrecimento" : objective === "bulk" ? "ganho de massa" : "manutenção"}`,
+      })),
+      // v2.8: Injeções de gordura (novos alimentos a serem adicionados)
+      fatBoostInjections: fatBoostResult.injections.map(inj => ({
+        optionNumber: inj.optionNumber,
+        mealName: inj.mealName,
+        mealId: inj.mealId,
+        optionId: inj.optionId,
+        foodId: inj.foodId,
+        foodName: inj.foodName,
+        grams: inj.grams,
+        fatAdded: inj.fatAdded,
+        reason: "Boost de gordura - azeite de oliva para atingir meta de gordura",
       })),
       // v2.5: Metadados de retry expandidos
       meta: {

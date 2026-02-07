@@ -183,6 +183,24 @@ export interface RebalancerDiagnostics {
       }>;
     }>;
   };
+  /** Diagnóstico de boost de gordura - injeção de azeite (v2.8) */
+  fatBoost?: {
+    /** Número de opções que receberam boost */
+    optionsBoosted: number;
+    /** Warnings de boost */
+    warnings: string[];
+    /** Injeções de azeite aplicadas */
+    injections: Array<{
+      optionNumber: number;
+      mealName: string;
+      mealId: string;
+      optionId: string;
+      foodId: string;
+      foodName: string;
+      grams: number;
+      fatAdded: number;
+    }>;
+  };
 }
 
 // =====================================================
