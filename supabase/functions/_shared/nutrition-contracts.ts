@@ -189,8 +189,11 @@ export function validateGeneratedPlan(
     }
   }
   
-  // CONTRATO 3: Carboidratos como base energética (threshold baseado no objetivo)
-  if (carbsPercent < carbsMinThreshold) {
+// CONTRATO 3: Carboidratos como base energética (threshold baseado no objetivo)
+  // Tolerance de 0.05% para evitar falsos negativos por arredondamento de ponto flutuante
+  // Ex: 79.95% arredonda para "80.0%" no display, mas falharia em comparação estrita
+  const CARB_EPSILON = 0.05;
+  if (carbsPercent < carbsMinThreshold - CARB_EPSILON) {
     errors.push(
       `[G7] Carboidratos insuficientes: ${Math.round(totals.carbs)}g ` +
       `(${carbsPercent.toFixed(1)}% da meta, mínimo: ${carbsMinThreshold}% para ${objective})`
