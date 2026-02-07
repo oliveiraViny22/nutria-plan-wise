@@ -29,13 +29,16 @@ const MEAL_TYPES = [
 
 const ROLE_OPTIONS = [
   { value: "carboidrato_base", label: "Carboidrato Base" },
+  { value: "tuberculo", label: "Tubérculo" },
   { value: "leguminosa", label: "Leguminosa" },
   { value: "proteina_principal", label: "Proteína Principal" },
   { value: "proteina", label: "Proteína" },
   { value: "proteina_leve", label: "Proteína Leve" },
+  { value: "peixe", label: "Peixe" },
   { value: "vegetal", label: "Vegetal" },
   { value: "gordura", label: "Gordura" },
   { value: "gordura_boa", label: "Gordura Boa" },
+  { value: "oleaginosa", label: "Oleaginosa" },
   { value: "fruta", label: "Fruta" },
   { value: "laticinio", label: "Laticínio" },
 ];
