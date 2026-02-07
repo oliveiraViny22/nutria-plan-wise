@@ -490,10 +490,15 @@ function fetchEligibleFoods(
     // 4. Aplicar restrições do usuário
     const isRestricted = restrictions.some(r => {
       const restriction = r.toLowerCase();
-      if (restriction.includes('lactose') && category === 'laticinios') return true;
+      // Lactose: bloquear laticínios e queijos
+      if (restriction.includes('lactose') && (category === 'laticinios' || category === 'queijos')) return true;
+      // Glúten: bloquear trigo, aveia, pão, macarrão
       if (restriction.includes('gluten') && (foodName.includes('trigo') || foodName.includes('aveia') || foodName.includes('pão') || foodName.includes('macarrão'))) return true;
+      // Vegetariano: bloquear proteínas animais (exceto ovos), peixes e frutos do mar
+      if (restriction.includes('vegetariano') && (category === 'peixes' || category === 'frutos_do_mar')) return true;
       if (restriction.includes('vegetariano') && category === 'proteinas' && !foodName.includes('ovo')) return true;
-      if (restriction.includes('vegano') && (category === 'proteinas' || category === 'laticinios')) return true;
+      // Vegano: bloquear proteínas, peixes, ovos, laticínios, queijos, frutos do mar
+      if (restriction.includes('vegano') && (category === 'proteinas' || category === 'peixes' || category === 'ovos' || category === 'laticinios' || category === 'queijos' || category === 'frutos_do_mar')) return true;
       return foodName.includes(restriction);
     });
     
@@ -524,8 +529,8 @@ function isCompatibleProteinSource(food: Food, mealType: MealType): boolean {
   const foodName = food.name.toLowerCase();
   const category = (food.category || '').toLowerCase();
   
-  // Deve ser categoria proteínas ou laticínios com proteína significativa
-  if (category !== 'proteinas' && category !== 'laticinios' && category !== 'gorduras') {
+  // Deve ser categoria proteínas, peixes ou laticínios com proteína significativa
+  if (category !== 'proteinas' && category !== 'peixes' && category !== 'laticinios' && category !== 'gorduras') {
     return false;
   }
   
@@ -600,8 +605,8 @@ function findCompatibleProteinSource(
       foodName.includes(keyword.toLowerCase())
     );
     
-    // Aceitar proteínas ou laticínios com proteína significativa
-    if (category === 'proteinas' && isValidSource) return true;
+    // Aceitar proteínas, peixes ou laticínios com proteína significativa
+    if ((category === 'proteinas' || category === 'peixes') && isValidSource) return true;
     if (category === 'laticinios' && isValidSource && f.protein >= 5) return true;
     
     // Para café da manhã e lanches, aceitar ovos e laticínios gerais
@@ -835,8 +840,8 @@ function findBaseCarbSource(
     const carbDensity = f.carbs; // carbs por 100g
     if (carbDensity < MIN_CARB_DENSITY) return false;
     
-    // Categoria carboidratos é prioridade absoluta
-    if (category === 'carboidratos') return true;
+    // Categoria carboidratos ou tuberculos é prioridade absoluta
+    if (category === 'carboidratos' || category === 'tuberculos') return true;
     
     // Leguminosas apenas se tiverem boa densidade de carbs
     if (category === 'leguminosas' && carbDensity >= 20) return true;
@@ -1160,22 +1165,23 @@ function buildMealOption(
       let isGoodForBoost: boolean;
       
       // PRIORIDADE MÁXIMA: Se proteína está baixa E carbs perto do limite,
-      // APENAS boostar proteínas magras
+      // APENAS boostar proteínas magras (inclui peixes)
       if (proteinBelowTarget && carbsNearLimit) {
-        isGoodForBoost = (category === 'proteinas' && food.fat < 12) ||
+        isGoodForBoost = ((category === 'proteinas' || category === 'peixes') && food.fat < 12) ||
                          (category === 'laticinios' && food.protein >= 10 && food.fat < 8);
       } 
       // Se carbs já está >= 80% da meta, NÃO boostar carboidratos
       else if (carbsNearLimit) {
-        isGoodForBoost = (category === 'proteinas' && food.fat < 10) ||
+        isGoodForBoost = ((category === 'proteinas' || category === 'peixes') && food.fat < 10) ||
                          (category === 'laticinios' && food.fat < 6) ||
                          (category === 'frutas' && food.carbs < 15); // Frutas com pouco carb OK
       } 
       // Caso normal: carbs ainda tem espaço, boost em tudo
       else {
         isGoodForBoost = category === 'carboidratos' || 
+                         category === 'tuberculos' ||
                          category === 'leguminosas' || 
-                         (category === 'proteinas' && food.fat < 10) ||
+                         ((category === 'proteinas' || category === 'peixes') && food.fat < 10) ||
                          (category === 'laticinios' && food.fat < 6);
       }
       if (!isGoodForBoost) continue;
@@ -1263,15 +1269,15 @@ function buildMealOption(
       if (category === 'gorduras' || food.fat > 15) continue;
       
       // CORREÇÃO v2.3: Regras mais rigorosas para rodada 2
-      // Se proteína baixa: APENAS proteínas
+      // Se proteína baixa: APENAS proteínas (inclui peixes)
       if (mustPrioritizeProtein) {
-        if (category !== 'proteinas' && !(category === 'laticinios' && food.protein >= 8)) {
+        if (category !== 'proteinas' && category !== 'peixes' && !(category === 'laticinios' && food.protein >= 8)) {
           continue;
         }
       }
-      // Se carbs já está alto: NÃO boostar carbs
+      // Se carbs já está alto: NÃO boostar carbs (inclui tuberculos)
       else if (mustAvoidCarbs) {
-        if (category === 'carboidratos' || category === 'leguminosas' || food.carbs > 20) {
+        if (category === 'carboidratos' || category === 'tuberculos' || category === 'leguminosas' || food.carbs > 20) {
           continue;
         }
       }
@@ -1344,9 +1350,10 @@ function buildMealOption(
       const food = mealFood.food;
       const category = (food.category || '').toLowerCase();
       
-      // G7 FIX: APENAS boostar fontes de carboidrato
+      // G7 FIX: APENAS boostar fontes de carboidrato (inclui tuberculos)
       // Priorizar carbs densos e com pouca gordura
       const isCarbSource = category === 'carboidratos' || 
+                           category === 'tuberculos' ||
                            category === 'leguminosas' ||
                            (food.carbs > 15 && food.fat < 5); // Densidade de carbs
       
@@ -1585,8 +1592,8 @@ function isBaseCarbSource(food: Food): boolean {
   const category = (food.category || '').toLowerCase();
   const foodName = food.name.toLowerCase();
   
-  // Categoria carboidratos ou leguminosas (ricas em carbs)
-  if (category === 'carboidratos' || category === 'leguminosas') {
+  // Categoria carboidratos, tuberculos ou leguminosas (ricas em carbs)
+  if (category === 'carboidratos' || category === 'tuberculos' || category === 'leguminosas') {
     return true;
   }
   

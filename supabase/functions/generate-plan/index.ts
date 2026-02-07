@@ -26,7 +26,7 @@ const MEAL_TYPES: Record<number, string[]> = { 2: ["lunch", "dinner"], 3: ["brea
 const ITEM_COUNTS: Record<string, { min: number; max: number }> = { breakfast: { min: 2, max: 4 }, morning_snack: { min: 2, max: 3 }, lunch: { min: 4, max: 6 }, afternoon_snack: { min: 2, max: 3 }, dinner: { min: 4, max: 6 }, supper: { min: 2, max: 3 } };
 const MAIN_MEALS = ["breakfast", "lunch", "dinner"];
 const SNACK_MEALS = ["morning_snack", "afternoon_snack", "supper"];
-const CANONICAL_CATS = ["carboidratos", "proteinas", "gorduras", "vegetais", "frutas", "laticinios", "leguminosas", "mistos"];
+const CANONICAL_CATS = ["carboidratos", "proteinas", "gorduras", "vegetais", "frutas", "laticinios", "leguminosas", "mistos", "peixes", "frutos_do_mar", "tuberculos", "cereais", "graos", "oleaginosas", "ovos", "cogumelos", "queijos", "sementes", "bebidas", "condimentos", "veganos", "receitas"];
 // Palavras-chave para detectar alimentos similares (evitar duplicação)
 const SIMILAR_FOOD_GROUPS: string[][] = [
   ["iogurte", "yogurt"],
@@ -94,8 +94,8 @@ function isFattyAnchor(f: Food): boolean {
     return true;
   }
   
-  // Regra 2: Proteínas com >8g gordura/100g
-  if (cat === "proteinas" && f.fat > FATTY_FOOD_RULES.MAX_FAT_PROTEIN) {
+  // Regra 2: Proteínas ou Peixes com >8g gordura/100g
+  if ((cat === "proteinas" || cat === "peixes") && f.fat > FATTY_FOOD_RULES.MAX_FAT_PROTEIN) {
     return true;
   }
   
@@ -131,8 +131,8 @@ function isFattyForRandomSelection(f: Food): boolean {
     return true;
   }
   
-  // Regra 3: Proteínas com gordura excessiva
-  if (cat === "proteinas" && f.fat > FATTY_FOOD_RULES.MAX_FAT_PROTEIN) {
+  // Regra 3: Proteínas ou Peixes com gordura excessiva
+  if ((cat === "proteinas" || cat === "peixes") && f.fat > FATTY_FOOD_RULES.MAX_FAT_PROTEIN) {
     return true;
   }
   
@@ -256,22 +256,26 @@ function filterFoods(all: Food[], avoided: string[], restrictions: string[]): Fo
     // Low Carb: bloquear alimentos com >15g carbs/100g
     if (hasLowCarb && f.carbs > 15) return false;
     
-    // Lactose: bloquear laticínios
-    if (hasLactose && c === "laticinios") return false;
+    // Lactose: bloquear laticínios e queijos
+    if (hasLactose && (c === "laticinios" || c === "queijos")) return false;
     
     // Glúten: bloquear trigo, pão, massas
     if (hasGluten && (n.includes("trigo") || n.includes("pão") || n.includes("pao") || n.includes("massa") || n.includes("macarrão"))) return false;
     
-    // Vegano: bloquear proteínas animais e laticínios (prevalece sobre pescetariano)
-    if (hasVegano && (c === "proteinas" || c === "laticinios")) return false;
+    // Vegano: bloquear proteínas animais, peixes, ovos, laticínios, queijos, frutos do mar
+    if (hasVegano && (c === "proteinas" || c === "peixes" || c === "ovos" || c === "laticinios" || c === "queijos" || c === "frutos_do_mar")) return false;
     
-    // Pescetariano (se não for vegano): bloquear carnes, permitir peixes
+    // Pescetariano (se não for vegano): bloquear carnes (categoria proteínas que NÃO são peixes), permitir peixes e frutos do mar
     if (hasPescetariano && !hasVegano && c === "proteinas") {
+      // Verificar se é peixe pelo nome (categoria ainda é proteínas no legado)
       const isPeixe = n.includes("peixe") || n.includes("salmão") || n.includes("salmon") || 
                       n.includes("atum") || n.includes("tilápia") || n.includes("tilapia") ||
-                      n.includes("sardinha") || n.includes("bacalhau") || n.includes("camarão");
+                      n.includes("sardinha") || n.includes("bacalhau") || n.includes("camarão") ||
+                      n.includes("merluza") || n.includes("robalo");
       if (!isPeixe) return false;
     }
+    // Peixes e frutos_do_mar sempre permitidos para pescetariano
+    // (já estão na categoria correta, não precisam de checagem adicional)
     
     return true;
   });
