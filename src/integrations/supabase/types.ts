@@ -524,6 +524,56 @@ export type Database = {
           },
         ]
       }
+      meal_contextual_blocks: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          food_id: string | null
+          id: string
+          is_active: boolean
+          keyword: string | null
+          meal_type: string
+          notes: string | null
+          rule_type: string
+          scope: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          food_id?: string | null
+          id?: string
+          is_active?: boolean
+          keyword?: string | null
+          meal_type: string
+          notes?: string | null
+          rule_type?: string
+          scope?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          food_id?: string | null
+          id?: string
+          is_active?: boolean
+          keyword?: string | null
+          meal_type?: string
+          notes?: string | null
+          rule_type?: string
+          scope?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meal_contextual_blocks_food_id_fkey"
+            columns: ["food_id"]
+            isOneToOne: false
+            referencedRelation: "foods"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       meal_logs: {
         Row: {
           calories_consumed: number | null
