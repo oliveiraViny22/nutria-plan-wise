@@ -657,6 +657,14 @@ export function AIRebalancer({
 
   const hasAdjustments = result && result.adjustments && result.adjustments.length > 0;
   const isAlreadyOptimized = result && result.alreadyOptimized;
+  
+  // Verificar se todas as opções estão validadas (100% convergidas)
+  const allOptionsValid = result?.optionValidations && 
+    result.optionValidations.length > 0 && 
+    result.optionValidations.every(v => v.isValid);
+  
+  // Plano está OK se já otimizado OU se todas as opções estão válidas
+  const isPlanFullyValid = isAlreadyOptimized || allOptionsValid;
 
   return (
     <>
@@ -880,10 +888,10 @@ export function AIRebalancer({
           )}
 
           <DialogFooter className="gap-2 sm:gap-0">
-            {isAlreadyOptimized ? (
+            {isPlanFullyValid ? (
               <Button onClick={handleCancel} className="w-full sm:w-auto">
                 <Check className="w-4 h-4 mr-2" />
-                Entendi, vou seguir o plano
+                Entendido
               </Button>
             ) : (
               <>
