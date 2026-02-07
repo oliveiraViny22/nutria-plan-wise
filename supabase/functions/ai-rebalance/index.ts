@@ -1,5 +1,5 @@
 // ============================================
-// REBALANCEADOR AUTOMÁTICO NUTRIAPLAN v2.6
+// REBALANCEADOR AUTOMÁTICO NUTRIAPLAN v2.7
 // ============================================
 // Implementação conforme especificação:
 // - Validação por objetivo (cut/maintain/bulk)
@@ -9,6 +9,7 @@
 // - RETRY AUTOMÁTICO para opções não convergidas (v2.4)
 // - EQUALIZAÇÃO CALÓRICA entre opções (v2.5)
 // - VERIFICAÇÃO UPFRONT de plano já otimizado (v2.6)
+// - BALANCEAMENTO DE GORDURA entre opções (v2.7)
 // ============================================
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
@@ -705,6 +706,220 @@ function equalizeOptionCalories(
 
   if (totalAdjusted > 0) {
     console.log(`\n[EQUALIZAÇÃO] Concluído: ${totalAdjusted} opção(ões) ajustada(s)${warnings.length > 0 ? `, ${warnings.length} warning(s)` : ''}\n`);
+  }
+
+  return { adjusted: totalAdjusted, warnings, adjustments };
+}
+
+// ============================================
+// BALANCEAMENTO DE GORDURA ENTRE OPÇÕES (v2.7)
+// Garante que a gordura fique ±10% entre as opções
+// ============================================
+
+interface FatBalancingResult {
+  adjusted: number;
+  warnings: string[];
+  adjustments: Array<{
+    optionNumber: number;
+    originalFat: number;
+    newFat: number;
+    reductions: Array<{ foodId: string; foodName: string; oldQty: number; newQty: number }>;
+  }>;
+}
+
+const MAX_FAT_VARIANCE_PERCENT = 10; // ±10% de variância de gordura permitida
+
+/**
+ * Balanceia a gordura entre opções do plano.
+ * Usa a Opção 1 como referência e reduz gorduras puras nas opções 2/3.
+ * 
+ * Estratégia:
+ * 1. Identifica opções com gordura acima de 10% da referência
+ * 2. Reduz alimentos com alta densidade de gordura (gordura/proteína > 1)
+ * 3. Prioriza: oleaginosas > azeites > gorduras puras
+ * 4. Não remove alimentos, apenas reduz porções
+ */
+function balanceFatBetweenOptions(
+  optionResults: Array<{
+    optionNumber: number;
+    foods: FoodWithMeta[];
+    finalQuantities: Map<string, number>;
+    finalTotals: MacroTargets;
+  }>,
+  targets: MacroTargets
+): FatBalancingResult {
+  const MAX_FAT_VARIANCE = MAX_FAT_VARIANCE_PERCENT / 100; // 0.10
+  const warnings: string[] = [];
+  const adjustments: FatBalancingResult['adjustments'] = [];
+  let totalAdjusted = 0;
+
+  // Encontrar opção 1 como referência
+  const referenceOption = optionResults.find(r => r.optionNumber === 1);
+  if (!referenceOption) {
+    console.log("[FAT BALANCE] Opção 1 não encontrada, pulando balanceamento de gordura");
+    return { adjusted: 0, warnings: [], adjustments: [] };
+  }
+
+  const referenceFat = referenceOption.finalTotals.fat;
+  if (referenceFat <= 0) {
+    console.log("[FAT BALANCE] Gordura de referência zerada, pulando balanceamento");
+    return { adjusted: 0, warnings: [], adjustments: [] };
+  }
+
+  console.log(`\n╔══════════════════════════════════════════════════════════════╗`);
+  console.log(`║  BALANCEAMENTO DE GORDURA ENTRE OPÇÕES (v2.7)                 ║`);
+  console.log(`╠══════════════════════════════════════════════════════════════╣`);
+  console.log(`║  Referência (Opção 1): ${referenceFat.toFixed(1)}g gordura`.padEnd(63) + `║`);
+  console.log(`║  Tolerância: ±${MAX_FAT_VARIANCE_PERCENT}%`.padEnd(63) + `║`);
+  console.log(`╚══════════════════════════════════════════════════════════════╝\n`);
+
+  // Processar opções 2 e 3
+  for (const option of optionResults) {
+    if (option.optionNumber === 1) continue;
+
+    const currentFat = option.finalTotals.fat;
+    const variance = (currentFat - referenceFat) / referenceFat;
+
+    // Se gordura está dentro da tolerância ou ABAIXO, pular
+    if (Math.abs(variance) <= MAX_FAT_VARIANCE) {
+      console.log(`[FAT BALANCE] Opção ${option.optionNumber}: ${currentFat.toFixed(1)}g (${(variance * 100).toFixed(1)}% vs ref) ✓ OK`);
+      continue;
+    }
+
+    // Só ajustar se gordura está ACIMA da referência + tolerância
+    if (variance <= 0) {
+      console.log(`[FAT BALANCE] Opção ${option.optionNumber}: ${currentFat.toFixed(1)}g (${(variance * 100).toFixed(1)}% vs ref) - abaixo da ref, skip`);
+      continue;
+    }
+
+    console.log(`[FAT BALANCE] Opção ${option.optionNumber}: ${currentFat.toFixed(1)}g (${(variance * 100).toFixed(1)}% acima ref) → precisa reduzir`);
+
+    // Identificar alimentos ricos em gordura que podem ser reduzidos
+    // Ordenar por "fat dominance" (gordura/100g comparado a proteína/100g)
+    const fatRichFoods = option.foods
+      .map(food => {
+        const fatPer100g = food.food.fat;
+        const proteinPer100g = food.food.protein;
+        const category = (food.food.category || "").toLowerCase();
+        const currentQty = option.finalQuantities.get(food.id) || food.quantity_grams;
+        
+        // Calcular dominância de gordura
+        const fatDominance = proteinPer100g > 0 ? fatPer100g / proteinPer100g : fatPer100g > 5 ? 10 : 0;
+        
+        // Categorias que são fontes puras de gordura (podem ser reduzidas mais)
+        const isPureFatSource = 
+          category.includes("gordura") || 
+          category.includes("oleaginosa") ||
+          category.includes("azeite") ||
+          category.includes("oleo");
+        
+        return {
+          food,
+          fatPer100g,
+          fatDominance,
+          isPureFatSource,
+          currentQty,
+        };
+      })
+      .filter(f => f.fatPer100g >= 5 && f.fatDominance >= 1) // Mínimo 5g gordura/100g e gordura dominante
+      .sort((a, b) => {
+        // Priorizar fontes puras de gordura primeiro
+        if (a.isPureFatSource !== b.isPureFatSource) {
+          return a.isPureFatSource ? -1 : 1;
+        }
+        // Depois ordenar por dominância de gordura
+        return b.fatDominance - a.fatDominance;
+      });
+
+    if (fatRichFoods.length === 0) {
+      warnings.push(
+        `Opção ${option.optionNumber}: gordura ${(variance * 100).toFixed(1)}% acima da referência, mas sem alimentos ricos em gordura para reduzir`
+      );
+      console.log(`[FAT BALANCE] ⚠️ Opção ${option.optionNumber}: sem alimentos ricos em gordura para ajustar`);
+      continue;
+    }
+
+    // Calcular quanto de gordura precisa ser reduzido
+    const targetFat = referenceFat * (1 + MAX_FAT_VARIANCE);
+    let fatToReduce = currentFat - targetFat;
+    const reductions: FatBalancingResult['adjustments'][0]['reductions'] = [];
+
+    console.log(`[FAT BALANCE] Gordura a reduzir: ${fatToReduce.toFixed(1)}g (meta: ${targetFat.toFixed(1)}g)`);
+
+    // Tentar reduzir gordura progressivamente
+    for (const fatFood of fatRichFoods) {
+      if (fatToReduce <= 0) break;
+
+      const limits = getCategoryLimitsForRebalancer(fatFood.food.food.category || "");
+      const currentQty = fatFood.currentQty;
+      const fatPer100g = fatFood.fatPer100g;
+      
+      // Calcular quanto pode reduzir (não ir abaixo do mínimo da categoria)
+      const minQty = limits.min;
+      const maxReduction = Math.max(0, currentQty - minQty);
+      
+      if (maxReduction <= 0) {
+        console.log(`[FAT BALANCE]   - ${fatFood.food.food.name}: já no mínimo (${currentQty}g)`);
+        continue;
+      }
+      
+      // Calcular redução necessária em gramas para cortar X gramas de gordura
+      const gramsToReduceForFat = (fatToReduce / fatPer100g) * 100;
+      const actualReduction = Math.min(maxReduction, gramsToReduceForFat);
+      
+      // Arredondar para múltiplo de 5
+      const roundedReduction = Math.round(actualReduction / 5) * 5;
+      
+      if (roundedReduction <= 0) continue;
+      
+      const newQty = currentQty - roundedReduction;
+      const actualFatReduction = (roundedReduction / 100) * fatPer100g;
+      
+      option.finalQuantities.set(fatFood.food.id, newQty);
+      fatToReduce -= actualFatReduction;
+      
+      reductions.push({
+        foodId: fatFood.food.food_id,
+        foodName: fatFood.food.food.name,
+        oldQty: currentQty,
+        newQty: newQty,
+      });
+      
+      console.log(`[FAT BALANCE]   - ${fatFood.food.food.name}: ${currentQty}g → ${newQty}g (-${roundedReduction}g, -${actualFatReduction.toFixed(1)}g gordura)`);
+    }
+
+    // Recalcular totais após ajuste
+    const newTotals = calculateTotals(option.foods, option.finalQuantities);
+    const newVariance = (newTotals.fat - referenceFat) / referenceFat;
+
+    // Atualizar totais no resultado
+    option.finalTotals.calories = newTotals.calories;
+    option.finalTotals.protein = newTotals.protein;
+    option.finalTotals.carbs = newTotals.carbs;
+    option.finalTotals.fat = newTotals.fat;
+
+    if (reductions.length > 0) {
+      adjustments.push({
+        optionNumber: option.optionNumber,
+        originalFat: currentFat,
+        newFat: newTotals.fat,
+        reductions,
+      });
+      totalAdjusted++;
+    }
+
+    if (Math.abs(newVariance) > MAX_FAT_VARIANCE) {
+      warnings.push(
+        `Opção ${option.optionNumber}: gordura ${newTotals.fat.toFixed(1)}g (${(newVariance * 100).toFixed(1)}% vs ref) - não totalmente balanceada`
+      );
+      console.log(`[FAT BALANCE] ⚠️ Opção ${option.optionNumber}: ${newTotals.fat.toFixed(1)}g (${(newVariance * 100).toFixed(1)}% vs ref) - não totalmente balanceada`);
+    } else {
+      console.log(`[FAT BALANCE] ✓ Opção ${option.optionNumber}: ${newTotals.fat.toFixed(1)}g (${(newVariance * 100).toFixed(1)}% vs ref) - balanceada`);
+    }
+  }
+
+  if (totalAdjusted > 0) {
+    console.log(`\n[FAT BALANCE] Concluído: ${totalAdjusted} opção(ões) ajustada(s)${warnings.length > 0 ? `, ${warnings.length} warning(s)` : ''}\n`);
   }
 
   return { adjusted: totalAdjusted, warnings, adjustments };
@@ -2377,6 +2592,28 @@ serve(async (req) => {
       }
     }
     
+    // ============================================
+    // BALANCEAMENTO DE GORDURA ENTRE OPÇÕES (v2.7)
+    // Garante que a gordura fique ±10% entre as opções
+    // ============================================
+    let fatBalancingResult: FatBalancingResult = { adjusted: 0, warnings: [], adjustments: [] };
+    
+    if (optionResults.length > 1) {
+      fatBalancingResult = balanceFatBetweenOptions(optionResults, targets);
+      
+      if (fatBalancingResult.adjusted > 0) {
+        log.info("FatBalancingApplied", {
+          optionsAdjusted: fatBalancingResult.adjusted,
+          warnings: fatBalancingResult.warnings.length,
+          adjustments: fatBalancingResult.adjustments,
+        });
+        
+        // Re-validar opções após balanceamento de gordura
+        optionValidations = validateOptions();
+        console.log(`[FAT BALANCE] Re-validação após balanceamento concluída`);
+      }
+    }
+    
     // Usar opção 1 como referência principal para compatibilidade
     const primaryResult = optionResults.find(r => r.optionNumber === 1) || optionResults[0];
     const primaryValidation = optionValidations.find(v => v.optionNumber === primaryResult.optionNumber)?.validation 
@@ -2461,8 +2698,6 @@ serve(async (req) => {
     // Calcular totais iniciais para compatibilidade
     const currentTotals = calculateTotals(primaryResult.foods, primaryResult.initialQuantities);
 
-    // Combinar todas as mudanças de todas as opções
-    const allFoodChanges = optionResults.flatMap(r => r.foodChanges);
     const totalIterations = Math.max(...optionResults.map(r => r.iterations));
 
     // Verificar se normalization foi aplicada em alguma opção
@@ -2481,7 +2716,7 @@ serve(async (req) => {
       return currentIndex < worstIndex ? result.refinementStatus : worst;
     }, RefinementStatus.CONVERGED);
 
-    // Construir diagnósticos do rebalanceador (v2.5)
+    // Construir diagnósticos do rebalanceador (v2.7)
     const convergenceTimeMs = Math.round(performance.now() - startTime);
     const diagnostics: RebalancerDiagnostics = {
       refinementStatus: primaryRefinementStatus,
@@ -2496,13 +2731,53 @@ serve(async (req) => {
       convergenceTimeMs,
       optionsProcessed: optionResults.length,
       retriesPerformed: totalRetriesPerformed,
-      // v2.5: Adicionado diagnóstico de equalização calórica
+      // v2.5: Diagnóstico de equalização calórica
       calorieEqualization: {
         optionsAdjusted: equalizationResult.adjusted,
         warnings: equalizationResult.warnings,
         adjustments: equalizationResult.adjustments,
       },
+      // v2.7: Diagnóstico de balanceamento de gordura
+      fatBalancing: {
+        optionsAdjusted: fatBalancingResult.adjusted,
+        warnings: fatBalancingResult.warnings,
+        adjustments: fatBalancingResult.adjustments,
+      },
     };
+
+    // Recoletar mudanças de alimentos após balanceamento de gordura
+    // (garante que as quantidades atualizadas pelo fatBalancing sejam incluídas)
+    const finalFoodChanges: Array<{
+      food_id: string;
+      food_name: string;
+      original_grams: number;
+      new_grams: number;
+      mealOptionFoodId: string;
+      mealId: string;
+      mealOptionId: string;
+      mealName: string;
+    }> = [];
+
+    for (const optResult of optionResults) {
+      for (const food of optResult.foods) {
+        const original = optResult.initialQuantities.get(food.id) || food.quantity_grams;
+        const final = optResult.finalQuantities.get(food.id) || food.quantity_grams;
+        const diff = Math.abs(final - original);
+        
+        if (diff >= 1) {
+          finalFoodChanges.push({
+            food_id: food.food_id,
+            food_name: food.food.name,
+            original_grams: original,
+            new_grams: Math.round(final),
+            mealOptionFoodId: food.id,
+            mealId: food.mealId,
+            mealOptionId: food.optionId,
+            mealName: food.mealName,
+          });
+        }
+      }
+    }
 
     const result: RebalanceResult = {
       status,
@@ -2510,7 +2785,7 @@ serve(async (req) => {
       iterations: totalIterations,
       final_totals: primaryResult.finalTotals,
       adjustments: primaryResult.adjustments,
-      food_changes: allFoodChanges.map(fc => ({
+      food_changes: finalFoodChanges.map(fc => ({
         food_id: fc.food_id,
         food_name: fc.food_name,
         original_grams: fc.original_grams,
@@ -2525,7 +2800,7 @@ serve(async (req) => {
       },
     };
 
-    // Log de resumo com diagnósticos (v2.5)
+    // Log de resumo com diagnósticos (v2.7)
     log.info("Rebalance complete", {
       g10Status: g10Metadata.g10Status,
       normalizationApplied: anyNormalizationApplied,
@@ -2539,6 +2814,9 @@ serve(async (req) => {
       // v2.5: Log de equalização
       equalizationApplied: equalizationResult.adjusted > 0,
       equalizationAdjustments: equalizationResult.adjusted,
+      // v2.7: Log de fat balancing
+      fatBalancingApplied: fatBalancingResult.adjusted > 0,
+      fatBalancingAdjustments: fatBalancingResult.adjusted,
       retriesPerOption: Object.fromEntries(retriesPerOption),
     });
 
@@ -2593,7 +2871,7 @@ serve(async (req) => {
         foodChanges: opt.foodChanges.length,
         normalizationApplied: opt.normalizationApplied,
       })),
-      adjustments: allFoodChanges.map((fc) => ({
+      adjustments: finalFoodChanges.map((fc) => ({
         mealOptionFoodId: fc.mealOptionFoodId,
         mealId: fc.mealId,
         mealOptionId: fc.mealOptionId,
