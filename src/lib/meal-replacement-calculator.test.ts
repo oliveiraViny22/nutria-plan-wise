@@ -487,4 +487,78 @@ describe('meal-replacement-calculator', () => {
       }
     });
   });
+
+  describe('Completude da Sugestão', () => {
+    it('deve incluir whey quando proteína é alta e cottage sozinho não basta', () => {
+      // Ceia típica com alta demanda proteica (ex: 20g proteína, 150 kcal)
+      const target: MacroTarget = { calories: 150, protein: 20, carbs: 10, fat: 5 };
+      const result = calculateMealReplacement(target, 'maintain');
+      
+      // Deve ter whey para atingir a meta proteica
+      const hasWhey = result.items.some(i => i.name.includes('Whey'));
+      
+      // Para uma ceia com 20g de proteína, cottage sozinho (12g/100g) não basta
+      // O sistema deve adicionar whey
+      expect(hasWhey).toBe(true);
+    });
+
+    it('deve complementar cottage com whey para atingir meta proteica elevada', () => {
+      // Refeição que demanda mais proteína do que cottage pode fornecer
+      const target: MacroTarget = { calories: 250, protein: 30, carbs: 15, fat: 8 };
+      const result = calculateMealReplacement(target, 'gain_muscle');
+      
+      // Com 30g de proteína necessária, deve ter whey
+      const hasWhey = result.items.some(i => i.name.includes('Whey'));
+      expect(hasWhey).toBe(true);
+      
+      // A precisão de proteína deve estar adequada (>= 85%)
+      expect(result.accuracy.protein).toBeGreaterThanOrEqual(85);
+    });
+
+    it('não deve sugerir ao usuário adicionar whey manualmente se já incluiu', () => {
+      const target: MacroTarget = { calories: 200, protein: 25, carbs: 12, fat: 6 };
+      const result = calculateMealReplacement(target, 'maintain');
+      
+      // Se whey foi adicionado, não deve haver dica pedindo para adicionar MAIS whey
+      // (dicas de preparo como "Bata o whey com água" são OK)
+      const hasWhey = result.items.some(i => i.name.includes('Whey'));
+      const hasTipToAddMoreWhey = result.tips.some(t => {
+        const lower = t.toLowerCase();
+        // Procurar por padrões que sugerem adicionar MAIS proteína/whey
+        return (lower.includes('adicione mais') && lower.includes('whey')) ||
+               (lower.includes('adicione') && lower.includes('scoop')) ||
+               (lower.includes('atingir') && lower.includes('meta') && lower.includes('proteína'));
+      });
+      
+      if (hasWhey) {
+        expect(hasTipToAddMoreWhey).toBe(false);
+      }
+    });
+  });
+
+  describe('Organização das Dicas', () => {
+    it('deve ter dica de preparo quando há whey e água', () => {
+      const target: MacroTarget = { calories: 400, protein: 28, carbs: 40, fat: 12 };
+      const result = calculateMealReplacement(target, 'maintain');
+      
+      const hasWhey = result.items.some(i => i.name.includes('Whey'));
+      const hasWater = result.items.some(i => i.name === 'Água');
+      
+      if (hasWhey && hasWater) {
+        const hasPreparationTip = result.tips.some(t => t.includes('🥤'));
+        expect(hasPreparationTip).toBe(true);
+      }
+    });
+
+    it('deve ter indicador de sucesso quando convergir', () => {
+      const target: MacroTarget = { calories: 400, protein: 25, carbs: 45, fat: 12 };
+      const result = calculateMealReplacement(target, 'maintain');
+      
+      if (result.accuracy.calories >= 90 && result.accuracy.calories <= 100 &&
+          result.accuracy.protein >= 90) {
+        const hasSuccessIndicator = result.tips.some(t => t.includes('✅'));
+        expect(hasSuccessIndicator).toBe(true);
+      }
+    });
+  });
 });

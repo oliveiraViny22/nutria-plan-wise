@@ -712,15 +712,28 @@ export function calculateMealReplacement(
   // Se temos poucos itens, adicionar diversidade antes de fillers
   const substantiveItems = items.filter(i => i.name !== 'Água');
   if (substantiveItems.length < minItemsRequired) {
-    // Priorizar adição de proteína se não tem whey
-    const hasProteinSource = items.some(i => 
-      i.name.includes('Whey') || i.name.includes('Iogurte') || 
-      i.name.includes('Ovo') || i.name.includes('Cottage')
+    // Priorizar adição de proteína se não tem whey E proteína está baixa
+    const hasWheyAlready = items.some(i => i.name.includes('Whey'));
+    const hasSolidProtein = items.some(i => 
+      i.name.includes('Iogurte') || i.name.includes('Ovo') || i.name.includes('Cottage')
     );
     
-    if (!hasProteinSource && remaining().protein >= 5 && remaining().calories >= 50) {
-      // Adicionar fonte proteica leve
-      const proteinOptions = ['Iogurte Grego Natural', 'Queijo Cottage', 'Ovo Cozido'];
+    // Se não tem whey mas tem fonte sólida de proteína, verificar se precisa complementar
+    if (!hasWheyAlready && remaining().protein >= 10 && remaining().calories >= 60) {
+      // Adicionar whey como complemento proteico
+      const wheyType = userGoal === 'lose_weight' ? 'Whey Protein Isolado' : 'Whey Protein Concentrado';
+      const whey = ACTIVE_SUPPLEMENTS[wheyType];
+      if (whey) {
+        const neededScoops = Math.min(1, remaining().protein / whey.macros.protein);
+        if (neededScoops >= 0.5) {
+          addItem(wheyType, ACTIVE_SUPPLEMENTS, 'supplement', neededScoops);
+        }
+      }
+    }
+    
+    // Se não tem nenhuma fonte de proteína, adicionar uma sólida
+    if (!hasWheyAlready && !hasSolidProtein && remaining().protein >= 5 && remaining().calories >= 50) {
+      const proteinOptions = ['Queijo Cottage', 'Iogurte Grego Natural', 'Ovo Cozido'];
       for (const opt of proteinOptions) {
         const item = ACTIVE_FOODS[opt];
         if (item && canAddItem(item.macros, 0.5)) {
@@ -1034,40 +1047,45 @@ export function calculateMealReplacement(
     accuracy.calories <= ACCURACY_TARGETS.calories.max &&
     accuracy.protein >= ACCURACY_TARGETS.protein.min;
 
-  // Dicas contextuais
+  // =====================================================
+  // DICAS ORGANIZADAS EM CATEGORIAS
+  // =====================================================
   const tips: string[] = [];
   
+  // 1. STATUS: Indicar se a substituição está otimizada
   if (finalConverged) {
-    tips.push('✅ Substituição otimizada: calorias e proteína dentro das metas.');
-  } else {
-    if (accuracy.protein < 90) {
-      tips.push('💡 Adicione mais 1 scoop de whey ou 2 ovos para atingir a meta de proteína.');
-    }
-    if (accuracy.calories < 90) {
-      tips.push('💡 Adicione mais alimentos para atingir as calorias necessárias.');
-    } else if (accuracy.calories > 100) {
-      tips.push('⚠️ Esta substituição excede as calorias originais em ' + (accuracy.calories - 100) + '%.');
-    }
+    tips.push('✅ Substituição completa e equilibrada.');
   }
   
-  if (accuracy.carbs < 80) {
-    tips.push('💡 Adicione 1 fatia de pão integral ou mais banana para os carboidratos.');
-  }
-  
-  if (items.length > 5) {
-    tips.push('📝 Prepare os ingredientes com antecedência para facilitar o consumo.');
-  }
-
-  // Dica de preparo baseada nos itens
+  // 2. MODO DE PREPARO: Como preparar os itens
   const hasWhey = items.some(i => i.name.includes('Whey'));
   const hasOats = items.some(i => i.name.includes('Aveia'));
   const hasBanana = items.some(i => i.name === 'Banana');
+  const hasCottage = items.some(i => i.name.includes('Cottage'));
   const hasNuts = items.some(i => ['Pasta de Amendoim Integral', 'Castanha de Caju', 'Nozes', 'Amêndoas', 'Castanha do Pará'].includes(i.name));
+  const hasWater = items.some(i => i.name === 'Água');
   
-  if (hasWhey && (hasOats || hasBanana)) {
-    tips.push('🥤 Bata todos os ingredientes no liquidificador para um shake completo.');
-  } else if (hasNuts && !hasWhey) {
-    tips.push('🥜 Consuma as oleaginosas como snack ou adicione ao iogurte/aveia.');
+  if (hasWhey && hasWater) {
+    if (hasOats || hasBanana) {
+      tips.push('🥤 Bata o whey com água no liquidificador, adicione os demais ingredientes.');
+    } else if (hasCottage) {
+      tips.push('🥤 Misture o whey com água e consuma com o queijo cottage separado ou junto.');
+    } else {
+      tips.push('🥤 Misture o whey com água em uma coqueteleira.');
+    }
+  } else if (hasOats && hasWater && !hasWhey) {
+    tips.push('🥣 Prepare a aveia como mingau com água quente ou deixe de molho.');
+  } else if (hasCottage && !hasWhey) {
+    tips.push('🥛 Consuma o queijo cottage puro ou com os demais itens.');
+  }
+  
+  if (hasNuts) {
+    tips.push('🥜 Oleaginosas: consuma como snack ou misture aos demais itens.');
+  }
+  
+  // 3. PRATICIDADE: Dicas de organização
+  if (items.filter(i => i.name !== 'Água').length >= 4) {
+    tips.push('📝 Dica: deixe os ingredientes separados para facilitar o preparo.');
   }
 
   // =====================================================
