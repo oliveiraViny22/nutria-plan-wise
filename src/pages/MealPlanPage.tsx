@@ -47,7 +47,8 @@ import {
 import { MealReplacementSection } from '@/components/MealReplacementCard';
 import { ProFeatureBadge } from '@/components/FeatureBadge';
 import { SupplementsPreview } from '@/components/SupplementsPreview';
- import { MealPlanPdf } from '@/components/MealPlanPdf';
+import { SupplementToggle } from '@/components/SupplementToggle';
+import { MealPlanPdf } from '@/components/MealPlanPdf';
 import { MetricCard, MacroBadge, FadeInView, AnimatedCounter } from '@/components/ui-kit';
 import { calculateHydration, getHydrationLabel } from '@/lib/hydration-recommendations';
 
@@ -233,43 +234,11 @@ export default function MealPlanPage() {
   const [meals, setMeals] = useState<MealData[]>([]);
   const [planTotals, setPlanTotals] = useState({ calories: 0, protein: 0, carbs: 0, fat: 0 });
   const [expandedMeals, setExpandedMeals] = useState<Record<string, boolean>>({});
-  const [supplementsEnabled, setSupplementsEnabled] = useState(profile?.include_supplements ?? false);
-  const [togglingSupplements, setTogglingSupplements] = useState(false);
-  
   // Check if user is on free plan - supplements feature is locked
   const isFreePlan = planInfo?.plan_type === 'gratuito';
-
-  // Sync local state with profile
-  useEffect(() => {
-    setSupplementsEnabled(profile?.include_supplements ?? false);
-  }, [profile?.include_supplements]);
-
-  const handleToggleSupplements = async (checked: boolean) => {
-    if (!user) return;
-    
-    setTogglingSupplements(true);
-    setSupplementsEnabled(checked);
-    
-    try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({ include_supplements: checked })
-        .eq('user_id', user.id);
-
-      if (error) throw error;
-      
-      // Refresh profile to sync state
-      await refreshProfile?.();
-      
-      toast.success(checked ? 'Suplementação ativada' : 'Suplementação desativada');
-    } catch (error) {
-      console.error('Error toggling supplements:', error);
-      setSupplementsEnabled(!checked); // Revert on error
-      toast.error('Erro ao alterar configuração');
-    } finally {
-      setTogglingSupplements(false);
-    }
-  };
+  
+  // Use profile as single source of truth (synced via AuthContext)
+  const supplementsEnabled = (profile as any)?.include_supplements ?? false;
 
   useEffect(() => {
     if (user) {
@@ -593,24 +562,18 @@ export default function MealPlanPage() {
               <h2 className="text-xl font-semibold print:text-lg">Suplementação Recomendada</h2>
               {isFreePlan && <ProFeatureBadge />}
             </div>
-            <div className="flex items-center gap-2 print:hidden">
+            <div className="print:hidden">
               {isFreePlan ? (
                 <div className="flex items-center gap-2 text-muted-foreground">
                   <Lock className="w-4 h-4" />
                   <span className="text-sm">Recurso Pro</span>
                 </div>
               ) : (
-                <>
-                  <Label htmlFor="supplements-toggle" className="text-sm text-muted-foreground cursor-pointer">
-                    {supplementsEnabled ? 'Ativado' : 'Desativado'}
-                  </Label>
-                  <Switch
-                    id="supplements-toggle"
-                    checked={supplementsEnabled}
-                    onCheckedChange={handleToggleSupplements}
-                    disabled={togglingSupplements}
-                  />
-                </>
+                <SupplementToggle 
+                  initialValue={supplementsEnabled}
+                  compact
+                  locked={false}
+                />
               )}
             </div>
           </div>
