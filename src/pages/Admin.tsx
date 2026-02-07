@@ -1,7 +1,12 @@
 /**
- * Admin Page - Refactored
+ * Admin Page - Refactored with Grouped Categories
  * 
- * Main admin panel that uses separate tab components for better maintainability
+ * Main admin panel organized into 5 logical categories:
+ * 1. Operacional: Métricas, Usuários
+ * 2. Dados: Alimentos
+ * 3. Configuração: Configurações, Planos
+ * 4. Regras: Políticas, Bloqueios, Feature Flags
+ * 5. Recursos: Auditoria, Documentação, Conversão
  */
 
 import { useState, useEffect, useCallback } from 'react';
@@ -21,9 +26,15 @@ import {
   Sparkles,
   History,
   Target,
+  ChevronDown,
+  Briefcase,
+  Cog,
+  Scale,
+  FolderOpen,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useAdminOperations } from '@/hooks/useAdminOperations';
 import { useToast } from '@/hooks/use-toast';
@@ -44,6 +55,56 @@ import { AdminPlansTab } from '@/components/admin/AdminPlansTab';
 import { AdminDocsTab } from '@/components/admin/AdminDocsTab';
 import { AdminPoliciesTab } from '@/components/admin/AdminPoliciesTab';
 import { AdminConversionTab } from '@/components/admin/AdminConversionTab';
+
+// Tab categories for organization
+const TAB_CATEGORIES = [
+  {
+    id: 'operational',
+    label: 'Operacional',
+    icon: Briefcase,
+    tabs: [
+      { id: 'metrics', label: 'Métricas', icon: BarChart3 },
+      { id: 'users', label: 'Usuários', icon: Users },
+    ],
+  },
+  {
+    id: 'data',
+    label: 'Dados',
+    icon: Database,
+    tabs: [
+      { id: 'foods', label: 'Alimentos', icon: Database },
+    ],
+  },
+  {
+    id: 'config',
+    label: 'Configuração',
+    icon: Cog,
+    tabs: [
+      { id: 'settings', label: 'Configurações', icon: Settings },
+      { id: 'plans', label: 'Planos', icon: CreditCard },
+    ],
+  },
+  {
+    id: 'rules',
+    label: 'Regras',
+    icon: Scale,
+    tabs: [
+      { id: 'policies', label: 'Políticas', icon: Target },
+      { id: 'blocks', label: 'Bloqueios', icon: AlertCircle },
+      { id: 'flags', label: 'Feature Flags', icon: Sparkles },
+    ],
+  },
+  {
+    id: 'resources',
+    label: 'Recursos',
+    icon: FolderOpen,
+    tabs: [
+      { id: 'audit', label: 'Auditoria', icon: History },
+      { id: 'docs', label: 'Documentação', icon: BookOpen },
+      { id: 'conversion', label: 'Conversão', icon: TrendingUp },
+    ],
+  },
+];
 
 export default function Admin() {
   const navigate = useNavigate();
@@ -100,6 +161,13 @@ export default function Admin() {
 
   const [activeTab, setActiveTab] = useState('metrics');
   const [editedSettings, setEditedSettings] = useState<Record<string, unknown>>({});
+  const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({
+    operational: true,
+    data: true,
+    config: false,
+    rules: false,
+    resources: false,
+  });
 
   // Metrics state
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
@@ -129,6 +197,16 @@ export default function Admin() {
       fetchPlans();
     }
   }, [isAdmin, fetchSettings, fetchFoodImports, fetchAuditLogs, fetchPlans]);
+
+  // Auto-expand category when tab changes
+  useEffect(() => {
+    const category = TAB_CATEGORIES.find(cat => 
+      cat.tabs.some(tab => tab.id === activeTab)
+    );
+    if (category && !expandedCategories[category.id]) {
+      setExpandedCategories(prev => ({ ...prev, [category.id]: true }));
+    }
+  }, [activeTab]);
 
   const fetchMetrics = async () => {
     setMetricsLoading(true);
@@ -350,6 +428,10 @@ export default function Admin() {
     }
   };
 
+  const toggleCategory = (categoryId: string) => {
+    setExpandedCategories(prev => ({ ...prev, [categoryId]: !prev[categoryId] }));
+  };
+
   // Convert settings to expected format
   const formattedSettings: SystemSetting[] = settings.map(s => ({
     id: s.id,
@@ -359,6 +441,15 @@ export default function Admin() {
     category: s.category,
     is_sensitive: s.is_sensitive,
   }));
+
+  // Get current tab label for mobile display
+  const getCurrentTabLabel = () => {
+    for (const category of TAB_CATEGORIES) {
+      const tab = category.tabs.find(t => t.id === activeTab);
+      if (tab) return tab.label;
+    }
+    return 'Métricas';
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -388,52 +479,43 @@ export default function Admin() {
 
       <main className="container mx-auto px-4 py-6">
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="mb-6 flex flex-wrap h-auto gap-1">
-            <TabsTrigger value="metrics" className="flex items-center gap-2">
-              <BarChart3 className="h-4 w-4" />
-              Métricas
-            </TabsTrigger>
-            <TabsTrigger value="users" className="flex items-center gap-2">
-              <Users className="h-4 w-4" />
-              Usuários
-            </TabsTrigger>
-            <TabsTrigger value="foods" className="flex items-center gap-2">
-              <Database className="h-4 w-4" />
-              Alimentos
-            </TabsTrigger>
-            <TabsTrigger value="settings" className="flex items-center gap-2">
-              <Settings className="h-4 w-4" />
-              Configurações
-            </TabsTrigger>
-            <TabsTrigger value="plans" className="flex items-center gap-2">
-              <CreditCard className="h-4 w-4" />
-              Planos
-            </TabsTrigger>
-            <TabsTrigger value="audit" className="flex items-center gap-2">
-              <History className="h-4 w-4" />
-              Auditoria
-            </TabsTrigger>
-            <TabsTrigger value="docs" className="flex items-center gap-2">
-              <BookOpen className="h-4 w-4" />
-              Documentação
-            </TabsTrigger>
-            <TabsTrigger value="policies" className="flex items-center gap-2">
-              <Target className="h-4 w-4" />
-              Políticas
-            </TabsTrigger>
-            <TabsTrigger value="blocks" className="flex items-center gap-2">
-              <AlertCircle className="h-4 w-4" />
-              Bloqueios
-            </TabsTrigger>
-            <TabsTrigger value="flags" className="flex items-center gap-2">
-              <Sparkles className="h-4 w-4" />
-              Feature Flags
-            </TabsTrigger>
-            <TabsTrigger value="conversion" className="flex items-center gap-2">
-              <TrendingUp className="h-4 w-4" />
-              Conversão
-            </TabsTrigger>
-          </TabsList>
+          {/* Grouped Tab Navigation */}
+          <div className="mb-6 space-y-2">
+            {TAB_CATEGORIES.map((category) => (
+              <Collapsible 
+                key={category.id}
+                open={expandedCategories[category.id]}
+                onOpenChange={() => toggleCategory(category.id)}
+              >
+                <CollapsibleTrigger asChild>
+                  <Button 
+                    variant="ghost" 
+                    className="w-full justify-between px-3 py-2 h-auto font-medium text-muted-foreground hover:text-foreground"
+                  >
+                    <span className="flex items-center gap-2">
+                      <category.icon className="h-4 w-4" />
+                      {category.label}
+                    </span>
+                    <ChevronDown className={`h-4 w-4 transition-transform ${expandedCategories[category.id] ? 'rotate-180' : ''}`} />
+                  </Button>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <TabsList className="w-full justify-start flex-wrap h-auto gap-1 p-1 bg-muted/50 ml-6 mt-1">
+                    {category.tabs.map((tab) => (
+                      <TabsTrigger 
+                        key={tab.id}
+                        value={tab.id} 
+                        className="flex items-center gap-2 data-[state=active]:bg-background"
+                      >
+                        <tab.icon className="h-4 w-4" />
+                        {tab.label}
+                      </TabsTrigger>
+                    ))}
+                  </TabsList>
+                </CollapsibleContent>
+              </Collapsible>
+            ))}
+          </div>
 
           {/* Metrics Tab */}
           <TabsContent value="metrics">
