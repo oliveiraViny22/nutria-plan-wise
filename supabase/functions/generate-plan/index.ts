@@ -790,6 +790,13 @@ function totalsForOption(mwo: MealWithOptions[], optionIndex: number): MacroTarg
 }
 
 /**
+ * Obtém número máximo de opções entre todas as refeições
+ */
+function getMaxOptionCount(mwo: MealWithOptions[]): number {
+  return Math.max(...mwo.map(m => m.options.length), 1);
+}
+
+/**
  * Valida contratos nutricionais para TODAS as opções de refeição
  * Retorna warnings se alguma opção violar os contratos
  * 
@@ -853,67 +860,56 @@ function validateNutritionalContracts(
  *   2. Se proteína resultante excederia 110% da meta, escalar apenas não-proteicos
  *   3. Para bulk com alta demanda calórica, usar limites expandidos e mais iterações
  */
-function scale(mwo: MealWithOptions[], targetCals: number, targetProtein?: number, objective: GeneratorObjective = "maintain", generatorDiagnostics: GeneratorDiagnostics = createInitialGeneratorDiagnostics()): void {
-  const PROTEIN_MAX_PERCENT = 1.10; // Proteína máxima permitida: 110% da meta
-  const PROTEIN_DENSE_RATIO = 0.25; // Alimento é "proteico" se >25% das calorias vêm de proteína
-  
-  // Para bulk com alta demanda, usar parâmetros mais agressivos
-  const isBulk = objective === "bulk";
-  const calorieGapPercent = Math.abs(targetCals - totals(mwo).calories) / targetCals;
-  const isHighDemand = calorieGapPercent > 0.25; // >25% de déficit
+/**
+ * Escala UMA opção específica para atingir as metas de calorias
+ * v5.28: Extração para permitir scaling independente por opção
+ */
+function scaleOption(
+  mwo: MealWithOptions[],
+  optionIndex: number,
+  targetCals: number,
+  targetProtein: number | undefined,
+  objective: GeneratorObjective,
+  isBulk: boolean,
+  isHighDemand: boolean,
+  generatorDiagnostics: GeneratorDiagnostics
+): void {
+  const PROTEIN_MAX_PERCENT = 1.10;
+  const PROTEIN_DENSE_RATIO = 0.25;
   
   const MAX_ITERATIONS = isBulk && isHighDemand ? 8 : 5;
   const MAX_CARB_COMPENSATION = isBulk && isHighDemand ? 4.0 : 2.5;
-  const CONVERGENCE_THRESHOLD = isBulk ? 0.12 : 0.08; // 12% tolerância para bulk durante scaling
+  const CONVERGENCE_THRESHOLD = isBulk ? 0.12 : 0.08;
   
-  // Inicializar contagem de iterações no diagnóstico
-  generatorDiagnostics.scaleIterations = 0;
+  // Calcular totais para ESTA opção específica
+  const getOptionTotals = () => totalsForOption(mwo, optionIndex);
   
-  // =====================================================
-  // v5.15: REDUÇÃO ATIVA DE PROTEÍNA (ANTES DO SCALING)
-  // Se proteína inicial já está alta em relação às calorias,
-  // reduzir porções de alimentos proteicos para liberar espaço
-  // =====================================================
-  const initialTotals = totals(mwo);
+  // Redução de proteína inicial se necessário
+  const initialTotals = getOptionTotals();
   const initialProteinPercent = targetProtein ? (initialTotals.protein / targetProtein) : 0;
   const initialCaloriePercent = initialTotals.calories / targetCals;
   
-  // Se proteína > 95% MAS calorias < 60%, temos um problema de proporção
-  // O scaling vai fazer a proteína explodir
   if (targetProtein && initialProteinPercent > 0.95 && initialCaloriePercent < 0.60) {
-    const targetProteinForScaling = targetProtein * 0.70; // Reduzir para 70% para dar margem
+    const targetProteinForScaling = targetProtein * 0.70;
     const proteinExcess = initialTotals.protein - targetProteinForScaling;
     
-    log("ProteinReductionStart", {
-      initialProtein: Math.round(initialTotals.protein),
-      targetProtein,
-      initialProteinPercent: Math.round(initialProteinPercent * 100),
-      initialCaloriePercent: Math.round(initialCaloriePercent * 100),
-      excessToRemove: Math.round(proteinExcess)
-    });
-    
     if (proteinExcess > 0) {
-      // Ordenar alimentos por densidade proteica (maior primeiro) para reduzir os mais proteicos
-      const proteinFoodsToReduce: { food: FoodSelection; mealType: string; optIdx: number }[] = [];
+      const proteinFoodsToReduce: { food: FoodSelection; mealType: string }[] = [];
       
       for (const m of mwo) {
-        for (let optIdx = 0; optIdx < m.options.length; optIdx++) {
-          const opt = m.options[optIdx];
-          if (!opt?.foods) continue;
-          for (const f of opt.foods) {
-            if (!f || typeof f.quantity_grams !== 'number') continue;
-            const proteinRatio = f.food.calories > 0 
-              ? (f.food.protein * 4) / f.food.calories
-              : 0;
-            // Alimentos com alta densidade proteica (>25% das calorias de proteína)
-            if (proteinRatio > PROTEIN_DENSE_RATIO && f.food.protein >= 10) {
-              proteinFoodsToReduce.push({ food: f, mealType: m.mealType, optIdx });
-            }
+        const opt = m.options[optionIndex];
+        if (!opt?.foods) continue;
+        for (const f of opt.foods) {
+          if (!f || typeof f.quantity_grams !== 'number') continue;
+          const proteinRatio = f.food.calories > 0 
+            ? (f.food.protein * 4) / f.food.calories
+            : 0;
+          if (proteinRatio > PROTEIN_DENSE_RATIO && f.food.protein >= 10) {
+            proteinFoodsToReduce.push({ food: f, mealType: m.mealType });
           }
         }
       }
       
-      // Ordenar por densidade proteica (maior primeiro)
       proteinFoodsToReduce.sort((a, b) => b.food.food.protein - a.food.food.protein);
       
       let remainingExcess = proteinExcess;
@@ -929,7 +925,6 @@ function scale(mwo: MealWithOptions[], targetCals: number, targetProtein?: numbe
         
         if (currentQty <= minQty) continue;
         
-        // Calcular quanto proteína podemos remover
         const maxRemovableGrams = currentQty - minQty;
         const proteinPer100g = f.food.protein || 0;
         const maxRemovableProtein = (maxRemovableGrams / 100) * proteinPer100g;
@@ -944,99 +939,48 @@ function scale(mwo: MealWithOptions[], targetCals: number, targetProtein?: numbe
           
           f.quantity_grams = newQty;
           remainingExcess -= actualProteinRemoved;
-          
-          log("ProteinReduced", {
-            food: f.food.name,
-            oldQty: currentQty,
-            newQty,
-            proteinRemoved: Math.round(actualProteinRemoved * 10) / 10
-          });
         }
       }
       
       // Recalcular totais após redução
       for (const m of mwo) {
-        for (const opt of m.options) {
-          if (opt) recalcOptionTotals(opt);
-        }
+        const opt = m.options[optionIndex];
+        if (opt) recalcOptionTotals(opt);
       }
-      
-      const afterReduction = totals(mwo);
-      log("ProteinReductionEnd", {
-        newProtein: Math.round(afterReduction.protein),
-        newCalories: afterReduction.calories,
-        proteinRemoved: Math.round(initialTotals.protein - afterReduction.protein)
-      });
     }
   }
   
-  if (isBulk && isHighDemand) {
-    log("ScaleBulkMode", { calorieGapPercent: Math.round(calorieGapPercent * 100), maxIterations: MAX_ITERATIONS, maxCompensation: MAX_CARB_COMPENSATION });
-  }
-  
+  // Loop de scaling para esta opção
   for (let iter = 0; iter < MAX_ITERATIONS; iter++) {
-    // Atualizar diagnóstico de iterações
-    generatorDiagnostics.scaleIterations = iter + 1;
-    
-    const current = totals(mwo);
+    const current = getOptionTotals();
     const proteinPercent = targetProtein ? (current.protein / targetProtein) : 0;
     
-    log("ScaleIter", { 
-      iter, 
-      currentCals: current.calories, 
-      currentProtein: Math.round(current.protein * 10) / 10,
-      targetCals, 
-      targetProtein,
-      proteinPercent: Math.round(proteinPercent * 100),
-      diff: Math.round(Math.abs(current.calories - targetCals) / targetCals * 1000) / 10
-    });
+    if (!current.calories || isNaN(current.calories)) return;
     
-    if (!current.calories || isNaN(current.calories)) {
-      log("ScaleAbortNaN", { iter, current });
-      return;
-    }
-    
-    // Se calorias estão dentro da tolerância, parar
     if (Math.abs(current.calories - targetCals) / targetCals <= CONVERGENCE_THRESHOLD) break;
     
     const calorieDeficit = current.calories < targetCals;
     const overallFactor = targetCals / (current.calories || 1);
     
-    // PROTEÇÃO PREVENTIVA: calcular proteína resultante se escalássemos tudo
     const projectedProtein = current.protein * overallFactor;
     const wouldExceedProtein = targetProtein && projectedProtein > targetProtein * PROTEIN_MAX_PERCENT;
     
-    if (wouldExceedProtein) {
-      log("ScaleProteinPreventive", { 
-        currentProtein: Math.round(current.protein),
-        projectedProtein: Math.round(projectedProtein),
-        maxAllowed: Math.round(targetProtein! * PROTEIN_MAX_PERCENT),
-        action: "protect_protein_foods"
-      });
-    }
-    
-    // Separar alimentos por densidade proteica
     let carbCaloriesTotal = 0;
-    let proteinFoodsCount = 0;
     
     for (const m of mwo) {
-      for (const opt of m.options) {
-        if (!opt || !opt.foods) continue;
-        for (const f of opt.foods) {
-          if (!f || typeof f.quantity_grams !== 'number') continue;
-          const proteinRatio = f.food.calories > 0 
-            ? (f.food.protein * 4) / f.food.calories
-            : 0;
-          if (proteinRatio <= PROTEIN_DENSE_RATIO) {
-            carbCaloriesTotal += (f.quantity_grams / 100) * f.food.calories;
-          } else {
-            proteinFoodsCount++;
-          }
+      const opt = m.options[optionIndex];
+      if (!opt || !opt.foods) continue;
+      for (const f of opt.foods) {
+        if (!f || typeof f.quantity_grams !== 'number') continue;
+        const proteinRatio = f.food.calories > 0 
+          ? (f.food.protein * 4) / f.food.calories
+          : 0;
+        if (proteinRatio <= PROTEIN_DENSE_RATIO) {
+          carbCaloriesTotal += (f.quantity_grams / 100) * f.food.calories;
         }
       }
     }
     
-    // Calcular fator de compensação para alimentos não-proteicos
     const calorieGap = targetCals - current.calories;
     const carbCompensationFactor = carbCaloriesTotal > 0 
       ? Math.min(MAX_CARB_COMPENSATION, 1 + (calorieGap / carbCaloriesTotal))
@@ -1044,186 +988,151 @@ function scale(mwo: MealWithOptions[], targetCals: number, targetProtein?: numbe
     
     for (const m of mwo) {
       const isSnack = SNACK_MEALS.includes(m.mealType);
+      const opt = m.options[optionIndex];
+      if (!opt || !opt.foods) continue;
       
-      for (const opt of m.options) {
-        if (!opt || !opt.foods) continue;
+      for (const f of opt.foods) {
+        if (!f || typeof f.quantity_grams !== 'number') continue;
         
-        for (const f of opt.foods) {
-          if (!f || typeof f.quantity_grams !== 'number') continue;
-          
-          // Calcular ratio proteína/calorias do alimento
-          const proteinRatio = f.food.calories > 0 
-            ? (f.food.protein * 4) / f.food.calories
-            : 0;
-          const isProteinDense = proteinRatio > PROTEIN_DENSE_RATIO;
-          
-          let itemFactor = overallFactor;
-          
-          if (wouldExceedProtein && calorieDeficit) {
-            // Precisamos adicionar calorias MAS proteger proteína
-            if (isProteinDense) {
-              itemFactor = 1.0; // NÃO escalar alimentos proteicos
-            } else {
-              // Compensar com alimentos não-proteicos
-              itemFactor = carbCompensationFactor;
-            }
+        const proteinRatio = f.food.calories > 0 
+          ? (f.food.protein * 4) / f.food.calories
+          : 0;
+        const isProteinDense = proteinRatio > PROTEIN_DENSE_RATIO;
+        
+        let itemFactor = overallFactor;
+        
+        if (wouldExceedProtein && calorieDeficit) {
+          if (isProteinDense) {
+            itemFactor = 1.0;
+          } else {
+            itemFactor = carbCompensationFactor;
           }
-          
-          const cat = (f.food.category || "").toLowerCase();
-          const catLimits = getCategoryLimits(cat, isSnack);
-          
-          // Para bulk com alta demanda, expandir limites de carboidratos
-          let maxQty = catLimits.max;
-          if (isBulk && isHighDemand && (cat === "carboidratos" || cat === "leguminosas")) {
-            maxQty = Math.round(catLimits.max * 1.5); // +50% para carbs em bulk
-          }
-          
-          const newQty = Math.round(f.quantity_grams * itemFactor / 5) * 5;
-          f.quantity_grams = Math.max(catLimits.min, Math.min(maxQty, newQty));
         }
-        recalcOptionTotals(opt);
+        
+        const cat = (f.food.category || "").toLowerCase();
+        const catLimits = getCategoryLimits(cat, isSnack);
+        
+        let maxQty = catLimits.max;
+        if (isBulk && isHighDemand && (cat === "carboidratos" || cat === "leguminosas")) {
+          maxQty = Math.round(catLimits.max * 1.5);
+        }
+        
+        const newQty = Math.round(f.quantity_grams * itemFactor / 5) * 5;
+        f.quantity_grams = Math.max(catLimits.min, Math.min(maxQty, newQty));
       }
+      recalcOptionTotals(opt);
     }
   }
   
-  // =====================================================
-  // v5.17: FALLBACK DE INJEÇÃO CALÓRICA (MELHORADO)
-  // Se após scaling o plano ainda está abaixo de 88% das calorias,
-  // E a proteína está perto/acima da meta (>98%), escalar AGRESSIVAMENTE
-  // carboidratos e leguminosas além do limite normal
-  // =====================================================
-  const postScaleTotals = totals(mwo);
+  // Fallback de injeção para bulk
+  const postScaleTotals = getOptionTotals();
   const postScaleCaloriePercent = postScaleTotals.calories / targetCals;
   const postScaleProteinPercent = targetProtein ? (postScaleTotals.protein / targetProtein) : 0;
   
-  // Log para debug
-  log("PostScaleTotals", {
-    calories: postScaleTotals.calories,
-    protein: Math.round(postScaleTotals.protein * 10) / 10,
-    carbs: Math.round(postScaleTotals.carbs * 10) / 10,
-    fat: Math.round(postScaleTotals.fat * 10) / 10,
-    targetCals
-  });
-  
-  // Detectar situação de travamento: calorias baixas + proteína perto/acima da meta
-  // Condição relaxada: proteína > 98% já indica que não podemos escalar proteínas
   const isStalled = postScaleCaloriePercent < 0.88 && postScaleProteinPercent > 0.98;
   
-  // =====================================================
-  // DIAGNÓSTICO: Atualizar estado de geração
-  // =====================================================
-  if (isStalled) {
-    generatorDiagnostics.generationState = GenerationState.STALL_DETECTED;
-    generatorDiagnostics.stallFallbackTriggered = true;
-    generatorDiagnostics.postScaleCaloriePercent = Math.round(postScaleCaloriePercent * 100);
-    generatorDiagnostics.postScaleProteinPercent = Math.round(postScaleProteinPercent * 100);
-  }
-  
   if (isStalled && isBulk) {
-    log("ScaleStalledDetected", {
-      caloriePercent: Math.round(postScaleCaloriePercent * 100),
-      proteinPercent: Math.round(postScaleProteinPercent * 100),
-      calorieDeficit: Math.round(targetCals - postScaleTotals.calories),
-      action: "aggressive_carb_injection",
-      generationState: generatorDiagnostics.generationState
-    });
-    
     const calorieDeficit = targetCals - postScaleTotals.calories;
-    const CARB_KCAL_PER_GRAM = 4;
-    // Estimativa: precisamos adicionar X gramas de carbs para cobrir Y kcal
-    // (assumindo alimentos com ~30% de carbs e ~100 kcal/100g)
-    const estimatedCarbGramsNeeded = (calorieDeficit / 1.0) * 0.8; // 80% para margem
+    const estimatedCarbGramsNeeded = (calorieDeficit / 1.0) * 0.8;
     
     let carbsInjected = 0;
     const maxCarbsToInject = estimatedCarbGramsNeeded;
     
-    // Escalar carboidratos além do limite normal
     for (const m of mwo) {
       if (carbsInjected >= maxCarbsToInject) break;
       
-      for (const opt of m.options) {
-        if (!opt?.foods || carbsInjected >= maxCarbsToInject) continue;
+      const opt = m.options[optionIndex];
+      if (!opt?.foods || carbsInjected >= maxCarbsToInject) continue;
+      
+      for (const f of opt.foods) {
+        if (carbsInjected >= maxCarbsToInject) break;
         
-        for (const f of opt.foods) {
-          if (carbsInjected >= maxCarbsToInject) break;
+        const cat = (f.food.category || "").toLowerCase();
+        if (cat !== "carboidratos" && cat !== "leguminosas") continue;
+        
+        const isSnack = SNACK_MEALS.includes(m.mealType);
+        const catLimits = getCategoryLimits(cat, isSnack);
+        const aggressiveMax = Math.round(catLimits.max * 2.0);
+        
+        const currentQty = f.quantity_grams;
+        if (currentQty >= aggressiveMax) continue;
+        
+        const carbsPer100g = f.food.carbs || 0;
+        if (carbsPer100g < 15) continue;
+        
+        const remainingCarbs = maxCarbsToInject - carbsInjected;
+        const gramsToAdd = Math.min(
+          aggressiveMax - currentQty,
+          (remainingCarbs / carbsPer100g) * 100,
+          100
+        );
+        
+        if (gramsToAdd >= 10) {
+          const newQty = Math.round((currentQty + gramsToAdd) / 5) * 5;
+          const actualIncrease = newQty - currentQty;
           
-          const cat = (f.food.category || "").toLowerCase();
-          if (cat !== "carboidratos" && cat !== "leguminosas") continue;
+          f.quantity_grams = newQty;
+          carbsInjected += actualIncrease;
           
-          // Para injeção agressiva, usar limite expandido de 2x o normal
-          const isSnack = SNACK_MEALS.includes(m.mealType);
-          const catLimits = getCategoryLimits(cat, isSnack);
-          const aggressiveMax = Math.round(catLimits.max * 2.0); // Dobrar limite
-          
-          const currentQty = f.quantity_grams;
-          if (currentQty >= aggressiveMax) continue;
-          
-          const carbsPer100g = f.food.carbs || 0;
-          if (carbsPer100g < 15) continue; // Só alimentos carb-ricos
-          
-          const remainingCarbs = maxCarbsToInject - carbsInjected;
-          const gramsToAdd = Math.min(
-            aggressiveMax - currentQty,
-            (remainingCarbs / carbsPer100g) * 100,
-            100 // Máximo de 100g de aumento por item
-          );
-          
-          if (gramsToAdd >= 10) {
-            const newQty = Math.round((currentQty + gramsToAdd) / 5) * 5;
-            const actualIncrease = newQty - currentQty;
-            const carbsAdded = (actualIncrease / 100) * carbsPer100g;
-            
-            f.quantity_grams = newQty;
-            carbsInjected += actualIncrease;
-            
-            // =====================================================
-            // DIAGNÓSTICO: Marcar injeção forçada de carboidratos
-            // =====================================================
-            generatorDiagnostics.generationState = GenerationState.FORCED_CARB_INJECTION;
-            generatorDiagnostics.carbInjectionApplied = true;
-            generatorDiagnostics.carbsInjectedGrams += actualIncrease;
-            
-            // Registrar alimento com limite expandido
-            const normalLimits = getCategoryLimits(cat, isSnack);
-            generatorDiagnostics.expandedLimitFoods.push({
-              foodId: f.food.id,
-              foodName: f.food.name,
-              originalGrams: currentQty,
-              finalGrams: newQty,
-              limitStatus: LimitStatus.EXPANDED,
-              categoryLimitNormal: normalLimits.max,
-              categoryLimitExpanded: aggressiveMax,
-            });
-            generatorDiagnostics.limitsExpanded = true;
-            
-            log("StalledCarbInjection", {
-              food: f.food.name,
-              oldQty: currentQty,
-              newQty,
-              carbsAdded: Math.round(carbsAdded),
-              limitStatus: LimitStatus.EXPANDED
-            });
-          }
+          generatorDiagnostics.generationState = GenerationState.FORCED_CARB_INJECTION;
+          generatorDiagnostics.carbInjectionApplied = true;
+          generatorDiagnostics.carbsInjectedGrams += actualIncrease;
+          generatorDiagnostics.limitsExpanded = true;
         }
-        recalcOptionTotals(opt);
       }
+      recalcOptionTotals(opt);
     }
+  }
+}
+
+/**
+ * Escalona porções para atingir calorias alvo
+ * v5.28: REFATORADO PARA ESCALAR CADA OPÇÃO INDEPENDENTEMENTE
+ * 
+ * Antes: Calculava fator baseado na Opção 1 e aplicava a todas
+ * Agora: Cada opção é escalada individualmente para suas próprias metas
+ */
+function scale(mwo: MealWithOptions[], targetCals: number, targetProtein?: number, objective: GeneratorObjective = "maintain", generatorDiagnostics: GeneratorDiagnostics = createInitialGeneratorDiagnostics()): void {
+  const isBulk = objective === "bulk";
+  const initialCalorieGapPercent = Math.abs(targetCals - totals(mwo).calories) / targetCals;
+  const isHighDemand = initialCalorieGapPercent > 0.25;
+  
+  // Inicializar diagnóstico
+  generatorDiagnostics.scaleIterations = 0;
+  
+  if (isBulk && isHighDemand) {
+    log("ScaleBulkMode", { calorieGapPercent: Math.round(initialCalorieGapPercent * 100), objective });
+  }
+  
+  // Obter número máximo de opções
+  const maxOptions = getMaxOptionCount(mwo);
+  
+  // Escalar CADA opção independentemente
+  for (let optIdx = 0; optIdx < maxOptions; optIdx++) {
+    log("ScaleOptionStart", { optionIndex: optIdx + 1, targetCals });
     
-    const afterInjection = totals(mwo);
-    log("StalledInjectionEnd", {
-      carbsInjected: Math.round(carbsInjected),
-      newCalories: afterInjection.calories,
-      newCaloriePercent: Math.round((afterInjection.calories / targetCals) * 100)
+    const beforeTotals = totalsForOption(mwo, optIdx);
+    
+    scaleOption(mwo, optIdx, targetCals, targetProtein, objective, isBulk, isHighDemand, generatorDiagnostics);
+    
+    const afterTotals = totalsForOption(mwo, optIdx);
+    
+    log("ScaleOptionEnd", { 
+      optionIndex: optIdx + 1, 
+      beforeCals: beforeTotals.calories,
+      afterCals: afterTotals.calories,
+      caloriePercent: Math.round((afterTotals.calories / targetCals) * 100)
     });
   }
   
-  // Log final
+  // Log final com todas as opções
   const finalTotals = totals(mwo);
   log("ScaleFinal", {
-    calories: finalTotals.calories,
-    protein: Math.round(finalTotals.protein * 10) / 10,
+    option1Calories: finalTotals.calories,
+    option1Protein: Math.round(finalTotals.protein * 10) / 10,
     proteinPercent: targetProtein ? Math.round((finalTotals.protein / targetProtein) * 100) : null,
-    objective
+    objective,
+    optionsProcessed: maxOptions
   });
 }
 
@@ -1518,27 +1427,14 @@ const FAT_FILLER_CONFIG = {
 
 /**
  * fillFat: Injeta fontes de gordura quando o macro de fat está abaixo da meta.
- * Escolhe automaticamente entre azeite (para gaps pequenos) e abacate (gaps maiores).
- * Adiciona apenas em refeições principais (almoço/jantar).
+ * v5.28: Opera POR OPÇÃO para garantir que cada opção atinja a meta de gordura
  */
 async function fillFat(
   mwo: MealWithOptions[],
   targetFat: number,
   sb: any
 ): Promise<void> {
-  const current = totals(mwo);
-  const fatPercent = current.fat / targetFat;
-  
-  // Só aplicar filler se gordura estiver abaixo do threshold
-  if (fatPercent >= FAT_FILLER_CONFIG.MIN_FAT_THRESHOLD) {
-    log("FatFillerSkip", { fatPercent: Math.round(fatPercent * 100), threshold: FAT_FILLER_CONFIG.MIN_FAT_THRESHOLD * 100 });
-    return;
-  }
-  
-  const fatDeficit = (targetFat * FAT_FILLER_CONFIG.MIN_FAT_THRESHOLD) - current.fat;
-  
-  // v5.22: Buscar alimentos coringa DIRETAMENTE do banco (não da lista filtrada)
-  // Isso garante que azeite/abacate estejam disponíveis mesmo com restrições
+  // Buscar alimentos coringa DIRETAMENTE do banco (não da lista filtrada)
   const { data: fatFoods } = await sb
     .from("foods")
     .select("id, name, calories, protein, carbs, fat, category, is_optional, unit_name, unit_weight_grams, unit_increment, unit_enabled")
@@ -1553,19 +1449,6 @@ async function fillFat(
     return;
   }
   
-  log("FatFillerStart", {
-    currentFat: Math.round(current.fat * 10) / 10,
-    targetFat,
-    fatPercent: Math.round(fatPercent * 100),
-    deficit: Math.round(fatDeficit * 10) / 10,
-  });
-  
-  // Escolher estratégia baseada no gap
-  // Azeite: 100g gordura/100g -> 10g azeite = 10g gordura
-  // Abacate: 15g gordura/100g -> 50g abacate = 7.5g gordura
-  const useAbacate = abacate && fatDeficit >= 5 && fatDeficit <= 12;
-  const useAzeite = azeite && (fatDeficit < 5 || fatDeficit > 12 || !abacate);
-  
   // Identificar refeições principais elegíveis (almoço e jantar)
   const mainMeals = mwo.filter(m => m.mealType === "lunch" || m.mealType === "dinner");
   
@@ -1574,22 +1457,47 @@ async function fillFat(
     return;
   }
   
-  let fatAdded = 0;
-  const fatToAdd = fatDeficit;
+  const maxOptions = getMaxOptionCount(mwo);
   
-  // Distribuir gordura entre as refeições principais
-  for (const m of mainMeals) {
-    if (fatAdded >= fatToAdd) break;
+  // v5.28: Aplicar fat filler para CADA opção individualmente
+  for (let optIdx = 0; optIdx < maxOptions; optIdx++) {
+    const optTotals = totalsForOption(mwo, optIdx);
+    const fatPercent = optTotals.fat / targetFat;
     
-    for (const opt of m.options) {
+    // Só aplicar filler se gordura desta opção estiver abaixo do threshold
+    if (fatPercent >= FAT_FILLER_CONFIG.MIN_FAT_THRESHOLD) {
+      if (optIdx === 0) {
+        log("FatFillerSkip", { option: optIdx + 1, fatPercent: Math.round(fatPercent * 100), threshold: FAT_FILLER_CONFIG.MIN_FAT_THRESHOLD * 100 });
+      }
+      continue;
+    }
+    
+    const fatDeficit = (targetFat * FAT_FILLER_CONFIG.MIN_FAT_THRESHOLD) - optTotals.fat;
+    
+    log("FatFillerStart", {
+      option: optIdx + 1,
+      currentFat: Math.round(optTotals.fat * 10) / 10,
+      targetFat,
+      fatPercent: Math.round(fatPercent * 100),
+      deficit: Math.round(fatDeficit * 10) / 10,
+    });
+    
+    const useAbacate = abacate && fatDeficit >= 5 && fatDeficit <= 12;
+    const useAzeite = azeite && (fatDeficit < 5 || fatDeficit > 12 || !abacate);
+    
+    let fatAdded = 0;
+    const fatToAdd = fatDeficit;
+    
+    for (const m of mainMeals) {
+      if (fatAdded >= fatToAdd) break;
+      
+      const opt = m.options[optIdx];
       if (!opt?.foods || fatAdded >= fatToAdd) continue;
       
-      // Verificar se já tem azeite ou abacate nessa opção
       const hasAzeite = opt.foods.some(f => f.food.id === FAT_FILLER_CONFIG.AZEITE_ID);
       const hasAbacate = opt.foods.some(f => f.food.id === FAT_FILLER_CONFIG.ABACATE_ID);
       
       if (useAzeite && azeite && !hasAzeite) {
-        // Calcular porção necessária de azeite (100g gordura/100g)
         const remainingFat = fatToAdd - fatAdded;
         const gramsNeeded = Math.min(
           FAT_FILLER_CONFIG.AZEITE_PORTION.max,
@@ -1609,6 +1517,7 @@ async function fillFat(
         fatAdded += fatFromAzeite;
         
         log("FatFillerAzeite", {
+          option: optIdx + 1,
           mealType: m.mealType,
           grams: gramsNeeded,
           fatAdded: Math.round(fatFromAzeite * 10) / 10,
@@ -1617,7 +1526,6 @@ async function fillFat(
         recalcOptionTotals(opt);
         
       } else if (useAbacate && abacate && !hasAbacate) {
-        // Calcular porção necessária de abacate (15g gordura/100g)
         const remainingFat = fatToAdd - fatAdded;
         const gramsNeeded = Math.min(
           FAT_FILLER_CONFIG.ABACATE_PORTION.max,
@@ -1637,6 +1545,7 @@ async function fillFat(
         fatAdded += fatFromAbacate;
         
         log("FatFillerAbacate", {
+          option: optIdx + 1,
           mealType: m.mealType,
           grams: gramsNeeded,
           fatAdded: Math.round(fatFromAbacate * 10) / 10,
@@ -1645,14 +1554,15 @@ async function fillFat(
         recalcOptionTotals(opt);
       }
     }
+    
+    const afterFiller = totalsForOption(mwo, optIdx);
+    log("FatFillerEnd", {
+      option: optIdx + 1,
+      fatAdded: Math.round(fatAdded * 10) / 10,
+      newFat: Math.round(afterFiller.fat * 10) / 10,
+      newFatPercent: Math.round((afterFiller.fat / targetFat) * 100),
+    });
   }
-  
-  const afterFiller = totals(mwo);
-  log("FatFillerEnd", {
-    fatAdded: Math.round(fatAdded * 10) / 10,
-    newFat: Math.round(afterFiller.fat * 10) / 10,
-    newFatPercent: Math.round((afterFiller.fat / targetFat) * 100),
-  });
 }
 
 async function save(sb: any, uid: string, mwo: MealWithOptions[]): Promise<string> {
