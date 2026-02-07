@@ -472,12 +472,49 @@ export function AIRebalancer({
     }
   };
 
+  // Sincroniza os totais do diet_plans com os valores corretos do backend
+  // Isso corrige discrepâncias entre o que está salvo e o que é calculado
+  const syncPlanTotalsFromBackend = async () => {
+    if (!result?.currentMacros) return;
+    
+    console.log('[syncPlanTotals] Sincronizando totais do plano com backend...');
+    
+    const { error } = await supabase
+      .from('diet_plans')
+      .update({
+        total_calories: Math.round(result.currentMacros.calories),
+        total_protein: Math.round(result.currentMacros.protein),
+        total_carbs: Math.round(result.currentMacros.carbs),
+        total_fat: Math.round(result.currentMacros.fat),
+      })
+      .eq('id', planId);
+    
+    if (error) {
+      console.error('[syncPlanTotals] Erro ao sincronizar:', error);
+    } else {
+      console.log('[syncPlanTotals] Totais sincronizados com sucesso');
+    }
+  };
+
   const handleConfirm = async () => {
     console.log('[handleConfirm] Starting with result:', result);
     console.log('[handleConfirm] Adjustments count:', result?.adjustments?.length);
     
     if (!result || !result.adjustments || !result.adjustments.length) {
       console.warn('[handleConfirm] No adjustments to apply');
+      
+      // Se alreadyOptimized, sincronizar totais do plano antes de fechar
+      if (result?.alreadyOptimized) {
+        await syncPlanTotalsFromBackend();
+        toast.success('Plano já está otimizado! ✅', {
+          description: 'Totais sincronizados com sucesso.'
+        });
+        setShowDialog(false);
+        setResult(null);
+        onComplete();
+        return;
+      }
+      
       toast.info('Nenhum ajuste para aplicar');
       return;
     }
@@ -903,7 +940,15 @@ export function AIRebalancer({
 
           <DialogFooter className="gap-2 sm:gap-0">
             {isAlreadyOptimized ? (
-              <Button onClick={handleCancel} className="w-full sm:w-auto">
+              <Button 
+                onClick={async () => {
+                  // Sincronizar totais do plano com o backend antes de fechar
+                  await syncPlanTotalsFromBackend();
+                  handleCancel();
+                  onComplete();
+                }} 
+                className="w-full sm:w-auto"
+              >
                 <Check className="w-4 h-4 mr-2" />
                 Entendido
               </Button>
