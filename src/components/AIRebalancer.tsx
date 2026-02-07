@@ -276,6 +276,7 @@ function OptionValidationStatus({ validations, meta }: {
               <div className="text-[10px] text-muted-foreground space-y-0.5">
                 <div>Cal: {validation.metrics.caloriePercent.toFixed(0)}%</div>
                 <div>Prot: {validation.metrics.proteinPercent.toFixed(0)}%</div>
+                <div>Carb: {validation.metrics.carbPercent.toFixed(0)}%</div>
                 <div>Gord: {validation.metrics.fatPercent.toFixed(0)}%</div>
               </div>
               
