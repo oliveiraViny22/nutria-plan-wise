@@ -6,6 +6,7 @@
  * - Import: Import/Export functionality
  * - Templates: Meal templates configuration
  * - Anchors: Anchor foods management
+ * - Blocks: Food blocking rules for generation
  */
 
 import { useState } from 'react';
@@ -14,6 +15,7 @@ import {
   Upload, 
   LayoutTemplate,
   Anchor,
+  ShieldAlert,
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Food } from '@/hooks/useAdminOperations';
@@ -22,7 +24,8 @@ import {
   FoodsDatabaseSubTab, 
   FoodsImportSubTab, 
   FoodsTemplatesSubTab, 
-  FoodsAnchorsSubTab 
+  FoodsAnchorsSubTab,
+  FoodsBlocksSubTab,
 } from './foods';
 
 interface FoodImport {
@@ -68,10 +71,10 @@ export function AdminFoodsTab({
   return (
     <div className="space-y-4">
       <Tabs value={activeSubTab} onValueChange={setActiveSubTab}>
-        <TabsList className="grid w-full grid-cols-4 max-w-2xl">
+        <TabsList className="grid w-full grid-cols-5 max-w-3xl">
           <TabsTrigger value="database" className="flex items-center gap-2">
             <Database className="h-4 w-4" />
-            <span className="hidden sm:inline">Banco de Dados</span>
+            <span className="hidden sm:inline">Banco</span>
             <span className="sm:hidden">Dados</span>
           </TabsTrigger>
           <TabsTrigger value="import" className="flex items-center gap-2">
@@ -87,6 +90,11 @@ export function AdminFoodsTab({
             <Anchor className="h-4 w-4" />
             <span className="hidden sm:inline">Âncoras</span>
             <span className="sm:hidden">Ânc.</span>
+          </TabsTrigger>
+          <TabsTrigger value="blocks" className="flex items-center gap-2">
+            <ShieldAlert className="h-4 w-4" />
+            <span className="hidden sm:inline">Bloqueios</span>
+            <span className="sm:hidden">Bloq.</span>
           </TabsTrigger>
         </TabsList>
 
@@ -118,6 +126,10 @@ export function AdminFoodsTab({
 
         <TabsContent value="anchors" className="mt-6">
           <FoodsAnchorsSubTab />
+        </TabsContent>
+
+        <TabsContent value="blocks" className="mt-6">
+          <FoodsBlocksSubTab />
         </TabsContent>
       </Tabs>
     </div>

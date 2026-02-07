@@ -3,19 +3,18 @@
  * 
  * Main admin panel organized into 5 logical categories:
  * 1. Operacional: Métricas, Usuários
- * 2. Dados: Alimentos
+ * 2. Dados: Alimentos (com sub-abas: Database, Import, Templates, Âncoras, Bloqueios)
  * 3. Configuração: Configurações, Planos
- * 4. Regras: Políticas, Bloqueios, Feature Flags
+ * 4. Regras: Políticas, Feature Flags
  * 5. Recursos: Auditoria, Documentação, Conversão
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Settings, 
   Shield, 
   ArrowLeft,
-  AlertCircle,
   Database,
   Users,
   BarChart3,
@@ -42,7 +41,6 @@ import { supabase } from '@/integrations/supabase/client';
 import SystemAudit from '@/components/SystemAudit';
 import { useRealtimeSettings } from '@/hooks/useRealtimeSettings';
 import { ThemeToggle } from '@/components/ThemeToggle';
-import { FoodBlockRulesManager } from '@/components/admin/FoodBlockRulesManager';
 import { FeatureFlagsManager } from '@/components/admin/FeatureFlagsManager';
 import { RateLimitsManager } from '@/components/admin/RateLimitsManager';
 
@@ -90,7 +88,6 @@ const TAB_CATEGORIES = [
     icon: Scale,
     tabs: [
       { id: 'policies', label: 'Políticas', icon: Target },
-      { id: 'blocks', label: 'Bloqueios', icon: AlertCircle },
       { id: 'flags', label: 'Feature Flags', icon: Sparkles },
     ],
   },
@@ -609,11 +606,6 @@ export default function Admin() {
           {/* Policies Tab */}
           <TabsContent value="policies">
             <AdminPoliciesTab />
-          </TabsContent>
-
-          {/* Blocks Tab */}
-          <TabsContent value="blocks">
-            <FoodBlockRulesManager />
           </TabsContent>
 
           {/* Feature Flags Tab */}
