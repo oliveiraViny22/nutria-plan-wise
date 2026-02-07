@@ -113,14 +113,17 @@ export default function Dashboard() {
   }, [searchParams, setSearchParams, refreshSubscription]);
 
   useEffect(() => {
-    fetchCurrentPlan();
-  }, []);
+    if (profile?.user_id) fetchCurrentPlan();
+  }, [profile?.user_id]);
 
   const fetchCurrentPlan = async () => {
     try {
+      if (!profile?.user_id) return;
+
       const { data: plans, error } = await supabase
         .from('diet_plans')
         .select('*')
+        .eq('user_id', profile.user_id)
         .order('created_at', { ascending: false })
         .limit(1);
 
