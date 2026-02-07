@@ -23,14 +23,14 @@ export const CATEGORY_LIMITS: Record<string, { min: number; max: number }> = {
   ovos: { min: 50, max: 200 },
 
   // ==========================================
-  // CARBOIDRATOS - porções energéticas
+  // CARBOIDRATOS - porções energéticas (expandido para bulk)
   // ==========================================
-  carboidratos: { min: 40, max: 300 },
-  'grãos': { min: 40, max: 250 },
-  cereais: { min: 30, max: 200 },
-  'pães': { min: 25, max: 150 },
-  massas: { min: 60, max: 250 },
-  'tubérculos': { min: 50, max: 300 },
+  carboidratos: { min: 40, max: 400 },      // +100g para bulk de alta caloria
+  'grãos': { min: 40, max: 350 },           // arroz, quinoa - +100g
+  cereais: { min: 30, max: 300 },           // aveia, granola - +100g
+  'pães': { min: 25, max: 200 },            // +50g
+  massas: { min: 60, max: 350 },            // macarrão integral - +100g
+  'tubérculos': { min: 50, max: 400 },      // batata-doce, mandioca - +100g
 
   // ==========================================
   // LEGUMINOSAS
@@ -94,8 +94,12 @@ export const SNACK_CATEGORY_LIMITS: Record<string, { min: number; max: number }>
  */
 export const SCALE_CATEGORY_LIMITS: Record<string, { min: number; max: number }> = {
   proteinas: { min: 50, max: 350 },
-  carboidratos: { min: 50, max: 400 },
-  leguminosas: { min: 40, max: 250 },
+  carboidratos: { min: 50, max: 500 },      // +100g para convergência bulk
+  'grãos': { min: 50, max: 450 },           // arroz, quinoa
+  cereais: { min: 30, max: 400 },           // aveia
+  'tubérculos': { min: 50, max: 500 },      // batata-doce, mandioca
+  massas: { min: 60, max: 450 },            // macarrão
+  leguminosas: { min: 40, max: 300 },       // feijão - +50g
   vegetais: { min: 30, max: 300 },
   frutas: { min: 50, max: 300 },
   laticinios: { min: 30, max: 250 },
