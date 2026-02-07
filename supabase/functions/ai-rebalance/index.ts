@@ -1,5 +1,5 @@
 // ============================================
-// REBALANCEADOR AUTOMÁTICO NUTRIAPLAN v2.5
+// REBALANCEADOR AUTOMÁTICO NUTRIAPLAN v2.6
 // ============================================
 // Implementação conforme especificação:
 // - Validação por objetivo (cut/maintain/bulk)
@@ -8,6 +8,7 @@
 // - Formato JSON estruturado
 // - RETRY AUTOMÁTICO para opções não convergidas (v2.4)
 // - EQUALIZAÇÃO CALÓRICA entre opções (v2.5)
+// - VERIFICAÇÃO UPFRONT de plano já otimizado (v2.6)
 // ============================================
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
@@ -1813,6 +1814,137 @@ serve(async (req) => {
     }
 
     const optionResults: OptionResult[] = [];
+    
+    // ============================================
+    // VERIFICAÇÃO UPFRONT: PLANO JÁ VALIDADO? (v2.6)
+    // Evita processamento desnecessário se todas as opções
+    // já estão válidas E com equivalência calórica
+    // ============================================
+    
+    interface UpfrontValidation {
+      optionNumber: number;
+      totals: MacroTargets;
+      isValid: boolean;
+      needsOptimization: boolean;
+      foods: FoodWithMeta[];
+      initialQuantities: Map<string, number>;
+    }
+    
+    const upfrontValidations: UpfrontValidation[] = [];
+    
+    for (const optionNumber of [1, 2, 3]) {
+      const optionFoods: FoodWithMeta[] = [];
+      const optionInitialQuantities = new Map<string, number>();
+      
+      for (const meal of typedMeals) {
+        const option = meal.meal_options.find((o) => o.option_number === optionNumber);
+        if (option) {
+          for (const food of option.meal_option_foods) {
+            optionFoods.push({
+              ...food,
+              mealName: meal.name,
+              mealId: meal.id,
+              optionId: option.id,
+            });
+            optionInitialQuantities.set(food.id, food.quantity_grams);
+          }
+        }
+      }
+      
+      if (optionFoods.length === 0) continue;
+      
+      const optionTotals = calculateTotals(optionFoods, optionInitialQuantities);
+      const validation = validatePlan(optionTotals, targets, objective, settings);
+      
+      // Verificar desvios para decidir se precisa otimização
+      const percents = calculatePercents(optionTotals, targets);
+      const OPTIMIZATION_THRESHOLD = 3;
+      const needsOpt = 
+        Math.abs(percents.calories - 100) > OPTIMIZATION_THRESHOLD ||
+        Math.abs(percents.protein - 100) > OPTIMIZATION_THRESHOLD ||
+        Math.abs(percents.carbs - 100) > OPTIMIZATION_THRESHOLD ||
+        Math.abs(percents.fat - 100) > OPTIMIZATION_THRESHOLD;
+      
+      upfrontValidations.push({
+        optionNumber,
+        totals: optionTotals,
+        isValid: validation.valid,
+        needsOptimization: needsOpt,
+        foods: optionFoods,
+        initialQuantities: optionInitialQuantities,
+      });
+    }
+    
+    // Verificar equivalência calórica entre opções (±5%)
+    const checkCalorieEquivalence = (): boolean => {
+      if (upfrontValidations.length <= 1) return true;
+      
+      const referenceCalories = upfrontValidations.find(v => v.optionNumber === 1)?.totals.calories;
+      if (!referenceCalories || referenceCalories <= 0) return true;
+      
+      const MAX_VARIANCE = GENERATOR_CONTRACT.MAX_OPTION_CALORIE_VARIANCE_PERCENT / 100;
+      
+      for (const validation of upfrontValidations) {
+        if (validation.optionNumber === 1) continue;
+        const variance = Math.abs(validation.totals.calories - referenceCalories) / referenceCalories;
+        if (variance > MAX_VARIANCE) {
+          console.log(`[UPFRONT] Opção ${validation.optionNumber} com variância calórica ${(variance * 100).toFixed(1)}% > ${GENERATOR_CONTRACT.MAX_OPTION_CALORIE_VARIANCE_PERCENT}%`);
+          return false;
+        }
+      }
+      return true;
+    };
+    
+    const allOptionsValid = upfrontValidations.every(v => v.isValid);
+    const noOptimizationNeeded = upfrontValidations.every(v => !v.needsOptimization);
+    const hasCalorieEquivalence = checkCalorieEquivalence();
+    
+    // Se TUDO está validado, retornar early com alreadyOptimized
+    if (allOptionsValid && noOptimizationNeeded && hasCalorieEquivalence) {
+      console.log(`\n╔══════════════════════════════════════════════════════════════╗`);
+      console.log(`║  PLANO JÁ OTIMIZADO - RETORNO EARLY (v2.6)                   ║`);
+      console.log(`╚══════════════════════════════════════════════════════════════╝\n`);
+      
+      const primaryTotals = upfrontValidations.find(v => v.optionNumber === 1)?.totals || targets;
+      const percents = calculatePercents(primaryTotals, targets);
+      
+      return new Response(JSON.stringify({
+        success: true,
+        alreadyOptimized: true,
+        currentMacros: primaryTotals,
+        targetMacros: targets,
+        proposedMacros: primaryTotals,
+        adjustments: [],
+        message: "Seu plano já está perfeitamente alinhado com suas metas nutricionais.",
+        warning: "Otimizações frequentes sem alterações no plano não afetarão os resultados.",
+        currentPercentages: {
+          calories: Math.round(percents.calories),
+          protein: Math.round(percents.protein),
+          carbs: Math.round(percents.carbs),
+          fat: Math.round(percents.fat),
+        },
+        optionValidations: upfrontValidations.map(v => ({
+          optionNumber: v.optionNumber,
+          status: "VALIDATED" as const,
+          metrics: {
+            caloriePercent: Math.round(calculatePercents(v.totals, targets).calories * 10) / 10,
+            proteinPercent: Math.round(calculatePercents(v.totals, targets).protein * 10) / 10,
+            carbPercent: Math.round(calculatePercents(v.totals, targets).carbs * 10) / 10,
+            fatPercent: Math.round(calculatePercents(v.totals, targets).fat * 10) / 10,
+          },
+          isValid: true,
+          isHardFail: false,
+          retriesUsed: 0,
+        })),
+        explanation: "Todas as opções já estão validadas e com equivalência calórica.",
+        warnings: [],
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    
+    console.log(`[UPFRONT] Validação: allValid=${allOptionsValid}, noOptNeeded=${noOptimizationNeeded}, calEquiv=${hasCalorieEquivalence}`);
+    console.log(`[UPFRONT] Continuando com pipeline de otimização...`);
     
     // Processar opções 1, 2 e 3
     for (const optionNumber of [1, 2, 3]) {

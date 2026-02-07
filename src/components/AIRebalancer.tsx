@@ -633,8 +633,10 @@ export function AIRebalancer({
   // - portanto, NÃO podemos concluir "já está otimizado" se existem ajustes a aplicar
   const allOptionsValid = hasOptionValidations && result!.optionValidations!.every(v => v.isValid);
 
-  // Só é "já otimizado" quando não há ajustes propostos (nada para aplicar)
-  const isAlreadyOptimized = !hasAdjustments && (allOptionsValid || !hasOptionValidations);
+  // v2.6: Backend pode retornar alreadyOptimized diretamente (verificação upfront)
+  // Fallback para lógica local se não vier do backend
+  const isAlreadyOptimized = result?.alreadyOptimized === true || 
+    (!hasAdjustments && (allOptionsValid || !hasOptionValidations));
 
   return (
     <>
