@@ -50,6 +50,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAccountPermissions } from '@/hooks/useAccountPermissions';
+import { useUserRole } from '@/hooks/useUserRole';
+import { useLinkedStudent } from '@/hooks/useLinkedStudent';
 import { toast } from '@/hooks/use-toast';
 import { MEAL_NAMES, MealType } from '@/lib/types';
 
@@ -104,18 +106,35 @@ export default function DailyLog() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const permissions = useAccountPermissions();
+  const { isProfessional, loading: roleLoading } = useUserRole();
+  const { isLinkedStudent, loading: linkedStudentLoading } = useLinkedStudent();
   
-  // Redirect free users to dashboard
+  // Redirect free users to dashboard (linked students can access daily logging)
   useEffect(() => {
-    if (!permissions.loading && permissions.plan_name === 'gratuito') {
+    if (
+      !permissions.loading &&
+      !roleLoading &&
+      !linkedStudentLoading &&
+      permissions.plan_name === 'gratuito' &&
+      !isProfessional &&
+      !isLinkedStudent
+    ) {
       toast({
         title: 'Funcionalidade Premium',
-        description: 'O registro de consumo está disponível apenas para planos pagos.',
+        description: 'O registro de consumo está disponível para planos pagos e alunos vinculados.',
         variant: 'destructive',
       });
       navigate('/dashboard');
     }
-  }, [permissions.loading, permissions.plan_name, navigate]);
+  }, [
+    permissions.loading,
+    permissions.plan_name,
+    roleLoading,
+    linkedStudentLoading,
+    isProfessional,
+    isLinkedStudent,
+    navigate,
+  ]);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [loading, setLoading] = useState(true);
   const [meals, setMeals] = useState<MealWithOptions[]>([]);
@@ -151,9 +170,9 @@ export default function DailyLog() {
         .eq('status', 'active')
         .order('created_at', { ascending: false })
         .limit(1)
-        .single();
+        .maybeSingle();
 
-      if (planError && planError.code !== 'PGRST116') {
+      if (planError) {
         throw planError;
       }
 
@@ -188,7 +207,7 @@ export default function DailyLog() {
             total_fat,
             meal_option_foods (
               id,
-              quantity,
+              quantity_grams,
               food:foods (
                 id,
                 name,
@@ -224,9 +243,9 @@ export default function DailyLog() {
         `)
         .eq('user_id', user.id)
         .eq('log_date', dateKey)
-        .single();
+        .maybeSingle();
 
-      if (logError && logError.code !== 'PGRST116') {
+      if (logError) {
         console.error('Error fetching daily log:', logError);
       }
 
@@ -249,7 +268,7 @@ export default function DailyLog() {
               foods: opt.meal_option_foods?.map((mof: any) => ({
                 id: mof.food?.id,
                 name: mof.food?.name,
-                quantity: mof.quantity,
+                quantity: mof.quantity_grams,
                 serving_size: mof.food?.serving_size,
               })) || [],
             })),
@@ -760,7 +779,7 @@ export default function DailyLog() {
                           {option.foods.map((food, idx) => (
                             <div key={idx} className="flex justify-between">
                               <span>{food.name}</span>
-                              <span>{food.quantity}x {food.serving_size}</span>
+                              <span>{food.quantity}g</span>
                             </div>
                           ))}
                         </div>
