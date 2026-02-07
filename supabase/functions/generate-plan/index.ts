@@ -91,6 +91,11 @@ const CONTEXTUAL_BLOCK_RULES = {
     "arroz"
   ],
   
+  // v5.31: Alimentos NÃO permitidos no ALMOÇO/JANTAR (adequados apenas para lanches)
+  BLOCKED_IN_LUNCH_DINNER: [
+    "abacate" // Abacate é mais adequado para lanches e café da manhã
+  ],
+  
   // Alimentos NÃO permitidos no lanche da manhã (v5.20)
   // Mesmos critérios do café da manhã
   BLOCKED_IN_MORNING_SNACK: [
@@ -217,6 +222,7 @@ function isFattyForRandomSelection(f: Food): boolean {
  * Verifica se um alimento deve ser bloqueado para um tipo específico de refeição.
  * Ex: Sobrecoxa é pesada demais para lanches; Seitan é inadequado para café
  * v5.23: Expandido para bloquear frutos do mar em lanches e folhosos na ceia
+ * v5.31: Abacate bloqueado no almoço/jantar (adequado apenas para lanches)
  */
 function isBlockedForMealType(f: Food, mealType: string): boolean {
   const name = f.name.toLowerCase();
@@ -225,6 +231,8 @@ function isBlockedForMealType(f: Food, mealType: string): boolean {
   const isMorningSnack = mealType === "morning_snack";
   const isAfternoonSnack = mealType === "afternoon_snack";
   const isSupper = mealType === "supper";
+  const isLunch = mealType === "lunch";
+  const isDinner = mealType === "dinner";
   
   // Alimentos pesados bloqueados em lanches (inclui frutos do mar)
   if (isSnack && CONTEXTUAL_BLOCK_RULES.BLOCKED_IN_SNACKS.some(kw => name.includes(kw))) {
@@ -248,6 +256,11 @@ function isBlockedForMealType(f: Food, mealType: string): boolean {
   
   // v5.23: Vegetais de folha puros bloqueados na ceia (não têm substância sozinhos)
   if (isSupper && CONTEXTUAL_BLOCK_RULES.BLOCKED_IN_SUPPER.some(kw => name.includes(kw))) {
+    return true;
+  }
+  
+  // v5.31: Abacate bloqueado no almoço/jantar (adequado para lanches/café)
+  if ((isLunch || isDinner) && CONTEXTUAL_BLOCK_RULES.BLOCKED_IN_LUNCH_DINNER.some(kw => name.includes(kw))) {
     return true;
   }
   
