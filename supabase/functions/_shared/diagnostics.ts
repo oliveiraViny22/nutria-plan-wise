@@ -164,6 +164,25 @@ export interface RebalancerDiagnostics {
       scaleFactor: number;
     }>;
   };
+  /** Diagnóstico de balanceamento de gordura entre opções (v2.7) */
+  fatBalancing?: {
+    /** Número de opções ajustadas */
+    optionsAdjusted: number;
+    /** Warnings de balanceamento */
+    warnings: string[];
+    /** Detalhes dos ajustes aplicados */
+    adjustments: Array<{
+      optionNumber: number;
+      originalFat: number;
+      newFat: number;
+      reductions: Array<{
+        foodId: string;
+        foodName: string;
+        oldQty: number;
+        newQty: number;
+      }>;
+    }>;
+  };
 }
 
 // =====================================================
