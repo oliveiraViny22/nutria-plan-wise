@@ -1,7 +1,7 @@
 /**
- * Admin Page - Refactored with Grouped Categories
+ * Admin Page - Card-Based Navigation Design
  * 
- * Main admin panel organized into 5 logical categories:
+ * Main admin panel with visual card navigation organized into 5 categories:
  * 1. Operacional: Métricas, Usuários
  * 2. Dados: Alimentos (com sub-abas: Database, Import, Templates, Âncoras, Bloqueios)
  * 3. Configuração: Configurações, Planos
@@ -25,15 +25,13 @@ import {
   Sparkles,
   History,
   Target,
-  ChevronDown,
   Briefcase,
   Cog,
   Scale,
   FolderOpen,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Tabs, TabsContent } from '@/components/ui/tabs';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useAdminOperations } from '@/hooks/useAdminOperations';
 import { useToast } from '@/hooks/use-toast';
@@ -43,6 +41,7 @@ import { useRealtimeSettings } from '@/hooks/useRealtimeSettings';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { FeatureFlagsManager } from '@/components/admin/FeatureFlagsManager';
 import { RateLimitsManager } from '@/components/admin/RateLimitsManager';
+import { AdminCardNav } from '@/components/admin/AdminCardNav';
 
 // Refactored tab components
 import { AdminMetricsTab, DashboardMetrics, TimeSeriesDataPoint } from '@/components/admin/AdminMetricsTab';
@@ -54,51 +53,61 @@ import { AdminDocsTab } from '@/components/admin/AdminDocsTab';
 import { AdminPoliciesTab } from '@/components/admin/AdminPoliciesTab';
 import { AdminConversionTab } from '@/components/admin/AdminConversionTab';
 
-// Tab categories for organization
+// Tab categories for visual card navigation
 const TAB_CATEGORIES = [
   {
     id: 'operational',
     label: 'Operacional',
+    description: 'Métricas do sistema e gestão de usuários',
     icon: Briefcase,
+    color: '210 70% 50%', // Blue
     tabs: [
-      { id: 'metrics', label: 'Métricas', icon: BarChart3 },
-      { id: 'users', label: 'Usuários', icon: Users },
+      { id: 'metrics', label: 'Métricas', icon: BarChart3, description: 'KPIs e dashboards' },
+      { id: 'users', label: 'Usuários', icon: Users, description: 'Cotas e permissões' },
     ],
   },
   {
     id: 'data',
     label: 'Dados',
+    description: 'Base de alimentos, templates e âncoras',
     icon: Database,
+    color: '152 55% 42%', // Green
     tabs: [
-      { id: 'foods', label: 'Alimentos', icon: Database },
+      { id: 'foods', label: 'Alimentos', icon: Database, description: 'Banco completo' },
     ],
   },
   {
     id: 'config',
     label: 'Configuração',
+    description: 'Parâmetros do sistema e planos',
     icon: Cog,
+    color: '45 85% 50%', // Yellow/Orange
     tabs: [
-      { id: 'settings', label: 'Configurações', icon: Settings },
-      { id: 'plans', label: 'Planos', icon: CreditCard },
+      { id: 'settings', label: 'Configurações', icon: Settings, description: 'Parâmetros gerais' },
+      { id: 'plans', label: 'Planos', icon: CreditCard, description: 'Assinaturas e limites' },
     ],
   },
   {
     id: 'rules',
     label: 'Regras',
+    description: 'Políticas de acesso e feature flags',
     icon: Scale,
+    color: '270 60% 55%', // Purple
     tabs: [
-      { id: 'policies', label: 'Políticas', icon: Target },
-      { id: 'flags', label: 'Feature Flags', icon: Sparkles },
+      { id: 'policies', label: 'Políticas', icon: Target, description: 'Regras de negócio' },
+      { id: 'flags', label: 'Feature Flags', icon: Sparkles, description: 'Rollout de features' },
     ],
   },
   {
     id: 'resources',
     label: 'Recursos',
+    description: 'Auditoria, documentação e ferramentas',
     icon: FolderOpen,
+    color: '350 65% 55%', // Red/Pink
     tabs: [
-      { id: 'audit', label: 'Auditoria', icon: History },
-      { id: 'docs', label: 'Documentação', icon: BookOpen },
-      { id: 'conversion', label: 'Conversão', icon: TrendingUp },
+      { id: 'audit', label: 'Auditoria', icon: History, description: 'Logs de ações' },
+      { id: 'docs', label: 'Documentação', icon: BookOpen, description: 'PDFs e exports' },
+      { id: 'conversion', label: 'Conversão', icon: TrendingUp, description: 'Análise de funil' },
     ],
   },
 ];
@@ -158,13 +167,6 @@ export default function Admin() {
 
   const [activeTab, setActiveTab] = useState('metrics');
   const [editedSettings, setEditedSettings] = useState<Record<string, unknown>>({});
-  const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({
-    operational: true,
-    data: true,
-    config: false,
-    rules: false,
-    resources: false,
-  });
 
   // Metrics state
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
@@ -194,16 +196,6 @@ export default function Admin() {
       fetchPlans();
     }
   }, [isAdmin, fetchSettings, fetchFoodImports, fetchAuditLogs, fetchPlans]);
-
-  // Auto-expand category when tab changes
-  useEffect(() => {
-    const category = TAB_CATEGORIES.find(cat => 
-      cat.tabs.some(tab => tab.id === activeTab)
-    );
-    if (category && !expandedCategories[category.id]) {
-      setExpandedCategories(prev => ({ ...prev, [category.id]: true }));
-    }
-  }, [activeTab]);
 
   const fetchMetrics = async () => {
     setMetricsLoading(true);
@@ -425,10 +417,6 @@ export default function Admin() {
     }
   };
 
-  const toggleCategory = (categoryId: string) => {
-    setExpandedCategories(prev => ({ ...prev, [categoryId]: !prev[categoryId] }));
-  };
-
   // Convert settings to expected format
   const formattedSettings: SystemSetting[] = settings.map(s => ({
     id: s.id,
@@ -439,14 +427,6 @@ export default function Admin() {
     is_sensitive: s.is_sensitive,
   }));
 
-  // Get current tab label for mobile display
-  const getCurrentTabLabel = () => {
-    for (const category of TAB_CATEGORIES) {
-      const tab = category.tabs.find(t => t.id === activeTab);
-      if (tab) return tab.label;
-    }
-    return 'Métricas';
-  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -476,42 +456,13 @@ export default function Admin() {
 
       <main className="container mx-auto px-4 py-6">
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          {/* Grouped Tab Navigation */}
-          <div className="mb-6 space-y-2">
-            {TAB_CATEGORIES.map((category) => (
-              <Collapsible 
-                key={category.id}
-                open={expandedCategories[category.id]}
-                onOpenChange={() => toggleCategory(category.id)}
-              >
-                <CollapsibleTrigger asChild>
-                  <Button 
-                    variant="ghost" 
-                    className="w-full justify-between px-3 py-2 h-auto font-medium text-muted-foreground hover:text-foreground"
-                  >
-                    <span className="flex items-center gap-2">
-                      <category.icon className="h-4 w-4" />
-                      {category.label}
-                    </span>
-                    <ChevronDown className={`h-4 w-4 transition-transform ${expandedCategories[category.id] ? 'rotate-180' : ''}`} />
-                  </Button>
-                </CollapsibleTrigger>
-                <CollapsibleContent>
-                  <TabsList className="w-full justify-start flex-wrap h-auto gap-1 p-1 bg-muted/50 ml-6 mt-1">
-                    {category.tabs.map((tab) => (
-                      <TabsTrigger 
-                        key={tab.id}
-                        value={tab.id} 
-                        className="flex items-center gap-2 data-[state=active]:bg-background"
-                      >
-                        <tab.icon className="h-4 w-4" />
-                        {tab.label}
-                      </TabsTrigger>
-                    ))}
-                  </TabsList>
-                </CollapsibleContent>
-              </Collapsible>
-            ))}
+          {/* Card-Based Navigation */}
+          <div className="mb-6">
+            <AdminCardNav
+              categories={TAB_CATEGORIES}
+              activeTab={activeTab}
+              onTabChange={setActiveTab}
+            />
           </div>
 
           {/* Metrics Tab */}
