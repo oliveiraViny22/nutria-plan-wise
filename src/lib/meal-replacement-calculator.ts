@@ -702,37 +702,65 @@ export function calculateMealReplacement(
     });
   }
 
-  // 6. DIVERSIDADE MÍNIMA: Garantir pelo menos 2-3 itens variados
-  // Evita sugestões de itens isolados (ex: só mel, só aveia)
+  // 6. DIVERSIDADE MÍNIMA E GARANTIA DE METAS
+  // Evita sugestões de itens isolados (ex: só cottage sem whey)
   const MIN_ITEMS_SUBSTANTIVE = 2; // Mínimo para refeições leves
   const MIN_ITEMS_FULL = 3;        // Mínimo para refeições completas
   const isFullMeal = targetMacros.calories >= 300;
   const minItemsRequired = isFullMeal ? MIN_ITEMS_FULL : MIN_ITEMS_SUBSTANTIVE;
   
+  // VERIFICAR SE PRECISA DE WHEY: Sempre adicionar whey se proteína ou calorias não atingidas
+  // Isso garante que refeições com cottage não fiquem incompletas
+  const hasWheyAlready = items.some(i => i.name.includes('Whey'));
+  const currentProteinPercent = targetMacros.protein > 0 ? (currentMacros.protein / targetMacros.protein) * 100 : 100;
+  const currentCaloriePercent = targetMacros.calories > 0 ? (currentMacros.calories / targetMacros.calories) * 100 : 100;
+  
+  // Adicionar whey se proteína < 90% OU calorias < 80% (e ainda cabe)
+  if (!hasWheyAlready && (currentProteinPercent < 90 || currentCaloriePercent < 80)) {
+    if (remaining().protein >= 5 && remaining().calories >= 40) {
+      const wheyType = userGoal === 'lose_weight' ? 'Whey Protein Isolado' : 'Whey Protein Concentrado';
+      const whey = ACTIVE_SUPPLEMENTS[wheyType];
+      if (whey) {
+        // Calcular scoops necessários para atingir ~95% da proteína alvo
+        const proteinNeeded = (targetMacros.protein * 0.95) - currentMacros.protein;
+        const scoopsForProtein = Math.max(0.5, Math.min(1.5, proteinNeeded / whey.macros.protein));
+        const optimalScale = calculateOptimalScale(whey.macros, scoopsForProtein, 0.5);
+        
+        if (optimalScale >= 0.5) {
+          const finalScoops = Math.round(optimalScale * 4) / 4; // Arredondar para 0.25
+          addItem(wheyType, ACTIVE_SUPPLEMENTS, 'supplement', finalScoops);
+        }
+      }
+    }
+  }
+  
+  // Após adicionar whey (se necessário), verificar água
+  const hasProteinPowderNow = items.some(i => 
+    i.type === 'supplement' && 
+    (i.name.includes('Whey') || i.name.includes('Caseína') || i.name.includes('Albumina'))
+  );
+  const hasWaterAlready = items.some(i => i.name === 'Água');
+  
+  if (hasProteinPowderNow && !hasWaterAlready) {
+    items.push({
+      name: 'Água',
+      quantity: '150-200ml',
+      macros: { calories: 0, protein: 0, carbs: 0, fat: 0 },
+      type: 'food',
+      notes: 'Base preferencial para shakes - mantém controle calórico',
+      reason: '💧 Água para não impactar o plano alimentar e garantir hidratação',
+    });
+  }
+  
   // Se temos poucos itens, adicionar diversidade antes de fillers
   const substantiveItems = items.filter(i => i.name !== 'Água');
   if (substantiveItems.length < minItemsRequired) {
-    // Priorizar adição de proteína se não tem whey E proteína está baixa
-    const hasWheyAlready = items.some(i => i.name.includes('Whey'));
     const hasSolidProtein = items.some(i => 
       i.name.includes('Iogurte') || i.name.includes('Ovo') || i.name.includes('Cottage')
     );
     
-    // Se não tem whey mas tem fonte sólida de proteína, verificar se precisa complementar
-    if (!hasWheyAlready && remaining().protein >= 10 && remaining().calories >= 60) {
-      // Adicionar whey como complemento proteico
-      const wheyType = userGoal === 'lose_weight' ? 'Whey Protein Isolado' : 'Whey Protein Concentrado';
-      const whey = ACTIVE_SUPPLEMENTS[wheyType];
-      if (whey) {
-        const neededScoops = Math.min(1, remaining().protein / whey.macros.protein);
-        if (neededScoops >= 0.5) {
-          addItem(wheyType, ACTIVE_SUPPLEMENTS, 'supplement', neededScoops);
-        }
-      }
-    }
-    
     // Se não tem nenhuma fonte de proteína, adicionar uma sólida
-    if (!hasWheyAlready && !hasSolidProtein && remaining().protein >= 5 && remaining().calories >= 50) {
+    if (!items.some(i => i.name.includes('Whey')) && !hasSolidProtein && remaining().protein >= 5 && remaining().calories >= 50) {
       const proteinOptions = ['Queijo Cottage', 'Iogurte Grego Natural', 'Ovo Cozido'];
       for (const opt of proteinOptions) {
         const item = ACTIVE_FOODS[opt];

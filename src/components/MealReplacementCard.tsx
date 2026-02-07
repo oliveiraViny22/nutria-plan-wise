@@ -236,35 +236,18 @@ export function MealReplacementCard({
               </AnimatePresence>
             </div>
 
-            {/* Dicas */}
-            {replacement.tips.length > 0 && (
+            {/* Dicas - exibir apenas dicas que NÃO são de preparo (já mostradas abaixo) */}
+            {replacement.tips.filter(tip => !tip.startsWith('🥤') && !tip.startsWith('🥣') && !tip.startsWith('🥛')).length > 0 && (
               <div className="space-y-1 p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
-                {replacement.tips.map((tip, idx) => (
-                  <p key={idx} className="text-xs text-muted-foreground">
-                    {tip}
-                  </p>
-                ))}
+                {replacement.tips
+                  .filter(tip => !tip.startsWith('🥤') && !tip.startsWith('🥣') && !tip.startsWith('🥛'))
+                  .map((tip, idx) => (
+                    <p key={idx} className="text-xs text-muted-foreground">
+                      {tip}
+                    </p>
+                  ))}
               </div>
             )}
-
-            {/* Modo de preparo */}
-            <div className="p-3 rounded-lg bg-muted/30 border border-border/50">
-              <p className="text-xs font-medium mb-1">🥤 Modo de Preparo Sugerido:</p>
-              <p className="text-xs text-muted-foreground">
-                {supplementCount > 0 ? (
-                  <>
-                    Bata o whey com água em um liquidificador ou coqueteleira. 
-                    {replacement.items.some(i => i.name.includes('Aveia')) && ' Adicione a aveia e bata bem.'}
-                    {replacement.items.some(i => i.name === 'Banana') && ' Adicione a banana para dar cremosidade.'}
-                    {replacement.items.some(i => i.name.includes('Pasta de Amendoim')) && ' Acrescente a pasta de amendoim por cima ou misture.'}
-                  </>
-                ) : replacement.items.some(i => i.name.includes('Aveia')) ? (
-                  'Prepare a aveia como mingau (cozinhar com água) ou deixe de molho por alguns minutos. Adicione os demais ingredientes.'
-                ) : (
-                  'Combine os alimentos em um bowl ou consuma separadamente conforme preferência.'
-                )}
-              </p>
-            </div>
           </CardContent>
         </CollapsibleContent>
       </Collapsible>
