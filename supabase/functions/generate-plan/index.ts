@@ -64,12 +64,17 @@ const FATTY_FOOD_RULES = {
 };
 
 // =====================================================
-// REGRAS CONTEXTUAIS DE ALIMENTOS (v5.20)
+// REGRAS CONTEXTUAIS DE ALIMENTOS (v5.23)
 // Alimentos bloqueados em tipos específicos de refeição
 // =====================================================
 const CONTEXTUAL_BLOCK_RULES = {
   // Alimentos NÃO permitidos em lanches (muito pesados para snacks)
-  BLOCKED_IN_SNACKS: ["sobrecoxa", "coxa de frango", "coxinha", "pernil", "costela", "picanha", "cupim"],
+  // v5.23: Expandido para incluir frutos do mar e ostras
+  BLOCKED_IN_SNACKS: [
+    "sobrecoxa", "coxa de frango", "coxinha", "pernil", "costela", "picanha", "cupim",
+    // v5.23: Frutos do mar não são adequados para lanches
+    "ostra", "mexilhão", "lula", "polvo", "lagosta", "caranguejo", "siri", "vieira", "camarão"
+  ],
   
   // Alimentos NÃO permitidos no café da manhã (proteínas de almoço/jantar)
   // v5.20: Expandido para incluir peixes, frutos do mar e arroz
@@ -94,6 +99,18 @@ const CONTEXTUAL_BLOCK_RULES = {
     "lula", "polvo", "ostra", "mexilhão", "lagosta", "caranguejo", "siri", "vieira", "dourado", "pescada",
     // Leguminosas e arroz
     "lentilha", "grão-de-bico", "feijão", "arroz"
+  ],
+  
+  // v5.23: Alimentos NÃO permitidos no lanche da tarde (frutos do mar)
+  BLOCKED_IN_AFTERNOON_SNACK: [
+    "ostra", "mexilhão", "lula", "polvo", "lagosta", "caranguejo", "siri", "vieira", "camarão",
+    "peixe branco", "salmão", "tilápia", "atum", "bacalhau", "robalo", "sardinha", "merluza"
+  ],
+  
+  // v5.23: Alimentos NÃO adequados para ceia (muito leves/folhosos sem substância)
+  BLOCKED_IN_SUPPER: [
+    // Vegetais de folha puros não são adequados como item principal de ceia
+    "alface", "rúcula", "agrião", "espinafre cru", "acelga"
   ],
   
   // Palavras-chave que indicam RECEITAS (não são alimentos simples)
@@ -199,15 +216,17 @@ function isFattyForRandomSelection(f: Food): boolean {
 /**
  * Verifica se um alimento deve ser bloqueado para um tipo específico de refeição.
  * Ex: Sobrecoxa é pesada demais para lanches; Seitan é inadequado para café
- * v5.20: Expandido para bloquear arroz e frutos do mar no café e lanche da manhã
+ * v5.23: Expandido para bloquear frutos do mar em lanches e folhosos na ceia
  */
 function isBlockedForMealType(f: Food, mealType: string): boolean {
   const name = f.name.toLowerCase();
   const isSnack = SNACK_MEALS.includes(mealType);
   const isBreakfast = mealType === "breakfast";
   const isMorningSnack = mealType === "morning_snack";
+  const isAfternoonSnack = mealType === "afternoon_snack";
+  const isSupper = mealType === "supper";
   
-  // Alimentos pesados bloqueados em lanches
+  // Alimentos pesados bloqueados em lanches (inclui frutos do mar)
   if (isSnack && CONTEXTUAL_BLOCK_RULES.BLOCKED_IN_SNACKS.some(kw => name.includes(kw))) {
     return true;
   }
@@ -219,6 +238,16 @@ function isBlockedForMealType(f: Food, mealType: string): boolean {
   
   // v5.20: Frutos do mar, arroz e leguminosas bloqueados no lanche da manhã também
   if (isMorningSnack && CONTEXTUAL_BLOCK_RULES.BLOCKED_IN_MORNING_SNACK.some(kw => name.includes(kw))) {
+    return true;
+  }
+  
+  // v5.23: Frutos do mar e peixes bloqueados no lanche da tarde
+  if (isAfternoonSnack && CONTEXTUAL_BLOCK_RULES.BLOCKED_IN_AFTERNOON_SNACK.some(kw => name.includes(kw))) {
+    return true;
+  }
+  
+  // v5.23: Vegetais de folha puros bloqueados na ceia (não têm substância sozinhos)
+  if (isSupper && CONTEXTUAL_BLOCK_RULES.BLOCKED_IN_SUPPER.some(kw => name.includes(kw))) {
     return true;
   }
   
