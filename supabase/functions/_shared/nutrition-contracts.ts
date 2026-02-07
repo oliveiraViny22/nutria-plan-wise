@@ -169,9 +169,12 @@ export function validateGeneratedPlan(
     ? GENERATOR_CONTRACT.CALORIE_TOLERANCE_PERCENT_BULK_HIGH 
     : GENERATOR_CONTRACT.CALORIE_TOLERANCE_PERCENT;
   
+  // Tolerância de 0.05% para evitar falsos negativos por arredondamento de ponto flutuante
+  const VALIDATION_EPSILON = 0.05;
+  
   // CONTRATO 1: Calorias dentro da tolerância (dinâmica por objetivo)
   const calorieDiff = Math.abs(caloriePercent - 100);
-  if (calorieDiff > calorieTolerance) {
+  if (calorieDiff > calorieTolerance + VALIDATION_EPSILON) {
     errors.push(
       `[G0] Calorias fora da tolerância: ${Math.round(totals.calories)} kcal ` +
       `(${caloriePercent.toFixed(1)}% da meta, limite: ±${calorieTolerance}%${isHighCalorieBulk ? ' [bulk alta caloria]' : ''})`
@@ -189,11 +192,8 @@ export function validateGeneratedPlan(
     }
   }
   
-// CONTRATO 3: Carboidratos como base energética (threshold baseado no objetivo)
-  // Tolerance de 0.05% para evitar falsos negativos por arredondamento de ponto flutuante
-  // Ex: 79.95% arredonda para "80.0%" no display, mas falharia em comparação estrita
-  const CARB_EPSILON = 0.05;
-  if (carbsPercent < carbsMinThreshold - CARB_EPSILON) {
+  // CONTRATO 3: Carboidratos como base energética (threshold baseado no objetivo)
+  if (carbsPercent < carbsMinThreshold - VALIDATION_EPSILON) {
     errors.push(
       `[G7] Carboidratos insuficientes: ${Math.round(totals.carbs)}g ` +
       `(${carbsPercent.toFixed(1)}% da meta, mínimo: ${carbsMinThreshold}% para ${objective})`
@@ -209,7 +209,7 @@ export function validateGeneratedPlan(
   }
   
   // CONTRATO 5: Proteína total ≥95%
-  if (proteinPercent < GENERATOR_CONTRACT.MIN_PROTEIN_PERCENT) {
+  if (proteinPercent < GENERATOR_CONTRACT.MIN_PROTEIN_PERCENT - VALIDATION_EPSILON) {
     errors.push(
       `[G1] Proteína total insuficiente: ${Math.round(totals.protein)}g ` +
       `(${proteinPercent.toFixed(1)}% da meta, mínimo: ${GENERATOR_CONTRACT.MIN_PROTEIN_PERCENT}%)`
