@@ -473,7 +473,14 @@ export function AIRebalancer({
   };
 
   const handleConfirm = async () => {
-    if (!result || !result.adjustments.length) return;
+    console.log('[handleConfirm] result:', result);
+    console.log('[handleConfirm] adjustments:', result?.adjustments);
+    
+    if (!result || !result.adjustments || !result.adjustments.length) {
+      console.warn('[handleConfirm] Sem ajustes para aplicar');
+      toast.info('Nenhum ajuste para aplicar');
+      return;
+    }
 
     setApplying(true);
     try {
