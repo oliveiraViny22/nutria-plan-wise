@@ -47,8 +47,18 @@ const FATTY_FOOD_RULES = {
   MAX_FAT_PROTEIN: 8,      // Proteínas com >8g gordura/100g → bloqueadas
   MAX_FAT_DAIRY: 8,        // Laticínios com >8g gordura/100g → bloqueadas  
   MAX_FAT_CARBS: 5,        // Carboidratos com >5g gordura/100g → bloqueadas
+  MAX_FAT_LEGUMES: 6,      // v5.21: Leguminosas com >6g gordura/100g → bloqueadas (ex: soja)
   MAX_FAT_GENERIC: 15,     // Qualquer alimento >15g gordura/100g → bloqueado (exceto categoria gorduras)
-  BLOCKED_KEYWORDS: ["oleaginosa", "castanha", "amendoim", "nozes", "amêndoa", "linhaça", "chia", "coco", "queijo amarelo", "queijo prato", "queijo mussarela", "queijo cheddar", "queijo parmesão", "queijo gorgonzola", "bacon", "linguiça"],
+  BLOCKED_KEYWORDS: [
+    // Oleaginosas e sementes gordurosas
+    "oleaginosa", "castanha", "amendoim", "nozes", "amêndoa", "linhaça", "chia", "coco",
+    // Queijos gordos
+    "queijo amarelo", "queijo prato", "queijo mussarela", "queijo cheddar", "queijo parmesão", "queijo gorgonzola", "queijo brie", "queijo feta",
+    // Carnes processadas
+    "bacon", "linguiça",
+    // v5.21: Leguminosas atípicas com alta gordura
+    "soja em grão"
+  ],
   // Categoria gorduras tem limite próprio de quantidade, não de bloqueio
   BLOCKED_CATEGORIES_AS_RANDOM: ["gorduras"], // Não selecionar aleatoriamente
 };
@@ -131,6 +141,11 @@ function isFattyAnchor(f: Food): boolean {
     return true;
   }
   
+  // Regra 5: v5.21 - Leguminosas com >6g gordura/100g (ex: soja)
+  if (cat === "leguminosas" && f.fat > FATTY_FOOD_RULES.MAX_FAT_LEGUMES) {
+    return true;
+  }
+  
   return false;
 }
 
@@ -168,7 +183,12 @@ function isFattyForRandomSelection(f: Food): boolean {
     return true;
   }
   
-  // Regra 6: Qualquer alimento genérico com >15g gordura/100g
+  // Regra 6: v5.21 - Leguminosas com gordura excessiva (ex: soja)
+  if (cat === "leguminosas" && f.fat > FATTY_FOOD_RULES.MAX_FAT_LEGUMES) {
+    return true;
+  }
+  
+  // Regra 7: Qualquer alimento genérico com >15g gordura/100g
   if (f.fat > FATTY_FOOD_RULES.MAX_FAT_GENERIC) {
     return true;
   }
