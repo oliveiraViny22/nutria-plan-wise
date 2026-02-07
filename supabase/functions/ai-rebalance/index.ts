@@ -1845,29 +1845,49 @@ serve(async (req) => {
       throw new Error("Nenhuma opção de refeição encontrada no plano");
     }
 
+    // ============================================
+    // VALIDAÇÃO INDIVIDUAL POR OPÇÃO (v2.3)
+    // ============================================
+    // Validar CADA opção separadamente para garantir convergência completa
+    
+    const optionValidations: Array<{
+      optionNumber: number;
+      validation: FinalValidationResult;
+      isValid: boolean;
+    }> = [];
+    
+    for (const result of optionResults) {
+      const validation = validateFinalPlan(
+        result.finalTotals,
+        targets,
+        {
+          g10Status: g10Metadata.g10Status,
+          normalizationApplied: result.normalizationApplied,
+          objective,
+        }
+      );
+      
+      console.log(`[VALIDAÇÃO] Opção ${result.optionNumber}: ${validation.status} (Cal=${validation.metrics.caloriePercent}%, Fat=${validation.metrics.fatPercent}%)`);
+      
+      optionValidations.push({
+        optionNumber: result.optionNumber,
+        validation,
+        isValid: validation.status !== "STRUCTURALLY_INVALID",
+      });
+    }
+    
     // Usar opção 1 como referência principal para compatibilidade
     const primaryResult = optionResults.find(r => r.optionNumber === 1) || optionResults[0];
+    const primaryValidation = optionValidations.find(v => v.optionNumber === primaryResult.optionNumber)?.validation 
+      || validateFinalPlan(primaryResult.finalTotals, targets, { g10Status: g10Metadata.g10Status, normalizationApplied: primaryResult.normalizationApplied, objective });
     
-    // ============================================
-    // VALIDAÇÃO FINAL ÚNICA (PATCH FINAL)
-    // ============================================
-    // Usar validateFinalPlan como ÚNICA fonte da verdade
-    const finalValidation = validateFinalPlan(
-      primaryResult.finalTotals,
-      targets,
-      {
-        g10Status: g10Metadata.g10Status,
-        normalizationApplied: optionResults.some(r => r.normalizationApplied),
-        objective, // Passar objetivo para validação por perfil
-      }
-    );
+    console.log(`[PATCH FINAL] Resultado da validação primária: ${primaryValidation.status}`);
+    console.log(`[PATCH FINAL] Métricas: Cal=${primaryValidation.metrics.caloriePercent}%, Prot=${primaryValidation.metrics.proteinPercent}%, Carb=${primaryValidation.metrics.carbPercent}%, Fat=${primaryValidation.metrics.fatPercent}%`);
     
-    console.log(`[PATCH FINAL] Resultado da validação: ${finalValidation.status}`);
-    console.log(`[PATCH FINAL] Métricas: Cal=${finalValidation.metrics.caloriePercent}%, Prot=${finalValidation.metrics.proteinPercent}%, Carb=${finalValidation.metrics.carbPercent}%, Fat=${finalValidation.metrics.fatPercent}%`);
-    
-    // Se validação final retornou STRUCTURALLY_INVALID, retornar imediatamente
-    if (finalValidation.status === "STRUCTURALLY_INVALID") {
-      console.log(`[PATCH FINAL] ❌ Plano STRUCTURALLY_INVALID: ${finalValidation.reason}`);
+    // Se TODAS as opções são estruturalmente inválidas, retornar imediatamente
+    const allInvalid = optionValidations.every(v => !v.isValid);
+    if (allInvalid) {
+      console.log(`[PATCH FINAL] ❌ TODAS as opções STRUCTURALLY_INVALID`);
       return new Response(
         JSON.stringify({
           status: "structurally_invalid",
@@ -1876,13 +1896,18 @@ serve(async (req) => {
           final_totals: primaryResult.finalTotals,
           adjustments: primaryResult.adjustments,
           structural_issue: {
-            reason: finalValidation.reason || "Final validation failed",
-            fat_percent: finalValidation.metrics.fatPercent,
-            calories_percent: finalValidation.metrics.caloriePercent,
+            reason: primaryValidation.reason || "All options failed validation",
+            fat_percent: primaryValidation.metrics.fatPercent,
+            calories_percent: primaryValidation.metrics.caloriePercent,
             action: "regenerate_plan",
           },
           food_changes: [],
-          finalValidation,
+          finalValidation: primaryValidation,
+          optionValidations: optionValidations.map(v => ({
+            optionNumber: v.optionNumber,
+            status: v.validation.status,
+            metrics: v.validation.metrics,
+          })),
         }),
         {
           status: 200,
@@ -1894,22 +1919,30 @@ serve(async (req) => {
     // Verificar convergência de todas as opções
     const allConverged = optionResults.every(r => r.converged);
     const anyConverged = optionResults.some(r => r.converged);
+    const allValidated = optionValidations.every(v => v.isValid);
 
-    // Determinar status baseado na validação final
-    // CORRIGIDO: Priorizar o status da validação final sobre a convergência
+    // Determinar status baseado na validação de TODAS as opções
+    // v2.3: Considerar validação de cada opção individualmente
     let status: "valid" | "valid_with_alert" | "error";
-    if (finalValidation.status === "VALIDATED") {
-      // Plano validado - status depende apenas se convergiu perfeitamente
-      status = allConverged ? "valid" : "valid_with_alert";
-    } else if (finalValidation.status === "VALIDATED_WITH_TOLERANCE") {
-      // Validado com tolerância clínica - sempre alerta
+    
+    if (allValidated && allConverged) {
+      // Todas as opções validadas E convergidas = válido
+      status = "valid";
+    } else if (allValidated) {
+      // Todas validadas mas nem todas convergidas = alerta
       status = "valid_with_alert";
-    } else if (finalValidation.status === "STRUCTURALLY_INVALID") {
-      // Estruturalmente inválido - erro
-      status = "error";
+    } else if (optionValidations.some(v => v.isValid)) {
+      // Pelo menos uma opção válida = alerta
+      status = "valid_with_alert";
     } else {
-      // Fallback para casos não mapeados
-      status = anyConverged ? "valid_with_alert" : "error";
+      // Nenhuma opção válida = erro
+      status = "error";
+    }
+    
+    // Incluir tolerância clínica no status se aplicável
+    const anyWithTolerance = optionValidations.some(v => v.validation.status === "VALIDATED_WITH_TOLERANCE");
+    if (anyWithTolerance && status === "valid") {
+      status = "valid_with_alert";
     }
 
     // Calcular totais iniciais para compatibilidade
@@ -1935,16 +1968,16 @@ serve(async (req) => {
       return currentIndex < worstIndex ? result.refinementStatus : worst;
     }, RefinementStatus.CONVERGED);
 
-    // Construir diagnósticos do rebalanceador
+    // Construir diagnósticos do rebalanceador (v2.3)
     const convergenceTimeMs = Math.round(performance.now() - startTime);
     const diagnostics: RebalancerDiagnostics = {
       refinementStatus: primaryRefinementStatus,
       normalization: {
         normalizationRequired: g10Metadata.g10Status === "ALLOW_REBALANCE",
         normalizationApplied: anyNormalizationApplied,
-        fatPercentBefore: finalValidation.metrics.fatPercent, // Simplificado
-        fatPercentAfter: finalValidation.metrics.fatPercent,
-        adjustedFoods: [], // Não rastreamos individualmente no momento
+        fatPercentBefore: primaryValidation.metrics.fatPercent,
+        fatPercentAfter: primaryValidation.metrics.fatPercent,
+        adjustedFoods: [],
       },
       totalIterations,
       convergenceTimeMs,
@@ -1963,30 +1996,29 @@ serve(async (req) => {
         original_grams: fc.original_grams,
         new_grams: fc.new_grams,
       })),
-      // Metadados G-10 + Validação Final + Diagnósticos
       meta: {
         g10Status: g10Metadata.g10Status,
         implicitFatRatio: g10Metadata.implicitFatRatio,
         normalizationApplied: anyNormalizationApplied,
-        finalValidation,
+        finalValidation: primaryValidation,
         diagnostics,
       },
     };
 
-    // Log de resumo com diagnósticos
+    // Log de resumo com diagnósticos (v2.3)
     log.info("Rebalance complete", {
       g10Status: g10Metadata.g10Status,
       normalizationApplied: anyNormalizationApplied,
-      finalValidation: finalValidation.status,
+      primaryValidation: primaryValidation.status,
+      allOptionsValid: allValidated,
       refinementStatus: primaryRefinementStatus,
       convergenceTimeMs,
       optionsCount: optionResults.length,
-      note: finalValidation.note,
+      optionStatuses: optionValidations.map(v => `Opt${v.optionNumber}:${v.validation.status}`).join(', '),
     });
 
     // Logar métricas de rebalanceamento para análise
     if (userId) {
-      // Incrementar uso de ajuste apenas se foi bem-sucedido
       if (status !== "error") {
         await supabase.rpc("increment_usage", { _user_id: userId, _feature: "adjustment" });
         log.info("Adjustment usage incremented", { userId });
@@ -2005,21 +2037,27 @@ serve(async (req) => {
       });
     }
 
-    // Retornar no formato esperado pelo frontend
+    // Retornar no formato esperado pelo frontend (v2.3)
+    // Inclui validações individuais por opção
     return new Response(JSON.stringify({
       success: status !== "error",
       result,
       currentMacros: currentTotals,
       targetMacros: targets,
       proposedMacros: primaryResult.finalTotals,
-      // Metadados G-10 + Validação Final no nível raiz para fácil acesso
       g10Meta: {
         g10Status: g10Metadata.g10Status,
         implicitFatRatio: g10Metadata.implicitFatRatio,
         normalizationApplied: anyNormalizationApplied,
       },
-      finalValidation,
-      // Incluir resultados de todas as opções
+      finalValidation: primaryValidation,
+      // v2.3: Validações individuais por opção
+      optionValidations: optionValidations.map(v => ({
+        optionNumber: v.optionNumber,
+        status: v.validation.status,
+        metrics: v.validation.metrics,
+        isValid: v.isValid,
+      })),
       optionResults: optionResults.map(opt => ({
         optionNumber: opt.optionNumber,
         converged: opt.converged,
@@ -2039,21 +2077,24 @@ serve(async (req) => {
         newGrams: fc.new_grams,
         reason: `Ajuste para ${objective === "cut" ? "emagrecimento" : objective === "bulk" ? "ganho de massa" : "manutenção"}`,
       })),
-      explanation: finalValidation.status === "VALIDATED_WITH_TOLERANCE"
-        ? `Plano validado com tolerância clínica (gordura: ${finalValidation.metrics.fatPercent}%). ${optionResults.length} opção(ões) processada(s).${anyNormalizationApplied ? ' Normalização de gordura implícita aplicada.' : ''}`
+      explanation: allValidated
+        ? `Plano ajustado com sucesso. ${optionResults.length} opção(ões) validada(s).${anyNormalizationApplied ? ' Normalização aplicada.' : ''}`
+        : anyWithTolerance
+        ? `Plano validado com tolerância clínica. ${optionValidations.filter(v => v.isValid).length}/${optionResults.length} opções válidas.`
         : status === "error"
         ? `Não foi possível atingir as metas. Verifique se as metas são realistas para os alimentos disponíveis.`
-        : `Plano ajustado em ${totalIterations} iteração(ões) para ${objective === "cut" ? "emagrecimento" : objective === "bulk" ? "ganho de massa" : "manutenção"}. ${optionResults.length} opção(ões) processada(s).${anyNormalizationApplied ? ' Normalização de gordura implícita aplicada.' : ''}`,
-      warnings: status === "error"
-        ? [`Validação final falhou: ${finalValidation.reason || 'critérios não atendidos'}`]
-        : status === "valid_with_alert"
-        ? [
-            ...(finalValidation.status === "VALIDATED_WITH_TOLERANCE" 
-              ? [`Tolerância clínica aplicada: gordura em ${finalValidation.metrics.fatPercent}%`] 
-              : []),
-            ...optionResults.filter(r => !r.converged).map(r => `Opção ${r.optionNumber} não convergiu completamente`)
-          ]
-        : [],
+        : `Plano ajustado. ${optionValidations.filter(v => v.isValid).length}/${optionResults.length} opções convergidas.`,
+      warnings: [
+        ...optionValidations
+          .filter(v => v.validation.status === "VALIDATED_WITH_TOLERANCE")
+          .map(v => `Opção ${v.optionNumber}: tolerância clínica (gordura ${v.validation.metrics.fatPercent}%)`),
+        ...optionValidations
+          .filter(v => !v.isValid)
+          .map(v => `Opção ${v.optionNumber}: ${v.validation.reason || 'não convergiu'}`),
+        ...optionResults
+          .filter(r => !r.converged && optionValidations.find(v => v.optionNumber === r.optionNumber)?.isValid)
+          .map(r => `Opção ${r.optionNumber}: convergência parcial`),
+      ],
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
