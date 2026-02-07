@@ -162,11 +162,6 @@ export function DashboardMeals({
                   <span className="font-medium text-foreground text-xs sm:text-sm text-center line-clamp-1">
                     {MEAL_NAMES[meal.name as MealType] || meal.name}
                   </span>
-                  {meal.total_calories !== undefined && (
-                    <span className="text-sm font-semibold text-foreground tabular-nums">
-                      {meal.total_calories} <span className="text-[10px] text-muted-foreground">kcal</span>
-                    </span>
-                  )}
                 </div>
               );
             })()}
