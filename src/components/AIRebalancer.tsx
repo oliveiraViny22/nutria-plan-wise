@@ -809,20 +809,6 @@ export function AIRebalancer({
                   )}
 
 
-                  {/* Warnings */}
-                  {result.warnings && result.warnings.length > 0 && (
-                    <Alert className="bg-amber-500/10 border-amber-500/20">
-                      <AlertTriangle className="h-4 w-4 text-amber-500" />
-                      <AlertDescription className="text-amber-700 dark:text-amber-300">
-                        <ul className="list-disc list-inside text-sm">
-                          {result.warnings.map((w, i) => (
-                            <li key={i}>{w}</li>
-                          ))}
-                        </ul>
-                      </AlertDescription>
-                    </Alert>
-                  )}
-
                   {/* Adjustments List */}
                   {hasAdjustments && result.adjustments && (
                     <div className="space-y-3">
