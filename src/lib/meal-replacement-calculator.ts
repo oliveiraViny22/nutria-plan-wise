@@ -588,16 +588,72 @@ export function calculateMealReplacement(
     });
   }
 
-  // 6. AJUSTE FINO: Preencher espaço restante se ainda abaixo de 90%
+  // 6. DIVERSIDADE MÍNIMA: Garantir pelo menos 2-3 itens variados
+  // Evita sugestões de itens isolados (ex: só mel, só aveia)
+  const MIN_ITEMS_SUBSTANTIVE = 2; // Mínimo para refeições leves
+  const MIN_ITEMS_FULL = 3;        // Mínimo para refeições completas
+  const isFullMeal = targetMacros.calories >= 300;
+  const minItemsRequired = isFullMeal ? MIN_ITEMS_FULL : MIN_ITEMS_SUBSTANTIVE;
+  
+  // Se temos poucos itens, adicionar diversidade antes de fillers
+  const substantiveItems = items.filter(i => i.name !== 'Água');
+  if (substantiveItems.length < minItemsRequired) {
+    // Priorizar adição de proteína se não tem whey
+    const hasProteinSource = items.some(i => 
+      i.name.includes('Whey') || i.name.includes('Iogurte') || 
+      i.name.includes('Ovo') || i.name.includes('Cottage')
+    );
+    
+    if (!hasProteinSource && remaining().protein >= 5 && remaining().calories >= 50) {
+      // Adicionar fonte proteica leve
+      const proteinOptions = ['Iogurte Grego Natural', 'Queijo Cottage', 'Ovo Cozido'];
+      for (const opt of proteinOptions) {
+        const item = ACTIVE_FOODS[opt];
+        if (item && canAddItem(item.macros, 0.5)) {
+          if (addItem(opt, ACTIVE_FOODS, 'food', 0.5)) break;
+        }
+      }
+    }
+    
+    // Adicionar fonte de carboidrato se não tem
+    const hasCarbSource = items.some(i => 
+      i.name.includes('Aveia') || i.name.includes('Banana') || i.name.includes('Maltodextrina')
+    );
+    
+    if (!hasCarbSource && remaining().carbs >= 10 && remaining().calories >= 50) {
+      if (bananaItem && canAddItem(bananaItem.macros, 0.5)) {
+        addItem('Banana', ACTIVE_FOODS, 'food', 0.5);
+      }
+    }
+    
+    // Adicionar fonte de gordura se não tem
+    const hasFatSource = items.some(i => 
+      i.name.includes('Amendoim') || i.name.includes('Castanha') || 
+      i.name.includes('Nozes') || i.name.includes('Amêndoas')
+    );
+    
+    if (!hasFatSource && remaining().fat >= 5 && remaining().calories >= 80 && substantiveItems.length < minItemsRequired) {
+      const fatOptions = ['Pasta de Amendoim Integral', 'Castanha de Caju', 'Amêndoas'];
+      for (const opt of fatOptions) {
+        const item = ACTIVE_FOODS[opt];
+        if (item && canAddItem(item.macros, 0.5)) {
+          if (addItem(opt, ACTIVE_FOODS, 'food', 0.5)) break;
+        }
+      }
+    }
+  }
+  
+  // 7. AJUSTE FINO: Preencher espaço restante se ainda abaixo de 90%
   const currentAccuracyPreFill = (currentMacros.calories / targetMacros.calories) * 100;
   
-  // Adicionar mel incrementalmente até atingir 90%
+  // Adicionar mel SOMENTE se já temos diversidade mínima
+  const currentSubstantiveItems = items.filter(i => i.name !== 'Água');
   const melItem = ACTIVE_FOODS['Mel'];
-  if (melItem && currentAccuracyPreFill < 90 && remaining().calories >= 30) {
+  if (melItem && currentAccuracyPreFill < 90 && remaining().calories >= 30 && currentSubstantiveItems.length >= MIN_ITEMS_SUBSTANTIVE) {
     // Calcular quantas porções de mel precisamos para atingir ~90%
     const caloriesNeeded = (targetMacros.calories * 0.90) - currentMacros.calories;
     const melPortionCalories = melItem.macros.calories;
-    const melScaleNeeded = Math.min(3, caloriesNeeded / melPortionCalories); // Máx 3 porções
+    const melScaleNeeded = Math.min(2, caloriesNeeded / melPortionCalories); // Máx 2 porções (reduzido de 3)
     
     if (melScaleNeeded >= 0.5) {
       // Arredondar para 0.5 para porções práticas
