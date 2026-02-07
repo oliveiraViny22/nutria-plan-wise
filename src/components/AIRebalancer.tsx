@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
+import { parseServingGrams } from '@/lib/serving-size';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ChevronDown,
@@ -615,15 +616,7 @@ export function AIRebalancer({
             const food = mof.food as any;
             if (!food) continue;
             
-            // Parse serving size - formats: "100g", "(100g)", "(100 ml)"
-            const servingSize = food.serving_size || '';
-            const parenMatch = servingSize.match(/\((\d+)\s*(g|ml)\)/i);
-            const directMatch = servingSize.match(/^(\d+)\s*(g|ml)$/i);
-            const baseGrams = parenMatch 
-              ? parseInt(parenMatch[1], 10) 
-              : directMatch 
-                ? parseInt(directMatch[1], 10) 
-                : 100;
+            const baseGrams = parseServingGrams(food.serving_size);
             
             // Use updated quantity if available, otherwise use DB value
             const actualGrams = updatedQuantities.get(mof.id) ?? mof.quantity_grams;
