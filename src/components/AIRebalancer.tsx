@@ -522,195 +522,44 @@ export function AIRebalancer({
 
     setApplying(true);
     try {
-      // Track all affected entities for recalculation
-      const affectedOptionIds = new Set<string>();
-      const affectedMealIds = new Set<string>();
+      // ===============================================================
+      // ESTRATÉGIA: Aplicar ajustes em batch e usar proposedMacros do backend
+      // ===============================================================
       
-      // Build a map of updated quantities to use during recalculation
-      // This ensures we use the new values even before the DB commits fully
-      const updatedQuantities = new Map<string, number>(); // mealOptionFoodId -> newGrams
-
-      // FASE 1: Aplicar todos os ajustes primários
-      console.log('[handleConfirm] Phase 1: Applying primary adjustments...');
-      for (const adj of result.adjustments) {
-        affectedOptionIds.add(adj.mealOptionId);
-        affectedMealIds.add(adj.mealId);
-        updatedQuantities.set(adj.mealOptionFoodId, adj.newGrams);
-
-        const { error: updateErr } = await supabase
+      // FASE 1: Aplicar todos os ajustes de porção (meal_option_foods)
+      console.log('[handleConfirm] Phase 1: Applying adjustments in batch...');
+      
+      // Processar ajustes em paralelo para velocidade
+      const updatePromises = result.adjustments.map(async (adj) => {
+        const { error } = await supabase
           .from('meal_option_foods')
           .update({ quantity_grams: adj.newGrams })
           .eq('id', adj.mealOptionFoodId);
-
-        if (updateErr) {
-          console.error('[handleConfirm] Error updating food:', adj.mealOptionFoodId, updateErr);
-          throw updateErr;
+        
+        if (error) {
+          console.error(`[handleConfirm] Error updating ${adj.foodName}:`, error);
+          throw error;
         }
         console.log(`[handleConfirm] Updated ${adj.foodName}: ${adj.originalGrams}g → ${adj.newGrams}g`);
-      }
-
-      // FASE 2: Propagar ajustes para outras opções da mesma refeição
-      console.log('[handleConfirm] Phase 2: Propagating to other options...');
-      for (const adj of result.adjustments) {
-        const { data: allOptions, error: allOptionsError } = await supabase
-          .from('meal_options')
-          .select('id, option_number')
-          .eq('meal_id', adj.mealId);
-
-        if (allOptionsError) throw allOptionsError;
-
-        if (allOptions) {
-          // Mark all options as affected for recalculation
-          for (const option of allOptions) {
-            affectedOptionIds.add(option.id);
-          }
-
-          for (const option of allOptions) {
-            if (option.id === adj.mealOptionId) continue;
-
-            // Find the same food in other options
-            const { data: otherFoods, error: otherFoodsError } = await supabase
-              .from('meal_option_foods')
-              .select('id')
-              .eq('meal_option_id', option.id)
-              .eq('food_id', adj.foodId)
-              .limit(1);
-
-            if (otherFoodsError) throw otherFoodsError;
-
-            if (otherFoods && otherFoods.length > 0) {
-              const { error: propagateErr } = await supabase
-                .from('meal_option_foods')
-                .update({ quantity_grams: adj.newGrams })
-                .eq('id', otherFoods[0].id);
-
-              if (propagateErr) throw propagateErr;
-              
-              // Track propagated updates
-              updatedQuantities.set(otherFoods[0].id, adj.newGrams);
-              console.log(`[handleConfirm] Propagated ${adj.foodName} to option ${option.option_number}`);
-            }
-          }
-        }
-      }
-
-      // FASE 3: Recalcular totais das opções afetadas
-      // Use uma pequena pausa para garantir que as escritas foram persistidas
-      console.log('[handleConfirm] Phase 3: Recalculating option totals...');
+        return adj;
+      });
       
-      for (const optionId of affectedOptionIds) {
-        const { data: optionFoods, error: optionFoodsError } = await supabase
-          .from('meal_option_foods')
-          .select('id, quantity_grams, food:foods(calories, protein, carbs, fat, serving_size)')
-          .eq('meal_option_id', optionId);
-
-        if (optionFoodsError) {
-          console.error('[handleConfirm] Error fetching option foods:', optionFoodsError);
-          throw optionFoodsError;
-        }
-
-        let totals = { calories: 0, protein: 0, carbs: 0, fat: 0 };
-
-        if (optionFoods) {
-          for (const mof of optionFoods) {
-            const food = mof.food as any;
-            if (!food) continue;
-            
-            const baseGrams = parseServingGrams(food.serving_size);
-            
-            // Use updated quantity if available, otherwise use DB value
-            const actualGrams = updatedQuantities.get(mof.id) ?? mof.quantity_grams;
-            const multiplier = actualGrams / baseGrams;
-            
-            totals.calories += food.calories * multiplier;
-            totals.protein += food.protein * multiplier;
-            totals.carbs += food.carbs * multiplier;
-            totals.fat += food.fat * multiplier;
-          }
-        }
-
-        const { error: updateOptionErr } = await supabase
-          .from('meal_options')
-          .update({
-            total_calories: Math.round(totals.calories),
-            total_protein: Math.round(totals.protein),
-            total_carbs: Math.round(totals.carbs),
-            total_fat: Math.round(totals.fat),
-          })
-          .eq('id', optionId);
-
-        if (updateOptionErr) {
-          console.error('[handleConfirm] Error updating option totals:', updateOptionErr);
-          throw updateOptionErr;
-        }
-        console.log(`[handleConfirm] Option ${optionId} totals: ${Math.round(totals.calories)} kcal`);
-      }
-
-      // FASE 4: Recalcular totais das refeições (baseado na opção 1)
-      console.log('[handleConfirm] Phase 4: Recalculating meal totals...');
-      for (const mealId of affectedMealIds) {
-        const { data: option1, error: option1Error } = await supabase
-          .from('meal_options')
-          .select('total_calories, total_protein, total_carbs, total_fat')
-          .eq('meal_id', mealId)
-          .eq('option_number', 1)
-          .single();
-
-        if (option1Error) {
-          console.error('[handleConfirm] Error fetching option 1:', option1Error);
-          // Continue even if option 1 not found
-          continue;
-        }
-
-        if (option1) {
-          const { error: mealUpdateErr } = await supabase
-            .from('meals')
-            .update({
-              total_calories: option1.total_calories,
-              total_protein: option1.total_protein,
-              total_carbs: option1.total_carbs,
-              total_fat: option1.total_fat,
-            })
-            .eq('id', mealId);
-
-          if (mealUpdateErr) {
-            console.error('[handleConfirm] Error updating meal:', mealUpdateErr);
-            throw mealUpdateErr;
-          }
-          console.log(`[handleConfirm] Meal ${mealId} updated: ${option1.total_calories} kcal`);
-        }
-      }
-
-      // FASE 5: Recalcular total do plano
-      console.log('[handleConfirm] Phase 5: Recalculating plan totals...');
-      const { data: allMeals, error: allMealsError } = await supabase
-        .from('meals')
-        .select('id, name, total_calories, total_protein, total_carbs, total_fat')
-        .eq('diet_plan_id', planId);
-
-      if (allMealsError) {
-        console.error('[handleConfirm] Error fetching meals:', allMealsError);
-        throw allMealsError;
-      }
-
-      let planTotals = { calories: 0, protein: 0, carbs: 0, fat: 0 };
-      if (allMeals) {
-        for (const m of allMeals) {
-          planTotals.calories += m.total_calories || 0;
-          planTotals.protein += m.total_protein || 0;
-          planTotals.carbs += m.total_carbs || 0;
-          planTotals.fat += m.total_fat || 0;
-          console.log(`[handleConfirm] Meal "${m.name}": ${m.total_calories || 0} kcal`);
-        }
-      }
-
+      await Promise.all(updatePromises);
+      console.log(`[handleConfirm] Phase 1 complete: ${result.adjustments.length} foods updated`);
+      
+      // FASE 2: Atualizar totais do plano com proposedMacros do backend
+      // O backend já calculou os totais corretos - usamos diretamente
+      console.log('[handleConfirm] Phase 2: Updating plan totals from proposedMacros...');
+      
+      const proposedMacros = result.proposedMacros || result.currentMacros;
+      
       const { error: planUpdateErr } = await supabase
         .from('diet_plans')
         .update({
-          total_calories: Math.round(planTotals.calories),
-          total_protein: Math.round(planTotals.protein),
-          total_carbs: Math.round(planTotals.carbs),
-          total_fat: Math.round(planTotals.fat),
+          total_calories: Math.round(proposedMacros.calories),
+          total_protein: Math.round(proposedMacros.protein),
+          total_carbs: Math.round(proposedMacros.carbs),
+          total_fat: Math.round(proposedMacros.fat),
         })
         .eq('id', planId);
 
@@ -719,7 +568,7 @@ export function AIRebalancer({
         throw planUpdateErr;
       }
 
-      console.log(`[handleConfirm] ✅ Plan totals updated: ${Math.round(planTotals.calories)} kcal, P:${Math.round(planTotals.protein)}g, C:${Math.round(planTotals.carbs)}g, F:${Math.round(planTotals.fat)}g`);
+      console.log(`[handleConfirm] ✅ Plan totals updated: ${Math.round(proposedMacros.calories)} kcal, P:${Math.round(proposedMacros.protein)}g, C:${Math.round(proposedMacros.carbs)}g, F:${Math.round(proposedMacros.fat)}g`);
 
       // Cleanup and success
       setShowDialog(false);
@@ -730,7 +579,7 @@ export function AIRebalancer({
       setTimeout(() => setShowSuccessAnimation(false), 2500);
       
       toast.success('Plano ajustado com sucesso! ✅', {
-        description: `${Math.round(planTotals.calories)} kcal | P: ${Math.round(planTotals.protein)}g | C: ${Math.round(planTotals.carbs)}g | G: ${Math.round(planTotals.fat)}g`
+        description: `${Math.round(proposedMacros.calories)} kcal | P: ${Math.round(proposedMacros.protein)}g | C: ${Math.round(proposedMacros.carbs)}g | G: ${Math.round(proposedMacros.fat)}g`
       });
       playSuccessSound();
       onComplete();
