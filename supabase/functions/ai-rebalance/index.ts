@@ -1,5 +1,5 @@
 // ============================================
-// REBALANCEADOR AUTOMÁTICO NUTRIAPLAN v2.8
+// REBALANCEADOR AUTOMÁTICO NUTRIAPLAN v2.9
 // ============================================
 // Implementação conforme especificação:
 // - Validação por objetivo (cut/maintain/bulk)
@@ -11,6 +11,7 @@
 // - VERIFICAÇÃO UPFRONT de plano já otimizado (v2.6)
 // - BALANCEAMENTO DE GORDURA entre opções (v2.7)
 // - FAT BOOST: Injeção de azeite quando gordura < 90% (v2.8)
+// - FAT BOOST AUTOMÁTICO + LOOP DE CONVERGÊNCIA (v2.9)
 // ============================================
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
@@ -965,14 +966,15 @@ async function boostFatWithOliveOil(
   }>,
   targets: MacroTargets,
   meals: Meal[],
-  supabase: any
+  supabase: any,
+  applyDirectly: boolean = true // v2.9: Aplicar diretamente no banco
 ): Promise<FatBoostResult> {
   const warnings: string[] = [];
   const injections: FatBoostResult['injections'] = [];
   let totalBoosted = 0;
 
   console.log(`\n╔══════════════════════════════════════════════════════════════╗`);
-  console.log(`║  FAT BOOST v2.8 - Injeção de Azeite                          ║`);
+  console.log(`║  FAT BOOST v2.9 - Injeção de Azeite (auto-apply: ${applyDirectly})         ║`);
   console.log(`╠══════════════════════════════════════════════════════════════╣`);
   console.log(`║  Meta de Gordura: ${targets.fat.toFixed(1)}g`.padEnd(63) + `║`);
   console.log(`║  Threshold: ${FAT_BOOST_CONFIG.MIN_FAT_THRESHOLD * 100}% (${(targets.fat * FAT_BOOST_CONFIG.MIN_FAT_THRESHOLD).toFixed(1)}g)`.padEnd(63) + `║`);
@@ -1035,28 +1037,25 @@ async function boostFatWithOliveOil(
     console.log(`[FAT BOOST] Opção ${optionResult.optionNumber}: ${currentFat.toFixed(1)}g (${(fatPercent * 100).toFixed(1)}%) → precisa +${fatDeficit.toFixed(1)}g`);
 
     // Verificar se já existe azeite nesta opção
-    const hasAzeite = optionResult.foods.some(f => f.food_id === FAT_BOOST_CONFIG.AZEITE_ID);
-    if (hasAzeite) {
+    const existingAzeite = optionResult.foods.find(f => f.food_id === FAT_BOOST_CONFIG.AZEITE_ID);
+    if (existingAzeite) {
       // Se já tem azeite, aumentar a quantidade ao invés de adicionar novo
-      const azeiteFood = optionResult.foods.find(f => f.food_id === FAT_BOOST_CONFIG.AZEITE_ID);
-      if (azeiteFood) {
-        const currentGrams = optionResult.finalQuantities.get(azeiteFood.id) || azeiteFood.quantity_grams;
-        const gramsToAdd = Math.min(
-          FAT_BOOST_CONFIG.AZEITE_PORTION.max - currentGrams,
-          Math.round((fatDeficit / azeite.fat) * 100)
-        );
+      const currentGrams = optionResult.finalQuantities.get(existingAzeite.id) || existingAzeite.quantity_grams;
+      const gramsToAdd = Math.min(
+        FAT_BOOST_CONFIG.AZEITE_PORTION.max - currentGrams,
+        Math.round((fatDeficit / azeite.fat) * 100)
+      );
 
-        if (gramsToAdd >= 2) {
-          const newGrams = currentGrams + gramsToAdd;
-          optionResult.finalQuantities.set(azeiteFood.id, newGrams);
-          
-          const fatAdded = (gramsToAdd / 100) * azeite.fat;
-          optionResult.finalTotals.fat += fatAdded;
-          optionResult.finalTotals.calories += (gramsToAdd / 100) * azeite.calories;
+      if (gramsToAdd >= 2) {
+        const newGrams = currentGrams + gramsToAdd;
+        optionResult.finalQuantities.set(existingAzeite.id, newGrams);
+        
+        const fatAdded = (gramsToAdd / 100) * azeite.fat;
+        optionResult.finalTotals.fat += fatAdded;
+        optionResult.finalTotals.calories += (gramsToAdd / 100) * azeite.calories;
 
-          console.log(`[FAT BOOST] Opção ${optionResult.optionNumber}: Azeite existente ${currentGrams}g → ${newGrams}g (+${fatAdded.toFixed(1)}g gordura)`);
-          totalBoosted++;
-        }
+        console.log(`[FAT BOOST] Opção ${optionResult.optionNumber}: Azeite existente ${currentGrams}g → ${newGrams}g (+${fatAdded.toFixed(1)}g gordura)`);
+        totalBoosted++;
       }
       continue;
     }
@@ -1081,8 +1080,70 @@ async function boostFatWithOliveOil(
 
       const fatFromAzeite = (gramsNeeded / 100) * azeite.fat;
       const caloriesFromAzeite = (gramsNeeded / 100) * azeite.calories;
+      const proteinFromAzeite = (gramsNeeded / 100) * azeite.protein;
+      const carbsFromAzeite = (gramsNeeded / 100) * azeite.carbs;
 
-      // Registrar injeção (será aplicada pelo frontend)
+      // v2.9: Aplicar diretamente no banco de dados
+      if (applyDirectly) {
+        // Inserir novo registro em meal_option_foods
+        const { data: insertedFood, error: insertError } = await supabase
+          .from("meal_option_foods")
+          .insert({
+            meal_option_id: option.id,
+            food_id: azeite.id,
+            quantity_grams: gramsNeeded,
+          })
+          .select("id")
+          .single();
+
+        if (insertError) {
+          console.error(`[FAT BOOST] ❌ Erro ao inserir azeite: ${insertError.message}`);
+          warnings.push(`Falha ao inserir azeite na opção ${optionResult.optionNumber}`);
+          continue;
+        }
+
+        console.log(`[FAT BOOST] ✅ Azeite inserido no banco: ${insertedFood.id}`);
+
+        // Atualizar totais da meal_option
+        const { error: updateError } = await supabase
+          .from("meal_options")
+          .update({
+            total_calories: (option.total_calories || 0) + caloriesFromAzeite,
+            total_protein: (option.total_protein || 0) + proteinFromAzeite,
+            total_carbs: (option.total_carbs || 0) + carbsFromAzeite,
+            total_fat: (option.total_fat || 0) + fatFromAzeite,
+          })
+          .eq("id", option.id);
+
+        if (updateError) {
+          console.error(`[FAT BOOST] ⚠️ Erro ao atualizar totais da opção: ${updateError.message}`);
+        }
+
+        // Adicionar à estrutura local para que a re-validação funcione
+        const newFoodEntry: FoodWithMeta = {
+          id: insertedFood.id,
+          meal_option_id: option.id,
+          food_id: azeite.id,
+          quantity_grams: gramsNeeded,
+          food: {
+            id: azeite.id,
+            name: azeite.name,
+            calories: azeite.calories,
+            protein: azeite.protein,
+            carbs: azeite.carbs,
+            fat: azeite.fat,
+            serving_size: azeite.serving_size,
+            category: azeite.category,
+          },
+          mealName: meal.name,
+          mealId: meal.id,
+          optionId: option.id,
+        };
+        optionResult.foods.push(newFoodEntry);
+        optionResult.finalQuantities.set(insertedFood.id, gramsNeeded);
+      }
+
+      // Registrar injeção
       injections.push({
         optionNumber: optionResult.optionNumber,
         mealName: meal.name,
@@ -1097,15 +1158,17 @@ async function boostFatWithOliveOil(
       // Atualizar totais projetados
       optionResult.finalTotals.fat += fatFromAzeite;
       optionResult.finalTotals.calories += caloriesFromAzeite;
+      optionResult.finalTotals.protein += proteinFromAzeite;
+      optionResult.finalTotals.carbs += carbsFromAzeite;
 
-      console.log(`[FAT BOOST] Opção ${optionResult.optionNumber}: +${gramsNeeded}g ${azeite.name} em ${meal.name} (+${fatFromAzeite.toFixed(1)}g gordura)`);
+      console.log(`[FAT BOOST] Opção ${optionResult.optionNumber}: +${gramsNeeded}g ${azeite.name} em ${meal.name} (+${fatFromAzeite.toFixed(1)}g gordura)${applyDirectly ? ' [APLICADO]' : ''}`);
       totalBoosted++;
       break; // Só injetar em uma refeição por opção
     }
   }
 
   if (totalBoosted > 0) {
-    console.log(`\n[FAT BOOST] Concluído: ${totalBoosted} opção(ões) com boost de gordura\n`);
+    console.log(`\n[FAT BOOST] Concluído: ${totalBoosted} opção(ões) com boost de gordura${applyDirectly ? ' (aplicado no banco)' : ''}\n`);
   } else {
     console.log(`\n[FAT BOOST] Nenhum boost necessário\n`);
   }
@@ -2803,19 +2866,22 @@ serve(async (req) => {
     }
     
     // ============================================
-    // FAT BOOST v2.8: Injetar azeite quando gordura < 90%
+    // FAT BOOST v2.9: Injetar azeite quando gordura < 90%
+    // Aplicação automática no banco de dados
     // ============================================
     let fatBoostResult: FatBoostResult = { boosted: 0, warnings: [], injections: [] };
     
     // Só aplicar boost se g10Status não for ALLOW_REBALANCE (não há excesso de gordura)
     if (g10Metadata.g10Status !== "ALLOW_REBALANCE") {
-      fatBoostResult = await boostFatWithOliveOil(optionResults, targets, typedMeals, supabase);
+      // v2.9: Aplicar diretamente no banco (applyDirectly: true)
+      fatBoostResult = await boostFatWithOliveOil(optionResults, targets, typedMeals, supabase, true);
       
       if (fatBoostResult.boosted > 0) {
         log.info("FatBoostApplied", {
           optionsBoosted: fatBoostResult.boosted,
           injections: fatBoostResult.injections.length,
           warnings: fatBoostResult.warnings.length,
+          appliedDirectly: true,
         });
         
         // Re-validar opções após boost de gordura
@@ -2824,6 +2890,108 @@ serve(async (req) => {
       }
     } else {
       console.log(`[FAT BOOST] Bloqueado - g10Status é ALLOW_REBALANCE (já há excesso de gordura)`);
+    }
+    
+    // ============================================
+    // LOOP DE CONVERGÊNCIA v2.9
+    // Re-executa equalização/balanceamento até todas as opções
+    // atingirem equivalência (max 3 iterações)
+    // ============================================
+    const MAX_CONVERGENCE_LOOPS = 3;
+    let convergenceLoop = 0;
+    
+    const checkFullEquivalence = (): { allValid: boolean; calorieEquivalent: boolean; fatEquivalent: boolean } => {
+      const allValid = optionValidations.every(v => v.isValid);
+      
+      if (optionResults.length <= 1) {
+        return { allValid, calorieEquivalent: true, fatEquivalent: true };
+      }
+      
+      const refOption = optionResults.find(r => r.optionNumber === 1);
+      if (!refOption) return { allValid, calorieEquivalent: true, fatEquivalent: true };
+      
+      const refCalories = refOption.finalTotals.calories;
+      const refFat = refOption.finalTotals.fat;
+      const MAX_CAL_VARIANCE = GENERATOR_CONTRACT.MAX_OPTION_CALORIE_VARIANCE_PERCENT / 100;
+      const MAX_FAT_VARIANCE = 0.10; // 10% de variância de gordura
+      
+      let calorieEquivalent = true;
+      let fatEquivalent = true;
+      
+      for (const opt of optionResults) {
+        if (opt.optionNumber === 1) continue;
+        
+        const calVariance = Math.abs(opt.finalTotals.calories - refCalories) / refCalories;
+        const fatVariance = Math.abs(opt.finalTotals.fat - refFat) / refFat;
+        
+        if (calVariance > MAX_CAL_VARIANCE) calorieEquivalent = false;
+        if (fatVariance > MAX_FAT_VARIANCE) fatEquivalent = false;
+      }
+      
+      return { allValid, calorieEquivalent, fatEquivalent };
+    };
+    
+    let equivalenceStatus = checkFullEquivalence();
+    
+    while (
+      convergenceLoop < MAX_CONVERGENCE_LOOPS &&
+      (!equivalenceStatus.allValid || !equivalenceStatus.calorieEquivalent || !equivalenceStatus.fatEquivalent)
+    ) {
+      convergenceLoop++;
+      console.log(`\n[CONVERGENCE LOOP ${convergenceLoop}/${MAX_CONVERGENCE_LOOPS}] Iniciando...`);
+      console.log(`  - allValid: ${equivalenceStatus.allValid}`);
+      console.log(`  - calorieEquivalent: ${equivalenceStatus.calorieEquivalent}`);
+      console.log(`  - fatEquivalent: ${equivalenceStatus.fatEquivalent}`);
+      
+      // Re-aplicar equalização calórica se necessário
+      if (!equivalenceStatus.calorieEquivalent) {
+        const loopEqualization = equalizeOptionCalories(optionResults, targets);
+        if (loopEqualization.adjusted > 0) {
+          equalizationResult.adjusted += loopEqualization.adjusted;
+          equalizationResult.warnings.push(...loopEqualization.warnings);
+          equalizationResult.adjustments.push(...loopEqualization.adjustments);
+          console.log(`  [LOOP] Equalização aplicada: ${loopEqualization.adjusted} opção(ões)`);
+        }
+      }
+      
+      // Re-aplicar balanceamento de gordura se necessário
+      if (!equivalenceStatus.fatEquivalent) {
+        const loopFatBalance = balanceFatBetweenOptions(optionResults, targets);
+        if (loopFatBalance.adjusted > 0) {
+          fatBalancingResult.adjusted += loopFatBalance.adjusted;
+          fatBalancingResult.warnings.push(...loopFatBalance.warnings);
+          fatBalancingResult.adjustments.push(...loopFatBalance.adjustments);
+          console.log(`  [LOOP] Balanceamento de gordura aplicado: ${loopFatBalance.adjusted} opção(ões)`);
+        }
+      }
+      
+      // Re-aplicar Fat Boost se alguma opção ainda estiver abaixo de 90%
+      if (g10Metadata.g10Status !== "ALLOW_REBALANCE") {
+        const loopFatBoost = await boostFatWithOliveOil(optionResults, targets, typedMeals, supabase, true);
+        if (loopFatBoost.boosted > 0) {
+          fatBoostResult.boosted += loopFatBoost.boosted;
+          fatBoostResult.warnings.push(...loopFatBoost.warnings);
+          fatBoostResult.injections.push(...loopFatBoost.injections);
+          console.log(`  [LOOP] Fat Boost aplicado: ${loopFatBoost.boosted} opção(ões)`);
+        }
+      }
+      
+      // Re-validar e verificar equivalência
+      optionValidations = validateOptions();
+      equivalenceStatus = checkFullEquivalence();
+      
+      console.log(`[CONVERGENCE LOOP ${convergenceLoop}] Resultado:`);
+      console.log(`  - allValid: ${equivalenceStatus.allValid}`);
+      console.log(`  - calorieEquivalent: ${equivalenceStatus.calorieEquivalent}`);
+      console.log(`  - fatEquivalent: ${equivalenceStatus.fatEquivalent}`);
+    }
+    
+    if (convergenceLoop > 0) {
+      log.info("ConvergenceLoopCompleted", {
+        loops: convergenceLoop,
+        maxLoops: MAX_CONVERGENCE_LOOPS,
+        finalStatus: equivalenceStatus,
+      });
     }
     
     // Usar opção 1 como referência principal para compatibilidade
@@ -2928,7 +3096,7 @@ serve(async (req) => {
       return currentIndex < worstIndex ? result.refinementStatus : worst;
     }, RefinementStatus.CONVERGED);
 
-    // Construir diagnósticos do rebalanceador (v2.7)
+    // Construir diagnósticos do rebalanceador (v2.9)
     const convergenceTimeMs = Math.round(performance.now() - startTime);
     const diagnostics: RebalancerDiagnostics = {
       refinementStatus: primaryRefinementStatus,
@@ -2943,6 +3111,7 @@ serve(async (req) => {
       convergenceTimeMs,
       optionsProcessed: optionResults.length,
       retriesPerformed: totalRetriesPerformed,
+      convergenceLoops: convergenceLoop, // v2.9: Loops de convergência
       // v2.5: Diagnóstico de equalização calórica
       calorieEqualization: {
         optionsAdjusted: equalizationResult.adjusted,
@@ -2955,7 +3124,7 @@ serve(async (req) => {
         warnings: fatBalancingResult.warnings,
         adjustments: fatBalancingResult.adjustments,
       },
-      // v2.8: Diagnóstico de boost de gordura
+      // v2.9: Diagnóstico de boost de gordura (aplicado automaticamente)
       fatBoost: {
         optionsBoosted: fatBoostResult.boosted,
         warnings: fatBoostResult.warnings,
