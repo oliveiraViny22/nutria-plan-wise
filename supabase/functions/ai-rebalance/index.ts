@@ -59,13 +59,28 @@ const VALIDATION_CONSTANTS = {
 type FinalValidationStatus = "VALIDATED" | "VALIDATED_WITH_TOLERANCE" | "STRUCTURALLY_INVALID";
 
 // ============================================
-// FAT BOOST CONFIG (v2.8) - Injetar azeite quando gordura < 90%
+// FAT BOOST CONFIG (v2.10) - Injeção contextual de gordura
+// - Azeite: almoço/jantar
+// - Castanhas/Abacate: lanches/ceia
 // ============================================
 const FAT_BOOST_CONFIG = {
+  // Alimentos fonte de gordura
   AZEITE_ID: "58de144e-5581-4da6-84b9-6854e24358d3",
+  ABACATE_ID: "17a20117-4ced-466d-a47e-e0ea5d63bdaf",
+  CASTANHA_PARA_ID: "8677ab0b-00d3-4279-b83b-58230c5c26f4",
+  AMENDOAS_ID: "9af881da-5e16-44ca-b61b-49f3b0c98029",
+  NOZES_ID: "510eb05a-917a-4341-8b2d-b990f424d1ae",
+  
   MIN_FAT_THRESHOLD: 0.90, // 90% da meta
-  AZEITE_PORTION: { min: 5, max: 15, default: 10 }, // 10g ≈ 10g gordura
-  ELIGIBLE_MEALS: ["almoço", "jantar"], // Apenas refeições principais
+  
+  // Porções por tipo de alimento
+  AZEITE_PORTION: { min: 5, max: 15, default: 10 },     // 10g ≈ 10g gordura
+  ABACATE_PORTION: { min: 30, max: 80, default: 50 },   // 50g ≈ 7.5g gordura
+  OLEAGINOSA_PORTION: { min: 10, max: 30, default: 15 }, // 15g ≈ 10g gordura
+  
+  // Refeições elegíveis por tipo de alimento
+  MAIN_MEALS: ["almoço", "jantar"],           // Para azeite
+  SNACK_MEALS: ["lanche", "manhã", "tarde", "ceia"], // Para castanhas/abacate
 };
 
 interface FinalValidationResult {
@@ -957,6 +972,11 @@ interface FatBoostResult {
   }>;
 }
 
+/**
+ * Fat Boost v2.10: Injeção contextual de gordura
+ * - Almoço/Jantar: Azeite
+ * - Lanches/Ceia: Castanhas, Abacate ou Nozes
+ */
 async function boostFatWithOliveOil(
   optionResults: Array<{
     optionNumber: number;
@@ -967,34 +987,42 @@ async function boostFatWithOliveOil(
   targets: MacroTargets,
   meals: Meal[],
   supabase: any,
-  applyDirectly: boolean = true // v2.9: Aplicar diretamente no banco
+  applyDirectly: boolean = true
 ): Promise<FatBoostResult> {
   const warnings: string[] = [];
   const injections: FatBoostResult['injections'] = [];
   let totalBoosted = 0;
 
   console.log(`\n╔══════════════════════════════════════════════════════════════╗`);
-  console.log(`║  FAT BOOST v2.9 - Injeção de Azeite (auto-apply: ${applyDirectly})         ║`);
+  console.log(`║  FAT BOOST v2.10 - Injeção Contextual de Gordura             ║`);
   console.log(`╠══════════════════════════════════════════════════════════════╣`);
   console.log(`║  Meta de Gordura: ${targets.fat.toFixed(1)}g`.padEnd(63) + `║`);
   console.log(`║  Threshold: ${FAT_BOOST_CONFIG.MIN_FAT_THRESHOLD * 100}% (${(targets.fat * FAT_BOOST_CONFIG.MIN_FAT_THRESHOLD).toFixed(1)}g)`.padEnd(63) + `║`);
+  console.log(`║  Azeite → Almoço/Jantar | Castanhas/Abacate → Lanches/Ceia   ║`);
   console.log(`╚══════════════════════════════════════════════════════════════╝\n`);
 
-  // Buscar azeite diretamente do banco (como o gerador faz)
-  const { data: azeiteData, error: azeiteError } = await supabase
+  // Buscar todos os alimentos de gordura do banco
+  const fatFoodIds = [
+    FAT_BOOST_CONFIG.AZEITE_ID,
+    FAT_BOOST_CONFIG.ABACATE_ID,
+    FAT_BOOST_CONFIG.CASTANHA_PARA_ID,
+    FAT_BOOST_CONFIG.AMENDOAS_ID,
+    FAT_BOOST_CONFIG.NOZES_ID,
+  ];
+  
+  const { data: fatFoodsData, error: fatError } = await supabase
     .from("foods")
     .select("id, name, calories, protein, carbs, fat, category, serving_size")
-    .eq("id", FAT_BOOST_CONFIG.AZEITE_ID)
-    .eq("is_active", true)
-    .maybeSingle();
+    .in("id", fatFoodIds)
+    .eq("is_active", true);
 
-  if (azeiteError || !azeiteData) {
-    console.log(`[FAT BOOST] ⚠️ Azeite não encontrado no banco (ID: ${FAT_BOOST_CONFIG.AZEITE_ID})`);
-    warnings.push("Azeite não disponível para injeção");
+  if (fatError || !fatFoodsData || fatFoodsData.length === 0) {
+    console.log(`[FAT BOOST] ⚠️ Nenhum alimento de gordura encontrado`);
+    warnings.push("Alimentos de gordura não disponíveis");
     return { boosted: 0, warnings, injections };
   }
 
-  const azeite = azeiteData as {
+  type FatFood = {
     id: string;
     name: string;
     calories: number;
@@ -1004,30 +1032,35 @@ async function boostFatWithOliveOil(
     category: string;
     serving_size: string;
   };
+  
+  const fatFoods = fatFoodsData as FatFood[];
+  const azeite = fatFoods.find(f => f.id === FAT_BOOST_CONFIG.AZEITE_ID);
+  const abacate = fatFoods.find(f => f.id === FAT_BOOST_CONFIG.ABACATE_ID);
+  const oleaginosas = fatFoods.filter(f => 
+    f.id === FAT_BOOST_CONFIG.CASTANHA_PARA_ID ||
+    f.id === FAT_BOOST_CONFIG.AMENDOAS_ID ||
+    f.id === FAT_BOOST_CONFIG.NOZES_ID
+  );
 
-  console.log(`[FAT BOOST] Azeite encontrado: ${azeite.name} (${azeite.fat}g gordura/100g)`);
+  console.log(`[FAT BOOST] Alimentos disponíveis: ${fatFoods.map(f => f.name).join(", ")}`);
 
-  // Identificar refeições elegíveis (almoço/jantar)
-  const eligibleMeals = meals.filter(m => {
-    const mealNameLower = m.name.toLowerCase();
-    return FAT_BOOST_CONFIG.ELIGIBLE_MEALS.some(eligible => 
-      mealNameLower.includes(eligible.toLowerCase())
-    );
-  });
+  // Classificar refeições por tipo
+  const isMainMeal = (mealName: string) => 
+    FAT_BOOST_CONFIG.MAIN_MEALS.some(m => mealName.toLowerCase().includes(m));
+  const isSnackMeal = (mealName: string) => 
+    FAT_BOOST_CONFIG.SNACK_MEALS.some(m => mealName.toLowerCase().includes(m));
 
-  if (eligibleMeals.length === 0) {
-    console.log(`[FAT BOOST] Nenhuma refeição elegível (almoço/jantar) encontrada`);
-    return { boosted: 0, warnings, injections };
-  }
+  const mainMeals = meals.filter(m => isMainMeal(m.name));
+  const snackMeals = meals.filter(m => isSnackMeal(m.name));
 
-  console.log(`[FAT BOOST] Refeições elegíveis: ${eligibleMeals.map(m => m.name).join(", ")}`);
+  console.log(`[FAT BOOST] Refeições principais: ${mainMeals.map(m => m.name).join(", ") || "nenhuma"}`);
+  console.log(`[FAT BOOST] Lanches/Ceia: ${snackMeals.map(m => m.name).join(", ") || "nenhuma"}`);
 
   // Processar cada opção
   for (const optionResult of optionResults) {
     const currentFat = optionResult.finalTotals.fat;
     const fatPercent = currentFat / targets.fat;
 
-    // Só aplicar boost se gordura estiver abaixo do threshold
     if (fatPercent >= FAT_BOOST_CONFIG.MIN_FAT_THRESHOLD) {
       console.log(`[FAT BOOST] Opção ${optionResult.optionNumber}: ${currentFat.toFixed(1)}g (${(fatPercent * 100).toFixed(1)}%) ✓ OK`);
       continue;
@@ -1036,144 +1069,198 @@ async function boostFatWithOliveOil(
     const fatDeficit = (targets.fat * FAT_BOOST_CONFIG.MIN_FAT_THRESHOLD) - currentFat;
     console.log(`[FAT BOOST] Opção ${optionResult.optionNumber}: ${currentFat.toFixed(1)}g (${(fatPercent * 100).toFixed(1)}%) → precisa +${fatDeficit.toFixed(1)}g`);
 
-    // Verificar se já existe azeite nesta opção
-    const existingAzeite = optionResult.foods.find(f => f.food_id === FAT_BOOST_CONFIG.AZEITE_ID);
-    if (existingAzeite) {
-      // Se já tem azeite, aumentar a quantidade ao invés de adicionar novo
-      const currentGrams = optionResult.finalQuantities.get(existingAzeite.id) || existingAzeite.quantity_grams;
-      const gramsToAdd = Math.min(
-        FAT_BOOST_CONFIG.AZEITE_PORTION.max - currentGrams,
-        Math.round((fatDeficit / azeite.fat) * 100)
-      );
+    let fatAdded = 0;
+    const fatToAdd = fatDeficit;
 
-      if (gramsToAdd >= 2) {
-        const newGrams = currentGrams + gramsToAdd;
-        optionResult.finalQuantities.set(existingAzeite.id, newGrams);
+    // ETAPA 1: Tentar injetar azeite no almoço/jantar
+    if (azeite && mainMeals.length > 0 && fatAdded < fatToAdd) {
+      for (const meal of mainMeals) {
+        if (fatAdded >= fatToAdd) break;
+
+        const option = meal.meal_options.find(o => o.option_number === optionResult.optionNumber);
+        if (!option) continue;
+
+        // Verificar se já tem azeite
+        const hasAzeite = option.meal_option_foods.some(f => f.food_id === FAT_BOOST_CONFIG.AZEITE_ID);
+        if (hasAzeite) continue;
+
+        const remainingFat = fatToAdd - fatAdded;
+        const gramsNeeded = Math.min(
+          FAT_BOOST_CONFIG.AZEITE_PORTION.max,
+          Math.max(FAT_BOOST_CONFIG.AZEITE_PORTION.min, Math.round((remainingFat / azeite.fat) * 100))
+        );
+
+        const result = await injectFatFood(
+          supabase, optionResult, option, meal, azeite, gramsNeeded, applyDirectly, injections
+        );
         
-        const fatAdded = (gramsToAdd / 100) * azeite.fat;
-        optionResult.finalTotals.fat += fatAdded;
-        optionResult.finalTotals.calories += (gramsToAdd / 100) * azeite.calories;
-
-        console.log(`[FAT BOOST] Opção ${optionResult.optionNumber}: Azeite existente ${currentGrams}g → ${newGrams}g (+${fatAdded.toFixed(1)}g gordura)`);
-        totalBoosted++;
+        if (result.success) {
+          fatAdded += result.fatAdded;
+          totalBoosted++;
+          console.log(`[FAT BOOST] Opção ${optionResult.optionNumber}: +${gramsNeeded}g ${azeite.name} em ${meal.name} (+${result.fatAdded.toFixed(1)}g)${applyDirectly ? ' [APLICADO]' : ''}`);
+          break; // Uma injeção por tipo de refeição
+        }
       }
-      continue;
     }
 
-    // Encontrar uma refeição elegível para injetar o azeite
-    for (const meal of eligibleMeals) {
-      const option = meal.meal_options.find(o => o.option_number === optionResult.optionNumber);
-      if (!option) continue;
+    // ETAPA 2: Tentar injetar castanhas/abacate nos lanches/ceia
+    if (snackMeals.length > 0 && fatAdded < fatToAdd) {
+      // Selecionar alimento de gordura aleatoriamente para variedade
+      const snackFatFoods: FatFood[] = [];
+      if (abacate) snackFatFoods.push(abacate);
+      snackFatFoods.push(...oleaginosas);
+      
+      // Embaralhar para variedade
+      const shuffled = snackFatFoods.sort(() => Math.random() - 0.5);
 
-      // Verificar se esta opção da refeição já tem azeite
-      const optionHasAzeite = option.meal_option_foods.some(f => f.food_id === FAT_BOOST_CONFIG.AZEITE_ID);
-      if (optionHasAzeite) continue;
+      for (const meal of snackMeals) {
+        if (fatAdded >= fatToAdd) break;
 
-      // Calcular quantidade de azeite necessária
-      const gramsNeeded = Math.min(
-        FAT_BOOST_CONFIG.AZEITE_PORTION.max,
-        Math.max(
-          FAT_BOOST_CONFIG.AZEITE_PORTION.min,
-          Math.round((fatDeficit / azeite.fat) * 100)
-        )
-      );
+        const option = meal.meal_options.find(o => o.option_number === optionResult.optionNumber);
+        if (!option) continue;
 
-      const fatFromAzeite = (gramsNeeded / 100) * azeite.fat;
-      const caloriesFromAzeite = (gramsNeeded / 100) * azeite.calories;
-      const proteinFromAzeite = (gramsNeeded / 100) * azeite.protein;
-      const carbsFromAzeite = (gramsNeeded / 100) * azeite.carbs;
+        // Tentar cada alimento de gordura
+        for (const fatFood of shuffled) {
+          if (fatAdded >= fatToAdd) break;
 
-      // v2.9: Aplicar diretamente no banco de dados
-      if (applyDirectly) {
-        // Inserir novo registro em meal_option_foods
-        const { data: insertedFood, error: insertError } = await supabase
-          .from("meal_option_foods")
-          .insert({
-            meal_option_id: option.id,
-            food_id: azeite.id,
-            quantity_grams: gramsNeeded,
-          })
-          .select("id")
-          .single();
+          // Verificar se já tem este alimento
+          const hasFood = option.meal_option_foods.some(f => f.food_id === fatFood.id);
+          if (hasFood) continue;
 
-        if (insertError) {
-          console.error(`[FAT BOOST] ❌ Erro ao inserir azeite: ${insertError.message}`);
-          warnings.push(`Falha ao inserir azeite na opção ${optionResult.optionNumber}`);
-          continue;
+          const remainingFat = fatToAdd - fatAdded;
+          const isOleaginosa = oleaginosas.includes(fatFood);
+          const portion = isOleaginosa ? FAT_BOOST_CONFIG.OLEAGINOSA_PORTION : FAT_BOOST_CONFIG.ABACATE_PORTION;
+          
+          const gramsNeeded = Math.min(
+            portion.max,
+            Math.max(portion.min, Math.round((remainingFat / fatFood.fat) * 100))
+          );
+
+          const result = await injectFatFood(
+            supabase, optionResult, option, meal, fatFood, gramsNeeded, applyDirectly, injections
+          );
+          
+          if (result.success) {
+            fatAdded += result.fatAdded;
+            totalBoosted++;
+            console.log(`[FAT BOOST] Opção ${optionResult.optionNumber}: +${gramsNeeded}g ${fatFood.name} em ${meal.name} (+${result.fatAdded.toFixed(1)}g)${applyDirectly ? ' [APLICADO]' : ''}`);
+            break; // Uma injeção por refeição
+          }
         }
-
-        console.log(`[FAT BOOST] ✅ Azeite inserido no banco: ${insertedFood.id}`);
-
-        // Atualizar totais da meal_option
-        const { error: updateError } = await supabase
-          .from("meal_options")
-          .update({
-            total_calories: (option.total_calories || 0) + caloriesFromAzeite,
-            total_protein: (option.total_protein || 0) + proteinFromAzeite,
-            total_carbs: (option.total_carbs || 0) + carbsFromAzeite,
-            total_fat: (option.total_fat || 0) + fatFromAzeite,
-          })
-          .eq("id", option.id);
-
-        if (updateError) {
-          console.error(`[FAT BOOST] ⚠️ Erro ao atualizar totais da opção: ${updateError.message}`);
-        }
-
-        // Adicionar à estrutura local para que a re-validação funcione
-        const newFoodEntry: FoodWithMeta = {
-          id: insertedFood.id,
-          meal_option_id: option.id,
-          food_id: azeite.id,
-          quantity_grams: gramsNeeded,
-          food: {
-            id: azeite.id,
-            name: azeite.name,
-            calories: azeite.calories,
-            protein: azeite.protein,
-            carbs: azeite.carbs,
-            fat: azeite.fat,
-            serving_size: azeite.serving_size,
-            category: azeite.category,
-          },
-          mealName: meal.name,
-          mealId: meal.id,
-          optionId: option.id,
-        };
-        optionResult.foods.push(newFoodEntry);
-        optionResult.finalQuantities.set(insertedFood.id, gramsNeeded);
       }
-
-      // Registrar injeção
-      injections.push({
-        optionNumber: optionResult.optionNumber,
-        mealName: meal.name,
-        mealId: meal.id,
-        optionId: option.id,
-        foodId: azeite.id,
-        foodName: azeite.name,
-        grams: gramsNeeded,
-        fatAdded: fatFromAzeite,
-      });
-
-      // Atualizar totais projetados
-      optionResult.finalTotals.fat += fatFromAzeite;
-      optionResult.finalTotals.calories += caloriesFromAzeite;
-      optionResult.finalTotals.protein += proteinFromAzeite;
-      optionResult.finalTotals.carbs += carbsFromAzeite;
-
-      console.log(`[FAT BOOST] Opção ${optionResult.optionNumber}: +${gramsNeeded}g ${azeite.name} em ${meal.name} (+${fatFromAzeite.toFixed(1)}g gordura)${applyDirectly ? ' [APLICADO]' : ''}`);
-      totalBoosted++;
-      break; // Só injetar em uma refeição por opção
     }
+
+    const newFatPercent = optionResult.finalTotals.fat / targets.fat;
+    console.log(`[FAT BOOST] Opção ${optionResult.optionNumber}: Final ${optionResult.finalTotals.fat.toFixed(1)}g (${(newFatPercent * 100).toFixed(1)}%)`);
   }
 
   if (totalBoosted > 0) {
-    console.log(`\n[FAT BOOST] Concluído: ${totalBoosted} opção(ões) com boost de gordura${applyDirectly ? ' (aplicado no banco)' : ''}\n`);
+    console.log(`\n[FAT BOOST] Concluído: ${totalBoosted} injeção(ões) de gordura${applyDirectly ? ' (aplicado no banco)' : ''}\n`);
   } else {
-    console.log(`\n[FAT BOOST] Nenhum boost necessário\n`);
+    console.log(`\n[FAT BOOST] Nenhum boost aplicado\n`);
   }
 
   return { boosted: totalBoosted, warnings, injections };
+}
+
+/**
+ * Helper: Injeta um alimento de gordura em uma opção de refeição
+ */
+async function injectFatFood(
+  supabase: any,
+  optionResult: {
+    optionNumber: number;
+    foods: FoodWithMeta[];
+    finalQuantities: Map<string, number>;
+    finalTotals: MacroTargets;
+  },
+  option: MealOption,
+  meal: Meal,
+  food: { id: string; name: string; calories: number; protein: number; carbs: number; fat: number; category: string; serving_size: string },
+  grams: number,
+  applyDirectly: boolean,
+  injections: FatBoostResult['injections']
+): Promise<{ success: boolean; fatAdded: number }> {
+  const fatFromFood = (grams / 100) * food.fat;
+  const caloriesFromFood = (grams / 100) * food.calories;
+  const proteinFromFood = (grams / 100) * food.protein;
+  const carbsFromFood = (grams / 100) * food.carbs;
+
+  if (applyDirectly) {
+    // Inserir novo registro em meal_option_foods
+    const { data: insertedFood, error: insertError } = await supabase
+      .from("meal_option_foods")
+      .insert({
+        meal_option_id: option.id,
+        food_id: food.id,
+        quantity_grams: grams,
+      })
+      .select("id")
+      .single();
+
+    if (insertError) {
+      console.error(`[FAT BOOST] ❌ Erro ao inserir ${food.name}: ${insertError.message}`);
+      return { success: false, fatAdded: 0 };
+    }
+
+    // Atualizar totais da meal_option
+    const { error: updateError } = await supabase
+      .from("meal_options")
+      .update({
+        total_calories: (option.total_calories || 0) + caloriesFromFood,
+        total_protein: (option.total_protein || 0) + proteinFromFood,
+        total_carbs: (option.total_carbs || 0) + carbsFromFood,
+        total_fat: (option.total_fat || 0) + fatFromFood,
+      })
+      .eq("id", option.id);
+
+    if (updateError) {
+      console.error(`[FAT BOOST] ⚠️ Erro ao atualizar totais: ${updateError.message}`);
+    }
+
+    // Adicionar à estrutura local
+    const newFoodEntry: FoodWithMeta = {
+      id: insertedFood.id,
+      meal_option_id: option.id,
+      food_id: food.id,
+      quantity_grams: grams,
+      food: {
+        id: food.id,
+        name: food.name,
+        calories: food.calories,
+        protein: food.protein,
+        carbs: food.carbs,
+        fat: food.fat,
+        serving_size: food.serving_size,
+        category: food.category,
+      },
+      mealName: meal.name,
+      mealId: meal.id,
+      optionId: option.id,
+    };
+    optionResult.foods.push(newFoodEntry);
+    optionResult.finalQuantities.set(insertedFood.id, grams);
+  }
+
+  // Registrar injeção
+  injections.push({
+    optionNumber: optionResult.optionNumber,
+    mealName: meal.name,
+    mealId: meal.id,
+    optionId: option.id,
+    foodId: food.id,
+    foodName: food.name,
+    grams: grams,
+    fatAdded: fatFromFood,
+  });
+
+  // Atualizar totais projetados
+  optionResult.finalTotals.fat += fatFromFood;
+  optionResult.finalTotals.calories += caloriesFromFood;
+  optionResult.finalTotals.protein += proteinFromFood;
+  optionResult.finalTotals.carbs += carbsFromFood;
+
+  return { success: true, fatAdded: fatFromFood };
 }
 
 /**
@@ -2986,10 +3073,74 @@ serve(async (req) => {
       console.log(`  - fatEquivalent: ${equivalenceStatus.fatEquivalent}`);
     }
     
-    if (convergenceLoop > 0) {
+    // ============================================
+    // CONVERGÊNCIA FORÇADA v2.10
+    // Se após MAX_CONVERGENCE_LOOPS ainda não convergiu,
+    // expandir limites de categoria para forçar metas
+    // ============================================
+    let forcedConvergenceApplied = false;
+    
+    if (!equivalenceStatus.allValid || !equivalenceStatus.fatEquivalent) {
+      console.log(`\n╔══════════════════════════════════════════════════════════════╗`);
+      console.log(`║  CONVERGÊNCIA FORÇADA v2.10 - Expandindo limites             ║`);
+      console.log(`╚══════════════════════════════════════════════════════════════╝\n`);
+      
+      // Expandir limites de porção em +50% para forçar convergência
+      const FORCED_EXPANSION = 1.5;
+      
+      for (const optResult of optionResults) {
+        const fatPercent = optResult.finalTotals.fat / targets.fat;
+        
+        // Se gordura abaixo de 90%, aumentar porções de alimentos gordurosos
+        if (fatPercent < FAT_BOOST_CONFIG.MIN_FAT_THRESHOLD) {
+          const fatDeficit = (targets.fat * 0.95) - optResult.finalTotals.fat; // Mirar 95%
+          
+          // Encontrar alimentos de gordura existentes e aumentar
+          const fattyFoods = optResult.foods.filter(f => {
+            const fatRatio = f.food.fat / (f.food.calories || 1) * 100;
+            return fatRatio > 30; // >30% das calorias são gordura
+          });
+          
+          for (const food of fattyFoods) {
+            if (fatDeficit <= 0) break;
+            
+            const currentQty = optResult.finalQuantities.get(food.id) || food.quantity_grams;
+            const maxQty = Math.round(currentQty * FORCED_EXPANSION);
+            const gramsToAdd = Math.min(
+              maxQty - currentQty,
+              Math.round((fatDeficit / food.food.fat) * 100)
+            );
+            
+            if (gramsToAdd >= 5) {
+              const newQty = currentQty + gramsToAdd;
+              optResult.finalQuantities.set(food.id, newQty);
+              
+              const fatAdded = (gramsToAdd / 100) * food.food.fat;
+              optResult.finalTotals.fat += fatAdded;
+              optResult.finalTotals.calories += (gramsToAdd / 100) * food.food.calories;
+              optResult.finalTotals.protein += (gramsToAdd / 100) * food.food.protein;
+              optResult.finalTotals.carbs += (gramsToAdd / 100) * food.food.carbs;
+              
+              console.log(`[FORÇADO] Opção ${optResult.optionNumber}: ${food.food.name} ${currentQty}g → ${newQty}g (+${fatAdded.toFixed(1)}g gordura)`);
+              forcedConvergenceApplied = true;
+            }
+          }
+        }
+      }
+      
+      // Re-validar após convergência forçada
+      if (forcedConvergenceApplied) {
+        optionValidations = validateOptions();
+        equivalenceStatus = checkFullEquivalence();
+        console.log(`[FORÇADO] Resultado: allValid=${equivalenceStatus.allValid}, fatEquiv=${equivalenceStatus.fatEquivalent}`);
+      }
+    }
+    
+    if (convergenceLoop > 0 || forcedConvergenceApplied) {
       log.info("ConvergenceLoopCompleted", {
         loops: convergenceLoop,
         maxLoops: MAX_CONVERGENCE_LOOPS,
+        forcedConvergenceApplied,
         finalStatus: equivalenceStatus,
       });
     }
