@@ -141,12 +141,15 @@ export default function MealDetail() {
     candidates,
     error: substitutionError,
     showAll,
+    includeProteinGroup,
     findCandidates,
     selectCandidate,
     confirmSubstitution: confirmSub,
     reset: resetSubstitution,
     setShowAll,
+    setIncludeProteinGroup,
     canSubstitute: checkCanSubstitute,
+    isProteinCategory,
     getImpact,
     requiresRebalance,
   } = useSubstitution({
@@ -738,10 +741,13 @@ export default function MealDetail() {
         impact={getImpact()}
         requiresRebalance={requiresRebalance()}
         showAll={showAll}
+        includeProteinGroup={includeProteinGroup}
+        isProteinCategory={selectedMealOptionFood?.food ? isProteinCategory(selectedMealOptionFood.food as Food) : false}
         onSelectCandidate={handleSelectCandidate}
         onConfirm={confirmSubstitution}
         onBack={handleBackToCandidates}
         onToggleShowAll={setShowAll}
+        onToggleProteinGroup={setIncludeProteinGroup}
       />
 
       {/* Dialog de remoção - APENAS para profissionais */}

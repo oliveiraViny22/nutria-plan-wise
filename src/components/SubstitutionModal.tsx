@@ -20,6 +20,9 @@ import {
   Eye,
   EyeOff,
   ShieldAlert,
+  Beef,
+  Fish,
+  Egg,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -36,8 +39,10 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Food, MealOptionFood } from '@/lib/types';
 import { SubstituteProposal, SubstituteCandidate, SubstituteError } from '@/lib/substitution-service';
+import { CATEGORY_LABELS } from '@/lib/food-categories';
 
 // =====================================================
 // TIPOS
@@ -55,10 +60,13 @@ interface SubstitutionModalProps {
   impact: 'low' | 'medium' | 'high' | null;
   requiresRebalance: boolean;
   showAll: boolean;
+  includeProteinGroup: boolean;
+  isProteinCategory: boolean;
   onSelectCandidate: (candidateId: string) => void;
   onConfirm: () => void;
   onBack: () => void;
   onToggleShowAll: (showAll: boolean) => void;
+  onToggleProteinGroup: (include: boolean) => void;
 }
 
 // =====================================================
@@ -169,15 +177,18 @@ function FoodCard({
 
 function CandidateItem({ 
   candidate, 
-  onSelect 
+  onSelect,
+  showCategory = false,
 }: { 
   candidate: SubstituteCandidate; 
   onSelect: () => void;
+  showCategory?: boolean;
 }) {
   const similarity = getSimilarityLabel(candidate.score);
   const percentage = Math.round(candidate.score * 100);
   const food = candidate.food;
   const hasWarning = candidate.hasProcessingWarning;
+  const categoryLabel = food.category ? (CATEGORY_LABELS[food.category as keyof typeof CATEGORY_LABELS] || food.category) : '';
   
   // Calcular macros para a porção sugerida
   const baseGrams = parseFloat(food.serving_size?.match(/(\d+)/)?.[1] || '100');
@@ -217,7 +228,14 @@ function CandidateItem({
               </TooltipProvider>
             )}
           </div>
-          <p className="text-xs text-muted-foreground">{candidate.newPortionGrams}g</p>
+          <div className="flex items-center gap-1.5">
+            <p className="text-xs text-muted-foreground">{candidate.newPortionGrams}g</p>
+            {showCategory && categoryLabel && (
+              <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                {categoryLabel}
+              </Badge>
+            )}
+          </div>
         </div>
         <div className="flex flex-col items-end gap-1 flex-shrink-0">
           <Badge variant={hasWarning ? 'outline' : similarity.variant} className={`text-xs ${hasWarning ? 'border-amber-500/50 text-amber-600' : ''}`}>
@@ -269,10 +287,13 @@ export function SubstitutionModal({
   impact,
   requiresRebalance,
   showAll,
+  includeProteinGroup,
+  isProteinCategory,
   onSelectCandidate,
   onConfirm,
   onBack,
   onToggleShowAll,
+  onToggleProteinGroup,
 }: SubstitutionModalProps) {
   const food = selectedFood?.food as Food | undefined;
   
@@ -350,6 +371,40 @@ export function SubstitutionModal({
           {/* Lista de candidatos */}
           {!proposal && (
             <div className="space-y-3">
+              {/* Toggle para trocar por outras proteínas */}
+              {isProteinCategory && (
+                <div className="flex flex-col gap-2">
+                  <Button
+                    variant={includeProteinGroup ? 'default' : 'outline'}
+                    size="sm"
+                    className="w-full gap-2"
+                    onClick={() => onToggleProteinGroup(!includeProteinGroup)}
+                  >
+                    {includeProteinGroup ? (
+                      <>
+                        <Fish className="w-4 h-4" />
+                        Mostrando todas as proteínas
+                      </>
+                    ) : (
+                      <>
+                        <Beef className="w-4 h-4" />
+                        Trocar por outra proteína (frango, peixe, carne...)
+                      </>
+                    )}
+                  </Button>
+                  
+                  {includeProteinGroup && (
+                    <motion.p
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      className="text-xs text-muted-foreground text-center"
+                    >
+                      Agora você pode trocar entre carnes, peixes, frutos do mar e ovos.
+                    </motion.p>
+                  )}
+                </div>
+              )}
+
               <div className="flex items-center justify-between">
                 <p className="text-sm font-medium">Escolha um equivalente:</p>
                 <div className="flex items-center gap-1">
@@ -393,8 +448,11 @@ export function SubstitutionModal({
                       </TooltipTrigger>
                       <TooltipContent className="max-w-xs">
                         <p className="text-xs">
-                          Mostramos apenas alimentos da mesma categoria nutricional para manter o equilíbrio do seu plano.
-                          O score indica quão similar é a composição nutricional.
+                          {includeProteinGroup 
+                            ? 'Mostrando fontes de proteína intercambiáveis: carnes, peixes, ovos e frutos do mar.'
+                            : 'Mostramos apenas alimentos da mesma categoria nutricional para manter o equilíbrio do seu plano.'
+                          }
+                          {' '}O score indica quão similar é a composição nutricional.
                         </p>
                       </TooltipContent>
                     </Tooltip>
@@ -423,13 +481,52 @@ export function SubstitutionModal({
                 </div>
               ) : candidates.length > 0 ? (
                 <div className="max-h-60 overflow-y-auto space-y-2 pr-1">
-                  {candidates.slice(0, 15).map((c) => (
-                    <CandidateItem
-                      key={c.food.id}
-                      candidate={c}
-                      onSelect={() => onSelectCandidate(c.food.id)}
-                    />
-                  ))}
+                  {/* Separar candidatos por categoria quando includeProteinGroup está ativo */}
+                  {includeProteinGroup ? (
+                    <>
+                      {/* Primeiro mostrar da mesma categoria */}
+                      {candidates.filter(c => !c.isCrossCategory).length > 0 && (
+                        <div className="space-y-2">
+                          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide px-1">
+                            Mesma categoria
+                          </p>
+                          {candidates.filter(c => !c.isCrossCategory).slice(0, 8).map((c) => (
+                            <CandidateItem
+                              key={c.food.id}
+                              candidate={c}
+                              onSelect={() => onSelectCandidate(c.food.id)}
+                            />
+                          ))}
+                        </div>
+                      )}
+                      
+                      {/* Depois mostrar de outras categorias de proteína */}
+                      {candidates.filter(c => c.isCrossCategory).length > 0 && (
+                        <div className="space-y-2 pt-2 border-t border-border">
+                          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide px-1 flex items-center gap-1">
+                            <Fish className="w-3 h-3" />
+                            Outras proteínas
+                          </p>
+                          {candidates.filter(c => c.isCrossCategory).slice(0, 10).map((c) => (
+                            <CandidateItem
+                              key={c.food.id}
+                              candidate={c}
+                              onSelect={() => onSelectCandidate(c.food.id)}
+                              showCategory
+                            />
+                          ))}
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    candidates.slice(0, 15).map((c) => (
+                      <CandidateItem
+                        key={c.food.id}
+                        candidate={c}
+                        onSelect={() => onSelectCandidate(c.food.id)}
+                      />
+                    ))
+                  )}
                 </div>
               ) : !error && (
                 <div className="text-center py-4 space-y-2">
@@ -445,6 +542,17 @@ export function SubstitutionModal({
                     >
                       <Eye className="w-3 h-3 mr-1" />
                       Ver todos da categoria
+                    </Button>
+                  )}
+                  {isProteinCategory && !includeProteinGroup && (
+                    <Button 
+                      variant="link" 
+                      size="sm" 
+                      className="text-xs"
+                      onClick={() => onToggleProteinGroup(true)}
+                    >
+                      <Beef className="w-3 h-3 mr-1" />
+                      Buscar em outras proteínas
                     </Button>
                   )}
                 </div>
