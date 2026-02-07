@@ -1851,7 +1851,7 @@ serve(async (req) => {
     // COM RETRY AUTOMÁTICO PARA OPÇÕES NÃO CONVERGIDAS
     // ============================================
     
-    const MAX_OPTION_RETRIES = 2; // Máximo de retries por opção
+    const MAX_OPTION_RETRIES = 5; // Máximo de retries por opção
     let retriesPerformed = 0;
     
     const validateOptions = (): Array<{
