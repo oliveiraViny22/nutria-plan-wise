@@ -120,8 +120,44 @@ export default function Progress() {
       if (weightResult.error) throw weightResult.error;
       if (measurementsResult.error) throw measurementsResult.error;
       
+      // Get weight logs
+      let weightLogs = (weightResult.data || []) as WeightLog[];
+      
+      // Include initial weight from profile (onboarding) as first log if no logs exist
+      // or if profile weight was set before any weight_logs
+      if (profile?.weight && profile.weight > 0) {
+        const profileCreatedAt = profile.created_at 
+          ? new Date(profile.created_at).toISOString().split('T')[0]
+          : new Date().toISOString().split('T')[0];
+        
+        // Check if we already have a log for the onboarding date
+        const hasOnboardingLog = weightLogs.some(log => log.log_date === profileCreatedAt);
+        
+        if (!hasOnboardingLog) {
+          // Add virtual log from profile weight (onboarding)
+          const onboardingLog: WeightLog = {
+            id: 'onboarding-initial',
+            weight_kg: profile.weight,
+            log_date: profileCreatedAt,
+          };
+          
+          // Insert at the beginning if it's the earliest
+          if (weightLogs.length === 0 || new Date(profileCreatedAt) <= new Date(weightLogs[0].log_date)) {
+            weightLogs = [onboardingLog, ...weightLogs];
+          } else {
+            // Insert in chronological order
+            const insertIndex = weightLogs.findIndex(log => new Date(log.log_date) > new Date(profileCreatedAt));
+            if (insertIndex === -1) {
+              weightLogs.push(onboardingLog);
+            } else {
+              weightLogs.splice(insertIndex, 0, onboardingLog);
+            }
+          }
+        }
+      }
+      
       setDailyLogs((logsResult.data || []) as DailyLogEntry[]);
-      setWeightLogs((weightResult.data || []) as WeightLog[]);
+      setWeightLogs(weightLogs);
       setBodyMeasurements((measurementsResult.data || []) as BodyMeasurement[]);
     } catch (error) {
       console.error('Error fetching data:', error);
