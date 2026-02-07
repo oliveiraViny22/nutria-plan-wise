@@ -478,25 +478,29 @@ export function calculateMealReplacement(
     return true;
   };
   
-  // 1. PROTEÍNA: Usar Whey SOMENTE se precisar de proteína E não vai exceder muito
+  // 1. PROTEÍNA: Usar Whey para atingir 90-100% da proteína
   const proteinDeficit = targetMacros.protein - currentMacros.protein;
   const proteinAccuracy = () => (currentMacros.protein / targetMacros.protein) * 100;
   
-  // Só adicionar whey se o deficit for significativo (>= 15g) e temos espaço
-  if (proteinDeficit >= 15 && remaining().calories >= 60) {
+  // Adicionar whey se o deficit for >= 10g (reduzido de 15g para incluir refeições menores)
+  // Para refeições com muita proteína (>40g), permitir até 1.5 scoops
+  const isHighProteinMeal = targetMacros.protein >= 40;
+  const maxScoops = isHighProteinMeal ? 1.5 : 1;
+  
+  if (proteinDeficit >= 10 && remaining().calories >= 60) {
     const wheyType = userGoal === 'lose_weight' ? 'Whey Protein Isolado' : 'Whey Protein Concentrado';
     const whey = ACTIVE_SUPPLEMENTS[wheyType];
     
     if (whey) {
-      // Calcular scoops para atingir ~95% da proteína (não 100%+)
+      // Calcular scoops para atingir ~95% da proteína
       const targetProteinScoops = (targetMacros.protein * 0.95 - currentMacros.protein) / whey.macros.protein;
-      const idealScoops = Math.min(1, Math.max(0.5, targetProteinScoops)); // Máx 1 scoop
+      const idealScoops = Math.min(maxScoops, Math.max(0.5, targetProteinScoops));
       const optimalScale = calculateOptimalScale(whey.macros, idealScoops, 0.5);
       
-      // Arredondar para 0.5
-      const finalScoops = Math.round(optimalScale * 2) / 2;
+      // Arredondar para 0.25 para mais precisão
+      const finalScoops = Math.round(optimalScale * 4) / 4;
       
-      if (finalScoops >= 0.5 && finalScoops <= 1) {
+      if (finalScoops >= 0.5 && finalScoops <= maxScoops) {
         addItem(wheyType, ACTIVE_SUPPLEMENTS, 'supplement', finalScoops);
       }
     }
@@ -674,9 +678,14 @@ export function calculateMealReplacement(
   // =====================================================
   // 8. REFINAMENTO ITERATIVO: Ajustar porções para convergência
   // =====================================================
+  
+  // METAS ADAPTATIVAS: Para refeições com pouca proteína (<20g), 
+  // relaxar o teto para 110% (já que 0.5 scoop de whey = 12.5g mínimo)
+  const isLowProteinMeal = targetMacros.protein < 20;
+  
   const ACCURACY_TARGETS = {
     calories: { min: 90, max: 100 },
-    protein: { min: 90, max: 105 },
+    protein: { min: 90, max: isLowProteinMeal ? 110 : 105 }, // Relaxar para refeições leves
     carbs: { min: 80, max: 120 },
     fat: { min: 80, max: 120 },
   };
@@ -699,8 +708,8 @@ export function calculateMealReplacement(
     );
   };
   
-  // Função para escalar um item existente
-  const scaleExistingItem = (itemIndex: number, newScale: number): boolean => {
+  // Função para escalar um item existente (permite redução agressiva)
+  const scaleExistingItem = (itemIndex: number, newScale: number, allowBelowMin: boolean = false): boolean => {
     const item = items[itemIndex];
     if (!item || item.name === 'Água') return false;
     
@@ -714,22 +723,24 @@ export function calculateMealReplacement(
       : 1;
     
     // Limitar newScale aos bounds do catálogo
-    const minScale = catalogItem.minPortion || 0.25;
+    const minScale = allowBelowMin ? 0.25 : (catalogItem.minPortion || 0.25);
     const maxScale = catalogItem.maxPortion || 2;
     const clampedScale = Math.max(minScale, Math.min(maxScale, newScale));
     
-    if (Math.abs(clampedScale - currentScale) < 0.1) return false; // Mudança insignificante
+    if (Math.abs(clampedScale - currentScale) < 0.05) return false; // Mudança insignificante
     
     // Atualizar macros
     const oldMacros = item.macros;
     const newMacros = scaleMacros(catalogItem.macros, clampedScale);
     
-    // Verificar se a mudança não excede limites críticos
-    const projectedProtein = currentMacros.protein - oldMacros.protein + newMacros.protein;
-    const projectedCalories = currentMacros.calories - oldMacros.calories + newMacros.calories;
-    
-    if (projectedProtein > targetMacros.protein * 1.10) return false; // Limite de proteína
-    if (projectedCalories > targetMacros.calories * 1.05) return false; // Limite de calorias
+    // Verificar se a mudança não excede limites críticos (apenas para aumentos)
+    if (clampedScale > currentScale) {
+      const projectedProtein = currentMacros.protein - oldMacros.protein + newMacros.protein;
+      const projectedCalories = currentMacros.calories - oldMacros.calories + newMacros.calories;
+      
+      if (projectedProtein > targetMacros.protein * 1.05) return false; // Limite de proteína mais rigoroso
+      if (projectedCalories > targetMacros.calories * 1.00) return false; // Limite de calorias mais rigoroso
+    }
     
     // Aplicar mudança
     currentMacros.calories = currentMacros.calories - oldMacros.calories + newMacros.calories;
@@ -746,22 +757,95 @@ export function calculateMealReplacement(
     return true;
   };
   
-  // Executar até 5 iterações de refinamento
-  const MAX_REFINEMENT_ITERATIONS = 5;
+  // Função para remover um item (para casos extremos)
+  const removeItem = (itemIndex: number): boolean => {
+    const item = items[itemIndex];
+    if (!item || item.name === 'Água') return false;
+    
+    // Atualizar macros
+    currentMacros.calories -= item.macros.calories;
+    currentMacros.protein -= item.macros.protein;
+    currentMacros.carbs -= item.macros.carbs;
+    currentMacros.fat -= item.macros.fat;
+    
+    items.splice(itemIndex, 1);
+    return true;
+  };
+  
+  // Executar até 8 iterações de refinamento (mais iterações para convergência)
+  const MAX_REFINEMENT_ITERATIONS = 8;
   for (let iteration = 0; iteration < MAX_REFINEMENT_ITERATIONS; iteration++) {
     const acc = calculateAccuracy();
     
     if (isConverged(acc)) break;
     
-    // Identificar o macro mais crítico (mais longe da meta)
-    const calorieGap = acc.calories < ACCURACY_TARGETS.calories.min 
-      ? ACCURACY_TARGETS.calories.min - acc.calories 
-      : (acc.calories > ACCURACY_TARGETS.calories.max ? acc.calories - ACCURACY_TARGETS.calories.max : 0);
-    const proteinGap = acc.protein < ACCURACY_TARGETS.protein.min 
-      ? ACCURACY_TARGETS.protein.min - acc.protein 
-      : 0; // Só preocupa se abaixo
+    // PRIORIDADE 1: Calorias acima de 100% - REDUZIR primeiro
+    if (acc.calories > ACCURACY_TARGETS.calories.max) {
+      const excessCalories = currentMacros.calories - targetMacros.calories;
+      
+      // Ordem de redução: Mel > Banana > Oleaginosas > Aveia > Whey (último recurso)
+      const reductionOrder = [
+        ...items.map((item, idx) => ({ item, idx })).filter(({ item }) => item.name === 'Mel'),
+        ...items.map((item, idx) => ({ item, idx })).filter(({ item }) => item.name === 'Banana'),
+        ...items.map((item, idx) => ({ item, idx })).filter(({ item }) => 
+          item.name.includes('Castanha') || item.name.includes('Amendoim') || item.name.includes('Nozes') || item.name.includes('Amêndoas')
+        ),
+        ...items.map((item, idx) => ({ item, idx })).filter(({ item }) => item.name.includes('Aveia')),
+        ...items.map((item, idx) => ({ item, idx })).filter(({ item }) => item.name.includes('Whey')),
+      ];
+      
+      for (const { item, idx } of reductionOrder) {
+        const catalogItem = ACTIVE_FOODS[item.name] || ACTIVE_SUPPLEMENTS[item.name];
+        if (!catalogItem) continue;
+        
+        const currentScale = catalogItem.macros.calories > 0 
+          ? item.macros.calories / catalogItem.macros.calories 
+          : 1;
+        
+        // Calcular quanto precisamos reduzir
+        const targetCalories = targetMacros.calories * 0.95; // Apontar para 95%
+        const caloriesOver = currentMacros.calories - targetCalories;
+        const scaleReduction = caloriesOver / catalogItem.macros.calories;
+        const newScale = Math.max(0.25, currentScale - scaleReduction);
+        
+        if (scaleExistingItem(idx, newScale, true)) {
+          break;
+        }
+      }
+      continue; // Verificar novamente antes de aumentar
+    }
     
-    // Prioridade: Calorias primeiro (se abaixo de 90%)
+    // PRIORIDADE 2: Proteína acima de 105% - REDUZIR whey com precisão
+    if (acc.protein > ACCURACY_TARGETS.protein.max) {
+      const wheyIdx = items.findIndex(item => item.name.includes('Whey'));
+      if (wheyIdx >= 0) {
+        const wheyItem = items[wheyIdx];
+        const catalogItem = ACTIVE_SUPPLEMENTS[wheyItem.name];
+        if (catalogItem) {
+          const currentScale = catalogItem.macros.protein > 0 
+            ? wheyItem.macros.protein / catalogItem.macros.protein 
+            : 1;
+          
+          // Reduzir whey para atingir exatamente 100% proteína
+          const targetProtein = targetMacros.protein * 1.00;
+          const proteinOver = currentMacros.protein - targetProtein;
+          const scaleReduction = proteinOver / catalogItem.macros.protein;
+          let newScale = currentScale - scaleReduction;
+          
+          // Mínimo 0.35 para garantir que não fique abaixo de 90% após redução
+          // (0.35 scoop = ~8.5g proteína, suficiente para targets de 10g+)
+          const minScaleForProtection = Math.max(0.35, (targetMacros.protein * 0.90) / catalogItem.macros.protein);
+          newScale = Math.max(minScaleForProtection, newScale);
+          
+          if (scaleExistingItem(wheyIdx, newScale, true)) {
+            continue;
+          }
+        }
+      }
+      continue;
+    }
+    
+    // PRIORIDADE 3: Calorias abaixo de 90% - AUMENTAR
     if (acc.calories < ACCURACY_TARGETS.calories.min) {
       // Tentar escalar itens de carboidrato para aumentar calorias
       const carbItems = items.map((item, idx) => ({ item, idx }))
@@ -787,7 +871,7 @@ export function calculateMealReplacement(
       }
     }
     
-    // Se proteína abaixo de 90%, tentar escalar whey
+    // PRIORIDADE 4: Proteína abaixo de 90% - AUMENTAR whey
     if (acc.protein < ACCURACY_TARGETS.protein.min) {
       const wheyIdx = items.findIndex(item => item.name.includes('Whey'));
       if (wheyIdx >= 0) {
@@ -798,36 +882,18 @@ export function calculateMealReplacement(
             ? wheyItem.macros.protein / catalogItem.macros.protein 
             : 1;
           
-          // Tentar aumentar para 1 scoop se ainda está em 0.5
-          if (currentScale < 1) {
-            scaleExistingItem(wheyIdx, 1);
+          // Calcular scale necessário para atingir ~95% da proteína
+          const targetProtein = targetMacros.protein * 0.95;
+          const proteinNeeded = targetProtein - currentMacros.protein;
+          const scaleNeeded = (proteinNeeded / catalogItem.macros.protein) + currentScale;
+          
+          // Tentar aumentar até 1 scoop (ou até o necessário)
+          const maxAllowed = isHighProteinMeal ? 1.5 : 1;
+          const newScale = Math.min(maxAllowed, Math.max(currentScale + 0.1, scaleNeeded));
+          
+          if (newScale > currentScale) {
+            scaleExistingItem(wheyIdx, newScale);
           }
-        }
-      }
-    }
-    
-    // Se calorias acima de 100%, tentar reduzir itens menos essenciais
-    if (acc.calories > ACCURACY_TARGETS.calories.max) {
-      // Reduzir mel primeiro, depois oleaginosas
-      const fillerItems = items.map((item, idx) => ({ item, idx }))
-        .filter(({ item }) => 
-          item.name === 'Mel' || item.name.includes('Castanha') || 
-          item.name.includes('Amendoim') || item.name.includes('Nozes')
-        );
-      
-      for (const { item, idx } of fillerItems) {
-        const catalogItem = ACTIVE_FOODS[item.name];
-        if (!catalogItem) continue;
-        
-        const currentScale = catalogItem.macros.calories > 0 
-          ? item.macros.calories / catalogItem.macros.calories 
-          : 1;
-        
-        // Reduzir em 0.25
-        const newScale = currentScale - 0.25;
-        if (newScale >= 0.25) {
-          scaleExistingItem(idx, newScale);
-          break;
         }
       }
     }
