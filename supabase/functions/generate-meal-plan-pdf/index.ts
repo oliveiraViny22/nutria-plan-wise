@@ -549,7 +549,12 @@ serve(async (req) => {
           
           let quantity = `${Math.round(grams)}g`;
           if (mof.display_quantity && mof.display_unit) {
-            quantity = `${mof.display_quantity} ${mof.display_unit}`;
+            // Formato dual: unidades + gramas para clareza
+            const displayQty = Number.isInteger(mof.display_quantity) 
+              ? mof.display_quantity 
+              : Number(mof.display_quantity).toFixed(1);
+            const unitPlural = mof.display_quantity === 1 ? mof.display_unit : mof.display_unit;
+            quantity = `${displayQty} ${unitPlural} (${Math.round(grams)}g)`;
           }
 
           return {
