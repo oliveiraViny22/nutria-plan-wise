@@ -519,7 +519,7 @@ export function SubstitutionModal({
                       )}
                     </>
                   ) : (
-                    candidates.slice(0, 15).map((c) => (
+                  candidates.slice(0, 25).map((c) => (
                       <CandidateItem
                         key={c.food.id}
                         candidate={c}
