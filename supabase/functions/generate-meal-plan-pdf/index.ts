@@ -208,10 +208,10 @@ function generateMealPlanPage(
       </div>
       
       <div class="meals-section">
-        <div class="meals-header">
-          <div class="meals-title">🍽️ Refeições</div>
-          <div class="options-legend">
-            ${Array.from({ length: colCount }, (_, i) => `<span>Opção ${i + 1}</span>`).join("")}
+        <div class="meals-header-row">
+          <div class="header-meal-label">🍽️ Refeições</div>
+          <div class="header-options-grid" style="grid-template-columns: repeat(${colCount}, 1fr);">
+            ${Array.from({ length: colCount }, (_, i) => `<div class="header-opt-label">Opção ${i + 1}</div>`).join("")}
           </div>
         </div>
         <div class="meals-grid">${mealsHtml}</div>
@@ -278,6 +278,73 @@ function generateSupplementPage(
     })
     .join("");
 
+  // Gerar HTML para micronutrientes recomendados
+  const micronutrientsHtml = `
+    <div class="micro-section">
+      <div class="micro-title">🧬 Micronutrientes Recomendados</div>
+      <div class="micro-grid">
+        <div class="micro-card">
+          <div class="micro-header">Vitamina D3</div>
+          <div class="micro-dose">2000 UI</div>
+          <div class="micro-timing">Com gordura (café/almoço)</div>
+          <div class="micro-benefit">Imunidade e saúde óssea</div>
+        </div>
+        <div class="micro-card">
+          <div class="micro-header">Ômega-3</div>
+          <div class="micro-dose">1000-2000mg</div>
+          <div class="micro-timing">Com o jantar</div>
+          <div class="micro-benefit">Anti-inflamatório e cardiovascular</div>
+        </div>
+        <div class="micro-card">
+          <div class="micro-header">Magnésio</div>
+          <div class="micro-dose">200-400mg</div>
+          <div class="micro-timing">Antes de dormir</div>
+          <div class="micro-benefit">Relaxamento e sono</div>
+        </div>
+        <div class="micro-card">
+          <div class="micro-header">Multivitamínico</div>
+          <div class="micro-dose">1 cápsula</div>
+          <div class="micro-timing">Com o café da manhã</div>
+          <div class="micro-benefit">Cobertura nutricional geral</div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  // Suporte adicional baseado no objetivo
+  const supportItems = {
+    lose_weight: [
+      { name: 'Cafeína', dose: '100-200mg', timing: 'Antes do treino', benefit: 'Aumenta metabolismo' },
+      { name: 'Fibras (Psyllium)', dose: '5g', timing: 'Com água, antes das refeições', benefit: 'Saciedade' },
+    ],
+    maintain: [
+      { name: 'Probióticos', dose: 'Conforme rótulo', timing: 'Em jejum', benefit: 'Saúde intestinal' },
+    ],
+    gain_muscle: [
+      { name: 'Creatina Monohidratada', dose: '5g', timing: 'Dose única diária', benefit: 'Força e volume muscular' },
+      { name: 'Beta-Alanina', dose: '2-4g', timing: 'Pré-treino', benefit: 'Resistência muscular' },
+    ],
+  };
+
+  const goalSupports = supportItems[profile.goal as keyof typeof supportItems] || supportItems.maintain;
+  const supportHtml = `
+    <div class="support-section">
+      <div class="support-title">💪 Suporte para ${goalLabel}</div>
+      <div class="support-grid">
+        ${goalSupports.map(s => `
+          <div class="support-card">
+            <div class="support-name">${s.name}</div>
+            <div class="support-details">
+              <span class="support-dose">${s.dose}</span>
+              <span class="support-timing">${s.timing}</span>
+            </div>
+            <div class="support-benefit">${s.benefit}</div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `;
+
   return `
     <div class="page page-supplements">
       <div class="header">
@@ -299,8 +366,12 @@ function generateSupplementPage(
       </div>
       
       <div class="supp-section">
-        ${supplements.length > 0 ? supplementsHtml : '<p class="no-supp">Nenhuma suplementação configurada para este plano.</p>'}
+        ${supplements.length > 0 ? supplementsHtml : '<p class="no-supp">Nenhuma alternativa de refeição para este plano.</p>'}
       </div>
+      
+      ${micronutrientsHtml}
+      
+      ${supportHtml}
       
       <div class="supp-notes">
         <div class="note-title">📋 Observações Importantes</div>
@@ -429,21 +500,33 @@ function generateExecutivePdf(
       flex-direction: column;
       min-height: 0;
     }
-    .meals-header {
+    .meals-header-row {
       display: flex;
-      justify-content: space-between;
-      align-items: center;
       margin-bottom: 4px;
       padding-bottom: 3px;
       border-bottom: 1px solid #e2e8f0;
     }
-    .meals-title { font-size: 9pt; font-weight: 700; }
-    .options-legend {
+    .header-meal-label { 
+      width: 80px;
+      min-width: 80px;
+      font-size: 9pt; 
+      font-weight: 700;
       display: flex;
-      gap: 20px;
-      font-size: 6pt;
-      color: #6b7280;
+      align-items: center;
+    }
+    .header-options-grid {
+      flex: 1;
+      display: grid;
+      gap: 1px;
+    }
+    .header-opt-label {
+      text-align: center;
+      font-size: 7pt;
       font-weight: 600;
+      color: #3b82f6;
+      background: #eff6ff;
+      padding: 3px 6px;
+      border-radius: 4px;
     }
     .meals-grid { 
       flex: 1;
@@ -677,9 +760,113 @@ function generateExecutivePdf(
     
     .no-supp {
       text-align: center;
-      padding: 40px;
+      padding: 20px;
       color: #9ca3af;
       font-size: 9pt;
+    }
+    
+    /* Micronutrientes */
+    .micro-section {
+      margin-top: 12px;
+      margin-bottom: 10px;
+    }
+    .micro-title {
+      font-size: 9pt;
+      font-weight: 700;
+      color: #7c3aed;
+      margin-bottom: 8px;
+      text-align: center;
+    }
+    .micro-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+    }
+    .micro-card {
+      background: #fff;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      padding: 8px;
+      text-align: center;
+    }
+    .micro-header {
+      font-size: 7pt;
+      font-weight: 700;
+      color: #374151;
+      margin-bottom: 4px;
+    }
+    .micro-dose {
+      font-size: 10pt;
+      font-weight: 800;
+      color: #8b5cf6;
+      margin-bottom: 2px;
+    }
+    .micro-timing {
+      font-size: 6pt;
+      color: #6b7280;
+      margin-bottom: 4px;
+    }
+    .micro-benefit {
+      font-size: 6pt;
+      color: #059669;
+      background: #ecfdf5;
+      padding: 2px 4px;
+      border-radius: 3px;
+    }
+    
+    /* Suporte por objetivo */
+    .support-section {
+      margin-top: 10px;
+      margin-bottom: 10px;
+    }
+    .support-title {
+      font-size: 9pt;
+      font-weight: 700;
+      color: #7c3aed;
+      margin-bottom: 8px;
+      text-align: center;
+    }
+    .support-grid {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .support-card {
+      background: linear-gradient(135deg, #f3e8ff, #fff);
+      border: 1px solid #c4b5fd;
+      border-radius: 6px;
+      padding: 8px 12px;
+      min-width: 140px;
+      text-align: center;
+    }
+    .support-name {
+      font-size: 8pt;
+      font-weight: 700;
+      color: #6d28d9;
+      margin-bottom: 4px;
+    }
+    .support-details {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      margin-bottom: 4px;
+    }
+    .support-dose {
+      font-size: 9pt;
+      font-weight: 800;
+      color: #7c3aed;
+    }
+    .support-timing {
+      font-size: 6pt;
+      color: #6b7280;
+    }
+    .support-benefit {
+      font-size: 6pt;
+      color: #059669;
+      background: #ecfdf5;
+      padding: 2px 6px;
+      border-radius: 3px;
     }
     
     @media print {
