@@ -152,7 +152,8 @@ export default function DailyLog() {
   // Success animation state
   const [showSuccessAnim, setShowSuccessAnim] = useState(false);
   
-  const isLateConfirmation = isBefore(startOfDay(selectedDate), startOfDay(new Date()));
+  const isPastDate = isBefore(startOfDay(selectedDate), startOfDay(new Date()));
+  const isReadOnly = isPastDate; // Past dates are read-only
   const dateKey = format(selectedDate, 'yyyy-MM-dd');
 
   const fetchDailyData = async () => {
@@ -327,10 +328,8 @@ export default function DailyLog() {
       setTimeout(() => setShowSuccessAnim(false), 1500);
 
       toast({
-        title: isLateConfirmation ? 'Refeição confirmada (atrasada)' : 'Refeição confirmada!',
-        description: isLateConfirmation 
-          ? 'O registro foi salvo como confirmação tardia.'
-          : 'Seu consumo foi registrado com sucesso.',
+        title: 'Refeição confirmada!',
+        description: 'Seu consumo foi registrado com sucesso.',
       });
 
       setConfirmingMeal(null);
@@ -504,10 +503,10 @@ export default function DailyLog() {
                       {format(selectedDate, 'dd/MM/yyyy')}
                     </p>
                   )}
-                  {isLateConfirmation && (
-                    <Badge variant="outline" className="mt-1 text-xs gap-1">
+                  {isReadOnly && (
+                    <Badge variant="secondary" className="mt-1 text-xs gap-1 bg-muted">
                       <Clock className="h-3 w-3" />
-                      Registro retroativo
+                      Somente visualização
                     </Badge>
                   )}
                 </div>
@@ -681,8 +680,8 @@ export default function DailyLog() {
                       </div>
                     )}
 
-                    {/* Options for pending meals - show all options directly */}
-                    {isPendingStatus(meal.log?.status) && (
+                    {/* Options for pending meals - show all options directly (only for today) */}
+                    {isPendingStatus(meal.log?.status) && !isReadOnly && (
                       <div className="space-y-3">
                         <p className="text-sm font-medium text-muted-foreground">Qual opção você consumiu?</p>
                         <div className="grid gap-2">
@@ -728,6 +727,15 @@ export default function DailyLog() {
                         </Button>
                       </div>
                     )}
+
+                    {/* Read-only message for past dates with pending meals */}
+                    {isPendingStatus(meal.log?.status) && isReadOnly && (
+                      <div className="p-3 bg-muted/50 rounded-lg border text-center">
+                        <p className="text-sm text-muted-foreground">
+                          Não registrado neste dia
+                        </p>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               </motion.div>
@@ -745,23 +753,12 @@ export default function DailyLog() {
               Confirmar refeição
             </DialogTitle>
             <DialogDescription>
-              {isLateConfirmation 
-                ? 'Este é um registro retroativo.'
-                : 'Confirme que você consumiu esta opção.'}
+              Confirme que você consumiu esta opção.
             </DialogDescription>
           </DialogHeader>
 
           {confirmingMeal && selectedOption && (
             <div className="space-y-4">
-              {isLateConfirmation && (
-                <div className="p-3 bg-amber-50 dark:bg-amber-950/30 rounded-lg border border-amber-200 dark:border-amber-800 flex items-center gap-2">
-                  <Clock className="h-4 w-4 text-amber-600" />
-                  <span className="text-sm text-amber-700 dark:text-amber-400">
-                    Registro para {format(selectedDate, 'dd/MM/yyyy')}
-                  </span>
-                </div>
-              )}
-
               {/* Show selected option details */}
               {(() => {
                 const option = confirmingMeal.options.find(o => o.id === selectedOption);
