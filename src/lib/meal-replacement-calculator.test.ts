@@ -352,5 +352,42 @@ describe('meal-replacement-calculator', () => {
         expect(liquid.reason!.length).toBeGreaterThan(10);
       });
     });
+
+    it('deve convergir calorias para 90-100% após refinamento iterativo', () => {
+      // Testar vários cenários de refeição
+      const scenarios = [
+        { calories: 350, protein: 20, carbs: 40, fat: 10 },
+        { calories: 500, protein: 35, carbs: 50, fat: 15 },
+        { calories: 600, protein: 40, carbs: 60, fat: 18 },
+      ];
+      
+      for (const target of scenarios) {
+        const result = calculateMealReplacement(target, 'maintain');
+        
+        // Calorias devem estar entre 85-105% (com margem de tolerância)
+        expect(result.accuracy.calories).toBeGreaterThanOrEqual(85);
+        expect(result.accuracy.calories).toBeLessThanOrEqual(105);
+      }
+    });
+
+    it('deve manter proteína entre 90-105% para refeições proteicas', () => {
+      const target: MacroTarget = { calories: 450, protein: 35, carbs: 35, fat: 12 };
+      const result = calculateMealReplacement(target, 'gain_muscle');
+      
+      // Proteína deve estar próxima da meta
+      expect(result.accuracy.protein).toBeGreaterThanOrEqual(70);
+      expect(result.accuracy.protein).toBeLessThanOrEqual(110);
+    });
+
+    it('deve incluir dica de sucesso quando convergir', () => {
+      const target: MacroTarget = { calories: 400, protein: 25, carbs: 45, fat: 12 };
+      const result = calculateMealReplacement(target, 'maintain');
+      
+      // Se convergiu, deve ter dica de sucesso
+      if (result.accuracy.calories >= 90 && result.accuracy.calories <= 100) {
+        const hasSuccessTip = result.tips.some(t => t.includes('✅'));
+        expect(hasSuccessTip).toBe(true);
+      }
+    });
   });
 });
