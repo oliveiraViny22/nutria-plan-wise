@@ -1350,6 +1350,153 @@ function boostCarbs(
   });
 }
 
+// =====================================================
+// FAT FILLER v5.20: Sistema inteligente de gordura
+// Injeta azeite/abacate quando gordura < 90% da meta
+// =====================================================
+const FAT_FILLER_CONFIG = {
+  // IDs dos alimentos "coringa" de gordura (da tabela foods)
+  AZEITE_ID: "58de144e-5581-4da6-84b9-6854e24358d3",
+  ABACATE_ID: "17a20117-4ced-466d-a47e-e0ea5d63bdaf",
+  // Threshold para ativar o filler (ex: 90% = ativa se fat < 90% da meta)
+  MIN_FAT_THRESHOLD: 0.90,
+  // Porções padrão
+  AZEITE_PORTION: { min: 5, max: 15, default: 10 },   // 10g = ~10g gordura
+  ABACATE_PORTION: { min: 30, max: 80, default: 50 }, // 50g = ~7.5g gordura
+};
+
+/**
+ * fillFat: Injeta fontes de gordura quando o macro de fat está abaixo da meta.
+ * Escolhe automaticamente entre azeite (para gaps pequenos) e abacate (gaps maiores).
+ * Adiciona apenas em refeições principais (almoço/jantar).
+ */
+function fillFat(
+  mwo: MealWithOptions[],
+  targetFat: number,
+  allFoods: Food[]
+): void {
+  const current = totals(mwo);
+  const fatPercent = current.fat / targetFat;
+  
+  // Só aplicar filler se gordura estiver abaixo do threshold
+  if (fatPercent >= FAT_FILLER_CONFIG.MIN_FAT_THRESHOLD) {
+    log("FatFillerSkip", { fatPercent: Math.round(fatPercent * 100), threshold: FAT_FILLER_CONFIG.MIN_FAT_THRESHOLD * 100 });
+    return;
+  }
+  
+  const fatDeficit = (targetFat * FAT_FILLER_CONFIG.MIN_FAT_THRESHOLD) - current.fat;
+  
+  // Buscar alimentos coringa do catálogo
+  const azeite = allFoods.find(f => f.id === FAT_FILLER_CONFIG.AZEITE_ID);
+  const abacate = allFoods.find(f => f.id === FAT_FILLER_CONFIG.ABACATE_ID);
+  
+  if (!azeite && !abacate) {
+    log("FatFillerNoFoods", { azeiteId: FAT_FILLER_CONFIG.AZEITE_ID, abacateId: FAT_FILLER_CONFIG.ABACATE_ID });
+    return;
+  }
+  
+  log("FatFillerStart", {
+    currentFat: Math.round(current.fat * 10) / 10,
+    targetFat,
+    fatPercent: Math.round(fatPercent * 100),
+    deficit: Math.round(fatDeficit * 10) / 10,
+  });
+  
+  // Escolher estratégia baseada no gap
+  // Azeite: 100g gordura/100g -> 10g azeite = 10g gordura
+  // Abacate: 15g gordura/100g -> 50g abacate = 7.5g gordura
+  const useAbacate = abacate && fatDeficit >= 5 && fatDeficit <= 12;
+  const useAzeite = azeite && (fatDeficit < 5 || fatDeficit > 12 || !abacate);
+  
+  // Identificar refeições principais elegíveis (almoço e jantar)
+  const mainMeals = mwo.filter(m => m.mealType === "lunch" || m.mealType === "dinner");
+  
+  if (mainMeals.length === 0) {
+    log("FatFillerNoMainMeals");
+    return;
+  }
+  
+  let fatAdded = 0;
+  const fatToAdd = fatDeficit;
+  
+  // Distribuir gordura entre as refeições principais
+  for (const m of mainMeals) {
+    if (fatAdded >= fatToAdd) break;
+    
+    for (const opt of m.options) {
+      if (!opt?.foods || fatAdded >= fatToAdd) continue;
+      
+      // Verificar se já tem azeite ou abacate nessa opção
+      const hasAzeite = opt.foods.some(f => f.food.id === FAT_FILLER_CONFIG.AZEITE_ID);
+      const hasAbacate = opt.foods.some(f => f.food.id === FAT_FILLER_CONFIG.ABACATE_ID);
+      
+      if (useAzeite && azeite && !hasAzeite) {
+        // Calcular porção necessária de azeite (100g gordura/100g)
+        const remainingFat = fatToAdd - fatAdded;
+        const gramsNeeded = Math.min(
+          FAT_FILLER_CONFIG.AZEITE_PORTION.max,
+          Math.max(FAT_FILLER_CONFIG.AZEITE_PORTION.min, Math.round(remainingFat))
+        );
+        
+        const fatFromAzeite = (gramsNeeded / 100) * azeite.fat;
+        
+        opt.foods.push({
+          food: azeite,
+          role_name: "gordura",
+          quantity_grams: gramsNeeded,
+          display_quantity: gramsNeeded,
+          display_unit: "ml",
+        });
+        
+        fatAdded += fatFromAzeite;
+        
+        log("FatFillerAzeite", {
+          mealType: m.mealType,
+          grams: gramsNeeded,
+          fatAdded: Math.round(fatFromAzeite * 10) / 10,
+        });
+        
+        recalcOptionTotals(opt);
+        
+      } else if (useAbacate && abacate && !hasAbacate) {
+        // Calcular porção necessária de abacate (15g gordura/100g)
+        const remainingFat = fatToAdd - fatAdded;
+        const gramsNeeded = Math.min(
+          FAT_FILLER_CONFIG.ABACATE_PORTION.max,
+          Math.max(FAT_FILLER_CONFIG.ABACATE_PORTION.min, Math.round((remainingFat / 15) * 100))
+        );
+        
+        const fatFromAbacate = (gramsNeeded / 100) * abacate.fat;
+        
+        opt.foods.push({
+          food: abacate,
+          role_name: "gordura",
+          quantity_grams: gramsNeeded,
+          display_quantity: gramsNeeded,
+          display_unit: "g",
+        });
+        
+        fatAdded += fatFromAbacate;
+        
+        log("FatFillerAbacate", {
+          mealType: m.mealType,
+          grams: gramsNeeded,
+          fatAdded: Math.round(fatFromAbacate * 10) / 10,
+        });
+        
+        recalcOptionTotals(opt);
+      }
+    }
+  }
+  
+  const afterFiller = totals(mwo);
+  log("FatFillerEnd", {
+    fatAdded: Math.round(fatAdded * 10) / 10,
+    newFat: Math.round(afterFiller.fat * 10) / 10,
+    newFatPercent: Math.round((afterFiller.fat / targetFat) * 100),
+  });
+}
+
 async function save(sb: any, uid: string, mwo: MealWithOptions[]): Promise<string> {
   const t = totals(mwo);
   
@@ -1555,6 +1702,13 @@ serve(async (req) => {
     // Debug: totais APÓS o boost de carbs
     const postBoostTotals = totals(mwo);
     log("PostBoostTotals", { ...postBoostTotals, objective });
+    
+    // v5.20: Fat Filler - Injetar gordura quando abaixo da meta
+    fillFat(mwo, tgt.fat, foods);
+    
+    // Debug: totais APÓS o fat filler
+    const postFatFillerTotals = totals(mwo);
+    log("PostFatFillerTotals", { ...postFatFillerTotals });
 
     // Validar contratos nutricionais ANTES de salvar (com objetivo para threshold de carbs)
     const validation = validateNutritionalContracts(mwo, tgt, objective);
