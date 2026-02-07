@@ -228,7 +228,7 @@ function SupplementsContent({ goal, planMacros, profileTargets }: SupplementsCon
 export default function MealPlanPage() {
   const navigate = useNavigate();
   const { profile, user, refreshProfile } = useAuth();
-  const { planInfo } = useCachedUserData();
+  const { planInfo, isAdmin } = useCachedUserData();
   const [loading, setLoading] = useState(true);
   const [meals, setMeals] = useState<MealData[]>([]);
   const [planTotals, setPlanTotals] = useState({ calories: 0, protein: 0, carbs: 0, fat: 0 });
@@ -294,7 +294,8 @@ export default function MealPlanPage() {
       }
 
       // Redirect to dashboard if plan is not saved (gate protection)
-      if (!plan.is_saved) {
+      // ADMIN BYPASS: Admins can always access the full plan
+      if (!plan.is_saved && !isAdmin) {
         toast.error('Salve o plano primeiro para ver o plano completo');
         navigate('/');
         return;

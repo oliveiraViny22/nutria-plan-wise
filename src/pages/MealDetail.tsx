@@ -89,7 +89,7 @@ export default function MealDetail() {
   const navigate = useNavigate();
   const { profile } = useAuth();
   const { isLinkedStudent } = useLinkedStudent();
-  const { isProfessional } = useUserRole();
+  const { isProfessional, isAdmin } = useUserRole();
   
   const studentIdFromQuery = searchParams.get('studentId');
   const isProfessionalViewingStudent = isProfessional && !!studentIdFromQuery;
@@ -125,7 +125,8 @@ export default function MealDetail() {
   const [showUpgradeDialog, setShowUpgradeDialog] = useState(false);
   
   // Check if plan is saved (gate logic)
-  const isPlanSaved = dietPlan?.is_saved ?? true;
+  // ADMIN BYPASS: Admins always see everything without restrictions
+  const isPlanSaved = isAdmin || (dietPlan?.is_saved ?? true);
   
   // Dialog de remoção (apenas para profissionais)
   const [showRemoveDialog, setShowRemoveDialog] = useState(false);
