@@ -37,7 +37,7 @@ import { DietPlan, Meal } from '@/lib/types';
 import { toast } from 'sonner';
 
 export default function Dashboard() {
-  const { profile, signOut } = useAuth();
+  const { profile, signOut, refreshProfile } = useAuth();
   const { isProfessional, isAdmin } = useUserRole();
   const { isLinkedStudent } = useLinkedStudent();
   const permissions = useAccountPermissions();
@@ -92,8 +92,9 @@ export default function Dashboard() {
         description: `Calorias: ${calories} | P: ${protein}g | C: ${carbs}g | G: ${fat}g`
       });
       
-      // Refresh page to update UI
-      window.location.reload();
+      // Refresh profile data reactively without full page reload
+      await refreshProfile();
+      await fetchCurrentPlan();
     } catch (error: any) {
       console.error('Error applying recommendations:', error);
       toast.error(error.message || 'Erro ao aplicar recomendações');
