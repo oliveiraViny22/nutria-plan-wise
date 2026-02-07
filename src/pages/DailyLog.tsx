@@ -12,10 +12,8 @@ import {
   ChevronRight,
   Clock,
   Loader2,
-  RefreshCw,
   SkipForward,
   UtensilsCrossed,
-  XCircle,
   AlertTriangle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -599,26 +597,15 @@ export default function DailyLog() {
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-3">
-                    {/* Link to meal detail for substitutions */}
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-xs text-muted-foreground hover:text-primary w-full justify-start -mt-1 mb-1"
-                      onClick={() => navigate(`/meal/${meal.id}`)}
-                    >
-                      <RefreshCw className="h-3 w-3 mr-1" />
-                      Ver detalhes / Substituir alimentos
-                    </Button>
-
                     {/* Show confirmed option details if confirmed */}
-                    {meal.log?.status && ['CONFIRMADA', 'CONFIRMADA_TARDIA'].includes(meal.log.status) && meal.log.confirmed_option_id && (
+                    {meal.log?.status && ['CONFIRMADA', 'CONFIRMADA_TARDIA', 'confirmed', 'late_confirmed'].includes(meal.log.status) && meal.log.confirmed_option_id && (
                       <div className="p-3 bg-green-50 dark:bg-green-950/30 rounded-lg border border-green-200 dark:border-green-800">
                         <div className="flex items-center gap-2 mb-1">
                           <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
                           <p className="text-sm font-medium text-green-700 dark:text-green-400">
                             {meal.options.find(o => o.id === meal.log?.confirmed_option_id)?.name || `Opção ${meal.options.find(o => o.id === meal.log?.confirmed_option_id)?.option_number}`}
                           </p>
-                          {meal.log.status === 'CONFIRMADA_TARDIA' && (
+                          {['CONFIRMADA_TARDIA', 'late_confirmed'].includes(meal.log.status) && (
                             <Badge variant="outline" className="text-[10px] h-5 border-amber-400 text-amber-600">
                               <Clock className="h-3 w-3 mr-0.5" />
                               Tardia
@@ -659,12 +646,12 @@ export default function DailyLog() {
                     )}
 
                     {/* Show exception info if skipped or out of plan */}
-                    {meal.log?.status === 'PULADA' && (
+                    {['PULADA', 'skipped'].includes(meal.log?.status || '') && (
                       <div className="p-3 bg-amber-50 dark:bg-amber-950/30 rounded-lg border border-amber-200 dark:border-amber-800">
                         <p className="text-sm text-amber-700 dark:text-amber-400">
                           Refeição pulada
                         </p>
-                        {meal.log.notes && (
+                        {meal.log?.notes && (
                           <p className="text-xs text-amber-600 dark:text-amber-500 mt-1">
                             Obs: {meal.log.notes}
                           </p>
@@ -672,12 +659,12 @@ export default function DailyLog() {
                       </div>
                     )}
 
-                    {meal.log?.status === 'FORA_DO_PLANO' && (
+                    {['FORA_DO_PLANO', 'out_of_plan'].includes(meal.log?.status || '') && (
                       <div className="p-3 bg-orange-50 dark:bg-orange-950/30 rounded-lg border border-orange-200 dark:border-orange-800">
                         <p className="text-sm text-orange-700 dark:text-orange-400">
                           Comeu fora do plano
                         </p>
-                        {meal.log.notes && (
+                        {meal.log?.notes && (
                           <p className="text-xs text-orange-600 dark:text-orange-500 mt-1">
                             Obs: {meal.log.notes}
                           </p>
@@ -685,36 +672,51 @@ export default function DailyLog() {
                       </div>
                     )}
 
-                    {/* Action buttons for pending meals */}
-                    {(!meal.log?.status || meal.log.status === 'PENDENTE') && (
-                      <div className="flex flex-col sm:flex-row gap-2">
+                    {/* Options for pending meals - show all options directly */}
+                    {(!meal.log?.status || ['PENDENTE', 'pending'].includes(meal.log?.status || '')) && (
+                      <div className="space-y-3">
+                        <p className="text-sm font-medium text-muted-foreground">Qual opção você consumiu?</p>
+                        <div className="grid gap-2">
+                          {meal.options.map((option) => (
+                            <Button
+                              key={option.id}
+                              variant="outline"
+                              className="h-auto p-3 justify-start text-left flex-col items-start hover:border-primary hover:bg-primary/5"
+                              onClick={() => {
+                                setConfirmingMeal(meal);
+                                setSelectedOption(option.id);
+                              }}
+                            >
+                              <div className="flex items-center justify-between w-full mb-1">
+                                <span className="font-medium text-sm">
+                                  {option.name || `Opção ${option.option_number}`}
+                                </span>
+                                <Badge variant="secondary" className="text-xs">
+                                  {option.total_calories} kcal
+                                </Badge>
+                              </div>
+                              <div className="text-xs text-muted-foreground">
+                                P: {option.total_protein}g • C: {option.total_carbs}g • G: {option.total_fat}g
+                              </div>
+                              {option.foods && option.foods.length > 0 && (
+                                <div className="text-xs text-muted-foreground mt-1 truncate w-full">
+                                  {option.foods.map(f => f.name).join(', ')}
+                                </div>
+                              )}
+                            </Button>
+                          ))}
+                        </div>
+                        
+                        {/* Secondary action for not following the plan */}
                         <Button
-                          className="flex-1"
-                          onClick={() => {
-                            setConfirmingMeal(meal);
-                            if (meal.options.length === 1) {
-                              setSelectedOption(meal.options[0].id);
-                            }
-                          }}
-                          disabled={meal.options.length === 0}
-                        >
-                          <Check className="h-4 w-4 mr-2" />
-                          Confirmar refeição
-                        </Button>
-                        <Button
-                          variant="outline"
+                          variant="ghost"
+                          size="sm"
+                          className="w-full text-muted-foreground"
                           onClick={() => setExceptionMeal(meal)}
                         >
-                          <XCircle className="h-4 w-4 mr-2" />
-                          Exceção
+                          <SkipForward className="h-4 w-4 mr-2" />
+                          Não segui o plano
                         </Button>
-                      </div>
-                    )}
-
-                    {/* Preview of options for pending meals */}
-                    {(!meal.log?.status || meal.log.status === 'PENDENTE') && meal.options.length > 1 && (
-                      <div className="text-xs text-muted-foreground">
-                        {meal.options.length} opções disponíveis
                       </div>
                     )}
                   </CardContent>
@@ -725,74 +727,70 @@ export default function DailyLog() {
         )}
       </main>
 
-      {/* Confirmation Dialog */}
+      {/* Confirmation Dialog - simplified since option is pre-selected */}
       <Dialog open={!!confirmingMeal} onOpenChange={(open) => !open && setConfirmingMeal(null)}>
-        <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
+        <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <UtensilsCrossed className="h-5 w-5 text-primary" />
-              Confirmar {confirmingMeal && (MEAL_NAMES[confirmingMeal.name as MealType] || confirmingMeal.name)}
+              Confirmar refeição
             </DialogTitle>
             <DialogDescription>
               {isLateConfirmation 
-                ? 'Este é um registro retroativo. Selecione a opção que você consumiu.'
-                : 'Selecione a opção que você está consumindo.'}
+                ? 'Este é um registro retroativo.'
+                : 'Confirme que você consumiu esta opção.'}
             </DialogDescription>
           </DialogHeader>
 
-          {confirmingMeal && (
+          {confirmingMeal && selectedOption && (
             <div className="space-y-4">
               {isLateConfirmation && (
                 <div className="p-3 bg-amber-50 dark:bg-amber-950/30 rounded-lg border border-amber-200 dark:border-amber-800 flex items-center gap-2">
                   <Clock className="h-4 w-4 text-amber-600" />
                   <span className="text-sm text-amber-700 dark:text-amber-400">
-                    Confirmação tardia para {format(selectedDate, 'dd/MM/yyyy')}
+                    Registro para {format(selectedDate, 'dd/MM/yyyy')}
                   </span>
                 </div>
               )}
 
-              <RadioGroup value={selectedOption} onValueChange={setSelectedOption}>
-                {confirmingMeal.options.map((option) => (
-                  <div key={option.id} className="relative">
-                    <RadioGroupItem
-                      value={option.id}
-                      id={option.id}
-                      className="peer sr-only"
-                    />
-                    <Label
-                      htmlFor={option.id}
-                      className="flex flex-col p-4 rounded-lg border-2 cursor-pointer transition-colors peer-data-[state=checked]:border-primary peer-data-[state=checked]:bg-primary/5 hover:bg-muted/50"
-                    >
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="font-semibold">
-                          {option.name || `Opção ${option.option_number}`}
-                        </span>
-                        <Badge variant="secondary" className="text-xs">
-                          {option.total_calories} kcal
-                        </Badge>
+              {/* Show selected option details */}
+              {(() => {
+                const option = confirmingMeal.options.find(o => o.id === selectedOption);
+                if (!option) return null;
+                return (
+                  <div className="p-4 rounded-lg border-2 border-primary bg-primary/5">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="font-semibold">
+                        {MEAL_NAMES[confirmingMeal.name as MealType] || confirmingMeal.name}
+                      </span>
+                      <Badge variant="secondary" className="text-xs">
+                        {option.total_calories} kcal
+                      </Badge>
+                    </div>
+                    <p className="text-sm font-medium text-primary mb-1">
+                      {option.name || `Opção ${option.option_number}`}
+                    </p>
+                    <div className="text-xs text-muted-foreground mb-2">
+                      P: {option.total_protein}g • C: {option.total_carbs}g • G: {option.total_fat}g
+                    </div>
+                    {option.foods && option.foods.length > 0 && (
+                      <div className="text-xs text-muted-foreground space-y-1 pt-2 border-t">
+                        {option.foods.map((food, idx) => (
+                          <div key={idx} className="flex justify-between">
+                            <span>{food.name}</span>
+                            <span>{food.quantity}g</span>
+                          </div>
+                        ))}
                       </div>
-                      <div className="text-xs text-muted-foreground mb-2">
-                        P: {option.total_protein}g • C: {option.total_carbs}g • G: {option.total_fat}g
-                      </div>
-                      {option.foods && option.foods.length > 0 && (
-                        <div className="text-xs text-muted-foreground space-y-1 pt-2 border-t">
-                          {option.foods.map((food, idx) => (
-                            <div key={idx} className="flex justify-between">
-                              <span>{food.name}</span>
-                              <span>{food.quantity}g</span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </Label>
+                    )}
                   </div>
-                ))}
-              </RadioGroup>
+                );
+              })()}
             </div>
           )}
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setConfirmingMeal(null)}>
+            <Button variant="outline" onClick={() => { setConfirmingMeal(null); setSelectedOption(''); }}>
               Cancelar
             </Button>
             <Button 
