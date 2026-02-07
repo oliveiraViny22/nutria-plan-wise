@@ -11,14 +11,25 @@ interface MealOptionsPreviewProps {
   anchors: AnchorFood[];
 }
 
+const GOAL_OPTIONS = [
+  { value: "all", label: "Todos os Objetivos" },
+  { value: "cut", label: "Cutting" },
+  { value: "maintain", label: "Manutenção" },
+  { value: "bulk", label: "Hipertrofia" },
+];
+
 export function MealOptionsPreview({ anchors }: MealOptionsPreviewProps) {
   const [open, setOpen] = useState(false);
   const [selectedMeal, setSelectedMeal] = useState("lunch");
+  const [selectedGoal, setSelectedGoal] = useState("all");
 
-  // Filter active anchors for selected meal
-  const mealAnchors = anchors.filter(
-    (a) => a.meal_type === selectedMeal && a.is_active
-  );
+  // Filter active anchors for selected meal and goal
+  const mealAnchors = anchors.filter((a) => {
+    if (a.meal_type !== selectedMeal || !a.is_active) return false;
+    if (selectedGoal === "all") return true;
+    // Include anchors for the selected goal OR universal anchors (null goal_type)
+    return a.goal_type === selectedGoal || a.goal_type === null;
+  });
 
   // Build preview for each option (1, 2, 3)
   const buildOptionPreview = (optionNumber: number) => {
@@ -81,7 +92,7 @@ export function MealOptionsPreview({ anchors }: MealOptionsPreviewProps) {
         </DialogHeader>
 
         <div className="py-4">
-          <div className="mb-4">
+          <div className="mb-4 flex gap-3">
             <Select value={selectedMeal} onValueChange={setSelectedMeal}>
               <SelectTrigger className="w-[200px]">
                 <SelectValue />
@@ -91,6 +102,19 @@ export function MealOptionsPreview({ anchors }: MealOptionsPreviewProps) {
                   <SelectItem key={m.value} value={m.value}>
                     {m.label}
                     {mealsWithAnchors.includes(m.value) && " ✓"}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select value={selectedGoal} onValueChange={setSelectedGoal}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {GOAL_OPTIONS.map((g) => (
+                  <SelectItem key={g.value} value={g.value}>
+                    {g.label}
                   </SelectItem>
                 ))}
               </SelectContent>
