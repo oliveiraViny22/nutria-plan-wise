@@ -1,11 +1,13 @@
 ================================================================================
                      GERADOR DE PLANO ALIMENTAR NutriaPlan
-                              DOCUMENTAÇÃO v5.17
+                              DOCUMENTAÇÃO v5.30
 ================================================================================
 
 Este documento contém a documentação técnica completa do motor de geração de 
 planos alimentares do NutriaPlan, incluindo contratos, regras operacionais e 
 código fonte.
+
+v5.30: Adicionada EQUALIZAÇÃO CALÓRICA ENTRE OPÇÕES (±5% de variância máxima)
 
 ================================================================================
                             ÍNDICE
@@ -75,6 +77,9 @@ CONTRATO DO GERADOR (GENERATOR_CONTRACT)
     
   MIN_PROTEIN_PERCENT: 95
     → Proteína total deve atingir mínimo 95% da meta
+    
+  MAX_OPTION_CALORIE_VARIANCE_PERCENT: 5 (v5.30)
+    → Todas as opções de uma refeição devem ter calorias dentro de ±5% da média
 
 --------------------------------------------------------------------------------
 LIMITES DE CARBOIDRATOS POR OBJETIVO

@@ -43,6 +43,12 @@ export const GENERATOR_CONTRACT = {
   
   /** Proteína mínima global: 95% da meta */
   MIN_PROTEIN_PERCENT: 95,
+  
+  /** 
+   * Tolerância máxima de variância calórica entre opções de uma mesma refeição.
+   * Todas as opções devem ter calorias dentro de ±5% da média.
+   */
+  MAX_OPTION_CALORIE_VARIANCE_PERCENT: 5,
 } as const;
 
 // =====================================================
