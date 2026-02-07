@@ -1,11 +1,12 @@
 // ============================================
-// REBALANCEADOR AUTOMÁTICO NUTRIAPLAN v2
+// REBALANCEADOR AUTOMÁTICO NUTRIAPLAN v2.4
 // ============================================
 // Implementação conforme especificação:
 // - Validação por objetivo (cut/maintain/bulk)
 // - Pipeline de 4 etapas (ordem fixa)
 // - Máximo de 3 ciclos de correção
 // - Formato JSON estruturado
+// - RETRY AUTOMÁTICO para opções não convergidas (v2.4)
 // ============================================
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
@@ -1846,34 +1847,162 @@ serve(async (req) => {
     }
 
     // ============================================
-    // VALIDAÇÃO INDIVIDUAL POR OPÇÃO (v2.3)
+    // VALIDAÇÃO INDIVIDUAL POR OPÇÃO (v2.4)
+    // COM RETRY AUTOMÁTICO PARA OPÇÕES NÃO CONVERGIDAS
     // ============================================
-    // Validar CADA opção separadamente para garantir convergência completa
     
-    const optionValidations: Array<{
+    const MAX_OPTION_RETRIES = 2; // Máximo de retries por opção
+    let retriesPerformed = 0;
+    
+    const validateOptions = (): Array<{
       optionNumber: number;
       validation: FinalValidationResult;
       isValid: boolean;
-    }> = [];
+    }> => {
+      const validations: Array<{
+        optionNumber: number;
+        validation: FinalValidationResult;
+        isValid: boolean;
+      }> = [];
+      
+      for (const result of optionResults) {
+        const validation = validateFinalPlan(
+          result.finalTotals,
+          targets,
+          {
+            g10Status: g10Metadata.g10Status,
+            normalizationApplied: result.normalizationApplied,
+            objective,
+          }
+        );
+        
+        console.log(`[VALIDAÇÃO] Opção ${result.optionNumber}: ${validation.status} (Cal=${validation.metrics.caloriePercent}%, Fat=${validation.metrics.fatPercent}%)`);
+        
+        validations.push({
+          optionNumber: result.optionNumber,
+          validation,
+          isValid: validation.status !== "STRUCTURALLY_INVALID",
+        });
+      }
+      return validations;
+    };
     
-    for (const result of optionResults) {
-      const validation = validateFinalPlan(
-        result.finalTotals,
-        targets,
-        {
-          g10Status: g10Metadata.g10Status,
-          normalizationApplied: result.normalizationApplied,
+    let optionValidations = validateOptions();
+    
+    // ============================================
+    // RETRY AUTOMÁTICO PARA OPÇÕES NÃO CONVERGIDAS (v2.4)
+    // ============================================
+    
+    const retryFailedOptions = async () => {
+      const failedOptions = optionValidations.filter(v => !v.isValid);
+      
+      if (failedOptions.length === 0 || retriesPerformed >= MAX_OPTION_RETRIES) {
+        return;
+      }
+      
+      console.log(`\n╔══════════════════════════════════════════════════════════════╗`);
+      console.log(`║  RETRY AUTOMÁTICO ${retriesPerformed + 1}/${MAX_OPTION_RETRIES} - ${failedOptions.length} opção(ões) falharam   ║`);
+      console.log(`╚══════════════════════════════════════════════════════════════╝\n`);
+      
+      for (const failedValidation of failedOptions) {
+        const optionIdx = optionResults.findIndex(r => r.optionNumber === failedValidation.optionNumber);
+        if (optionIdx === -1) continue;
+        
+        const optionResult = optionResults[optionIdx];
+        const optionFoods = optionResult.foods;
+        
+        console.log(`[RETRY] Re-otimizando Opção ${optionResult.optionNumber}...`);
+        
+        // Re-executar pipeline com as quantidades atuais como ponto de partida
+        const pipelineResult = runCorrectionPipeline(
+          optionFoods,
+          optionResult.finalQuantities,
+          targets,
           objective,
+          settings,
+          g10Metadata,
+          3 // Max ciclos
+        );
+        
+        // Se ainda estruturalmente inválido, pular
+        if (pipelineResult.structurallyInvalid) {
+          console.log(`[RETRY] Opção ${optionResult.optionNumber} permanece estruturalmente inválida`);
+          continue;
         }
-      );
+        
+        // Re-executar refinamento
+        const contributions = new Map<string, MacroTargets>();
+        for (const food of optionFoods) {
+          contributions.set(food.id, getFoodContributionPer100g(food.food));
+        }
+        
+        const refinementResult = runFinalRefinement(
+          optionFoods,
+          pipelineResult.quantities,
+          targets,
+          contributions,
+          200, // Mais iterações no retry
+          objective
+        );
+        
+        // Atualizar resultado da opção
+        const newFinalTotals = calculateTotals(optionFoods, refinementResult.quantities);
+        const newIterations = optionResult.iterations + pipelineResult.iterations + refinementResult.iterations;
+        
+        // Recalcular mudanças de alimentos
+        const newFoodChanges: OptionResult['foodChanges'] = [];
+        for (const food of optionFoods) {
+          const original = optionResult.initialQuantities.get(food.id) || food.quantity_grams;
+          const final = refinementResult.quantities.get(food.id) || food.quantity_grams;
+          const diff = Math.abs(final - original);
+          
+          if (diff >= 1) {
+            newFoodChanges.push({
+              food_id: food.food_id,
+              food_name: food.food.name,
+              original_grams: original,
+              new_grams: Math.round(final),
+              mealOptionFoodId: food.id,
+              mealId: food.mealId,
+              mealOptionId: food.optionId,
+              mealName: food.mealName,
+            });
+          }
+        }
+        
+        // Atualizar optionResults com o novo resultado
+        optionResults[optionIdx] = {
+          ...optionResult,
+          finalQuantities: refinementResult.quantities,
+          finalTotals: newFinalTotals,
+          iterations: newIterations,
+          converged: refinementResult.converged,
+          normalizationApplied: pipelineResult.normalizationApplied,
+          refinementStatus: refinementResult.refinementStatus,
+          foodChanges: newFoodChanges,
+        };
+        
+        console.log(`[RETRY] Opção ${optionResult.optionNumber}: Cal=${Math.round(newFinalTotals.calories)}/${targets.calories}, Prot=${Math.round(newFinalTotals.protein)}/${targets.protein}g`);
+      }
       
-      console.log(`[VALIDAÇÃO] Opção ${result.optionNumber}: ${validation.status} (Cal=${validation.metrics.caloriePercent}%, Fat=${validation.metrics.fatPercent}%)`);
+      retriesPerformed++;
       
-      optionValidations.push({
-        optionNumber: result.optionNumber,
-        validation,
-        isValid: validation.status !== "STRUCTURALLY_INVALID",
-      });
+      // Re-validar todas as opções após o retry
+      optionValidations = validateOptions();
+      
+      // Continuar retrying se ainda houver opções falhando e não excedeu limite
+      const stillFailed = optionValidations.filter(v => !v.isValid);
+      if (stillFailed.length > 0 && retriesPerformed < MAX_OPTION_RETRIES) {
+        console.log(`[RETRY] Ainda ${stillFailed.length} opção(ões) falhando, tentando novamente...`);
+        await retryFailedOptions();
+      }
+    };
+    
+    // Executar retries se necessário
+    const initialFailedCount = optionValidations.filter(v => !v.isValid).length;
+    if (initialFailedCount > 0) {
+      await retryFailedOptions();
+      console.log(`[RETRY] Concluído: ${retriesPerformed} retry(s) executado(s)`);
     }
     
     // Usar opção 1 como referência principal para compatibilidade
@@ -1883,11 +2012,12 @@ serve(async (req) => {
     
     console.log(`[PATCH FINAL] Resultado da validação primária: ${primaryValidation.status}`);
     console.log(`[PATCH FINAL] Métricas: Cal=${primaryValidation.metrics.caloriePercent}%, Prot=${primaryValidation.metrics.proteinPercent}%, Carb=${primaryValidation.metrics.carbPercent}%, Fat=${primaryValidation.metrics.fatPercent}%`);
+    console.log(`[PATCH FINAL] Retries executados: ${retriesPerformed}`);
     
-    // Se TODAS as opções são estruturalmente inválidas, retornar imediatamente
+    // Se TODAS as opções são estruturalmente inválidas (mesmo após retries), retornar imediatamente
     const allInvalid = optionValidations.every(v => !v.isValid);
     if (allInvalid) {
-      console.log(`[PATCH FINAL] ❌ TODAS as opções STRUCTURALLY_INVALID`);
+      console.log(`[PATCH FINAL] ❌ TODAS as opções STRUCTURALLY_INVALID (após ${retriesPerformed} retries)`);
       return new Response(
         JSON.stringify({
           status: "structurally_invalid",
@@ -1900,6 +2030,7 @@ serve(async (req) => {
             fat_percent: primaryValidation.metrics.fatPercent,
             calories_percent: primaryValidation.metrics.caloriePercent,
             action: "regenerate_plan",
+            retriesAttempted: retriesPerformed,
           },
           food_changes: [],
           finalValidation: primaryValidation,
@@ -1908,6 +2039,10 @@ serve(async (req) => {
             status: v.validation.status,
             metrics: v.validation.metrics,
           })),
+          meta: {
+            retriesPerformed,
+            maxRetries: MAX_OPTION_RETRIES,
+          },
         }),
         {
           status: 200,
@@ -1968,7 +2103,7 @@ serve(async (req) => {
       return currentIndex < worstIndex ? result.refinementStatus : worst;
     }, RefinementStatus.CONVERGED);
 
-    // Construir diagnósticos do rebalanceador (v2.3)
+    // Construir diagnósticos do rebalanceador (v2.4)
     const convergenceTimeMs = Math.round(performance.now() - startTime);
     const diagnostics: RebalancerDiagnostics = {
       refinementStatus: primaryRefinementStatus,
@@ -1982,6 +2117,7 @@ serve(async (req) => {
       totalIterations,
       convergenceTimeMs,
       optionsProcessed: optionResults.length,
+      retriesPerformed, // v2.4: Incluir contagem de retries
     };
 
     const result: RebalanceResult = {
@@ -2005,7 +2141,7 @@ serve(async (req) => {
       },
     };
 
-    // Log de resumo com diagnósticos (v2.3)
+    // Log de resumo com diagnósticos (v2.4)
     log.info("Rebalance complete", {
       g10Status: g10Metadata.g10Status,
       normalizationApplied: anyNormalizationApplied,
@@ -2015,6 +2151,7 @@ serve(async (req) => {
       convergenceTimeMs,
       optionsCount: optionResults.length,
       optionStatuses: optionValidations.map(v => `Opt${v.optionNumber}:${v.validation.status}`).join(', '),
+      retriesPerformed,
     });
 
     // Logar métricas de rebalanceamento para análise
@@ -2037,8 +2174,8 @@ serve(async (req) => {
       });
     }
 
-    // Retornar no formato esperado pelo frontend (v2.3)
-    // Inclui validações individuais por opção
+    // Retornar no formato esperado pelo frontend (v2.4)
+    // Inclui validações individuais por opção e informações de retry
     return new Response(JSON.stringify({
       success: status !== "error",
       result,
@@ -2051,7 +2188,7 @@ serve(async (req) => {
         normalizationApplied: anyNormalizationApplied,
       },
       finalValidation: primaryValidation,
-      // v2.3: Validações individuais por opção
+      // v2.4: Validações individuais por opção
       optionValidations: optionValidations.map(v => ({
         optionNumber: v.optionNumber,
         status: v.validation.status,
@@ -2077,13 +2214,19 @@ serve(async (req) => {
         newGrams: fc.new_grams,
         reason: `Ajuste para ${objective === "cut" ? "emagrecimento" : objective === "bulk" ? "ganho de massa" : "manutenção"}`,
       })),
+      // v2.4: Metadados de retry
+      meta: {
+        retriesPerformed,
+        maxRetries: MAX_OPTION_RETRIES,
+        diagnostics,
+      },
       explanation: allValidated
-        ? `Plano ajustado com sucesso. ${optionResults.length} opção(ões) validada(s).${anyNormalizationApplied ? ' Normalização aplicada.' : ''}`
+        ? `Plano ajustado com sucesso. ${optionResults.length} opção(ões) validada(s).${anyNormalizationApplied ? ' Normalização aplicada.' : ''}${retriesPerformed > 0 ? ` (${retriesPerformed} retry(s))` : ''}`
         : anyWithTolerance
-        ? `Plano validado com tolerância clínica. ${optionValidations.filter(v => v.isValid).length}/${optionResults.length} opções válidas.`
+        ? `Plano validado com tolerância clínica. ${optionValidations.filter(v => v.isValid).length}/${optionResults.length} opções válidas.${retriesPerformed > 0 ? ` (${retriesPerformed} retry(s))` : ''}`
         : status === "error"
-        ? `Não foi possível atingir as metas. Verifique se as metas são realistas para os alimentos disponíveis.`
-        : `Plano ajustado. ${optionValidations.filter(v => v.isValid).length}/${optionResults.length} opções convergidas.`,
+        ? `Não foi possível atingir as metas após ${retriesPerformed} tentativa(s). Verifique se as metas são realistas para os alimentos disponíveis.`
+        : `Plano ajustado. ${optionValidations.filter(v => v.isValid).length}/${optionResults.length} opções convergidas.${retriesPerformed > 0 ? ` (${retriesPerformed} retry(s))` : ''}`,
       warnings: [
         ...optionValidations
           .filter(v => v.validation.status === "VALIDATED_WITH_TOLERANCE")
@@ -2094,6 +2237,7 @@ serve(async (req) => {
         ...optionResults
           .filter(r => !r.converged && optionValidations.find(v => v.optionNumber === r.optionNumber)?.isValid)
           .map(r => `Opção ${r.optionNumber}: convergência parcial`),
+        ...(retriesPerformed > 0 ? [`${retriesPerformed} retry(s) automático(s) executado(s)`] : []),
       ],
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

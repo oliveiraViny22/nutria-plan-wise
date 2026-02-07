@@ -148,6 +148,8 @@ export interface RebalancerDiagnostics {
   convergenceTimeMs: number;
   /** Opções de refeição processadas */
   optionsProcessed: number;
+  /** Retries automáticos executados em opções que falharam (v2.4) */
+  retriesPerformed?: number;
 }
 
 // =====================================================
