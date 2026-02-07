@@ -501,42 +501,62 @@ export function AIRebalancer({
 
     setApplying(true);
     try {
-      // Aplicar cada ajuste no banco
+      // Aplicar cada ajuste no banco e rastrear todas as opções impactadas
+      // (inclui opções propagadas — especialmente a opção 1, usada nos totais do dashboard)
+      const affectedOptionIds = new Set<string>();
+      const affectedMealIds = new Set<string>();
+
       for (const adj of result.adjustments) {
-        await supabase
+        affectedOptionIds.add(adj.mealOptionId);
+        affectedMealIds.add(adj.mealId);
+
+        const { error: updateErr } = await supabase
           .from('meal_option_foods')
           .update({ quantity_grams: adj.newGrams })
           .eq('id', adj.mealOptionFoodId);
 
+        if (updateErr) throw updateErr;
+
         // Propagar para outras opções da mesma refeição
-        const { data: allOptions } = await supabase
+        const { data: allOptions, error: allOptionsError } = await supabase
           .from('meal_options')
           .select('id, option_number')
           .eq('meal_id', adj.mealId);
 
+        if (allOptionsError) throw allOptionsError;
+
         if (allOptions) {
+          // Marcar todas as opções como afetadas (garante recálculo da opção 1)
+          for (const option of allOptions) {
+            affectedOptionIds.add(option.id);
+          }
+
           for (const option of allOptions) {
             if (option.id === adj.mealOptionId) continue;
-            
+
             // Encontrar o mesmo alimento nas outras opções
-            const { data: otherFoods } = await supabase
+            const { data: otherFoods, error: otherFoodsError } = await supabase
               .from('meal_option_foods')
               .select('id')
               .eq('meal_option_id', option.id)
-              .eq('food_id', adj.foodId);
+              .eq('food_id', adj.foodId)
+              .limit(1);
+
+            if (otherFoodsError) throw otherFoodsError;
 
             if (otherFoods && otherFoods.length > 0) {
-              await supabase
+              const { error: propagateErr } = await supabase
                 .from('meal_option_foods')
                 .update({ quantity_grams: adj.newGrams })
                 .eq('id', otherFoods[0].id);
+
+              if (propagateErr) throw propagateErr;
             }
           }
         }
       }
 
-      // Recalcular totais das opções afetadas
-      const affectedOptionIds = new Set(result.adjustments.map(a => a.mealOptionId));
+      // Recalcular totais das opções afetadas (inclui as propagadas)
       
       for (const optionId of affectedOptionIds) {
         const { data: optionFoods } = await supabase
@@ -579,8 +599,6 @@ export function AIRebalancer({
       }
 
       // Recalcular totais das refeições
-      const affectedMealIds = new Set(result.adjustments.map(a => a.mealId));
-
       for (const mealId of affectedMealIds) {
         const { data: mealOptions } = await supabase
           .from('meal_options')
