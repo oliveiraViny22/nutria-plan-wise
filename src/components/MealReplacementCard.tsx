@@ -253,10 +253,13 @@ export function MealReplacementCard({
               <p className="text-xs text-muted-foreground">
                 {supplementCount > 0 ? (
                   <>
-                    Bata o whey com o leite em um liquidificador ou coqueteleira. 
-                    {foodCount > 0 && ' Adicione os alimentos sólidos (banana, aveia) e bata até ficar homogêneo.'}
+                    Bata o whey com água em um liquidificador ou coqueteleira. 
+                    {replacement.items.some(i => i.name.includes('Aveia')) && ' Adicione a aveia e bata bem.'}
+                    {replacement.items.some(i => i.name === 'Banana') && ' Adicione a banana para dar cremosidade.'}
                     {replacement.items.some(i => i.name.includes('Pasta de Amendoim')) && ' Acrescente a pasta de amendoim por cima ou misture.'}
                   </>
+                ) : replacement.items.some(i => i.name.includes('Aveia')) ? (
+                  'Prepare a aveia como mingau (cozinhar com água) ou deixe de molho por alguns minutos. Adicione os demais ingredientes.'
                 ) : (
                   'Combine os alimentos em um bowl ou consuma separadamente conforme preferência.'
                 )}

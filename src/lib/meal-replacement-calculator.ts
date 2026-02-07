@@ -305,9 +305,55 @@ function scaleMacros(macros: MacroTarget, scale: number): MacroTarget {
 
 /**
  * Formata a quantidade baseada no scale
+ * Regras especiais:
+ * - Banana: incrementos de 0.5 (meia, 1, 1.5, 2...)
+ * - Whey/suplementos: mostrar apenas gramatura (não scoops)
+ * - Valores em gramas: arredondar para inteiros
  */
-function formatQuantity(originalPortion: string, scale: number): string {
-  if (scale === 1) return originalPortion;
+function formatQuantity(originalPortion: string, scale: number, itemName?: string): string {
+  if (scale === 1) {
+    // Para whey, remover referência a scoop e mostrar só gramas
+    if (itemName && (itemName.includes('Whey') || itemName.includes('Caseína') || itemName.includes('Albumina'))) {
+      const gramsMatch = originalPortion.match(/^(\d+)g/);
+      if (gramsMatch) {
+        return `${gramsMatch[1]}g`;
+      }
+    }
+    return originalPortion;
+  }
+  
+  // Para BANANA: usar incrementos naturais (0.5, 1, 1.5, 2...)
+  if (itemName === 'Banana') {
+    const roundedScale = Math.round(scale * 2) / 2; // Arredondar para 0.5
+    const gramsMatch = originalPortion.match(/\((\d+)g\)/);
+    const baseGrams = gramsMatch ? parseInt(gramsMatch[1]) : 100;
+    const newGrams = Math.round(baseGrams * roundedScale);
+    
+    if (roundedScale === 0.5) {
+      return `½ banana (${newGrams}g)`;
+    } else if (roundedScale === 1) {
+      return `1 banana (${newGrams}g)`;
+    } else if (roundedScale === 1.5) {
+      return `1½ banana (${newGrams}g)`;
+    } else if (roundedScale === 2) {
+      return `2 bananas (${newGrams}g)`;
+    } else if (roundedScale === 2.5) {
+      return `2½ bananas (${newGrams}g)`;
+    } else {
+      return `${roundedScale} banana${roundedScale > 1 ? 's' : ''} (${newGrams}g)`;
+    }
+  }
+  
+  // Para WHEY e suplementos em pó: mostrar apenas gramatura
+  if (itemName && (itemName.includes('Whey') || itemName.includes('Caseína') || itemName.includes('Albumina') || 
+                   itemName.includes('Maltodextrina') || itemName.includes('Dextrose'))) {
+    const gramsMatch = originalPortion.match(/^(\d+)g/);
+    if (gramsMatch) {
+      const baseGrams = parseInt(gramsMatch[1]);
+      const newGrams = Math.round(baseGrams * scale);
+      return `${newGrams}g`;
+    }
+  }
   
   // Extrai a quantidade numérica da porção
   const match = originalPortion.match(/^(\d+(?:,\d+)?(?:\.\d+)?)\s*(.*)$/);
@@ -319,27 +365,34 @@ function formatQuantity(originalPortion: string, scale: number): string {
   }
   
   // Para porções como "1 unidade (100g)"
-  const unitMatch = originalPortion.match(/(\d+)\s*(unidade|fatia|pote|scoop)/i);
+  const unitMatch = originalPortion.match(/(\d+)\s*(unidade|fatia|pote)/i);
   if (unitMatch) {
     const num = parseInt(unitMatch[1]);
     const unit = unitMatch[2];
-    const newNum = Math.round(num * scale);
+    const newNum = Math.round(num * scale * 2) / 2; // Permitir meios
     const gramsMatch = originalPortion.match(/\((\d+)g\)/);
     const newGrams = gramsMatch ? Math.round(parseInt(gramsMatch[1]) * scale) : null;
-    return `${newNum} ${unit}${newNum > 1 && !unit.endsWith('s') ? 's' : ''}${newGrams ? ` (${newGrams}g)` : ''}`;
+    
+    // Formatar frações naturais
+    let formattedNum: string;
+    if (newNum === 0.5) {
+      formattedNum = '½';
+    } else if (newNum === 1.5) {
+      formattedNum = '1½';
+    } else if (newNum === 2.5) {
+      formattedNum = '2½';
+    } else {
+      formattedNum = String(Math.round(newNum));
+    }
+    
+    return `${formattedNum} ${unit}${newNum > 1 && !unit.endsWith('s') ? 's' : ''}${newGrams ? ` (${newGrams}g)` : ''}`;
   }
   
-  // Para "Xg (Y scoops)" ou similar
+  // Para "Xg" genérico
   const gramsMatch = originalPortion.match(/^(\d+)g/);
   if (gramsMatch) {
     const grams = parseInt(gramsMatch[1]);
     const newGrams = Math.round(grams * scale);
-    const scoopMatch = originalPortion.match(/\((\d+)\s*scoop/i);
-    if (scoopMatch) {
-      const scoops = parseInt(scoopMatch[1]);
-      const newScoops = Math.round(scoops * scale * 10) / 10;
-      return `${newGrams}g (${newScoops} scoop${newScoops !== 1 ? 's' : ''})`;
-    }
     return `${newGrams}g`;
   }
   
@@ -464,7 +517,7 @@ export function calculateMealReplacement(
     
     items.push({
       name,
-      quantity: formatQuantity(item.portion, finalScale),
+      quantity: formatQuantity(item.portion, finalScale, name),
       macros: scaledMacros,
       type,
       notes: item.notes,
@@ -572,23 +625,30 @@ export function calculateMealReplacement(
   // Não adicionar proteína extra (iogurte, ovos) para evitar exceder a meta
   // O whey já deve cobrir a necessidade proteica
 
-  // 5. LÍQUIDO: Base para shake (obrigatório se tiver suplemento em pó)
+  // 5. LÍQUIDO: Base para shake (obrigatório se tiver suplemento em pó OU aveia)
   const hasProteinPowder = items.some(i => 
     i.type === 'supplement' && 
     (i.name.includes('Whey') || i.name.includes('Caseína') || i.name.includes('Albumina'))
   );
+  const hasOatmeal = items.some(i => i.name.includes('Aveia'));
   
-  if (hasProteinPowder) {
-    // ÁGUA é sempre a base preferencial para shakes
+  if (hasProteinPowder || hasOatmeal) {
+    // ÁGUA é sempre a base preferencial para shakes e mingaus
     // Isso garante que o shake não impacte negativamente no plano alimentar,
     // mantendo hidratação e controle preciso de calorias
+    const reason = hasProteinPowder 
+      ? '💧 Água para não impactar o plano alimentar e garantir hidratação'
+      : '💧 Água para preparar a aveia (mingau ou shake)';
+    
     items.push({
       name: 'Água',
       quantity: '150-200ml',
       macros: { calories: 0, protein: 0, carbs: 0, fat: 0 },
       type: 'food',
-      notes: 'Base preferencial para shakes - mantém controle calórico',
-      reason: '💧 Água para não impactar o plano alimentar e garantir hidratação',
+      notes: hasOatmeal && !hasProteinPowder 
+        ? 'Preparar a aveia como mingau ou deixar de molho'
+        : 'Base preferencial para shakes - mantém controle calórico',
+      reason,
     });
   }
 
