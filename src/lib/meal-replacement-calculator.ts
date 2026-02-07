@@ -671,7 +671,169 @@ export function calculateMealReplacement(
     }
   }
 
-  // Calcular totais
+  // =====================================================
+  // 8. REFINAMENTO ITERATIVO: Ajustar porções para convergência
+  // =====================================================
+  const ACCURACY_TARGETS = {
+    calories: { min: 90, max: 100 },
+    protein: { min: 90, max: 105 },
+    carbs: { min: 80, max: 120 },
+    fat: { min: 80, max: 120 },
+  };
+  
+  // Função para calcular accuracy atual
+  const calculateAccuracy = () => ({
+    calories: targetMacros.calories > 0 ? (currentMacros.calories / targetMacros.calories) * 100 : 100,
+    protein: targetMacros.protein > 0 ? (currentMacros.protein / targetMacros.protein) * 100 : 100,
+    carbs: targetMacros.carbs > 0 ? (currentMacros.carbs / targetMacros.carbs) * 100 : 100,
+    fat: targetMacros.fat > 0 ? (currentMacros.fat / targetMacros.fat) * 100 : 100,
+  });
+  
+  // Função para verificar se todos os macros estão convergidos
+  const isConverged = (acc: ReturnType<typeof calculateAccuracy>) => {
+    return (
+      acc.calories >= ACCURACY_TARGETS.calories.min &&
+      acc.calories <= ACCURACY_TARGETS.calories.max &&
+      acc.protein >= ACCURACY_TARGETS.protein.min &&
+      acc.protein <= ACCURACY_TARGETS.protein.max
+    );
+  };
+  
+  // Função para escalar um item existente
+  const scaleExistingItem = (itemIndex: number, newScale: number): boolean => {
+    const item = items[itemIndex];
+    if (!item || item.name === 'Água') return false;
+    
+    // Encontrar item no catálogo
+    const catalogItem = ACTIVE_FOODS[item.name] || ACTIVE_SUPPLEMENTS[item.name];
+    if (!catalogItem) return false;
+    
+    // Calcular scale atual baseado nos macros
+    const currentScale = catalogItem.macros.calories > 0 
+      ? item.macros.calories / catalogItem.macros.calories 
+      : 1;
+    
+    // Limitar newScale aos bounds do catálogo
+    const minScale = catalogItem.minPortion || 0.25;
+    const maxScale = catalogItem.maxPortion || 2;
+    const clampedScale = Math.max(minScale, Math.min(maxScale, newScale));
+    
+    if (Math.abs(clampedScale - currentScale) < 0.1) return false; // Mudança insignificante
+    
+    // Atualizar macros
+    const oldMacros = item.macros;
+    const newMacros = scaleMacros(catalogItem.macros, clampedScale);
+    
+    // Verificar se a mudança não excede limites críticos
+    const projectedProtein = currentMacros.protein - oldMacros.protein + newMacros.protein;
+    const projectedCalories = currentMacros.calories - oldMacros.calories + newMacros.calories;
+    
+    if (projectedProtein > targetMacros.protein * 1.10) return false; // Limite de proteína
+    if (projectedCalories > targetMacros.calories * 1.05) return false; // Limite de calorias
+    
+    // Aplicar mudança
+    currentMacros.calories = currentMacros.calories - oldMacros.calories + newMacros.calories;
+    currentMacros.protein = currentMacros.protein - oldMacros.protein + newMacros.protein;
+    currentMacros.carbs = currentMacros.carbs - oldMacros.carbs + newMacros.carbs;
+    currentMacros.fat = currentMacros.fat - oldMacros.fat + newMacros.fat;
+    
+    items[itemIndex] = {
+      ...item,
+      quantity: formatQuantity(catalogItem.portion, clampedScale),
+      macros: newMacros,
+    };
+    
+    return true;
+  };
+  
+  // Executar até 5 iterações de refinamento
+  const MAX_REFINEMENT_ITERATIONS = 5;
+  for (let iteration = 0; iteration < MAX_REFINEMENT_ITERATIONS; iteration++) {
+    const acc = calculateAccuracy();
+    
+    if (isConverged(acc)) break;
+    
+    // Identificar o macro mais crítico (mais longe da meta)
+    const calorieGap = acc.calories < ACCURACY_TARGETS.calories.min 
+      ? ACCURACY_TARGETS.calories.min - acc.calories 
+      : (acc.calories > ACCURACY_TARGETS.calories.max ? acc.calories - ACCURACY_TARGETS.calories.max : 0);
+    const proteinGap = acc.protein < ACCURACY_TARGETS.protein.min 
+      ? ACCURACY_TARGETS.protein.min - acc.protein 
+      : 0; // Só preocupa se abaixo
+    
+    // Prioridade: Calorias primeiro (se abaixo de 90%)
+    if (acc.calories < ACCURACY_TARGETS.calories.min) {
+      // Tentar escalar itens de carboidrato para aumentar calorias
+      const carbItems = items.map((item, idx) => ({ item, idx }))
+        .filter(({ item }) => 
+          item.name.includes('Aveia') || item.name.includes('Banana') || 
+          item.name === 'Mel' || item.name.includes('Maltodextrina')
+        );
+      
+      for (const { item, idx } of carbItems) {
+        const catalogItem = ACTIVE_FOODS[item.name] || ACTIVE_SUPPLEMENTS[item.name];
+        if (!catalogItem) continue;
+        
+        const currentScale = catalogItem.macros.calories > 0 
+          ? item.macros.calories / catalogItem.macros.calories 
+          : 1;
+        
+        // Calcular quanto precisamos aumentar
+        const caloriesNeeded = targetMacros.calories * 0.92 - currentMacros.calories;
+        const scaleIncrease = caloriesNeeded / catalogItem.macros.calories;
+        const newScale = currentScale + Math.min(0.5, scaleIncrease);
+        
+        if (scaleExistingItem(idx, newScale)) break;
+      }
+    }
+    
+    // Se proteína abaixo de 90%, tentar escalar whey
+    if (acc.protein < ACCURACY_TARGETS.protein.min) {
+      const wheyIdx = items.findIndex(item => item.name.includes('Whey'));
+      if (wheyIdx >= 0) {
+        const wheyItem = items[wheyIdx];
+        const catalogItem = ACTIVE_SUPPLEMENTS[wheyItem.name];
+        if (catalogItem) {
+          const currentScale = catalogItem.macros.protein > 0 
+            ? wheyItem.macros.protein / catalogItem.macros.protein 
+            : 1;
+          
+          // Tentar aumentar para 1 scoop se ainda está em 0.5
+          if (currentScale < 1) {
+            scaleExistingItem(wheyIdx, 1);
+          }
+        }
+      }
+    }
+    
+    // Se calorias acima de 100%, tentar reduzir itens menos essenciais
+    if (acc.calories > ACCURACY_TARGETS.calories.max) {
+      // Reduzir mel primeiro, depois oleaginosas
+      const fillerItems = items.map((item, idx) => ({ item, idx }))
+        .filter(({ item }) => 
+          item.name === 'Mel' || item.name.includes('Castanha') || 
+          item.name.includes('Amendoim') || item.name.includes('Nozes')
+        );
+      
+      for (const { item, idx } of fillerItems) {
+        const catalogItem = ACTIVE_FOODS[item.name];
+        if (!catalogItem) continue;
+        
+        const currentScale = catalogItem.macros.calories > 0 
+          ? item.macros.calories / catalogItem.macros.calories 
+          : 1;
+        
+        // Reduzir em 0.25
+        const newScale = currentScale - 0.25;
+        if (newScale >= 0.25) {
+          scaleExistingItem(idx, newScale);
+          break;
+        }
+      }
+    }
+  }
+
+  // Calcular totais finais
   const totalMacros = items.reduce(
     (acc, item) => ({
       calories: acc.calories + item.macros.calories,
@@ -682,29 +844,38 @@ export function calculateMealReplacement(
     { calories: 0, protein: 0, carbs: 0, fat: 0 }
   );
 
-  // Calcular precisão
+  // Calcular precisão final
   const accuracy = {
     calories: targetMacros.calories > 0 ? Math.round((totalMacros.calories / targetMacros.calories) * 100) : 100,
     protein: targetMacros.protein > 0 ? Math.round((totalMacros.protein / targetMacros.protein) * 100) : 100,
     carbs: targetMacros.carbs > 0 ? Math.round((totalMacros.carbs / targetMacros.carbs) * 100) : 100,
     fat: targetMacros.fat > 0 ? Math.round((totalMacros.fat / targetMacros.fat) * 100) : 100,
   };
+  
+  // Verificar convergência final
+  const finalConverged = 
+    accuracy.calories >= ACCURACY_TARGETS.calories.min && 
+    accuracy.calories <= ACCURACY_TARGETS.calories.max &&
+    accuracy.protein >= ACCURACY_TARGETS.protein.min;
 
   // Dicas contextuais
   const tips: string[] = [];
   
-  if (accuracy.protein < 90) {
-    tips.push('💡 Adicione mais 1 scoop de whey ou 2 ovos para atingir a meta de proteína.');
+  if (finalConverged) {
+    tips.push('✅ Substituição otimizada: calorias e proteína dentro das metas.');
+  } else {
+    if (accuracy.protein < 90) {
+      tips.push('💡 Adicione mais 1 scoop de whey ou 2 ovos para atingir a meta de proteína.');
+    }
+    if (accuracy.calories < 90) {
+      tips.push('💡 Adicione mais alimentos para atingir as calorias necessárias.');
+    } else if (accuracy.calories > 100) {
+      tips.push('⚠️ Esta substituição excede as calorias originais em ' + (accuracy.calories - 100) + '%.');
+    }
   }
+  
   if (accuracy.carbs < 80) {
     tips.push('💡 Adicione 1 fatia de pão integral ou mais banana para os carboidratos.');
-  }
-  if (accuracy.calories > 100) {
-    tips.push('⚠️ Esta substituição excede as calorias originais em ' + (accuracy.calories - 100) + '%.');
-  } else if (accuracy.calories < 90) {
-    tips.push('💡 Adicione mais alimentos para atingir as calorias necessárias.');
-  } else {
-    tips.push('✅ Calorias dentro da margem ideal (±10%).');
   }
   
   if (items.length > 5) {
