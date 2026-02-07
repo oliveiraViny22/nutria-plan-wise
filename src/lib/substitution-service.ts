@@ -551,7 +551,7 @@ export function findSubstituteCandidates(
     };
   });
   
-  // Ordenar: mesma categoria primeiro, depois por score (alimentos com warning vão ao final)
+  // Ordenar: mesma categoria primeiro, sem warning, depois alfabeticamente
   scoredCandidates.sort((a, b) => {
     // 1. Alimentos da mesma categoria vêm primeiro
     if (!a.isCrossCategory && b.isCrossCategory) return -1;
@@ -561,8 +561,8 @@ export function findSubstituteCandidates(
     if (a.hasProcessingWarning && !b.hasProcessingWarning) return 1;
     if (!a.hasProcessingWarning && b.hasProcessingWarning) return -1;
     
-    // 3. Ordenar por score
-    return b.score - a.score;
+    // 3. Ordenar alfabeticamente pelo nome do alimento
+    return a.food.name.localeCompare(b.food.name, 'pt-BR');
   });
   
   return scoredCandidates;
