@@ -418,16 +418,28 @@ function buildMeal(mt: string, opt: number, roles: any[], foods: Food[], anchors
   };
   
   // v5.15: Verificar se adicionar alimento excederia limite de proteína em lanche
+  // v5.21: Não aplicar para categorias de baixa proteína (frutas, vegetais, gorduras)
+  const LOW_PROTEIN_CATEGORIES = ["frutas", "vegetais", "gorduras", "carboidratos"];
+  
   const wouldExceedSnackProtein = (food: Food, grams: number): boolean => {
     if (!isSnack) return false;
+    // v5.21: Não penalizar categorias de baixa proteína
+    const cat = (food.category || "").toLowerCase();
+    if (LOW_PROTEIN_CATEGORIES.includes(cat)) return false;
+    
     const currentProt = getCurrentProtein();
     const addedProt = (food.protein * grams) / 100;
     return (currentProt + addedProt) > MAX_SNACK_PROTEIN;
   };
   
   // v5.15: Calcular quantidade máxima para não exceder proteína em lanche
+  // v5.21: Não aplicar para categorias de baixa proteína
   const getMaxQtyForSnackProtein = (food: Food, baseQty: number): number => {
     if (!isSnack || food.protein <= 0) return baseQty;
+    // v5.21: Não limitar categorias de baixa proteína
+    const cat = (food.category || "").toLowerCase();
+    if (LOW_PROTEIN_CATEGORIES.includes(cat)) return baseQty;
+    
     const currentProt = getCurrentProtein();
     const remainingProt = Math.max(0, MAX_SNACK_PROTEIN - currentProt);
     const maxGramsForProtein = (remainingProt / food.protein) * 100;
