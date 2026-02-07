@@ -150,6 +150,20 @@ export interface RebalancerDiagnostics {
   optionsProcessed: number;
   /** Retries automáticos executados em opções que falharam (v2.4) */
   retriesPerformed?: number;
+  /** Diagnóstico de equalização calórica entre opções (v2.5) */
+  calorieEqualization?: {
+    /** Número de opções ajustadas */
+    optionsAdjusted: number;
+    /** Warnings de equalização */
+    warnings: string[];
+    /** Detalhes dos ajustes aplicados */
+    adjustments: Array<{
+      optionNumber: number;
+      originalCalories: number;
+      newCalories: number;
+      scaleFactor: number;
+    }>;
+  };
 }
 
 // =====================================================

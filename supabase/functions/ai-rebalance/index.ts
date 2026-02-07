@@ -1,5 +1,5 @@
 // ============================================
-// REBALANCEADOR AUTOMÁTICO NUTRIAPLAN v2.4
+// REBALANCEADOR AUTOMÁTICO NUTRIAPLAN v2.5
 // ============================================
 // Implementação conforme especificação:
 // - Validação por objetivo (cut/maintain/bulk)
@@ -7,6 +7,7 @@
 // - Máximo de 3 ciclos de correção
 // - Formato JSON estruturado
 // - RETRY AUTOMÁTICO para opções não convergidas (v2.4)
+// - EQUALIZAÇÃO CALÓRICA entre opções (v2.5)
 // ============================================
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
@@ -14,6 +15,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import {
   KCAL_PER_GRAM,
   REBALANCER_CONTRACT,
+  GENERATOR_CONTRACT,
 } from "../_shared/nutrition-contracts.ts";
 import { createLogger, logAIUsage, type RebalanceMetrics } from "../_shared/logger.ts";
 import { getCorsHeaders } from "../_shared/security.ts";
@@ -576,6 +578,162 @@ function validatePlan(
   }
 
   return { valid: errors.length === 0, errors };
+}
+
+// ============================================
+// EQUALIZAÇÃO CALÓRICA ENTRE OPÇÕES (v2.5)
+// Garante que opções 2 e 3 tenham ±5% de calorias da opção 1
+// ============================================
+
+interface EqualizationResult {
+  adjusted: number;
+  warnings: string[];
+  adjustments: Array<{
+    optionNumber: number;
+    originalCalories: number;
+    newCalories: number;
+    scaleFactor: number;
+  }>;
+}
+
+/**
+ * Equaliza as calorias entre opções do plano.
+ * Usa a Opção 1 como referência e escala as opções 2/3 proporcionalmente.
+ * 
+ * @param optionResults - Resultados de todas as opções processadas
+ * @param targets - Metas de macros
+ * @returns Resultado da equalização com ajustes aplicados
+ */
+function equalizeOptionCalories(
+  optionResults: Array<{
+    optionNumber: number;
+    foods: FoodWithMeta[];
+    finalQuantities: Map<string, number>;
+    finalTotals: MacroTargets;
+  }>,
+  targets: MacroTargets
+): EqualizationResult {
+  const MAX_VARIANCE = GENERATOR_CONTRACT.MAX_OPTION_CALORIE_VARIANCE_PERCENT / 100; // 0.05
+  const warnings: string[] = [];
+  const adjustments: EqualizationResult['adjustments'] = [];
+  let totalAdjusted = 0;
+
+  // Encontrar opção 1 como referência
+  const referenceOption = optionResults.find(r => r.optionNumber === 1);
+  if (!referenceOption) {
+    console.log("[EQUALIZAÇÃO] Opção 1 não encontrada, pulando equalização");
+    return { adjusted: 0, warnings: [], adjustments: [] };
+  }
+
+  const referenceCalories = referenceOption.finalTotals.calories;
+  if (referenceCalories <= 0) {
+    console.log("[EQUALIZAÇÃO] Calorias de referência zeradas, pulando equalização");
+    return { adjusted: 0, warnings: [], adjustments: [] };
+  }
+
+  console.log(`\n╔══════════════════════════════════════════════════════════════╗`);
+  console.log(`║  EQUALIZAÇÃO CALÓRICA ENTRE OPÇÕES (v2.5)                     ║`);
+  console.log(`╠══════════════════════════════════════════════════════════════╣`);
+  console.log(`║  Referência (Opção 1): ${referenceCalories.toFixed(0)} kcal`.padEnd(63) + `║`);
+  console.log(`║  Tolerância: ±${GENERATOR_CONTRACT.MAX_OPTION_CALORIE_VARIANCE_PERCENT}%`.padEnd(63) + `║`);
+  console.log(`╚══════════════════════════════════════════════════════════════╝\n`);
+
+  // Processar opções 2 e 3
+  for (const option of optionResults) {
+    if (option.optionNumber === 1) continue; // Pular referência
+
+    const currentCalories = option.finalTotals.calories;
+    const variance = Math.abs(currentCalories - referenceCalories) / referenceCalories;
+
+    // Se já está dentro da tolerância, pular
+    if (variance <= MAX_VARIANCE) {
+      console.log(`[EQUALIZAÇÃO] Opção ${option.optionNumber}: ${currentCalories.toFixed(0)} kcal (${(variance * 100).toFixed(1)}% variância) ✓ OK`);
+      continue;
+    }
+
+    // Calcular fator de escala
+    const scaleFactor = referenceCalories / currentCalories;
+
+    console.log(`[EQUALIZAÇÃO] Opção ${option.optionNumber}: ${currentCalories.toFixed(0)} kcal (${(variance * 100).toFixed(1)}% variância) → aplicando escala ${scaleFactor.toFixed(3)}`);
+
+    // Aplicar escala proporcional a todos os alimentos
+    for (const food of option.foods) {
+      const currentQty = option.finalQuantities.get(food.id) || food.quantity_grams;
+      const category = (food.food.category || "").toLowerCase();
+      
+      // Usar limites de categoria para clamping
+      const limits = getCategoryLimitsForRebalancer(category);
+      
+      // Calcular nova quantidade arredondada para múltiplo de 5
+      const rawNewQty = currentQty * scaleFactor;
+      const newQty = Math.round(rawNewQty / 5) * 5;
+      const clampedQty = Math.max(limits.min, Math.min(limits.max, newQty));
+      
+      option.finalQuantities.set(food.id, clampedQty);
+    }
+
+    // Recalcular totais após ajuste
+    const newTotals = calculateTotals(option.foods, option.finalQuantities);
+    const newVariance = Math.abs(newTotals.calories - referenceCalories) / referenceCalories;
+
+    adjustments.push({
+      optionNumber: option.optionNumber,
+      originalCalories: currentCalories,
+      newCalories: newTotals.calories,
+      scaleFactor,
+    });
+
+    // Atualizar totais no resultado
+    option.finalTotals.calories = newTotals.calories;
+    option.finalTotals.protein = newTotals.protein;
+    option.finalTotals.carbs = newTotals.carbs;
+    option.finalTotals.fat = newTotals.fat;
+
+    totalAdjusted++;
+
+    if (newVariance > MAX_VARIANCE) {
+      warnings.push(
+        `Opção ${option.optionNumber} não pôde ser totalmente equalizada: ${newTotals.calories.toFixed(0)} kcal ` +
+        `(${(newVariance * 100).toFixed(1)}% variância, máximo: ${GENERATOR_CONTRACT.MAX_OPTION_CALORIE_VARIANCE_PERCENT}%)`
+      );
+      console.log(`[EQUALIZAÇÃO] ⚠️ Opção ${option.optionNumber}: ${newTotals.calories.toFixed(0)} kcal (${(newVariance * 100).toFixed(1)}% variância) - não totalmente equalizada`);
+    } else {
+      console.log(`[EQUALIZAÇÃO] ✓ Opção ${option.optionNumber}: ${newTotals.calories.toFixed(0)} kcal (${(newVariance * 100).toFixed(1)}% variância) - equalizada`);
+    }
+  }
+
+  if (totalAdjusted > 0) {
+    console.log(`\n[EQUALIZAÇÃO] Concluído: ${totalAdjusted} opção(ões) ajustada(s)${warnings.length > 0 ? `, ${warnings.length} warning(s)` : ''}\n`);
+  }
+
+  return { adjusted: totalAdjusted, warnings, adjustments };
+}
+
+/**
+ * Obtém limites de categoria para o rebalanceador.
+ * Simplificado para uso no contexto do rebalanceador.
+ */
+function getCategoryLimitsForRebalancer(category: string): { min: number; max: number } {
+  const normalizedCategory = category.toLowerCase().trim()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  
+  // Limites padrão por categoria (alinhados com category-limits.ts)
+  const CATEGORY_LIMITS: Record<string, { min: number; max: number }> = {
+    "proteinas": { min: 50, max: 400 },
+    "carboidratos": { min: 30, max: 500 },
+    "gorduras": { min: 5, max: 30 },
+    "vegetais": { min: 30, max: 300 },
+    "frutas": { min: 50, max: 300 },
+    "laticinios": { min: 50, max: 400 },
+    "leguminosas": { min: 30, max: 250 },
+    "oleaginosas": { min: 10, max: 50 },
+    "ovos": { min: 50, max: 200 },
+    "peixes": { min: 80, max: 400 },
+    "cereais": { min: 30, max: 200 },
+    "tuberculos": { min: 50, max: 400 },
+  };
+  
+  return CATEGORY_LIMITS[normalizedCategory] || { min: 20, max: 500 };
 }
 
 // ============================================
@@ -2065,6 +2223,28 @@ serve(async (req) => {
       }
     }
     
+    // ============================================
+    // EQUALIZAÇÃO CALÓRICA ENTRE OPÇÕES (v2.5)
+    // Garante que as opções 2 e 3 tenham ±5% de calorias da opção 1
+    // ============================================
+    let equalizationResult: EqualizationResult = { adjusted: 0, warnings: [], adjustments: [] };
+    
+    if (optionResults.length > 1) {
+      equalizationResult = equalizeOptionCalories(optionResults, targets);
+      
+      if (equalizationResult.adjusted > 0) {
+        log.info("CalorieEqualizationApplied", {
+          optionsAdjusted: equalizationResult.adjusted,
+          warnings: equalizationResult.warnings.length,
+          adjustments: equalizationResult.adjustments,
+        });
+        
+        // Re-validar opções após equalização
+        optionValidations = validateOptions();
+        console.log(`[EQUALIZAÇÃO] Re-validação após equalização concluída`);
+      }
+    }
+    
     // Usar opção 1 como referência principal para compatibilidade
     const primaryResult = optionResults.find(r => r.optionNumber === 1) || optionResults[0];
     const primaryValidation = optionValidations.find(v => v.optionNumber === primaryResult.optionNumber)?.validation 
@@ -2169,7 +2349,7 @@ serve(async (req) => {
       return currentIndex < worstIndex ? result.refinementStatus : worst;
     }, RefinementStatus.CONVERGED);
 
-    // Construir diagnósticos do rebalanceador (v2.4)
+    // Construir diagnósticos do rebalanceador (v2.5)
     const convergenceTimeMs = Math.round(performance.now() - startTime);
     const diagnostics: RebalancerDiagnostics = {
       refinementStatus: primaryRefinementStatus,
@@ -2183,7 +2363,13 @@ serve(async (req) => {
       totalIterations,
       convergenceTimeMs,
       optionsProcessed: optionResults.length,
-      retriesPerformed: totalRetriesPerformed, // v2.5: Total global de retries
+      retriesPerformed: totalRetriesPerformed,
+      // v2.5: Adicionado diagnóstico de equalização calórica
+      calorieEqualization: {
+        optionsAdjusted: equalizationResult.adjusted,
+        warnings: equalizationResult.warnings,
+        adjustments: equalizationResult.adjustments,
+      },
     };
 
     const result: RebalanceResult = {
@@ -2207,7 +2393,7 @@ serve(async (req) => {
       },
     };
 
-    // Log de resumo com diagnósticos (v2.4)
+    // Log de resumo com diagnósticos (v2.5)
     log.info("Rebalance complete", {
       g10Status: g10Metadata.g10Status,
       normalizationApplied: anyNormalizationApplied,
@@ -2218,6 +2404,9 @@ serve(async (req) => {
       optionsCount: optionResults.length,
       optionStatuses: optionValidations.map(v => `Opt${v.optionNumber}:${v.validation.status}`).join(', '),
       totalRetriesPerformed,
+      // v2.5: Log de equalização
+      equalizationApplied: equalizationResult.adjusted > 0,
+      equalizationAdjustments: equalizationResult.adjusted,
       retriesPerOption: Object.fromEntries(retriesPerOption),
     });
 
