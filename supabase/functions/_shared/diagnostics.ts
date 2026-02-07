@@ -150,6 +150,8 @@ export interface RebalancerDiagnostics {
   optionsProcessed: number;
   /** Retries automáticos executados em opções que falharam (v2.4) */
   retriesPerformed?: number;
+  /** Loops de convergência executados (v2.9) */
+  convergenceLoops?: number;
   /** Diagnóstico de equalização calórica entre opções (v2.5) */
   calorieEqualization?: {
     /** Número de opções ajustadas */
@@ -183,7 +185,7 @@ export interface RebalancerDiagnostics {
       }>;
     }>;
   };
-  /** Diagnóstico de boost de gordura - injeção de azeite (v2.8) */
+  /** Diagnóstico de boost de gordura - injeção de azeite (v2.9) */
   fatBoost?: {
     /** Número de opções que receberam boost */
     optionsBoosted: number;
