@@ -7,7 +7,6 @@ import {
   TrendingUp,
   TrendingDown,
   Calendar,
-  History,
   Target,
   CheckCircle2,
   XCircle,
@@ -304,8 +303,8 @@ export default function Progress() {
         <Tabs defaultValue="weight" className="space-y-4 sm:space-y-6">
           <TabsList className={`grid w-full h-auto ${
             canAccessMeasurements 
-              ? (isPaidUser ? 'grid-cols-4' : 'grid-cols-2')
-              : (isPaidUser ? 'grid-cols-3' : 'grid-cols-1')
+              ? (isPaidUser ? 'grid-cols-3' : 'grid-cols-2')
+              : (isPaidUser ? 'grid-cols-2' : 'grid-cols-1')
           }`}>
             <TabsTrigger value="weight" className="text-xs sm:text-sm py-2 sm:py-2.5">
               <Scale className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
@@ -318,16 +317,10 @@ export default function Progress() {
               </TabsTrigger>
             )}
             {isPaidUser && (
-              <>
-                <TabsTrigger value="adherence" className="text-xs sm:text-sm py-2 sm:py-2.5">
-                  <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                  Adesão
-                </TabsTrigger>
-                <TabsTrigger value="history" className="text-xs sm:text-sm py-2 sm:py-2.5">
-                  <History className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                  Histórico
-                </TabsTrigger>
-              </>
+              <TabsTrigger value="adherence" className="text-xs sm:text-sm py-2 sm:py-2.5">
+                <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                Adesão
+              </TabsTrigger>
             )}
           </TabsList>
 
@@ -503,65 +496,6 @@ export default function Progress() {
             </TabsContent>
           )}
 
-          {/* History Tab - Paid users only */}
-          {isPaidUser && (
-            <TabsContent value="history" className="space-y-4">
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-              >
-                {dailyLogs.length === 0 ? (
-                  <Card>
-                    <CardContent className="py-12 text-center">
-                      <History className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                      <h3 className="text-lg font-medium mb-2">Nenhum registro encontrado</h3>
-                      <p className="text-muted-foreground mb-4">
-                        Comece a registrar suas refeições para acompanhar seu progresso
-                      </p>
-                      <Button onClick={() => navigate('/daily-log')}>
-                        Registrar Hoje
-                      </Button>
-                    </CardContent>
-                  </Card>
-                ) : (
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-base">Histórico de Registros</CardTitle>
-                      <CardDescription>Últimos 90 dias</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-2 max-h-[400px] overflow-y-auto">
-                        {dailyLogs.slice().reverse().map((log) => (
-                          <div 
-                            key={log.id} 
-                            className="flex items-center justify-between py-3 border-b last:border-0"
-                          >
-                            <div className="flex items-center gap-3">
-                              {getStatusIcon(log.status)}
-                              <div>
-                                <p className="font-medium text-sm">
-                                  {format(new Date(log.log_date), "dd 'de' MMMM", { locale: ptBR })}
-                                </p>
-                                <p className="text-xs text-muted-foreground">
-                                  {log.total_calories_consumed || 0} kcal consumidas
-                                </p>
-                              </div>
-                            </div>
-                            <Badge 
-                              variant={log.status === 'complete' ? 'default' : log.status === 'partial' ? 'secondary' : 'outline'}
-                              className="text-xs"
-                            >
-                              {getStatusLabel(log.status)}
-                            </Badge>
-                          </div>
-                        ))}
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
-              </motion.div>
-            </TabsContent>
-          )}
         </Tabs>
       </main>
     </div>
