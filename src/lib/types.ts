@@ -155,6 +155,7 @@ export interface Meal {
   total_fat: number;
   created_at: string;
   options?: MealOption[];
+  options_count?: number; // Count of available options
 }
 
 export interface MealOption {

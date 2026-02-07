@@ -141,12 +141,21 @@ export default function Dashboard() {
   const fetchMeals = async (planId: string) => {
     const { data, error } = await supabase
       .from('meals')
-      .select('*')
+      .select(`
+        *,
+        meal_options(id)
+      `)
       .eq('diet_plan_id', planId)
       .order('created_at');
 
     if (!error && data) {
-      setMeals(data as Meal[]);
+      // Map meals with options count
+      const mealsWithOptionsCount = data.map((meal: any) => ({
+        ...meal,
+        options_count: meal.meal_options?.length || 0,
+        meal_options: undefined, // Remove raw data
+      }));
+      setMeals(mealsWithOptionsCount as Meal[]);
       await fetchTodayLogs(planId, data.length);
     }
   };

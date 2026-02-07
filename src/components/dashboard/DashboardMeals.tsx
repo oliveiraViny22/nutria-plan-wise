@@ -145,12 +145,13 @@ export function DashboardMeals({
             animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: 0.2 + index * 0.03 }}
           >
-          {(() => {
+            {(() => {
               const IconComponent = getMealIcon(meal.name);
+              const optionsCount = (meal as any).options_count || 0;
               return (
                 <div
                   className={`
-                    flex flex-col items-center justify-center p-3 rounded-xl
+                    relative flex flex-col items-center justify-center p-3 rounded-xl
                     bg-card/50 hover:bg-muted/40 transition-all cursor-pointer
                     border border-border/30 hover:border-border/50
                     hover:shadow-sm hover:scale-[1.02] active:scale-[0.98]
@@ -158,6 +159,11 @@ export function DashboardMeals({
                   `}
                   onClick={() => navigate(`/meal/${meal.id}`)}
                 >
+                  {optionsCount > 0 && (
+                    <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] flex items-center justify-center text-[10px] font-semibold bg-primary text-primary-foreground rounded-full px-1">
+                      {optionsCount}
+                    </span>
+                  )}
                   <IconComponent className="w-4 h-4 text-muted-foreground" />
                   <span className="font-medium text-foreground text-xs sm:text-sm text-center line-clamp-1">
                     {MEAL_NAMES[meal.name as MealType] || meal.name}
