@@ -3,14 +3,24 @@ import { supabase } from '@/integrations/supabase/client';
 import { useNetworkStatus } from './useNetworkStatus';
 import {
   queueMealConfirmation,
+  queueWeightLog,
+  queueBodyMeasurement,
   getPendingConfirmations,
+  getPendingWeightLogs,
+  getPendingMeasurements,
   getPendingCount,
   removePendingConfirmation,
+  removePendingWeightLog,
+  removePendingMeasurement,
   updatePendingConfirmation,
+  updatePendingWeightLog,
+  updatePendingMeasurement,
   updateSyncStatus,
   getSyncStatus,
   isOnline,
   PendingMealConfirmation,
+  PendingWeightLog,
+  PendingBodyMeasurement,
   SyncStatus,
 } from '@/lib/offline-sync';
 import { toast } from 'sonner';
@@ -29,12 +39,32 @@ export interface UseOfflineSyncResult {
     status: 'confirmed' | 'skipped' | 'out_of_plan' | 'late_confirmed',
     logDate?: string
   ) => Promise<{ success: boolean; isOffline: boolean }>;
+  logWeight: (
+    userId: string,
+    weightKg: number,
+    logDate?: string,
+    notes?: string
+  ) => Promise<{ success: boolean; isOffline: boolean }>;
+  logMeasurement: (
+    userId: string,
+    data: {
+      measurementDate?: string;
+      waistCm?: number;
+      hipCm?: number;
+      chestCm?: number;
+      armCm?: number;
+      thighCm?: number;
+      calfCm?: number;
+      bodyFatPercent?: number;
+      notes?: string;
+    }
+  ) => Promise<{ success: boolean; isOffline: boolean }>;
   syncNow: () => Promise<void>;
   refreshStatus: () => Promise<void>;
 }
 
 /**
- * Hook for offline-capable meal confirmation with background sync
+ * Hook for offline-capable data sync with background sync
  */
 export function useOfflineSync(): UseOfflineSyncResult {
   const { isOnline: networkOnline } = useNetworkStatus();
@@ -48,9 +78,6 @@ export function useOfflineSync(): UseOfflineSyncResult {
   const isSyncingRef = useRef(false);
   const syncTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  /**
-   * Refresh the sync status from IndexedDB
-   */
   const refreshStatus = useCallback(async () => {
     try {
       const status = await getSyncStatus();
@@ -60,14 +87,15 @@ export function useOfflineSync(): UseOfflineSyncResult {
     }
   }, []);
 
-  /**
-   * Sync a single pending confirmation to the server
-   */
+  // ==========================================
+  // SYNC INDIVIDUAL ITEMS
+  // ==========================================
+
   const syncConfirmation = useCallback(async (
     confirmation: PendingMealConfirmation
   ): Promise<boolean> => {
     try {
-      const { data, error } = await supabase.rpc('confirm_meal_consumption', {
+      const { error } = await supabase.rpc('confirm_meal_consumption', {
         _user_id: confirmation.userId,
         _meal_id: confirmation.mealId,
         _option_id: confirmation.optionId,
@@ -76,33 +104,99 @@ export function useOfflineSync(): UseOfflineSyncResult {
       });
 
       if (error) throw error;
-
-      // Success - remove from pending queue
       await removePendingConfirmation(confirmation.id);
       return true;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
-      
-      // Update retry count and error
       await updatePendingConfirmation(confirmation.id, {
         retryCount: confirmation.retryCount + 1,
         lastError: errorMessage,
       });
 
-      // Remove if max retries exceeded
       if (confirmation.retryCount + 1 >= MAX_RETRIES) {
-        console.error(`Max retries exceeded for confirmation ${confirmation.id}`, error);
         await removePendingConfirmation(confirmation.id);
-        toast.error('Falha ao sincronizar refeição. Tente novamente.');
+        toast.error('Falha ao sincronizar refeição.');
       }
-
       return false;
     }
   }, []);
 
-  /**
-   * Sync all pending confirmations
-   */
+  const syncWeightLog = useCallback(async (
+    weightLog: PendingWeightLog
+  ): Promise<boolean> => {
+    try {
+      const { error } = await supabase
+        .from('weight_logs')
+        .upsert({
+          user_id: weightLog.userId,
+          weight_kg: weightLog.weightKg,
+          log_date: weightLog.logDate,
+          notes: weightLog.notes,
+        }, {
+          onConflict: 'user_id,log_date',
+        });
+
+      if (error) throw error;
+      await removePendingWeightLog(weightLog.id);
+      return true;
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
+      await updatePendingWeightLog(weightLog.id, {
+        retryCount: weightLog.retryCount + 1,
+        lastError: errorMessage,
+      });
+
+      if (weightLog.retryCount + 1 >= MAX_RETRIES) {
+        await removePendingWeightLog(weightLog.id);
+        toast.error('Falha ao sincronizar peso.');
+      }
+      return false;
+    }
+  }, []);
+
+  const syncMeasurement = useCallback(async (
+    measurement: PendingBodyMeasurement
+  ): Promise<boolean> => {
+    try {
+      const { error } = await supabase
+        .from('body_measurements')
+        .upsert({
+          user_id: measurement.userId,
+          measurement_date: measurement.measurementDate,
+          waist_cm: measurement.waistCm,
+          hip_cm: measurement.hipCm,
+          chest_cm: measurement.chestCm,
+          arm_cm: measurement.armCm,
+          thigh_cm: measurement.thighCm,
+          calf_cm: measurement.calfCm,
+          body_fat_percent: measurement.bodyFatPercent,
+          notes: measurement.notes,
+        }, {
+          onConflict: 'user_id,measurement_date',
+        });
+
+      if (error) throw error;
+      await removePendingMeasurement(measurement.id);
+      return true;
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
+      await updatePendingMeasurement(measurement.id, {
+        retryCount: measurement.retryCount + 1,
+        lastError: errorMessage,
+      });
+
+      if (measurement.retryCount + 1 >= MAX_RETRIES) {
+        await removePendingMeasurement(measurement.id);
+        toast.error('Falha ao sincronizar medidas.');
+      }
+      return false;
+    }
+  }, []);
+
+  // ==========================================
+  // SYNC ALL PENDING
+  // ==========================================
+
   const syncNow = useCallback(async () => {
     if (isSyncingRef.current || !isOnline()) return;
 
@@ -111,9 +205,15 @@ export function useOfflineSync(): UseOfflineSyncResult {
     await refreshStatus();
 
     try {
-      const pending = await getPendingConfirmations();
+      const [confirmations, weightLogs, measurements] = await Promise.all([
+        getPendingConfirmations(),
+        getPendingWeightLogs(),
+        getPendingMeasurements(),
+      ]);
       
-      if (pending.length === 0) {
+      const totalPending = confirmations.length + weightLogs.length + measurements.length;
+      
+      if (totalPending === 0) {
         await updateSyncStatus({ 
           isSyncing: false, 
           lastSyncAt: Date.now(),
@@ -126,24 +226,31 @@ export function useOfflineSync(): UseOfflineSyncResult {
       let successCount = 0;
       let failCount = 0;
 
-      // Sort by timestamp (oldest first) to preserve order
-      const sorted = [...pending].sort((a, b) => a.timestamp - b.timestamp);
-
-      for (const confirmation of sorted) {
+      // Sync confirmations
+      for (const confirmation of confirmations.sort((a, b) => a.timestamp - b.timestamp)) {
         const success = await syncConfirmation(confirmation);
-        if (success) {
-          successCount++;
-        } else {
-          failCount++;
-          // Wait before retrying next to avoid hammering the server
-          await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS));
-        }
+        success ? successCount++ : failCount++;
+        if (!success) await new Promise(r => setTimeout(r, RETRY_DELAY_MS));
+      }
+
+      // Sync weight logs
+      for (const weightLog of weightLogs.sort((a, b) => a.timestamp - b.timestamp)) {
+        const success = await syncWeightLog(weightLog);
+        success ? successCount++ : failCount++;
+        if (!success) await new Promise(r => setTimeout(r, RETRY_DELAY_MS));
+      }
+
+      // Sync measurements
+      for (const measurement of measurements.sort((a, b) => a.timestamp - b.timestamp)) {
+        const success = await syncMeasurement(measurement);
+        success ? successCount++ : failCount++;
+        if (!success) await new Promise(r => setTimeout(r, RETRY_DELAY_MS));
       }
 
       await updateSyncStatus({
         isSyncing: false,
         lastSyncAt: Date.now(),
-        lastError: failCount > 0 ? `${failCount} falha(s) ao sincronizar` : null,
+        lastError: failCount > 0 ? `${failCount} falha(s)` : null,
       });
 
       if (successCount > 0 && failCount === 0) {
@@ -163,11 +270,12 @@ export function useOfflineSync(): UseOfflineSyncResult {
     } finally {
       isSyncingRef.current = false;
     }
-  }, [syncConfirmation, refreshStatus]);
+  }, [syncConfirmation, syncWeightLog, syncMeasurement, refreshStatus]);
 
-  /**
-   * Confirm a meal - saves locally first, then syncs if online
-   */
+  // ==========================================
+  // PUBLIC API METHODS
+  // ==========================================
+
   const confirmMeal = useCallback(async (
     userId: string,
     mealId: string,
@@ -177,7 +285,6 @@ export function useOfflineSync(): UseOfflineSyncResult {
   ): Promise<{ success: boolean; isOffline: boolean }> => {
     const date = logDate || new Date().toISOString().split('T')[0];
     
-    // Always save to local queue first (offline-first approach)
     await queueMealConfirmation(userId, mealId, optionId, status, date);
     await refreshStatus();
 
@@ -186,9 +293,8 @@ export function useOfflineSync(): UseOfflineSyncResult {
       return { success: true, isOffline: true };
     }
 
-    // If online, try to sync immediately
     try {
-      const { data, error } = await supabase.rpc('confirm_meal_consumption', {
+      const { error } = await supabase.rpc('confirm_meal_consumption', {
         _user_id: userId,
         _meal_id: mealId,
         _option_id: optionId,
@@ -198,7 +304,6 @@ export function useOfflineSync(): UseOfflineSyncResult {
 
       if (error) throw error;
 
-      // Success - remove from pending queue
       const pendingKey = `${mealId}-${date}`;
       await removePendingConfirmation(pendingKey);
       await refreshStatus();
@@ -206,21 +311,130 @@ export function useOfflineSync(): UseOfflineSyncResult {
       return { success: true, isOffline: false };
     } catch (error) {
       console.error('Failed to sync meal confirmation:', error);
-      // Keep in queue for later sync
       toast.info('Salvo localmente. Tentaremos sincronizar em breve.');
       return { success: true, isOffline: true };
     }
   }, [networkOnline, refreshStatus]);
 
-  // Initial status load
+  const logWeight = useCallback(async (
+    userId: string,
+    weightKg: number,
+    logDate?: string,
+    notes?: string
+  ): Promise<{ success: boolean; isOffline: boolean }> => {
+    const date = logDate || new Date().toISOString().split('T')[0];
+    
+    await queueWeightLog(userId, weightKg, date, notes);
+    await refreshStatus();
+
+    if (!networkOnline) {
+      toast.info('Peso salvo offline. Será sincronizado quando reconectar.');
+      return { success: true, isOffline: true };
+    }
+
+    try {
+      const { error } = await supabase
+        .from('weight_logs')
+        .upsert({
+          user_id: userId,
+          weight_kg: weightKg,
+          log_date: date,
+          notes,
+        }, {
+          onConflict: 'user_id,log_date',
+        });
+
+      if (error) throw error;
+
+      const pendingKey = `weight-${userId}-${date}`;
+      await removePendingWeightLog(pendingKey);
+      await refreshStatus();
+
+      return { success: true, isOffline: false };
+    } catch (error) {
+      console.error('Failed to sync weight log:', error);
+      toast.info('Peso salvo localmente.');
+      return { success: true, isOffline: true };
+    }
+  }, [networkOnline, refreshStatus]);
+
+  const logMeasurement = useCallback(async (
+    userId: string,
+    data: {
+      measurementDate?: string;
+      waistCm?: number;
+      hipCm?: number;
+      chestCm?: number;
+      armCm?: number;
+      thighCm?: number;
+      calfCm?: number;
+      bodyFatPercent?: number;
+      notes?: string;
+    }
+  ): Promise<{ success: boolean; isOffline: boolean }> => {
+    const date = data.measurementDate || new Date().toISOString().split('T')[0];
+    
+    await queueBodyMeasurement({
+      userId,
+      measurementDate: date,
+      waistCm: data.waistCm,
+      hipCm: data.hipCm,
+      chestCm: data.chestCm,
+      armCm: data.armCm,
+      thighCm: data.thighCm,
+      calfCm: data.calfCm,
+      bodyFatPercent: data.bodyFatPercent,
+      notes: data.notes,
+    });
+    await refreshStatus();
+
+    if (!networkOnline) {
+      toast.info('Medidas salvas offline. Serão sincronizadas quando reconectar.');
+      return { success: true, isOffline: true };
+    }
+
+    try {
+      const { error } = await supabase
+        .from('body_measurements')
+        .upsert({
+          user_id: userId,
+          measurement_date: date,
+          waist_cm: data.waistCm,
+          hip_cm: data.hipCm,
+          chest_cm: data.chestCm,
+          arm_cm: data.armCm,
+          thigh_cm: data.thighCm,
+          calf_cm: data.calfCm,
+          body_fat_percent: data.bodyFatPercent,
+          notes: data.notes,
+        }, {
+          onConflict: 'user_id,measurement_date',
+        });
+
+      if (error) throw error;
+
+      const pendingKey = `measurement-${userId}-${date}`;
+      await removePendingMeasurement(pendingKey);
+      await refreshStatus();
+
+      return { success: true, isOffline: false };
+    } catch (error) {
+      console.error('Failed to sync measurement:', error);
+      toast.info('Medidas salvas localmente.');
+      return { success: true, isOffline: true };
+    }
+  }, [networkOnline, refreshStatus]);
+
+  // ==========================================
+  // EFFECTS
+  // ==========================================
+
   useEffect(() => {
     refreshStatus();
   }, [refreshStatus]);
 
-  // Auto-sync when coming back online
   useEffect(() => {
     if (networkOnline) {
-      // Delay sync slightly to ensure network is stable
       syncTimeoutRef.current = setTimeout(() => {
         syncNow();
       }, 1000);
@@ -233,7 +447,6 @@ export function useOfflineSync(): UseOfflineSyncResult {
     };
   }, [networkOnline, syncNow]);
 
-  // Listen for visibility changes to sync when tab becomes active
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible' && isOnline()) {
@@ -250,6 +463,8 @@ export function useOfflineSync(): UseOfflineSyncResult {
     pendingCount: syncStatus.pendingCount,
     isSyncing: syncStatus.isSyncing,
     confirmMeal,
+    logWeight,
+    logMeasurement,
     syncNow,
     refreshStatus,
   };
