@@ -27,7 +27,7 @@ export default function TermsOfUse() {
           <section>
             <h2 className="text-xl font-semibold text-foreground mb-3">1. Aceitação dos Termos</h2>
             <p>
-              Ao acessar e usar o NutriPlan ("Plataforma", "Serviço", "nós" ou "nosso"), você ("Usuário", "você") 
+              Ao acessar e usar o NutriaPlan ("Plataforma", "Serviço", "nós" ou "nosso"), você ("Usuário", "você") 
               concorda em cumprir e estar vinculado a estes Termos de Uso. Se você não concordar com qualquer 
               parte destes termos, não poderá acessar o serviço. O uso continuado da plataforma após quaisquer 
               alterações constitui aceitação dos termos modificados.
@@ -37,7 +37,7 @@ export default function TermsOfUse() {
           <section>
             <h2 className="text-xl font-semibold text-foreground mb-3">2. Descrição do Serviço</h2>
             <p>
-              O NutriPlan é uma plataforma de planejamento alimentar que utiliza inteligência artificial 
+              O NutriaPlan é uma plataforma de planejamento alimentar que utiliza inteligência artificial 
               para criar planos nutricionais personalizados. O serviço inclui, mas não se limita a:
             </p>
             <ul className="list-disc pl-6 mt-2 space-y-1">
@@ -52,7 +52,7 @@ export default function TermsOfUse() {
 
           <section>
             <h2 className="text-xl font-semibold text-foreground mb-3">3. Elegibilidade e Cadastro</h2>
-            <p>Para usar o NutriPlan, você deve:</p>
+            <p>Para usar o NutriaPlan, você deve:</p>
             <ul className="list-disc pl-6 mt-2 space-y-1">
               <li>Ter pelo menos 18 anos de idade ou possuir autorização de um responsável legal</li>
               <li>Fornecer informações verdadeiras, precisas e completas durante o cadastro</li>
@@ -86,7 +86,7 @@ export default function TermsOfUse() {
           <section>
             <h2 className="text-xl font-semibold text-foreground mb-3">5. Isenção de Responsabilidade Médica</h2>
             <p className="font-medium text-foreground">
-              IMPORTANTE: O NutriPlan é uma ferramenta de educação nutricional e planejamento alimentar. 
+              IMPORTANTE: O NutriaPlan é uma ferramenta de educação nutricional e planejamento alimentar. 
               NÃO substitui aconselhamento médico, diagnóstico ou tratamento profissional.
             </p>
             <ul className="list-disc pl-6 mt-2 space-y-1">
@@ -120,7 +120,7 @@ export default function TermsOfUse() {
 
           <section>
             <h2 className="text-xl font-semibold text-foreground mb-3">7. Planos e Pagamentos</h2>
-            <p>O NutriPlan oferece diferentes níveis de acesso:</p>
+            <p>O NutriaPlan oferece diferentes níveis de acesso:</p>
             <ul className="list-disc pl-6 mt-2 space-y-1">
               <li><strong>Plano Gratuito:</strong> Acesso limitado às funcionalidades básicas</li>
               <li><strong>Plano Pessoal:</strong> Acesso completo às funcionalidades para uso individual</li>
@@ -139,9 +139,9 @@ export default function TermsOfUse() {
           <section>
             <h2 className="text-xl font-semibold text-foreground mb-3">8. Propriedade Intelectual</h2>
             <p>
-              Todo o conteúdo do NutriPlan, incluindo mas não limitado a textos, gráficos, logos, 
+              Todo o conteúdo do NutriaPlan, incluindo mas não limitado a textos, gráficos, logos, 
               ícones, imagens, clipes de áudio, downloads digitais, compilações de dados e software, 
-              é propriedade exclusiva do NutriPlan ou de seus licenciadores e está protegido por leis 
+              é propriedade exclusiva do NutriaPlan ou de seus licenciadores e está protegido por leis 
               de direitos autorais, marcas registradas e outras leis de propriedade intelectual.
             </p>
             <p className="mt-2">
@@ -185,7 +185,7 @@ export default function TermsOfUse() {
           <section>
             <h2 className="text-xl font-semibold text-foreground mb-3">11. Indenização</h2>
             <p>
-              Você concorda em defender, indenizar e isentar o NutriPlan, seus diretores, funcionários 
+              Você concorda em defender, indenizar e isentar o NutriaPlan, seus diretores, funcionários 
               e parceiros de quaisquer reclamações, danos, obrigações, perdas, responsabilidades, custos 
               ou dívidas decorrentes de: (i) seu uso do serviço; (ii) violação destes termos; 
               (iii) violação de direitos de terceiros.

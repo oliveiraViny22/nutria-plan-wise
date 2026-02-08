@@ -13,7 +13,7 @@ interface FeatureTooltipProps {
   delay?: number;
 }
 
-const TOOLTIP_STORAGE_PREFIX = 'nutriplan_tooltip_seen_';
+const TOOLTIP_STORAGE_PREFIX = 'nutriaplan_tooltip_seen_';
 
 export function FeatureTooltip({
   id,

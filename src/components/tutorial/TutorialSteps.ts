@@ -25,7 +25,7 @@ export const tutorialSteps: TutorialStep[] = [
   {
     id: 'welcome',
     icon: Sparkles,
-    title: 'Bem-vindo ao NutriPlan! 🎉',
+    title: 'Bem-vindo ao NutriaPlan! 🎉',
     description: 'Seu assistente de nutrição com inteligência artificial. Vamos descobrir como o sistema pode te ajudar a alcançar seus objetivos de forma simples e eficiente.',
   },
   {

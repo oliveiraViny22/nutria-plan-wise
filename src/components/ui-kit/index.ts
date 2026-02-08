@@ -1,4 +1,4 @@
-// NutriPlan UI Kit - Component Exports
+// NutriaPlan UI Kit - Component Exports
 // =====================================
 
 // Cards

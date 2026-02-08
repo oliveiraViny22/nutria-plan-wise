@@ -377,7 +377,7 @@ export default function Index() {
                 </div>
                 <HeroImage 
                   src={heroImage} 
-                  alt="NutriPlan - Planejamento alimentar inteligente" 
+                  alt="NutriaPlan - Planejamento alimentar inteligente" 
                   className="w-full h-auto max-w-[280px] xs:max-w-xs sm:max-w-sm mx-auto drop-shadow-xl relative z-10"
                 />
               </div>
@@ -473,10 +473,10 @@ export default function Index() {
                   whileHover={{ scale: 1.02 }}
                   transition={{ type: "spring", stiffness: 300 }}
                 >
-                  <HeroImage 
-                    src={heroImage} 
-                    alt="NutriPlan - Planejamento alimentar inteligente" 
-                    className="w-full h-auto max-w-md md:max-w-lg lg:max-w-xl xl:max-w-2xl 2xl:max-w-3xl mx-auto drop-shadow-2xl relative z-10"
+                    <HeroImage 
+                      src={heroImage} 
+                      alt="NutriaPlan - Planejamento alimentar inteligente" 
+                      className="w-full h-auto max-w-md md:max-w-lg lg:max-w-xl xl:max-w-2xl 2xl:max-w-3xl mx-auto drop-shadow-2xl relative z-10"
                   />
                 </motion.div>
               </motion.div>
@@ -859,7 +859,7 @@ export default function Index() {
       <footer className="container mx-auto px-4 py-4 pb-safe border-t border-border">
         <div className="flex flex-col xs:flex-row items-center justify-between gap-2">
           <p className="text-xs text-muted-foreground text-center xs:text-left">
-            © 2026 NutriPlan. Todos os direitos reservados.
+            © 2026 NutriaPlan. Todos os direitos reservados.
           </p>
           <div className="flex items-center gap-3 xs:gap-4">
             <Link to="/terms" className="text-xs text-muted-foreground hover:text-primary transition-colors min-h-[44px] flex items-center">

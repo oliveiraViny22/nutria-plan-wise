@@ -45,7 +45,7 @@ export function DashboardFooter({ onOpenTutorial, onResetTutorials }: DashboardF
       <p className="text-xs text-muted-foreground">
         Este aplicativo oferece educação nutricional e não substitui um
         profissional de saúde. Consulte um nutricionista para orientação
-        personalizada.
+        personalizada. © 2026 NutriaPlan.
       </p>
     </motion.section>
   );
