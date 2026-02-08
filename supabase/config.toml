@@ -48,3 +48,6 @@ verify_jwt = false
 [functions.generate-plan]
 verify_jwt = false
 
+[functions.cleanup-orphan-users]
+verify_jwt = false
+
