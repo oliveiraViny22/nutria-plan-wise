@@ -329,7 +329,7 @@ export default function Index() {
       </section>
 
       {/* Features Grid with Mobile-Optimized Parallax */}
-      <section ref={featuresRef} className="relative py-12 sm:py-24 overflow-hidden bg-gradient-to-b from-background via-muted/20 to-background">
+      <section ref={featuresRef} className="relative py-12 sm:py-24 overflow-hidden bg-muted/30">
         {/* Background decoration with parallax - hidden on mobile */}
         {!isMobile && (
           <motion.div
