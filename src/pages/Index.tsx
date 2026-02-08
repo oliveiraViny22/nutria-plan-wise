@@ -204,6 +204,24 @@ export default function Index() {
   // Steps cards 3D rotation for large screens
   const stepsRotateY = useTransform(smoothStepsProgress, [0, 0.5, 1], [-3, 0, 3]);
   const stepsPerspective = useTransform(smoothStepsProgress, [0, 0.5, 1], [1000, 1200, 1000]);
+  
+  // Additional large screen hero parallax transforms (defined unconditionally to respect hook rules)
+  const heroOrb5Y = useTransform(smoothHeroProgress, [0, 1], [0, 280]);
+  const heroOrb6Y = useTransform(smoothHeroProgress, [0, 1], [20, 400]);
+  
+  // Additional large screen features parallax transforms
+  const featuresFloat1Y = useTransform(smoothFeaturesProgress, [0, 1], [40, -80]);
+  const featuresFloat1Rotate = useTransform(smoothFeaturesProgress, [0, 1], [0, 15]);
+  const featuresFloat2Y = useTransform(smoothFeaturesProgress, [0, 1], [60, -40]);
+  const featuresFloat2Rotate = useTransform(smoothFeaturesProgress, [0, 1], [0, -10]);
+  
+  // Additional large screen steps parallax transforms
+  const stepsFloat1Y = useTransform(smoothStepsProgress, [0, 1], [0, -160]);
+  const stepsFloat1Rotate = useTransform(smoothStepsProgress, [0, 1], [0, 20]);
+  const stepsFloat2Y = useTransform(smoothStepsProgress, [0, 1], [20, -120]);
+  const stepsFloat2Rotate = useTransform(smoothStepsProgress, [0, 1], [15, -5]);
+  const stepsFloat3Y = useTransform(smoothStepsProgress, [0, 1], [40, -200]);
+  const stepsFloat3Scale = useTransform(smoothStepsProgress, [0, 0.5, 1], [0.8, 1.1, 0.9]);
 
   const features = [
     { icon: Target, title: 'Metas Personalizadas', description: 'Calcule suas necessidades calóricas e de macros automaticamente' },
@@ -242,7 +260,7 @@ export default function Index() {
   ];
 
   return (
-    <div ref={containerRef} className="min-h-screen overflow-x-hidden">
+    <div ref={containerRef} className="min-h-screen overflow-x-hidden w-full max-w-full">
       {/* Fixed Header with blur on scroll */}
       <motion.header 
         className="fixed top-0 left-0 right-0 z-50 backdrop-blur-md bg-background/80 border-b border-border/50"
@@ -285,35 +303,35 @@ export default function Index() {
           </>
         ) : (
           <>
-            {/* Layer 1 - Fastest moving, deepest background */}
+            {/* Layer 1 - Fastest moving, deepest background - constrained within viewport */}
             <motion.div 
               style={{ y: orb1Y }}
-              className="absolute top-20 left-10 w-72 3xl:w-96 h-72 3xl:h-96 bg-primary/20 rounded-full blur-3xl opacity-60" 
+              className="absolute top-20 left-[2%] w-72 3xl:w-96 h-72 3xl:h-96 bg-primary/20 rounded-full blur-3xl opacity-60" 
             />
-            {/* Layer 2 - Medium speed */}
+            {/* Layer 2 - Medium speed - constrained within viewport */}
             <motion.div 
               style={{ y: orb2Y }}
-              className="absolute bottom-10 right-10 w-96 3xl:w-[500px] h-96 3xl:h-[500px] bg-accent/30 rounded-full blur-3xl opacity-40" 
+              className="absolute bottom-10 right-[2%] w-80 3xl:w-[400px] h-80 3xl:h-[400px] bg-accent/30 rounded-full blur-3xl opacity-40" 
             />
-            {/* Layer 3 - Center glow */}
+            {/* Layer 3 - Center glow - contained size */}
             <motion.div 
               style={{ opacity: orb3Opacity, y: orb3Y }}
-              className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] 3xl:w-[900px] h-[600px] 3xl:h-[900px] bg-gradient-radial from-primary/10 to-transparent rounded-full blur-3xl" 
+              className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] 3xl:w-[700px] h-[500px] 3xl:h-[700px] bg-gradient-radial from-primary/10 to-transparent rounded-full blur-3xl" 
             />
             {/* Layer 4 - Large screens only - additional depth layers */}
             {isLargeScreen && (
               <>
                 <motion.div 
                   style={{ y: orb4Y }}
-                  className="absolute top-1/4 right-1/4 w-48 h-48 bg-primary/15 rounded-full blur-2xl opacity-50" 
+                  className="absolute top-1/4 right-[15%] w-40 h-40 bg-primary/15 rounded-full blur-2xl opacity-50" 
                 />
                 <motion.div 
-                  style={{ y: useTransform(smoothHeroProgress, [0, 1], [0, 280]) }}
-                  className="absolute bottom-1/4 left-1/3 w-64 h-64 bg-accent/20 rounded-full blur-3xl opacity-35" 
+                  style={{ y: heroOrb5Y }}
+                  className="absolute bottom-1/4 left-[20%] w-56 h-56 bg-accent/20 rounded-full blur-3xl opacity-35" 
                 />
                 <motion.div 
-                  style={{ y: useTransform(smoothHeroProgress, [0, 1], [20, 400]) }}
-                  className="absolute top-1/3 left-1/4 w-32 h-32 bg-primary/25 rounded-full blur-xl opacity-45" 
+                  style={{ y: heroOrb6Y }}
+                  className="absolute top-1/3 left-[15%] w-28 h-28 bg-primary/25 rounded-full blur-xl opacity-45" 
                 />
               </>
             )}
@@ -496,33 +514,33 @@ export default function Index() {
             {/* Large screen multi-layer parallax decorations */}
             {isLargeScreen && (
               <>
-                {/* Layer 2 - Slower moving elements */}
+                {/* Layer 2 - Slower moving elements - contained positions */}
                 <motion.div
                   style={{ y: featuresLayer1Y }}
-                  className="absolute top-20 right-20 w-40 h-40 bg-primary/8 rounded-full blur-2xl pointer-events-none"
+                  className="absolute top-20 right-[5%] w-36 h-36 bg-primary/8 rounded-full blur-2xl pointer-events-none"
                 />
                 <motion.div
                   style={{ y: featuresLayer2Y }}
-                  className="absolute bottom-32 left-16 w-56 h-56 bg-accent/8 rounded-full blur-2xl pointer-events-none"
+                  className="absolute bottom-32 left-[4%] w-48 h-48 bg-accent/8 rounded-full blur-2xl pointer-events-none"
                 />
-                {/* Layer 3 - Subtle floating elements */}
+                {/* Layer 3 - Subtle floating elements - contained positions */}
                 <motion.div
                   style={{ y: featuresLayer3Y }}
-                  className="absolute top-1/2 right-1/3 w-24 h-24 bg-primary/10 rounded-full blur-xl pointer-events-none"
+                  className="absolute top-1/2 right-[25%] w-20 h-20 bg-primary/10 rounded-full blur-xl pointer-events-none"
                 />
                 <motion.div
                   style={{ 
-                    y: useTransform(smoothFeaturesProgress, [0, 1], [40, -80]),
-                    rotate: useTransform(smoothFeaturesProgress, [0, 1], [0, 15])
+                    y: featuresFloat1Y,
+                    rotate: featuresFloat1Rotate
                   }}
-                  className="absolute bottom-1/4 right-10 w-20 h-20 border border-primary/20 rounded-2xl pointer-events-none"
+                  className="absolute bottom-1/4 right-[3%] w-16 h-16 border border-primary/20 rounded-2xl pointer-events-none"
                 />
                 <motion.div
                   style={{ 
-                    y: useTransform(smoothFeaturesProgress, [0, 1], [60, -40]),
-                    rotate: useTransform(smoothFeaturesProgress, [0, 1], [0, -10])
+                    y: featuresFloat2Y,
+                    rotate: featuresFloat2Rotate
                   }}
-                  className="absolute top-1/4 left-20 w-16 h-16 border border-accent/15 rounded-xl pointer-events-none"
+                  className="absolute top-1/4 left-[5%] w-14 h-14 border border-accent/15 rounded-xl pointer-events-none"
                 />
               </>
             )}
@@ -627,53 +645,53 @@ export default function Index() {
               style={{ y: stepsBackgroundY }}
               className="absolute inset-0 bg-muted/30"
             />
-            {/* Layer 1 - Primary decorations */}
+            {/* Layer 1 - Primary decorations - contained positions */}
             <motion.div
               style={{ y: stepsDecor1Y }}
-              className="absolute top-20 right-10 w-40 3xl:w-64 h-40 3xl:h-64 bg-primary/10 rounded-full blur-3xl"
+              className="absolute top-20 right-[3%] w-36 3xl:w-56 h-36 3xl:h-56 bg-primary/10 rounded-full blur-3xl"
             />
             <motion.div
               style={{ y: stepsDecor2Y }}
-              className="absolute bottom-20 left-10 w-60 3xl:w-80 h-60 3xl:h-80 bg-accent/10 rounded-full blur-3xl"
+              className="absolute bottom-20 left-[3%] w-52 3xl:w-72 h-52 3xl:h-72 bg-accent/10 rounded-full blur-3xl"
             />
             <motion.div
               style={{ y: stepsDecor3Y }}
-              className="absolute top-1/2 right-1/4 w-32 3xl:w-48 h-32 3xl:h-48 bg-primary/5 rounded-full blur-2xl hidden lg:block"
+              className="absolute top-1/2 right-[20%] w-28 3xl:w-40 h-28 3xl:h-40 bg-primary/5 rounded-full blur-2xl hidden lg:block"
             />
             
-            {/* Large screen additional parallax layers */}
+            {/* Large screen additional parallax layers - contained positions */}
             {isLargeScreen && (
               <>
                 {/* Layer 2 - Slower moving geometric shapes */}
                 <motion.div
                   style={{ y: stepsDecor4Y }}
-                  className="absolute top-1/3 left-1/4 w-24 h-24 bg-primary/8 rounded-2xl blur-xl pointer-events-none"
+                  className="absolute top-1/3 left-[15%] w-20 h-20 bg-primary/8 rounded-2xl blur-xl pointer-events-none"
                 />
                 <motion.div
                   style={{ y: stepsDecor5Y }}
-                  className="absolute bottom-1/3 right-1/5 w-36 h-36 bg-accent/8 rounded-full blur-2xl pointer-events-none"
+                  className="absolute bottom-1/3 right-[12%] w-32 h-32 bg-accent/8 rounded-full blur-2xl pointer-events-none"
                 />
                 {/* Layer 3 - Subtle floating geometric accents */}
                 <motion.div
                   style={{ 
-                    y: useTransform(smoothStepsProgress, [0, 1], [0, -160]),
-                    rotate: useTransform(smoothStepsProgress, [0, 1], [0, 20])
+                    y: stepsFloat1Y,
+                    rotate: stepsFloat1Rotate
                   }}
-                  className="absolute top-1/4 right-16 w-12 h-12 border-2 border-primary/15 rounded-lg pointer-events-none"
+                  className="absolute top-1/4 right-[5%] w-10 h-10 border-2 border-primary/15 rounded-lg pointer-events-none"
                 />
                 <motion.div
                   style={{ 
-                    y: useTransform(smoothStepsProgress, [0, 1], [20, -120]),
-                    rotate: useTransform(smoothStepsProgress, [0, 1], [15, -5])
+                    y: stepsFloat2Y,
+                    rotate: stepsFloat2Rotate
                   }}
-                  className="absolute bottom-1/4 left-24 w-10 h-10 border border-accent/20 rounded-full pointer-events-none"
+                  className="absolute bottom-1/4 left-[6%] w-8 h-8 border border-accent/20 rounded-full pointer-events-none"
                 />
                 <motion.div
                   style={{ 
-                    y: useTransform(smoothStepsProgress, [0, 1], [40, -200]),
-                    scale: useTransform(smoothStepsProgress, [0, 0.5, 1], [0.8, 1.1, 0.9])
+                    y: stepsFloat3Y,
+                    scale: stepsFloat3Scale
                   }}
-                  className="absolute top-2/3 left-1/3 w-8 h-8 bg-primary/12 rounded-full blur-sm pointer-events-none"
+                  className="absolute top-2/3 left-[25%] w-6 h-6 bg-primary/12 rounded-full blur-sm pointer-events-none"
                 />
               </>
             )}
