@@ -387,8 +387,23 @@ export default function Index() {
             style={{ opacity: heroOpacity, scale: heroScale }}
             className="container max-w-7xl 3xl:max-w-[1600px] 4xl:max-w-[1920px] mx-auto px-6 py-16 lg:py-20 relative z-10"
           >
-            <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 xl:gap-24 3xl:gap-32">
-              {/* Text Content with Parallax */}
+            {/* Centered Badge */}
+            <motion.div 
+              variants={containerVariants}
+              initial="hidden"
+              animate="visible"
+              className="text-center mb-8 lg:mb-12"
+            >
+              <motion.div 
+                variants={itemVariants}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-primary/10 backdrop-blur-sm rounded-full text-primary text-sm font-medium border border-primary/20"
+              >
+                <Leaf className="w-4 h-4" /> Planejamento alimentar com IA
+              </motion.div>
+            </motion.div>
+
+            <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 xl:gap-24 3xl:gap-32 items-center">
+              {/* Text Content with Parallax - aligned to the left next to image */}
               <motion.div 
                 style={{ y: heroTextY }}
                 className="text-center lg:text-left"
@@ -398,12 +413,6 @@ export default function Index() {
                   initial="hidden"
                   animate="visible"
                 >
-                  <motion.div 
-                    variants={itemVariants}
-                    className="inline-flex items-center gap-2 px-4 py-2 bg-primary/10 backdrop-blur-sm rounded-full text-primary text-sm font-medium mb-6 border border-primary/20"
-                  >
-                    <Leaf className="w-4 h-4" /> Planejamento alimentar com IA
-                  </motion.div>
                   <motion.h1 
                     variants={itemVariants}
                     className="text-4xl lg:text-5xl xl:text-7xl font-bold text-foreground mb-8 leading-tight"
