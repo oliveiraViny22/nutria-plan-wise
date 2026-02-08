@@ -169,17 +169,17 @@ export default function Index() {
         animate={{ y: 0 }}
         transition={{ duration: 0.5, ease: "easeOut" }}
       >
-        <div className="container max-w-7xl 3xl:max-w-[1600px] 4xl:max-w-[1920px] mx-auto px-4 3xl:px-8 4xl:px-12 py-3 sm:py-4 3xl:py-5 flex items-center justify-between gap-2">
+        <div className="container mx-auto px-4 py-3 sm:py-4 flex items-center justify-between gap-2">
           <Logo size="lg" />
-          <div className="flex items-center gap-1 sm:gap-3 3xl:gap-4">
+          <div className="flex items-center gap-1 sm:gap-3">
             <ThemeToggle />
             <Link to="/login">
-              <Button variant="ghost" size="sm" className="text-xs sm:text-sm 3xl:text-base px-2 sm:px-4 3xl:px-6 touch-manipulation">
+              <Button variant="ghost" size="sm" className="text-xs sm:text-sm px-2 sm:px-4 touch-manipulation">
                 Entrar
               </Button>
             </Link>
             <Link to="/signup">
-              <Button variant="hero" size="sm" className="text-xs sm:text-sm 3xl:text-base px-2 sm:px-4 3xl:px-6 touch-manipulation">
+              <Button variant="hero" size="sm" className="text-xs sm:text-sm px-2 sm:px-4 touch-manipulation">
                 <span className="hidden xs:inline">Começar grátis</span>
                 <span className="xs:hidden">Começar</span>
               </Button>
@@ -206,24 +206,15 @@ export default function Index() {
           <>
             <motion.div 
               style={{ y: orb1Y }}
-              className="absolute top-20 left-10 w-72 h-72 3xl:w-96 3xl:h-96 4xl:w-[500px] 4xl:h-[500px] bg-primary/20 rounded-full blur-3xl opacity-60" 
+              className="absolute top-20 left-10 w-72 h-72 bg-primary/20 rounded-full blur-3xl opacity-60" 
             />
             <motion.div 
               style={{ y: orb2Y }}
-              className="absolute bottom-10 right-10 w-96 h-96 3xl:w-[500px] 3xl:h-[500px] 4xl:w-[700px] 4xl:h-[700px] bg-accent/30 rounded-full blur-3xl opacity-40" 
+              className="absolute bottom-10 right-10 w-96 h-96 bg-accent/30 rounded-full blur-3xl opacity-40" 
             />
             <motion.div 
               style={{ opacity: orb3Opacity }}
-              className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] 3xl:w-[800px] 3xl:h-[800px] 4xl:w-[1000px] 4xl:h-[1000px] bg-gradient-radial from-primary/10 to-transparent rounded-full blur-3xl" 
-            />
-            {/* Extra orbs for ultrawide screens */}
-            <motion.div 
-              style={{ y: orb1Y }}
-              className="hidden 3xl:block absolute top-40 right-1/4 w-64 h-64 4xl:w-80 4xl:h-80 bg-primary/15 rounded-full blur-3xl opacity-50" 
-            />
-            <motion.div 
-              style={{ y: orb2Y }}
-              className="hidden 4xl:block absolute bottom-40 left-1/4 w-72 h-72 bg-accent/20 rounded-full blur-3xl opacity-40" 
+              className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-gradient-radial from-primary/10 to-transparent rounded-full blur-3xl" 
             />
           </>
         )}
@@ -484,24 +475,15 @@ export default function Index() {
             />
             <motion.div
               style={{ y: stepsDecor1Y }}
-              className="absolute top-20 right-10 w-40 h-40 3xl:w-56 3xl:h-56 4xl:w-72 4xl:h-72 bg-primary/10 rounded-full blur-3xl"
+              className="absolute top-20 right-10 w-40 h-40 bg-primary/10 rounded-full blur-3xl"
             />
             <motion.div
               style={{ y: stepsDecor2Y }}
-              className="absolute bottom-20 left-10 w-60 h-60 3xl:w-80 3xl:h-80 4xl:w-96 4xl:h-96 bg-accent/10 rounded-full blur-3xl"
+              className="absolute bottom-20 left-10 w-60 h-60 bg-accent/10 rounded-full blur-3xl"
             />
             <motion.div
               style={{ y: stepsDecor3Y }}
-              className="absolute top-1/2 right-1/4 w-32 h-32 3xl:w-48 3xl:h-48 bg-primary/5 rounded-full blur-2xl hidden lg:block"
-            />
-            {/* Extra decorative elements for ultrawide */}
-            <motion.div
-              style={{ y: stepsDecor1Y }}
-              className="hidden 3xl:block absolute top-1/3 left-1/4 w-40 h-40 4xl:w-52 4xl:h-52 bg-accent/8 rounded-full blur-3xl"
-            />
-            <motion.div
-              style={{ y: stepsDecor2Y }}
-              className="hidden 4xl:block absolute bottom-1/3 right-1/3 w-44 h-44 bg-primary/8 rounded-full blur-3xl"
+              className="absolute top-1/2 right-1/4 w-32 h-32 bg-primary/5 rounded-full blur-2xl hidden lg:block"
             />
           </>
         )}
@@ -552,17 +534,17 @@ export default function Index() {
                 initial={{ opacity: 0, y: 20 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
-                className="text-center mb-16 3xl:mb-20"
+                className="text-center mb-16"
               >
-                <h2 className="text-3xl lg:text-4xl xl:text-5xl 3xl:text-6xl font-bold text-foreground mb-6">
+                <h2 className="text-3xl lg:text-4xl xl:text-5xl font-bold text-foreground mb-6">
                   Como funciona
                 </h2>
-                <p className="text-muted-foreground max-w-3xl 3xl:max-w-4xl mx-auto text-lg xl:text-xl 3xl:text-2xl">
+                <p className="text-muted-foreground max-w-3xl mx-auto text-lg xl:text-xl">
                   Em 4 passos simples, você terá um plano alimentar personalizado.
                 </p>
               </motion.div>
 
-              <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-8 xl:gap-10 3xl:gap-12 4xl:gap-16">
+              <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-8 xl:gap-10">
                 {steps.map((step, i) => (
                   <motion.div
                     key={step.number}
@@ -584,17 +566,17 @@ export default function Index() {
                       />
                     )}
                     
-                    <div className="bg-card/80 backdrop-blur-sm rounded-2xl p-8 xl:p-10 3xl:p-12 shadow-lg border border-border/50 h-full relative z-10 hover:border-primary/30 hover:shadow-xl transition-all duration-300 3xl:hover:scale-[1.02]">
-                      <div className="flex items-center gap-4 3xl:gap-5 mb-6">
-                        <div className="w-16 h-16 xl:w-18 xl:h-18 3xl:w-20 3xl:h-20 rounded-2xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center text-primary-foreground shadow-md relative overflow-hidden">
-                          <step.icon className="w-7 h-7 xl:w-8 xl:h-8 3xl:w-9 3xl:h-9 relative z-10" />
+                    <div className="bg-card/80 backdrop-blur-sm rounded-2xl p-8 xl:p-10 shadow-lg border border-border/50 h-full relative z-10 hover:border-primary/30 hover:shadow-xl transition-all duration-300">
+                      <div className="flex items-center gap-4 mb-6">
+                        <div className="w-16 h-16 xl:w-18 xl:h-18 rounded-2xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center text-primary-foreground shadow-md relative overflow-hidden">
+                          <step.icon className="w-7 h-7 xl:w-8 xl:h-8 relative z-10" />
                         </div>
-                        <span className="text-5xl xl:text-6xl 3xl:text-7xl font-bold text-primary/20">
+                        <span className="text-5xl xl:text-6xl font-bold text-primary/20">
                           {step.number}
                         </span>
                       </div>
-                      <h3 className="font-semibold text-foreground mb-3 text-xl xl:text-2xl 3xl:text-3xl leading-tight">{step.title}</h3>
-                      <p className="text-base 3xl:text-lg text-muted-foreground leading-relaxed">{step.description}</p>
+                      <h3 className="font-semibold text-foreground mb-3 text-xl xl:text-2xl leading-tight">{step.title}</h3>
+                      <p className="text-base text-muted-foreground leading-relaxed">{step.description}</p>
                     </div>
                   </motion.div>
                 ))}
@@ -620,16 +602,16 @@ export default function Index() {
       </section>
 
       {/* Footer */}
-      <footer className="container max-w-7xl 3xl:max-w-[1600px] 4xl:max-w-[1920px] mx-auto px-4 3xl:px-8 4xl:px-12 py-8 3xl:py-12 border-t border-border">
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 3xl:gap-6">
-          <p className="text-sm 3xl:text-base text-muted-foreground">
+      <footer className="container mx-auto px-4 py-8 border-t border-border">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+          <p className="text-sm text-muted-foreground">
             © 2026 NutriPlan. Todos os direitos reservados.
           </p>
-          <div className="flex items-center gap-4 3xl:gap-6">
-            <Link to="/terms" className="text-sm 3xl:text-base text-muted-foreground hover:text-primary transition-colors">
+          <div className="flex items-center gap-4">
+            <Link to="/terms" className="text-sm text-muted-foreground hover:text-primary transition-colors">
               Termos de Uso
             </Link>
-            <Link to="/privacy" className="text-sm 3xl:text-base text-muted-foreground hover:text-primary transition-colors">
+            <Link to="/privacy" className="text-sm text-muted-foreground hover:text-primary transition-colors">
               Política de Privacidade
             </Link>
           </div>
