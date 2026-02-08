@@ -448,12 +448,7 @@ export default function Index() {
                   key={f.title} 
                   variants={itemVariants}
                   custom={index}
-                  whileHover={{ 
-                    y: -12, 
-                    scale: 1.03,
-                    transition: { type: "spring", stiffness: 400 }
-                  }}
-                  className="card-elevated rounded-2xl p-8 xl:p-10 text-left cursor-pointer backdrop-blur-sm bg-card/80 border border-border/50 hover:border-primary/30 transition-colors"
+                  className="card-elevated rounded-2xl p-8 xl:p-10 text-left backdrop-blur-sm bg-card/80 border border-border/50"
                 >
                   <div className="w-14 h-14 xl:w-16 xl:h-16 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center mb-6">
                     <f.icon className="w-7 h-7 xl:w-8 xl:h-8 text-primary" />
