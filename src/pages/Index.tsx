@@ -270,15 +270,15 @@ export default function Index() {
       >
         <div className="container mx-auto px-4 py-3 sm:py-4 flex items-center justify-between gap-2">
           <Logo size="lg" />
-          <div className="flex items-center gap-1 sm:gap-3">
+          <div className="flex items-center gap-1 xs:gap-2 sm:gap-3">
             <ThemeToggle />
             <Link to="/login">
-              <Button variant="ghost" size="sm" className="text-xs sm:text-sm px-2 sm:px-4 touch-manipulation">
+              <Button variant="ghost" size="sm" className="text-xs sm:text-sm px-2 sm:px-4 min-h-[44px] touch-manipulation">
                 Entrar
               </Button>
             </Link>
             <Link to="/signup">
-              <Button variant="hero" size="sm" className="text-xs sm:text-sm px-2 sm:px-4 touch-manipulation">
+              <Button variant="hero" size="sm" className="text-xs sm:text-sm px-2 xs:px-3 sm:px-4 min-h-[44px] touch-manipulation">
                 <span className="hidden xs:inline">Começar grátis</span>
                 <span className="xs:hidden">Começar</span>
               </Button>
@@ -347,21 +347,21 @@ export default function Index() {
                 <div className="inline-flex items-center gap-2 px-3 py-2 bg-primary/10 backdrop-blur-sm rounded-full text-primary text-xs font-medium mb-4 border border-primary/20">
                   <Leaf className="w-3 h-3" /> Planejamento alimentar com IA
                 </div>
-                <h1 className="text-2xl font-bold text-foreground mb-4 leading-tight">
+                <h1 className="text-2xl xs:text-3xl font-bold text-foreground mb-4 leading-tight">
                   Nutrição inteligente para seus <span className="text-primary bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">objetivos</span>
                 </h1>
                 <p className="text-sm text-muted-foreground max-w-xl mx-auto mb-6">
                   Crie planos alimentares personalizados, substitua alimentos e entenda o impacto de cada escolha na sua saúde.
                 </p>
-                <div className="flex flex-col gap-3 justify-center">
+                <div className="flex flex-col xs:flex-row gap-3 justify-center">
                   <Link to="/signup">
-                    <Button variant="hero" size="lg" className="text-sm w-full group">
+                    <Button variant="hero" size="lg" className="text-sm w-full xs:w-auto min-h-[48px] group">
                       Começar agora 
                       <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
                     </Button>
                   </Link>
                   <a href="#como-funciona">
-                    <Button variant="outline" size="lg" className="text-sm w-full group">
+                    <Button variant="outline" size="lg" className="text-sm w-full xs:w-auto min-h-[48px] group">
                       Como funciona 
                       <ChevronDown className="w-4 h-4 ml-2 group-hover:translate-y-1 transition-transform" />
                     </Button>
@@ -377,7 +377,8 @@ export default function Index() {
                 <img 
                   src={heroImage} 
                   alt="NutriPlan - Planejamento alimentar inteligente" 
-                  className="w-full h-auto max-w-[280px] mx-auto drop-shadow-xl relative z-10"
+                  className="w-full h-auto max-w-[280px] xs:max-w-xs sm:max-w-sm mx-auto drop-shadow-xl relative z-10"
+                  loading="lazy"
                 />
               </div>
             </div>
@@ -385,7 +386,7 @@ export default function Index() {
         ) : (
           <motion.main 
             style={{ opacity: heroOpacity, scale: heroScale }}
-            className="container max-w-7xl 3xl:max-w-[1600px] 4xl:max-w-[1920px] mx-auto px-6 py-16 lg:py-20 relative z-10"
+            className="container max-w-7xl 2xl:max-w-[1400px] 3xl:max-w-[1600px] 4xl:max-w-[1920px] mx-auto px-4 sm:px-6 py-12 md:py-16 lg:py-20 relative z-10"
           >
             {/* Centered Badge */}
             <motion.div 
@@ -402,11 +403,11 @@ export default function Index() {
               </motion.div>
             </motion.div>
 
-            <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 xl:gap-24 3xl:gap-32 items-center">
+            <div className="grid md:grid-cols-2 gap-8 md:gap-12 lg:gap-16 xl:gap-24 3xl:gap-32 items-center">
               {/* Text Content with Parallax - aligned to the left next to image */}
               <motion.div 
                 style={{ y: heroTextY }}
-                className="text-center lg:text-left"
+                className="text-center md:text-left"
               >
                 <motion.div 
                   variants={containerVariants}
@@ -415,28 +416,28 @@ export default function Index() {
                 >
                   <motion.h1 
                     variants={itemVariants}
-                    className="text-4xl lg:text-5xl xl:text-7xl font-bold text-foreground mb-8 leading-tight"
+                    className="text-3xl md:text-4xl lg:text-5xl xl:text-6xl 2xl:text-7xl font-bold text-foreground mb-6 md:mb-8 leading-tight"
                   >
                     Nutrição inteligente para seus <span className="text-primary bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">objetivos</span>
                   </motion.h1>
                   <motion.p 
                     variants={itemVariants}
-                    className="text-lg xl:text-xl text-muted-foreground max-w-2xl mx-auto lg:mx-0 mb-10"
+                    className="text-base md:text-lg xl:text-xl text-muted-foreground max-w-2xl mx-auto md:mx-0 mb-8 md:mb-10"
                   >
                     Crie planos alimentares personalizados, substitua alimentos e entenda o impacto de cada escolha na sua saúde.
                   </motion.p>
                   <motion.div 
                     variants={itemVariants}
-                    className="flex flex-col sm:flex-row gap-3 justify-center lg:justify-start"
+                    className="flex flex-col sm:flex-row gap-3 justify-center md:justify-start"
                   >
                     <Link to="/signup">
-                      <Button variant="hero" size="lg" className="text-base w-full sm:w-auto group">
+                      <Button variant="hero" size="lg" className="text-base w-full sm:w-auto min-h-[48px] xl:min-h-[52px] xl:px-8 group">
                         Começar agora 
                         <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
                       </Button>
                     </Link>
                     <a href="#como-funciona">
-                      <Button variant="outline" size="lg" className="text-base w-full sm:w-auto group">
+                      <Button variant="outline" size="lg" className="text-base w-full sm:w-auto min-h-[48px] xl:min-h-[52px] group">
                         Como funciona 
                         <ChevronDown className="w-4 h-4 ml-2 group-hover:translate-y-1 transition-transform" />
                       </Button>
@@ -448,7 +449,7 @@ export default function Index() {
               {/* Hero Image with Parallax */}
               <motion.div
                 style={{ y: heroImageY, rotate: heroImageRotate }}
-                className="relative order-first lg:order-last"
+                className="relative order-first md:order-last"
               >
                 <motion.div 
                   className="absolute inset-0 flex items-center justify-center pointer-events-none"
@@ -475,7 +476,8 @@ export default function Index() {
                   <img 
                     src={heroImage} 
                     alt="NutriPlan - Planejamento alimentar inteligente" 
-                    className="w-full h-auto max-w-lg lg:max-w-xl xl:max-w-3xl mx-auto drop-shadow-2xl relative z-10"
+                    className="w-full h-auto max-w-md md:max-w-lg lg:max-w-xl xl:max-w-2xl 2xl:max-w-3xl mx-auto drop-shadow-2xl relative z-10"
+                    loading="lazy"
                   />
                 </motion.div>
               </motion.div>
@@ -567,17 +569,17 @@ export default function Index() {
               </p>
             </div>
 
-            <div className="grid grid-cols-2 gap-3 max-w-5xl mx-auto">
+            <div className="grid grid-cols-2 gap-4 max-w-5xl mx-auto">
               {features.map((f) => (
                 <div 
                   key={f.title}
-                  className="card-elevated rounded-xl p-3 text-left backdrop-blur-sm bg-card/80 border border-border/50"
+                  className="card-elevated rounded-xl p-3 xs:p-4 text-left backdrop-blur-sm bg-card/80 border border-border/50"
                 >
-                  <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center mb-2">
-                    <f.icon className="w-4 h-4 text-primary" />
+                  <div className="w-8 h-8 xs:w-10 xs:h-10 rounded-lg bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center mb-2">
+                    <f.icon className="w-4 h-4 xs:w-5 xs:h-5 text-primary" />
                   </div>
-                  <h3 className="font-semibold text-foreground mb-1 text-xs leading-tight">{f.title}</h3>
-                  <p className="text-[10px] text-muted-foreground leading-snug line-clamp-3">{f.description}</p>
+                  <h3 className="font-semibold text-foreground mb-1 text-xs xs:text-sm leading-tight">{f.title}</h3>
+                  <p className="text-[11px] xs:text-xs text-muted-foreground leading-snug line-clamp-3">{f.description}</p>
                 </div>
               ))}
             </div>
@@ -585,18 +587,18 @@ export default function Index() {
         ) : (
           <motion.div
             style={{ opacity: featuresOpacity }}
-            className="container max-w-7xl 3xl:max-w-[1600px] 4xl:max-w-[1920px] mx-auto px-6 relative z-10"
+            className="container max-w-7xl 2xl:max-w-[1400px] 3xl:max-w-[1600px] 4xl:max-w-[1920px] mx-auto px-4 sm:px-6 relative z-10"
           >
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
-              className="text-center mb-16 3xl:mb-20"
+              className="text-center mb-12 md:mb-16 3xl:mb-20"
             >
-              <h2 className="text-3xl lg:text-4xl xl:text-5xl 3xl:text-6xl font-bold text-foreground mb-6">
+              <h2 className="text-2xl md:text-3xl lg:text-4xl xl:text-5xl 2xl:text-5xl 3xl:text-6xl font-bold text-foreground mb-4 md:mb-6">
                 Recursos inteligentes
               </h2>
-              <p className="text-muted-foreground max-w-3xl 3xl:max-w-4xl mx-auto text-lg xl:text-xl 3xl:text-2xl">
+              <p className="text-muted-foreground max-w-3xl 3xl:max-w-4xl mx-auto text-base md:text-lg xl:text-xl 3xl:text-2xl">
                 Ferramentas poderosas para transformar sua alimentação
               </p>
             </motion.div>
@@ -607,7 +609,7 @@ export default function Index() {
                 perspective: 1200,
                 rotateX: featuresRotateX 
               } : undefined}
-              className="grid sm:grid-cols-2 lg:grid-cols-3 gap-8 xl:gap-10 3xl:gap-12 4xl:gap-16"
+              className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8 xl:gap-10 3xl:gap-12 4xl:gap-16"
             >
               {features.map((f, index) => (
                 <motion.div 
@@ -624,7 +626,7 @@ export default function Index() {
                     rotateY: 2,
                     transition: { type: "spring", stiffness: 300, damping: 20 }
                   } : { y: -8 }}
-                  className="card-elevated rounded-2xl p-8 xl:p-10 3xl:p-12 text-left backdrop-blur-sm bg-card/80 border border-border/50 transform-gpu"
+                  className="card-elevated rounded-2xl p-6 md:p-8 xl:p-10 3xl:p-12 text-left backdrop-blur-sm bg-card/80 border border-border/50 transform-gpu"
                   style={{ transformStyle: isLargeScreen ? "preserve-3d" : undefined }}
                 >
                   <motion.div 
@@ -707,7 +709,7 @@ export default function Index() {
           </>
         )}
 
-        <div className="container max-w-7xl 3xl:max-w-[1600px] 4xl:max-w-[1920px] mx-auto px-6 relative z-10">
+        <div className="container max-w-7xl 2xl:max-w-[1400px] 3xl:max-w-[1600px] 4xl:max-w-[1920px] mx-auto px-4 sm:px-6 relative z-10">
           {isMobile ? (
             <>
               <div className="text-center mb-8">
@@ -719,20 +721,20 @@ export default function Index() {
                 </p>
               </div>
 
-              <div className="grid grid-cols-2 gap-3 max-w-6xl mx-auto">
+              <div className="grid grid-cols-2 gap-4 max-w-6xl mx-auto">
                 {steps.map((step) => (
                   <div key={step.number} className="relative">
-                    <div className="bg-card/80 backdrop-blur-sm rounded-xl p-3 shadow-lg border border-border/50 h-full relative z-10">
+                    <div className="bg-card/80 backdrop-blur-sm rounded-xl p-3 xs:p-4 shadow-lg border border-border/50 h-full relative z-10">
                       <div className="flex items-center gap-2 mb-2">
-                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center text-primary-foreground shadow-md">
-                          <step.icon className="w-5 h-5 relative z-10" />
+                        <div className="w-10 h-10 xs:w-12 xs:h-12 rounded-xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center text-primary-foreground shadow-md">
+                          <step.icon className="w-5 h-5 xs:w-6 xs:h-6 relative z-10" />
                         </div>
-                        <span className="text-2xl font-bold text-primary/20">
+                        <span className="text-2xl xs:text-3xl font-bold text-primary/20">
                           {step.number}
                         </span>
                       </div>
-                      <h3 className="font-semibold text-foreground mb-1 text-xs leading-tight">{step.title}</h3>
-                      <p className="text-[10px] text-muted-foreground leading-snug line-clamp-3">{step.description}</p>
+                      <h3 className="font-semibold text-foreground mb-1 text-xs xs:text-sm leading-tight">{step.title}</h3>
+                      <p className="text-[11px] xs:text-xs text-muted-foreground leading-snug line-clamp-3">{step.description}</p>
                     </div>
                   </div>
                 ))}
@@ -740,7 +742,7 @@ export default function Index() {
 
               <div className="text-center mt-8">
                 <Link to="/signup">
-                  <Button variant="hero" size="lg" className="group text-sm">
+                  <Button variant="hero" size="lg" className="group text-sm min-h-[48px]">
                     Criar minha conta grátis 
                     <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
                   </Button>
@@ -753,12 +755,12 @@ export default function Index() {
                 initial={{ opacity: 0, y: 20 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
-                className="text-center mb-16"
+                className="text-center mb-12 md:mb-16"
               >
-                <h2 className="text-3xl lg:text-4xl xl:text-5xl font-bold text-foreground mb-6">
+                <h2 className="text-2xl md:text-3xl lg:text-4xl xl:text-5xl 2xl:text-5xl font-bold text-foreground mb-4 md:mb-6">
                   Como funciona
                 </h2>
-                <p className="text-muted-foreground max-w-3xl mx-auto text-lg xl:text-xl">
+                <p className="text-muted-foreground max-w-3xl mx-auto text-base md:text-lg xl:text-xl">
                   Em 4 passos simples, você terá um plano alimentar personalizado.
                 </p>
               </motion.div>
@@ -769,7 +771,7 @@ export default function Index() {
                   perspective: stepsPerspective,
                   rotateY: stepsRotateY 
                 } : undefined}
-                className="grid sm:grid-cols-2 lg:grid-cols-4 gap-8 xl:gap-10 3xl:gap-12"
+                className="grid sm:grid-cols-2 xl:grid-cols-4 gap-6 md:gap-8 xl:gap-10 3xl:gap-12"
               >
                 {steps.map((step, i) => (
                   <motion.div
@@ -855,16 +857,16 @@ export default function Index() {
       </section>
 
       {/* Footer */}
-      <footer className="container mx-auto px-4 py-4 border-t border-border">
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-2">
-          <p className="text-xs text-muted-foreground">
+      <footer className="container mx-auto px-4 py-4 pb-safe border-t border-border">
+        <div className="flex flex-col xs:flex-row items-center justify-between gap-2">
+          <p className="text-xs text-muted-foreground text-center xs:text-left">
             © 2026 NutriPlan. Todos os direitos reservados.
           </p>
-          <div className="flex items-center gap-3">
-            <Link to="/terms" className="text-xs text-muted-foreground hover:text-primary transition-colors">
+          <div className="flex items-center gap-3 xs:gap-4">
+            <Link to="/terms" className="text-xs text-muted-foreground hover:text-primary transition-colors min-h-[44px] flex items-center">
               Termos de Uso
             </Link>
-            <Link to="/privacy" className="text-xs text-muted-foreground hover:text-primary transition-colors">
+            <Link to="/privacy" className="text-xs text-muted-foreground hover:text-primary transition-colors min-h-[44px] flex items-center">
               Política de Privacidade
             </Link>
           </div>
