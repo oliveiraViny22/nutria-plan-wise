@@ -254,11 +254,15 @@ export default function Index() {
               </motion.div>
             </motion.div>
             
-            {/* Hero Image with Parallax - Clean design */}
+            {/* Hero Image with Parallax - Clean design with glow */}
             <motion.div
               style={{ y: heroImageY, rotate: heroImageRotate }}
               className="relative order-first lg:order-last"
             >
+              {/* Glow effect behind image */}
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <div className="w-3/4 h-3/4 bg-primary/20 rounded-full blur-3xl opacity-60" />
+              </div>
               <motion.div
                 variants={scaleIn}
                 initial="hidden"
@@ -270,7 +274,7 @@ export default function Index() {
                 <img 
                   src={heroImage} 
                   alt="NutriPlan - Planejamento alimentar inteligente" 
-                  className="w-full h-auto max-w-sm sm:max-w-md lg:max-w-xl xl:max-w-2xl mx-auto drop-shadow-2xl"
+                  className="w-full h-auto max-w-sm sm:max-w-md lg:max-w-xl xl:max-w-2xl mx-auto drop-shadow-2xl relative z-10"
                 />
               </motion.div>
             </motion.div>
