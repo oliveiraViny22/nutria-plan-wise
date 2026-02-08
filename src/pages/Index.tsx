@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { motion, useScroll, useTransform, useSpring } from 'framer-motion';
-import { ArrowRight, Leaf, Target, RefreshCw, MessageCircle, UserPlus, ClipboardList, Utensils, TrendingUp, ChevronDown, Sparkles } from 'lucide-react';
+import { ArrowRight, Leaf, Target, RefreshCw, MessageCircle, UserPlus, ClipboardList, Utensils, TrendingUp, ChevronDown, Sparkles, Trophy, BarChart3, Flame } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Logo } from '@/components/Logo';
 import { ThemeToggle } from '@/components/ThemeToggle';
@@ -107,6 +107,9 @@ export default function Index() {
     { icon: Target, title: 'Metas Personalizadas', description: 'Calcule suas necessidades calóricas e de macros automaticamente' },
     { icon: RefreshCw, title: 'Substituição Inteligente', description: 'Troque alimentos e veja o impacto nutricional em tempo real' },
     { icon: MessageCircle, title: 'Assistente IA', description: 'Tire dúvidas nutricionais com nosso assistente inteligente' },
+    { icon: BarChart3, title: 'Relatórios de Progresso', description: 'Acompanhe sua evolução de peso e medidas com gráficos detalhados' },
+    { icon: Trophy, title: 'Gamificação', description: 'Mantenha a motivação com streaks de adesão e conquistas' },
+    { icon: Flame, title: 'Registro Diário', description: 'Confirme suas refeições e monitore sua adesão ao plano' },
   ];
 
   const steps = [
@@ -363,7 +366,7 @@ export default function Index() {
             initial="hidden"
             whileInView="visible"
             viewport={{ once: true, margin: "-100px" }}
-            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 max-w-4xl mx-auto"
+            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 max-w-5xl mx-auto"
           >
             {features.map((f, index) => (
               <motion.div 
@@ -447,16 +450,30 @@ export default function Index() {
                   />
                 )}
                 
-                <div className="bg-card/80 backdrop-blur-sm rounded-2xl p-6 shadow-lg border border-border/50 h-full relative z-10 hover:border-primary/30 transition-colors">
+                <div className="bg-card/80 backdrop-blur-sm rounded-2xl p-6 shadow-lg border border-border/50 h-full relative z-10 hover:border-primary/30 hover:shadow-xl transition-all duration-300">
                   <div className="flex items-center gap-4 mb-4">
                     <motion.div 
-                      whileHover={{ rotate: 360 }}
-                      transition={{ duration: 0.6 }}
-                      className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center text-primary-foreground shadow-md"
+                      whileHover={{ rotate: 360, scale: 1.1 }}
+                      whileTap={{ scale: 0.95 }}
+                      transition={{ duration: 0.6, type: "spring" }}
+                      className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center text-primary-foreground shadow-md relative overflow-hidden group"
                     >
-                      <step.icon className="w-6 h-6" />
+                      <motion.div
+                        className="absolute inset-0 bg-white/20"
+                        initial={{ x: "-100%", opacity: 0 }}
+                        whileHover={{ x: "100%", opacity: 1 }}
+                        transition={{ duration: 0.5 }}
+                      />
+                      <step.icon className="w-6 h-6 relative z-10" />
                     </motion.div>
-                    <span className="text-4xl font-bold text-primary/20">{step.number}</span>
+                    <motion.span 
+                      initial={{ opacity: 0.2 }}
+                      whileInView={{ opacity: 0.2 }}
+                      whileHover={{ opacity: 0.4, scale: 1.05 }}
+                      className="text-4xl font-bold text-primary"
+                    >
+                      {step.number}
+                    </motion.span>
                   </div>
                   <h3 className="font-semibold text-foreground mb-2 text-lg">{step.title}</h3>
                   <p className="text-sm text-muted-foreground">{step.description}</p>
