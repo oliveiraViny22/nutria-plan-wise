@@ -7,6 +7,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Logo } from '@/components/Logo';
 import { ThemeToggle } from '@/components/ThemeToggle';
+import { OptimizedImage } from '@/components/OptimizedImage';
+import loginIllustration from '@/assets/hero-nutrition.png';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserRole } from '@/hooks/useUserRole';
 import { toast } from 'sonner';
@@ -170,7 +172,12 @@ export default function Login() {
           transition={{ duration: 0.6, delay: 0.2 }}
           className="max-w-lg text-center"
         >
-          <div className="w-48 h-48 lg:w-64 lg:h-64 mx-auto mb-6 lg:mb-8 rounded-full gradient-primary opacity-20" />
+          <OptimizedImage
+            src={loginIllustration}
+            alt="Planejamento alimentar inteligente"
+            className="w-64 h-64 lg:w-80 lg:h-80 mx-auto mb-6 lg:mb-8 rounded-2xl shadow-xl"
+            priority={true}
+          />
           <h2 className="text-xl lg:text-2xl font-bold text-foreground mb-3 lg:mb-4">
             Planejamento alimentar inteligente
           </h2>
