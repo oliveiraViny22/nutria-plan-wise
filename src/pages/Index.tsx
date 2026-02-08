@@ -4,6 +4,7 @@ import { ArrowRight, Leaf, RefreshCw, MessageCircle, UserPlus, ClipboardList, Ut
 import { Button } from '@/components/ui/button';
 import { Logo } from '@/components/Logo';
 import { ThemeToggle } from '@/components/ThemeToggle';
+import { HeroImage } from '@/components/OptimizedImage';
 import heroImage from '@/assets/hero-nutrition.png';
 import { useRef, useEffect, useState } from 'react';
 
@@ -369,16 +370,15 @@ export default function Index() {
                 </div>
               </div>
               
-              {/* Hero Image - Static on mobile */}
+              {/* Hero Image - Static on mobile, optimized loading */}
               <div className="relative order-first">
                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                   <div className="w-3/4 h-3/4 bg-primary/30 rounded-full blur-2xl opacity-50" />
                 </div>
-                <img 
+                <HeroImage 
                   src={heroImage} 
                   alt="NutriPlan - Planejamento alimentar inteligente" 
                   className="w-full h-auto max-w-[280px] xs:max-w-xs sm:max-w-sm mx-auto drop-shadow-xl relative z-10"
-                  loading="lazy"
                 />
               </div>
             </div>
@@ -473,11 +473,10 @@ export default function Index() {
                   whileHover={{ scale: 1.02 }}
                   transition={{ type: "spring", stiffness: 300 }}
                 >
-                  <img 
+                  <HeroImage 
                     src={heroImage} 
                     alt="NutriPlan - Planejamento alimentar inteligente" 
                     className="w-full h-auto max-w-md md:max-w-lg lg:max-w-xl xl:max-w-2xl 2xl:max-w-3xl mx-auto drop-shadow-2xl relative z-10"
-                    loading="lazy"
                   />
                 </motion.div>
               </motion.div>
