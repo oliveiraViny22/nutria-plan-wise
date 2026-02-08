@@ -276,25 +276,27 @@ export default function Index() {
                   alt="NutriPlan - Planejamento alimentar inteligente" 
                   className="w-full h-auto max-w-xs sm:max-w-sm lg:max-w-lg mx-auto drop-shadow-2xl"
                 />
-                {/* Floating elements with enhanced parallax */}
+                {/* Floating elements - positioned relative to image */}
                 <motion.div
                   style={{ y: floatingIcon1Y }}
                   animate={{ 
                     rotate: [0, 5, 0, -5, 0],
+                    scale: [1, 1.05, 1],
                   }}
                   transition={{ 
                     duration: 6, 
                     repeat: Infinity,
                     ease: "easeInOut"
                   }}
-                  className="absolute -top-4 -right-4 w-16 h-16 sm:w-20 sm:h-20 bg-gradient-to-br from-accent to-accent/60 rounded-2xl shadow-lg flex items-center justify-center backdrop-blur-sm"
+                  className="absolute top-4 right-0 sm:top-8 sm:-right-2 lg:top-12 lg:right-4 w-12 h-12 sm:w-16 sm:h-16 bg-gradient-to-br from-accent to-accent/60 rounded-2xl shadow-lg flex items-center justify-center backdrop-blur-sm border border-white/20"
                 >
-                  <Target className="w-8 h-8 sm:w-10 sm:h-10 text-accent-foreground" />
+                  <Target className="w-6 h-6 sm:w-8 sm:h-8 text-accent-foreground" />
                 </motion.div>
                 <motion.div
                   style={{ y: floatingIcon2Y }}
                   animate={{ 
                     rotate: [0, -5, 0, 5, 0],
+                    scale: [1, 1.05, 1],
                   }}
                   transition={{ 
                     duration: 7, 
@@ -302,9 +304,9 @@ export default function Index() {
                     ease: "easeInOut",
                     delay: 1
                   }}
-                  className="absolute -bottom-4 -left-4 w-14 h-14 sm:w-16 sm:h-16 bg-gradient-to-br from-primary to-primary/60 rounded-xl shadow-lg flex items-center justify-center backdrop-blur-sm"
+                  className="absolute bottom-8 left-0 sm:bottom-12 sm:-left-2 lg:bottom-16 lg:left-4 w-10 h-10 sm:w-14 sm:h-14 bg-gradient-to-br from-primary to-primary/60 rounded-xl shadow-lg flex items-center justify-center backdrop-blur-sm border border-white/20"
                 >
-                  <Leaf className="w-6 h-6 sm:w-8 sm:h-8 text-primary-foreground" />
+                  <Leaf className="w-5 h-5 sm:w-7 sm:h-7 text-primary-foreground" />
                 </motion.div>
               </motion.div>
             </motion.div>
