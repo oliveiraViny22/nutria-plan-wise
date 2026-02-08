@@ -118,6 +118,11 @@ export default function Index() {
   // Steps section parallax - enhanced
   const smoothStepsProgress = useSpring(stepsScrollProgress, { stiffness: 60, damping: 20 });
   const stepsBackgroundY = useTransform(smoothStepsProgress, [0, 1], [isMobile ? 30 : 80, isMobile ? -30 : -80]);
+  
+  // Steps decorative elements parallax - defined at top level to avoid hooks rules violation
+  const stepsDecor1Y = useTransform(smoothStepsProgress, [0, 1], [0, -120]);
+  const stepsDecor2Y = useTransform(smoothStepsProgress, [0, 1], [0, -180]);
+  const stepsDecor3Y = useTransform(smoothStepsProgress, [0, 1], [50, -100]);
 
   const features = [
     { icon: Target, title: 'Metas Personalizadas', description: 'Calcule suas necessidades calóricas e de macros automaticamente' },
@@ -399,15 +404,15 @@ export default function Index() {
         {!isMobile && (
           <>
             <motion.div
-              style={{ y: useTransform(smoothStepsProgress, [0, 1], [0, -120]) }}
+              style={{ y: stepsDecor1Y }}
               className="absolute top-20 right-10 w-40 h-40 bg-primary/10 rounded-full blur-3xl"
             />
             <motion.div
-              style={{ y: useTransform(smoothStepsProgress, [0, 1], [0, -180]) }}
+              style={{ y: stepsDecor2Y }}
               className="absolute bottom-20 left-10 w-60 h-60 bg-accent/10 rounded-full blur-3xl"
             />
             <motion.div
-              style={{ y: useTransform(smoothStepsProgress, [0, 1], [50, -100]) }}
+              style={{ y: stepsDecor3Y }}
               className="absolute top-1/2 right-1/4 w-32 h-32 bg-primary/5 rounded-full blur-2xl hidden lg:block"
             />
           </>
