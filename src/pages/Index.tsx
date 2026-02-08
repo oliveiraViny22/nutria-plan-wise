@@ -267,7 +267,7 @@ export default function Index() {
                   opacity: [0.5, 0.7, 0.5]
                 }}
                 transition={{ 
-                  duration: 4,
+                  duration: 6,
                   repeat: Infinity,
                   ease: "easeInOut"
                 }}
