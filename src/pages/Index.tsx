@@ -420,7 +420,7 @@ export default function Index() {
         ) : (
           <motion.div
             style={{ opacity: featuresOpacity }}
-            className="container mx-auto px-6 lg:px-12 xl:px-20 relative z-10"
+            className="w-full max-w-7xl mx-auto px-6 lg:px-12 xl:px-16 relative z-10"
           >
             <motion.div
               initial={{ opacity: 0, y: 20 }}
@@ -441,7 +441,7 @@ export default function Index() {
               initial="hidden"
               whileInView="visible"
               viewport={{ once: true, margin: "-100px" }}
-              className="grid sm:grid-cols-2 lg:grid-cols-3 gap-8 xl:gap-10 max-w-7xl mx-auto"
+              className="grid sm:grid-cols-2 lg:grid-cols-3 gap-8 xl:gap-10"
             >
               {features.map((f, index) => (
                 <motion.div 
@@ -488,7 +488,7 @@ export default function Index() {
           </>
         )}
 
-        <div className="container mx-auto px-6 lg:px-12 xl:px-20 relative z-10">
+        <div className="w-full max-w-7xl mx-auto px-6 lg:px-12 xl:px-16 relative z-10">
           {isMobile ? (
             <>
               <div className="text-center mb-8">
@@ -544,7 +544,7 @@ export default function Index() {
                 </p>
               </motion.div>
 
-              <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-8 xl:gap-10 max-w-7xl mx-auto">
+              <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-8 xl:gap-10">
                 {steps.map((step, i) => (
                   <motion.div
                     key={step.number}
