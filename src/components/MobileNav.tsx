@@ -43,6 +43,7 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { FreePlanBadge } from '@/components/FeatureBadge';
+import { SyncStatusBadge } from '@/components/SyncStatusIndicator';
 
 interface NavItem {
   label: string;
@@ -199,11 +200,14 @@ export function MobileNav() {
                 />
               )}
             </div>
-            <SheetClose asChild>
-              <Button variant="ghost" size="icon" className="h-8 w-8">
-                <X className="h-4 w-4" />
-              </Button>
-            </SheetClose>
+            <div className="flex items-center gap-1">
+              <SyncStatusBadge />
+              <SheetClose asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8">
+                  <X className="h-4 w-4" />
+                </Button>
+              </SheetClose>
+            </div>
           </SheetTitle>
         </SheetHeader>
         
