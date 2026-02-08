@@ -6,9 +6,6 @@ verify_jwt = false
 [functions.reconcile-subscriptions]
 verify_jwt = false
 
-[functions.generate-meal-plan-v2]
-verify_jwt = false
-
 [functions.confirm-meal]
 verify_jwt = false
 
@@ -36,9 +33,6 @@ verify_jwt = false
 [functions.audit-foods]
 verify_jwt = false
 
-[functions.rebalance-meal-plan]
-verify_jwt = false
-
 [functions.ai-rebalance]
 verify_jwt = false
 
@@ -50,4 +44,3 @@ verify_jwt = false
 
 [functions.cleanup-orphan-users]
 verify_jwt = false
-
