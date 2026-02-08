@@ -259,10 +259,21 @@ export default function Index() {
               style={{ y: heroImageY, rotate: heroImageRotate }}
               className="relative order-first lg:order-last"
             >
-              {/* Glow effect behind image */}
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <div className="w-3/4 h-3/4 bg-primary/20 rounded-full blur-3xl opacity-60" />
-              </div>
+              {/* Animated glow effect behind image */}
+              <motion.div 
+                className="absolute inset-0 flex items-center justify-center pointer-events-none"
+                animate={{ 
+                  scale: [1, 1.1, 1],
+                  opacity: [0.5, 0.7, 0.5]
+                }}
+                transition={{ 
+                  duration: 4,
+                  repeat: Infinity,
+                  ease: "easeInOut"
+                }}
+              >
+                <div className="w-3/4 h-3/4 bg-primary/25 rounded-full blur-3xl" />
+              </motion.div>
               <motion.div
                 variants={scaleIn}
                 initial="hidden"
