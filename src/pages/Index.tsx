@@ -196,141 +196,191 @@ export default function Index() {
         {/* Animated Background Gradient */}
         <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-primary/10 to-accent/5 dark:from-primary/10 dark:via-primary/5 dark:to-background" />
         
-        {/* Parallax Background Orbs - Simplified for mobile */}
-        <motion.div 
-          style={isMobile ? {} : { y: orb1Y }}
-          className="absolute top-10 sm:top-20 left-4 sm:left-10 w-32 sm:w-72 h-32 sm:h-72 bg-primary/20 rounded-full blur-3xl opacity-40 sm:opacity-60" 
-        />
-        <motion.div 
-          style={isMobile ? {} : { y: orb2Y }}
-          className="absolute bottom-10 right-4 sm:right-10 w-40 sm:w-96 h-40 sm:h-96 bg-accent/30 rounded-full blur-3xl opacity-30 sm:opacity-40" 
-        />
-        {!isMobile && (
-          <motion.div 
-            style={{ opacity: orb3Opacity }}
-            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-gradient-radial from-primary/10 to-transparent rounded-full blur-3xl" 
-          />
+        {/* Background Orbs - Static on mobile, parallax on desktop */}
+        {isMobile ? (
+          <>
+            <div className="absolute top-10 left-4 w-32 h-32 bg-primary/20 rounded-full blur-3xl opacity-40" />
+            <div className="absolute bottom-10 right-4 w-40 h-40 bg-accent/30 rounded-full blur-3xl opacity-30" />
+          </>
+        ) : (
+          <>
+            <motion.div 
+              style={{ y: orb1Y }}
+              className="absolute top-20 left-10 w-72 h-72 bg-primary/20 rounded-full blur-3xl opacity-60" 
+            />
+            <motion.div 
+              style={{ y: orb2Y }}
+              className="absolute bottom-10 right-10 w-96 h-96 bg-accent/30 rounded-full blur-3xl opacity-40" 
+            />
+            <motion.div 
+              style={{ opacity: orb3Opacity }}
+              className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-gradient-radial from-primary/10 to-transparent rounded-full blur-3xl" 
+            />
+          </>
         )}
 
-        
-        <motion.main 
-          style={isMobile ? {} : { opacity: heroOpacity, scale: heroScale }}
-          className="container mx-auto px-4 py-6 sm:py-12 lg:py-16 relative z-10"
-        >
-          <div className="grid lg:grid-cols-2 gap-6 sm:gap-8 lg:gap-12 items-center">
-            {/* Text Content with Parallax */}
-            <motion.div 
-              style={isMobile ? {} : { y: heroTextY }}
-              className="text-center lg:text-left"
-            >
-              <motion.div 
-                variants={containerVariants}
-                initial="hidden"
-                animate="visible"
-              >
-                <motion.div 
-                  variants={itemVariants}
-                  className="inline-flex items-center gap-2 px-3 sm:px-4 py-2 bg-primary/10 backdrop-blur-sm rounded-full text-primary text-xs sm:text-sm font-medium mb-4 sm:mb-6 border border-primary/20"
-                >
-                  <Leaf className="w-3 h-3 sm:w-4 sm:h-4" /> Planejamento alimentar com IA
-                </motion.div>
-                <motion.h1 
-                  variants={itemVariants}
-                  className="text-2xl sm:text-4xl lg:text-5xl xl:text-6xl font-bold text-foreground mb-4 sm:mb-6 leading-tight"
-                >
+        {/* Main Content - No parallax on mobile */}
+        {isMobile ? (
+          <main className="container mx-auto px-4 py-6 relative z-10">
+            <div className="grid gap-6 items-center">
+              {/* Text Content - Static on mobile */}
+              <div className="text-center">
+                <div className="inline-flex items-center gap-2 px-3 py-2 bg-primary/10 backdrop-blur-sm rounded-full text-primary text-xs font-medium mb-4 border border-primary/20">
+                  <Leaf className="w-3 h-3" /> Planejamento alimentar com IA
+                </div>
+                <h1 className="text-2xl font-bold text-foreground mb-4 leading-tight">
                   Nutrição inteligente para seus <span className="text-primary bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">objetivos</span>
-                </motion.h1>
-                <motion.p 
-                  variants={itemVariants}
-                  className="text-sm sm:text-lg text-muted-foreground max-w-xl mx-auto lg:mx-0 mb-6 sm:mb-8"
-                >
+                </h1>
+                <p className="text-sm text-muted-foreground max-w-xl mx-auto mb-6">
                   Crie planos alimentares personalizados, substitua alimentos e entenda o impacto de cada escolha na sua saúde.
-                </motion.p>
-                <motion.div 
-                  variants={itemVariants}
-                  className="flex flex-col sm:flex-row gap-3 justify-center lg:justify-start"
-                >
+                </p>
+                <div className="flex flex-col gap-3 justify-center">
                   <Link to="/signup">
-                    <Button variant="hero" size="lg" className="text-sm sm:text-base w-full sm:w-auto group">
+                    <Button variant="hero" size="lg" className="text-sm w-full group">
                       Começar agora 
-                      <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 ml-2 group-hover:translate-x-1 transition-transform" />
+                      <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
                     </Button>
                   </Link>
                   <a href="#como-funciona">
-                    <Button variant="outline" size="lg" className="text-sm sm:text-base w-full sm:w-auto group">
+                    <Button variant="outline" size="lg" className="text-sm w-full group">
                       Como funciona 
                       <ChevronDown className="w-4 h-4 ml-2 group-hover:translate-y-1 transition-transform" />
                     </Button>
                   </a>
-                </motion.div>
-              </motion.div>
-            </motion.div>
-            
-            {/* Hero Image with Mobile-Optimized Parallax */}
-            <motion.div
-              style={isMobile ? {} : { y: heroImageY, rotate: heroImageRotate }}
-              className="relative order-first lg:order-last"
-            >
-              {/* Animated glow effect behind image - reduced on mobile */}
-              <motion.div 
-                className="absolute inset-0 flex items-center justify-center pointer-events-none"
-                animate={isMobile ? { 
-                  scale: [1, 1.1, 1],
-                  opacity: [0.3, 0.5, 0.3]
-                } : { 
-                  scale: [1, 1.3, 1],
-                  opacity: [0.4, 0.8, 0.4]
-                }}
-                transition={{ 
-                  duration: isMobile ? 4 : 3,
-                  repeat: Infinity,
-                  ease: "easeInOut"
-                }}
-              >
-                <div className="w-3/4 sm:w-4/5 h-3/4 sm:h-4/5 bg-primary/30 sm:bg-primary/40 rounded-full blur-2xl sm:blur-3xl" />
-              </motion.div>
-              <motion.div
-                variants={scaleIn}
-                initial="hidden"
-                animate="visible"
-                className="relative"
-                whileHover={isMobile ? {} : { scale: 1.02 }}
-                transition={{ type: "spring", stiffness: 300 }}
-              >
+                </div>
+              </div>
+              
+              {/* Hero Image - Static on mobile */}
+              <div className="relative order-first">
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                  <div className="w-3/4 h-3/4 bg-primary/30 rounded-full blur-2xl opacity-50" />
+                </div>
                 <img 
                   src={heroImage} 
                   alt="NutriPlan - Planejamento alimentar inteligente" 
-                  className="w-full h-auto max-w-[280px] sm:max-w-md lg:max-w-xl xl:max-w-2xl mx-auto drop-shadow-xl sm:drop-shadow-2xl relative z-10"
+                  className="w-full h-auto max-w-[280px] mx-auto drop-shadow-xl relative z-10"
                 />
+              </div>
+            </div>
+          </main>
+        ) : (
+          <motion.main 
+            style={{ opacity: heroOpacity, scale: heroScale }}
+            className="container mx-auto px-4 py-12 lg:py-16 relative z-10"
+          >
+            <div className="grid lg:grid-cols-2 gap-8 lg:gap-12 items-center">
+              {/* Text Content with Parallax */}
+              <motion.div 
+                style={{ y: heroTextY }}
+                className="text-center lg:text-left"
+              >
+                <motion.div 
+                  variants={containerVariants}
+                  initial="hidden"
+                  animate="visible"
+                >
+                  <motion.div 
+                    variants={itemVariants}
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-primary/10 backdrop-blur-sm rounded-full text-primary text-sm font-medium mb-6 border border-primary/20"
+                  >
+                    <Leaf className="w-4 h-4" /> Planejamento alimentar com IA
+                  </motion.div>
+                  <motion.h1 
+                    variants={itemVariants}
+                    className="text-4xl lg:text-5xl xl:text-6xl font-bold text-foreground mb-6 leading-tight"
+                  >
+                    Nutrição inteligente para seus <span className="text-primary bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">objetivos</span>
+                  </motion.h1>
+                  <motion.p 
+                    variants={itemVariants}
+                    className="text-lg text-muted-foreground max-w-xl mx-auto lg:mx-0 mb-8"
+                  >
+                    Crie planos alimentares personalizados, substitua alimentos e entenda o impacto de cada escolha na sua saúde.
+                  </motion.p>
+                  <motion.div 
+                    variants={itemVariants}
+                    className="flex flex-col sm:flex-row gap-3 justify-center lg:justify-start"
+                  >
+                    <Link to="/signup">
+                      <Button variant="hero" size="lg" className="text-base w-full sm:w-auto group">
+                        Começar agora 
+                        <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
+                      </Button>
+                    </Link>
+                    <a href="#como-funciona">
+                      <Button variant="outline" size="lg" className="text-base w-full sm:w-auto group">
+                        Como funciona 
+                        <ChevronDown className="w-4 h-4 ml-2 group-hover:translate-y-1 transition-transform" />
+                      </Button>
+                    </a>
+                  </motion.div>
+                </motion.div>
               </motion.div>
-            </motion.div>
-          </div>
-        </motion.main>
+              
+              {/* Hero Image with Parallax */}
+              <motion.div
+                style={{ y: heroImageY, rotate: heroImageRotate }}
+                className="relative order-first lg:order-last"
+              >
+                <motion.div 
+                  className="absolute inset-0 flex items-center justify-center pointer-events-none"
+                  animate={{ 
+                    scale: [1, 1.3, 1],
+                    opacity: [0.4, 0.8, 0.4]
+                  }}
+                  transition={{ 
+                    duration: 3,
+                    repeat: Infinity,
+                    ease: "easeInOut"
+                  }}
+                >
+                  <div className="w-4/5 h-4/5 bg-primary/40 rounded-full blur-3xl" />
+                </motion.div>
+                <motion.div
+                  variants={scaleIn}
+                  initial="hidden"
+                  animate="visible"
+                  className="relative"
+                  whileHover={{ scale: 1.02 }}
+                  transition={{ type: "spring", stiffness: 300 }}
+                >
+                  <img 
+                    src={heroImage} 
+                    alt="NutriPlan - Planejamento alimentar inteligente" 
+                    className="w-full h-auto max-w-md lg:max-w-xl xl:max-w-2xl mx-auto drop-shadow-2xl relative z-10"
+                  />
+                </motion.div>
+              </motion.div>
+            </div>
+          </motion.main>
+        )}
 
-        {/* Scroll indicator - hidden on mobile for cleaner look */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 1.5 }}
-          className="absolute bottom-4 sm:bottom-8 left-1/2 -translate-x-1/2 hidden sm:block"
-        >
+        {/* Scroll indicator - hidden on mobile */}
+        {!isMobile && (
           <motion.div
-            animate={{ y: [0, 10, 0] }}
-            transition={{ duration: 1.5, repeat: Infinity }}
-            className="w-6 h-10 rounded-full border-2 border-muted-foreground/30 flex items-start justify-center p-2"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 1.5 }}
+            className="absolute bottom-8 left-1/2 -translate-x-1/2"
           >
             <motion.div
-              animate={{ opacity: [0.5, 1, 0.5] }}
+              animate={{ y: [0, 10, 0] }}
               transition={{ duration: 1.5, repeat: Infinity }}
-              className="w-1.5 h-2.5 bg-muted-foreground/50 rounded-full"
-            />
+              className="w-6 h-10 rounded-full border-2 border-muted-foreground/30 flex items-start justify-center p-2"
+            >
+              <motion.div
+                animate={{ opacity: [0.5, 1, 0.5] }}
+                transition={{ duration: 1.5, repeat: Infinity }}
+                className="w-1.5 h-2.5 bg-muted-foreground/50 rounded-full"
+              />
+            </motion.div>
           </motion.div>
-        </motion.div>
+        )}
       </section>
 
-      {/* Features Grid with Mobile-Optimized Parallax */}
+      {/* Features Grid - No parallax on mobile */}
       <section ref={featuresRef} className="relative py-12 sm:py-24 overflow-hidden bg-muted/30">
-        {/* Background decoration with parallax - hidden on mobile */}
+        {/* Background decoration with parallax - desktop only */}
         {!isMobile && (
           <motion.div
             style={{ y: featuresY }}
@@ -341,68 +391,93 @@ export default function Index() {
           </motion.div>
         )}
 
-        <motion.div
-          style={isMobile ? {} : { opacity: featuresOpacity }}
-          className="container mx-auto px-4 relative z-10"
-        >
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            className="text-center mb-8 sm:mb-12"
-          >
-            <h2 className="text-xl sm:text-3xl lg:text-4xl font-bold text-foreground mb-3 sm:mb-4">
-              Recursos inteligentes
-            </h2>
-            <p className="text-muted-foreground max-w-2xl mx-auto text-xs sm:text-base px-2">
-              Ferramentas poderosas para transformar sua alimentação
-            </p>
-          </motion.div>
+        {isMobile ? (
+          <div className="container mx-auto px-4 relative z-10">
+            <div className="text-center mb-8">
+              <h2 className="text-xl font-bold text-foreground mb-3">
+                Recursos inteligentes
+              </h2>
+              <p className="text-muted-foreground text-xs px-2">
+                Ferramentas poderosas para transformar sua alimentação
+              </p>
+            </div>
 
-          <motion.div 
-            variants={containerVariants}
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true, margin: isMobile ? "-50px" : "-100px" }}
-            className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6 max-w-5xl mx-auto"
-          >
-            {features.map((f, index) => (
-              <motion.div 
-                key={f.title} 
-                variants={itemVariants}
-                custom={index}
-                whileHover={isMobile ? {} : { 
-                  y: -12, 
-                  scale: 1.03,
-                  transition: { type: "spring", stiffness: 400 }
-                }}
-                whileTap={isMobile ? { scale: 0.98 } : {}}
-                className="card-elevated rounded-xl sm:rounded-2xl p-3 sm:p-6 text-left cursor-pointer backdrop-blur-sm bg-card/80 border border-border/50 hover:border-primary/30 transition-colors"
-              >
+            <div className="grid grid-cols-2 gap-3 max-w-5xl mx-auto">
+              {features.map((f) => (
                 <div 
-                  className="w-8 h-8 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center mb-2 sm:mb-4"
+                  key={f.title}
+                  className="card-elevated rounded-xl p-3 text-left backdrop-blur-sm bg-card/80 border border-border/50"
                 >
-                  <f.icon className="w-4 h-4 sm:w-6 sm:h-6 text-primary" />
+                  <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center mb-2">
+                    <f.icon className="w-4 h-4 text-primary" />
+                  </div>
+                  <h3 className="font-semibold text-foreground mb-1 text-xs leading-tight">{f.title}</h3>
+                  <p className="text-[10px] text-muted-foreground leading-snug line-clamp-3">{f.description}</p>
                 </div>
-                <h3 className="font-semibold text-foreground mb-1 text-xs sm:text-base leading-tight">{f.title}</h3>
-                <p className="text-[10px] sm:text-sm text-muted-foreground leading-snug line-clamp-3 sm:line-clamp-none">{f.description}</p>
-              </motion.div>
-            ))}
+              ))}
+            </div>
+          </div>
+        ) : (
+          <motion.div
+            style={{ opacity: featuresOpacity }}
+            className="container mx-auto px-4 relative z-10"
+          >
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              className="text-center mb-12"
+            >
+              <h2 className="text-3xl lg:text-4xl font-bold text-foreground mb-4">
+                Recursos inteligentes
+              </h2>
+              <p className="text-muted-foreground max-w-2xl mx-auto text-base">
+                Ferramentas poderosas para transformar sua alimentação
+              </p>
+            </motion.div>
+
+            <motion.div 
+              variants={containerVariants}
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true, margin: "-100px" }}
+              className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 max-w-5xl mx-auto"
+            >
+              {features.map((f, index) => (
+                <motion.div 
+                  key={f.title} 
+                  variants={itemVariants}
+                  custom={index}
+                  whileHover={{ 
+                    y: -12, 
+                    scale: 1.03,
+                    transition: { type: "spring", stiffness: 400 }
+                  }}
+                  className="card-elevated rounded-2xl p-6 text-left cursor-pointer backdrop-blur-sm bg-card/80 border border-border/50 hover:border-primary/30 transition-colors"
+                >
+                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center mb-4">
+                    <f.icon className="w-6 h-6 text-primary" />
+                  </div>
+                  <h3 className="font-semibold text-foreground mb-1 text-base leading-tight">{f.title}</h3>
+                  <p className="text-sm text-muted-foreground leading-snug">{f.description}</p>
+                </motion.div>
+              ))}
+            </motion.div>
           </motion.div>
-        </motion.div>
+        )}
       </section>
 
-      {/* How It Works Section - Mobile Optimized */}
+      {/* How It Works Section - No parallax on mobile */}
       <section ref={stepsRef} id="como-funciona" className="relative py-12 sm:py-24 overflow-hidden">
-        {/* Parallax Background - Simplified on mobile */}
-        <motion.div
-          style={isMobile ? {} : { y: stepsBackgroundY }}
-          className="absolute inset-0 bg-muted/30"
-        />
-        
-        {/* Decorative elements - Hidden on mobile */}
-        {!isMobile && (
+        {/* Background - Static on mobile, parallax on desktop */}
+        {isMobile ? (
+          <div className="absolute inset-0 bg-muted/30" />
+        ) : (
           <>
+            <motion.div
+              style={{ y: stepsBackgroundY }}
+              className="absolute inset-0 bg-muted/30"
+            />
             <motion.div
               style={{ y: stepsDecor1Y }}
               className="absolute top-20 right-10 w-40 h-40 bg-primary/10 rounded-full blur-3xl"
@@ -419,75 +494,115 @@ export default function Index() {
         )}
 
         <div className="container mx-auto px-4 relative z-10">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            className="text-center mb-8 sm:mb-12"
-          >
-            <h2 className="text-xl sm:text-3xl lg:text-4xl font-bold text-foreground mb-3 sm:mb-4">
-              Como funciona
-            </h2>
-            <p className="text-muted-foreground max-w-2xl mx-auto text-xs sm:text-base px-2">
-              Em 4 passos simples, você terá um plano alimentar personalizado.
-            </p>
-          </motion.div>
+          {isMobile ? (
+            <>
+              <div className="text-center mb-8">
+                <h2 className="text-xl font-bold text-foreground mb-3">
+                  Como funciona
+                </h2>
+                <p className="text-muted-foreground text-xs px-2">
+                  Em 4 passos simples, você terá um plano alimentar personalizado.
+                </p>
+              </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-8 max-w-6xl mx-auto">
-            {steps.map((step, i) => (
+              <div className="grid grid-cols-2 gap-3 max-w-6xl mx-auto">
+                {steps.map((step) => (
+                  <div key={step.number} className="relative">
+                    <div className="bg-card/80 backdrop-blur-sm rounded-xl p-3 shadow-lg border border-border/50 h-full relative z-10">
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center text-primary-foreground shadow-md">
+                          <step.icon className="w-5 h-5 relative z-10" />
+                        </div>
+                        <span className="text-2xl font-bold text-primary/20">
+                          {step.number}
+                        </span>
+                      </div>
+                      <h3 className="font-semibold text-foreground mb-1 text-xs leading-tight">{step.title}</h3>
+                      <p className="text-[10px] text-muted-foreground leading-snug line-clamp-3">{step.description}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="text-center mt-8">
+                <Link to="/signup">
+                  <Button variant="hero" size="lg" className="group text-sm">
+                    Criar minha conta grátis 
+                    <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
+                  </Button>
+                </Link>
+              </div>
+            </>
+          ) : (
+            <>
               <motion.div
-                key={step.number}
-                initial={{ opacity: 0, y: 30 }}
+                initial={{ opacity: 0, y: 20 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
-                transition={{ delay: isMobile ? i * 0.08 : i * 0.15, type: "spring", stiffness: 120 }}
-                whileHover={isMobile ? {} : { y: -8 }}
-                whileTap={isMobile ? { scale: 0.98 } : {}}
-                className="relative"
+                className="text-center mb-12"
               >
-                {/* Connector Line - Hidden on mobile and last item */}
-                {i < steps.length - 1 && (
-                  <motion.div 
-                    initial={{ scaleX: 0 }}
-                    whileInView={{ scaleX: 1 }}
-                    viewport={{ once: true }}
-                    transition={{ delay: i * 0.15 + 0.3, duration: 0.5 }}
-                    className="hidden lg:block absolute top-12 left-[60%] w-full h-0.5 bg-gradient-to-r from-primary/50 to-primary/10 origin-left" 
-                  />
-                )}
-                
-                <div className="bg-card/80 backdrop-blur-sm rounded-xl sm:rounded-2xl p-3 sm:p-6 shadow-lg border border-border/50 h-full relative z-10 hover:border-primary/30 hover:shadow-xl transition-all duration-300">
-                  <div className="flex items-center gap-2 sm:gap-4 mb-2 sm:mb-4">
-                    <div 
-                      className="w-10 h-10 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center text-primary-foreground shadow-md relative overflow-hidden"
-                    >
-                      <step.icon className="w-5 h-5 sm:w-6 sm:h-6 relative z-10" />
-                    </div>
-                    <span className="text-2xl sm:text-4xl font-bold text-primary/20">
-                      {step.number}
-                    </span>
-                  </div>
-                  <h3 className="font-semibold text-foreground mb-1 sm:mb-2 text-xs sm:text-lg leading-tight">{step.title}</h3>
-                  <p className="text-[10px] sm:text-sm text-muted-foreground leading-snug line-clamp-3 sm:line-clamp-none">{step.description}</p>
-                </div>
+                <h2 className="text-3xl lg:text-4xl font-bold text-foreground mb-4">
+                  Como funciona
+                </h2>
+                <p className="text-muted-foreground max-w-2xl mx-auto text-base">
+                  Em 4 passos simples, você terá um plano alimentar personalizado.
+                </p>
               </motion.div>
-            ))}
-          </div>
 
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ delay: 0.4 }}
-            className="text-center mt-8 sm:mt-12"
-          >
-            <Link to="/signup">
-              <Button variant="hero" size="lg" className="group text-sm sm:text-base">
-                Criar minha conta grátis 
-                <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 ml-2 group-hover:translate-x-1 transition-transform" />
-              </Button>
-            </Link>
-          </motion.div>
+              <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-8 max-w-6xl mx-auto">
+                {steps.map((step, i) => (
+                  <motion.div
+                    key={step.number}
+                    initial={{ opacity: 0, y: 30 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ delay: i * 0.15, type: "spring", stiffness: 120 }}
+                    whileHover={{ y: -8 }}
+                    className="relative"
+                  >
+                    {/* Connector Line - Desktop only */}
+                    {i < steps.length - 1 && (
+                      <motion.div 
+                        initial={{ scaleX: 0 }}
+                        whileInView={{ scaleX: 1 }}
+                        viewport={{ once: true }}
+                        transition={{ delay: i * 0.15 + 0.3, duration: 0.5 }}
+                        className="hidden lg:block absolute top-12 left-[60%] w-full h-0.5 bg-gradient-to-r from-primary/50 to-primary/10 origin-left" 
+                      />
+                    )}
+                    
+                    <div className="bg-card/80 backdrop-blur-sm rounded-2xl p-6 shadow-lg border border-border/50 h-full relative z-10 hover:border-primary/30 hover:shadow-xl transition-all duration-300">
+                      <div className="flex items-center gap-4 mb-4">
+                        <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center text-primary-foreground shadow-md relative overflow-hidden">
+                          <step.icon className="w-6 h-6 relative z-10" />
+                        </div>
+                        <span className="text-4xl font-bold text-primary/20">
+                          {step.number}
+                        </span>
+                      </div>
+                      <h3 className="font-semibold text-foreground mb-2 text-lg leading-tight">{step.title}</h3>
+                      <p className="text-sm text-muted-foreground leading-snug">{step.description}</p>
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: 0.4 }}
+                className="text-center mt-12"
+              >
+                <Link to="/signup">
+                  <Button variant="hero" size="lg" className="group text-base">
+                    Criar minha conta grátis 
+                    <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
+                  </Button>
+                </Link>
+              </motion.div>
+            </>
+          )}
         </div>
       </section>
 
