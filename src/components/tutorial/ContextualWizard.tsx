@@ -25,7 +25,7 @@ interface ContextualWizardProps {
   trigger?: boolean;
 }
 
-const WIZARD_STORAGE_PREFIX = 'nutriplan_wizard_completed_';
+const WIZARD_STORAGE_PREFIX = 'nutriaplan_wizard_completed_';
 
 export function ContextualWizard({
   id,

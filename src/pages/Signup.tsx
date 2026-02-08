@@ -36,10 +36,10 @@ export default function Signup() {
     e.preventDefault();
     setFieldErrors({});
 
-    // Check terms acceptance first
+    // Check terms acceptance first - LGPD compliance
     if (!acceptedTerms) {
       setFieldErrors({ terms: 'Você deve aceitar os termos para continuar' });
-      toast.error('Você deve aceitar os Termos de Uso e Política de Privacidade');
+      toast.error('Você deve aceitar os Termos de Uso e Política de Privacidade (LGPD)');
       return;
     }
 
@@ -251,7 +251,7 @@ export default function Signup() {
               )}
             </div>
 
-            {/* Terms acceptance checkbox */}
+            {/* Terms acceptance checkbox - LGPD compliance */}
             <div className="space-y-1.5">
               <div className="flex items-start gap-3">
                 <Checkbox
@@ -264,7 +264,7 @@ export default function Signup() {
                   htmlFor="acceptTerms"
                   className="text-xs text-muted-foreground leading-relaxed cursor-pointer"
                 >
-                  Li e aceito os{' '}
+                  Li e concordo com os{' '}
                   <Link to="/terms" className="text-primary hover:underline" target="_blank">
                     Termos de Uso
                   </Link>{' '}
@@ -272,6 +272,7 @@ export default function Signup() {
                   <Link to="/privacy" className="text-primary hover:underline" target="_blank">
                     Política de Privacidade
                   </Link>
+                  , incluindo o tratamento dos meus dados pessoais conforme a LGPD (Lei nº 13.709/2018).
                 </label>
               </div>
               {fieldErrors.terms && (

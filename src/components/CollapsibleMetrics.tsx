@@ -25,7 +25,7 @@ interface CollapsibleMetricsProps {
   className?: string;
 }
 
-const STORAGE_KEY = 'nutriplan-metrics-collapsed';
+const STORAGE_KEY = 'nutriaplan-metrics-collapsed';
 
 export function CollapsibleMetrics({
   metabolicData,

@@ -25,7 +25,7 @@ export function Logo({ size = 'md', showText = true }: LogoProps) {
       </div>
       {showText && (
         <span className={`font-sans font-bold ${textSizeClasses[size]} tracking-tight`}>
-          <span className="text-foreground">Nutri</span>
+          <span className="text-foreground">Nutria</span>
           <span className="text-gradient">Plan</span>
         </span>
       )}

@@ -27,7 +27,7 @@ export default function PrivacyPolicy() {
           <section>
             <h2 className="text-xl font-semibold text-foreground mb-3">1. Introdução</h2>
             <p>
-              Esta Política de Privacidade ("Política") descreve como o NutriPlan ("nós", "nosso" ou "Plataforma") 
+              Esta Política de Privacidade ("Política") descreve como o NutriaPlan ("nós", "nosso" ou "Plataforma") 
               coleta, usa, armazena e protege suas informações pessoais em conformidade com a Lei Geral de 
               Proteção de Dados (LGPD - Lei nº 13.709/2018) e demais regulamentações aplicáveis.
             </p>
@@ -216,7 +216,7 @@ export default function PrivacyPolicy() {
           <section>
             <h2 className="text-xl font-semibold text-foreground mb-3">13. Menores de Idade</h2>
             <p>
-              O NutriPlan não é destinado a menores de 18 anos. Não coletamos intencionalmente 
+              O NutriaPlan não é destinado a menores de 18 anos. Não coletamos intencionalmente 
               dados de menores sem consentimento parental. Se identificarmos que coletamos dados 
               de um menor, tomaremos medidas para excluí-los prontamente.
             </p>

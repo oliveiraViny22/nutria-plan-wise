@@ -178,7 +178,7 @@ function generateMealPlanPage(
     <div class="page page-meal-plan">
       <div class="header">
         <h1>🥗 Plano Alimentar</h1>
-        <div class="meta">${generatedAt}<br><span class="brand">NutriAI</span></div>
+        <div class="meta">${generatedAt}<br><span class="brand">NutriaPlan</span></div>
       </div>
       
       <div class="profile">
@@ -222,7 +222,7 @@ function generateMealPlanPage(
         <div class="tips-content">${tipsHtml}</div>
       </div>
       
-      <div class="footer"><strong>NutriAI</strong> · nutria-plan-wise.lovable.app · Consulte sempre um nutricionista</div>
+      <div class="footer"><strong>NutriaPlan</strong> · nutria-plan-wise.lovable.app · Consulte sempre um nutricionista</div>
     </div>`;
 }
 
@@ -349,7 +349,7 @@ function generateSupplementPage(
     <div class="page page-supplements">
       <div class="header">
         <h1>💊 Suplementação Recomendada</h1>
-        <div class="meta">${generatedAt}<br><span class="brand">NutriAI</span></div>
+        <div class="meta">${generatedAt}<br><span class="brand">NutriaPlan</span></div>
       </div>
       
       <div class="supp-intro">
@@ -383,7 +383,7 @@ function generateSupplementPage(
         </ul>
       </div>
       
-      <div class="footer"><strong>NutriAI</strong> · nutria-plan-wise.lovable.app · Consulte sempre um nutricionista</div>
+      <div class="footer"><strong>NutriaPlan</strong> · nutria-plan-wise.lovable.app · Consulte sempre um nutricionista</div>
     </div>`;
 }
 
