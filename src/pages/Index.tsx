@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { motion, useScroll, useTransform, useSpring } from 'framer-motion';
+import { motion, useScroll, useTransform, useSpring, useInView } from 'framer-motion';
 import { ArrowRight, Leaf, RefreshCw, MessageCircle, UserPlus, ClipboardList, Utensils, TrendingUp, ChevronDown, Trophy, BarChart3, Flame, Target } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Logo } from '@/components/Logo';
@@ -19,6 +19,20 @@ const useIsMobile = () => {
   }, []);
   
   return isMobile;
+};
+
+// Hook to detect large screens (3xl+)
+const useIsLargeScreen = () => {
+  const [isLarge, setIsLarge] = useState(false);
+  
+  useEffect(() => {
+    const checkLarge = () => setIsLarge(window.innerWidth >= 1920);
+    checkLarge();
+    window.addEventListener('resize', checkLarge);
+    return () => window.removeEventListener('resize', checkLarge);
+  }, []);
+  
+  return isLarge;
 };
 
 // Animation variants for staggered children - optimized for mobile
@@ -59,12 +73,63 @@ const scaleIn = {
   },
 };
 
+// Enhanced progressive reveal for large screens
+const progressiveRevealVariants = {
+  hidden: { 
+    opacity: 0, 
+    y: 60,
+    scale: 0.95,
+    rotateX: 8,
+  },
+  visible: (i: number) => ({
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    rotateX: 0,
+    transition: {
+      type: "spring" as const,
+      stiffness: 80,
+      damping: 18,
+      delay: i * 0.12,
+    },
+  }),
+};
+
+// Staggered card reveal with 3D effect for large screens
+const card3DVariants = {
+  hidden: { 
+    opacity: 0, 
+    y: 80,
+    z: -100,
+    rotateY: -5,
+    scale: 0.9,
+  },
+  visible: (i: number) => ({
+    opacity: 1,
+    y: 0,
+    z: 0,
+    rotateY: 0,
+    scale: 1,
+    transition: {
+      type: "spring" as const,
+      stiffness: 60,
+      damping: 15,
+      delay: i * 0.15,
+    },
+  }),
+};
+
 export default function Index() {
   const containerRef = useRef<HTMLDivElement>(null);
   const heroRef = useRef<HTMLElement>(null);
   const featuresRef = useRef<HTMLElement>(null);
   const stepsRef = useRef<HTMLElement>(null);
   const isMobile = useIsMobile();
+  const isLargeScreen = useIsLargeScreen();
+  
+  // Feature cards refs for individual scroll tracking
+  const featureRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const stepRefs = useRef<(HTMLDivElement | null)[]>([]);
   
   // Main scroll progress for the entire page
   const { scrollYProgress } = useScroll({
@@ -90,39 +155,55 @@ export default function Index() {
     offset: ["start end", "end start"],
   });
 
-  // Smooth spring physics - lighter on mobile
+  // Smooth spring physics - lighter on mobile, enhanced on large screens
   const springConfig = isMobile 
     ? { stiffness: 100, damping: 30, mass: 0.3 }
+    : isLargeScreen
+    ? { stiffness: 40, damping: 25, mass: 0.8 }
     : { stiffness: 50, damping: 20, mass: 0.5 };
   
   const smoothProgress = useSpring(scrollYProgress, springConfig);
   const smoothHeroProgress = useSpring(heroScrollProgress, { stiffness: 80, damping: 25 });
   
-  // Hero parallax transforms - reduced on mobile for performance
+  // Hero parallax transforms - enhanced for large screens
   const heroOpacity = useTransform(heroScrollProgress, [0, 0.5], [1, 0]);
-  const heroScale = useTransform(smoothHeroProgress, [0, 0.6], [1, isMobile ? 0.95 : 0.9]);
-  const heroImageY = useTransform(smoothHeroProgress, [0, 1], [0, isMobile ? 40 : 120]);
-  const heroImageRotate = useTransform(smoothHeroProgress, [0, 1], [0, isMobile ? 2 : 5]);
-  const heroTextY = useTransform(smoothHeroProgress, [0, 1], [0, isMobile ? 30 : 80]);
+  const heroScale = useTransform(smoothHeroProgress, [0, 0.6], [1, isMobile ? 0.95 : isLargeScreen ? 0.85 : 0.9]);
+  const heroImageY = useTransform(smoothHeroProgress, [0, 1], [0, isMobile ? 40 : isLargeScreen ? 200 : 120]);
+  const heroImageRotate = useTransform(smoothHeroProgress, [0, 1], [0, isMobile ? 2 : isLargeScreen ? 8 : 5]);
+  const heroTextY = useTransform(smoothHeroProgress, [0, 1], [0, isMobile ? 30 : isLargeScreen ? 120 : 80]);
   
-  // Background orbs parallax - minimal on mobile
-  const orb1Y = useTransform(smoothHeroProgress, [0, 1], [0, isMobile ? 100 : 350]);
-  const orb2Y = useTransform(smoothHeroProgress, [0, 1], [0, isMobile ? 60 : 220]);
-  const orb3Opacity = useTransform(heroScrollProgress, [0, 0.7], [isMobile ? 0.15 : 0.3, 0]);
+  // Multi-layer parallax orbs - more layers for large screens
+  const orb1Y = useTransform(smoothHeroProgress, [0, 1], [0, isMobile ? 100 : isLargeScreen ? 500 : 350]);
+  const orb2Y = useTransform(smoothHeroProgress, [0, 1], [0, isMobile ? 60 : isLargeScreen ? 350 : 220]);
+  const orb3Y = useTransform(smoothHeroProgress, [0, 1], [0, isLargeScreen ? 250 : 150]);
+  const orb4Y = useTransform(smoothHeroProgress, [0, 1], [0, isLargeScreen ? 180 : 100]);
+  const orb3Opacity = useTransform(heroScrollProgress, [0, 0.7], [isMobile ? 0.15 : isLargeScreen ? 0.5 : 0.3, 0]);
 
-  // Features section parallax - smoother entrance
+  // Features section parallax - enhanced multi-layer for large screens
   const smoothFeaturesProgress = useSpring(featuresScrollProgress, { stiffness: 60, damping: 20 });
-  const featuresY = useTransform(smoothFeaturesProgress, [0, 0.5, 1], [isMobile ? 50 : 150, 0, isMobile ? -30 : -80]);
+  const featuresY = useTransform(smoothFeaturesProgress, [0, 0.5, 1], [isMobile ? 50 : isLargeScreen ? 200 : 150, 0, isMobile ? -30 : isLargeScreen ? -120 : -80]);
   const featuresOpacity = useTransform(featuresScrollProgress, [0, 0.2, 0.8, 1], [0, 1, 1, 0.7]);
+  
+  // Feature cards individual parallax layers (large screens only)
+  const featuresLayer1Y = useTransform(smoothFeaturesProgress, [0, 1], [100, -60]);
+  const featuresLayer2Y = useTransform(smoothFeaturesProgress, [0, 1], [80, -40]);
+  const featuresLayer3Y = useTransform(smoothFeaturesProgress, [0, 1], [60, -20]);
+  const featuresRotateX = useTransform(smoothFeaturesProgress, [0, 0.5, 1], [5, 0, -3]);
 
   // Steps section parallax - enhanced
   const smoothStepsProgress = useSpring(stepsScrollProgress, { stiffness: 60, damping: 20 });
-  const stepsBackgroundY = useTransform(smoothStepsProgress, [0, 1], [isMobile ? 30 : 80, isMobile ? -30 : -80]);
+  const stepsBackgroundY = useTransform(smoothStepsProgress, [0, 1], [isMobile ? 30 : isLargeScreen ? 150 : 80, isMobile ? -30 : isLargeScreen ? -150 : -80]);
   
-  // Steps decorative elements parallax - defined at top level to avoid hooks rules violation
-  const stepsDecor1Y = useTransform(smoothStepsProgress, [0, 1], [0, -120]);
-  const stepsDecor2Y = useTransform(smoothStepsProgress, [0, 1], [0, -180]);
-  const stepsDecor3Y = useTransform(smoothStepsProgress, [0, 1], [50, -100]);
+  // Steps decorative elements parallax - enhanced multi-layer
+  const stepsDecor1Y = useTransform(smoothStepsProgress, [0, 1], [0, isLargeScreen ? -200 : -120]);
+  const stepsDecor2Y = useTransform(smoothStepsProgress, [0, 1], [0, isLargeScreen ? -280 : -180]);
+  const stepsDecor3Y = useTransform(smoothStepsProgress, [0, 1], [50, isLargeScreen ? -180 : -100]);
+  const stepsDecor4Y = useTransform(smoothStepsProgress, [0, 1], [80, isLargeScreen ? -100 : -60]);
+  const stepsDecor5Y = useTransform(smoothStepsProgress, [0, 1], [30, isLargeScreen ? -220 : -140]);
+  
+  // Steps cards 3D rotation for large screens
+  const stepsRotateY = useTransform(smoothStepsProgress, [0, 0.5, 1], [-3, 0, 3]);
+  const stepsPerspective = useTransform(smoothStepsProgress, [0, 0.5, 1], [1000, 1200, 1000]);
 
   const features = [
     { icon: Target, title: 'Metas Personalizadas', description: 'Calcule suas necessidades calóricas e de macros automaticamente' },
@@ -196,7 +277,7 @@ export default function Index() {
         {/* Animated Background Gradient */}
         <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-primary/10 to-accent/5 dark:from-primary/10 dark:via-primary/5 dark:to-background" />
         
-        {/* Background Orbs - Static on mobile, parallax on desktop */}
+        {/* Background Orbs - Static on mobile, multi-layer parallax on desktop/large screens */}
         {isMobile ? (
           <>
             <div className="absolute top-10 left-4 w-32 h-32 bg-primary/20 rounded-full blur-3xl opacity-40" />
@@ -204,18 +285,38 @@ export default function Index() {
           </>
         ) : (
           <>
+            {/* Layer 1 - Fastest moving, deepest background */}
             <motion.div 
               style={{ y: orb1Y }}
-              className="absolute top-20 left-10 w-72 h-72 bg-primary/20 rounded-full blur-3xl opacity-60" 
+              className="absolute top-20 left-10 w-72 3xl:w-96 h-72 3xl:h-96 bg-primary/20 rounded-full blur-3xl opacity-60" 
             />
+            {/* Layer 2 - Medium speed */}
             <motion.div 
               style={{ y: orb2Y }}
-              className="absolute bottom-10 right-10 w-96 h-96 bg-accent/30 rounded-full blur-3xl opacity-40" 
+              className="absolute bottom-10 right-10 w-96 3xl:w-[500px] h-96 3xl:h-[500px] bg-accent/30 rounded-full blur-3xl opacity-40" 
             />
+            {/* Layer 3 - Center glow */}
             <motion.div 
-              style={{ opacity: orb3Opacity }}
-              className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-gradient-radial from-primary/10 to-transparent rounded-full blur-3xl" 
+              style={{ opacity: orb3Opacity, y: orb3Y }}
+              className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] 3xl:w-[900px] h-[600px] 3xl:h-[900px] bg-gradient-radial from-primary/10 to-transparent rounded-full blur-3xl" 
             />
+            {/* Layer 4 - Large screens only - additional depth layers */}
+            {isLargeScreen && (
+              <>
+                <motion.div 
+                  style={{ y: orb4Y }}
+                  className="absolute top-1/4 right-1/4 w-48 h-48 bg-primary/15 rounded-full blur-2xl opacity-50" 
+                />
+                <motion.div 
+                  style={{ y: useTransform(smoothHeroProgress, [0, 1], [0, 280]) }}
+                  className="absolute bottom-1/4 left-1/3 w-64 h-64 bg-accent/20 rounded-full blur-3xl opacity-35" 
+                />
+                <motion.div 
+                  style={{ y: useTransform(smoothHeroProgress, [0, 1], [20, 400]) }}
+                  className="absolute top-1/3 left-1/4 w-32 h-32 bg-primary/25 rounded-full blur-xl opacity-45" 
+                />
+              </>
+            )}
           </>
         )}
 
@@ -378,17 +479,54 @@ export default function Index() {
         )}
       </section>
 
-      {/* Features Grid - No parallax on mobile */}
-      <section ref={featuresRef} className="relative py-20 sm:py-32 overflow-hidden bg-muted/30">
-        {/* Background decoration with parallax - desktop only */}
+      {/* Features Grid - No parallax on mobile, enhanced multi-layer on large screens */}
+      <section ref={featuresRef} className="relative py-20 sm:py-32 3xl:py-40 overflow-hidden bg-muted/30">
+        {/* Background decoration with multi-layer parallax - desktop only */}
         {!isMobile && (
-          <motion.div
-            style={{ y: featuresY }}
-            className="absolute inset-0 pointer-events-none"
-          >
-            <div className="absolute top-0 left-1/4 w-64 h-64 bg-primary/5 rounded-full blur-3xl" />
-            <div className="absolute bottom-0 right-1/4 w-80 h-80 bg-accent/5 rounded-full blur-3xl" />
-          </motion.div>
+          <>
+            {/* Layer 1 - Base background movement */}
+            <motion.div
+              style={{ y: featuresY }}
+              className="absolute inset-0 pointer-events-none"
+            >
+              <div className="absolute top-0 left-1/4 w-64 3xl:w-96 h-64 3xl:h-96 bg-primary/5 rounded-full blur-3xl" />
+              <div className="absolute bottom-0 right-1/4 w-80 3xl:w-[450px] h-80 3xl:h-[450px] bg-accent/5 rounded-full blur-3xl" />
+            </motion.div>
+            
+            {/* Large screen multi-layer parallax decorations */}
+            {isLargeScreen && (
+              <>
+                {/* Layer 2 - Slower moving elements */}
+                <motion.div
+                  style={{ y: featuresLayer1Y }}
+                  className="absolute top-20 right-20 w-40 h-40 bg-primary/8 rounded-full blur-2xl pointer-events-none"
+                />
+                <motion.div
+                  style={{ y: featuresLayer2Y }}
+                  className="absolute bottom-32 left-16 w-56 h-56 bg-accent/8 rounded-full blur-2xl pointer-events-none"
+                />
+                {/* Layer 3 - Subtle floating elements */}
+                <motion.div
+                  style={{ y: featuresLayer3Y }}
+                  className="absolute top-1/2 right-1/3 w-24 h-24 bg-primary/10 rounded-full blur-xl pointer-events-none"
+                />
+                <motion.div
+                  style={{ 
+                    y: useTransform(smoothFeaturesProgress, [0, 1], [40, -80]),
+                    rotate: useTransform(smoothFeaturesProgress, [0, 1], [0, 15])
+                  }}
+                  className="absolute bottom-1/4 right-10 w-20 h-20 border border-primary/20 rounded-2xl pointer-events-none"
+                />
+                <motion.div
+                  style={{ 
+                    y: useTransform(smoothFeaturesProgress, [0, 1], [60, -40]),
+                    rotate: useTransform(smoothFeaturesProgress, [0, 1], [0, -10])
+                  }}
+                  className="absolute top-1/4 left-20 w-16 h-16 border border-accent/15 rounded-xl pointer-events-none"
+                />
+              </>
+            )}
+          </>
         )}
 
         {isMobile ? (
@@ -436,23 +574,39 @@ export default function Index() {
               </p>
             </motion.div>
 
+            {/* Feature cards with progressive reveal and 3D effects on large screens */}
             <motion.div 
-              variants={containerVariants}
-              initial="hidden"
-              whileInView="visible"
-              viewport={{ once: true, margin: "-100px" }}
+              style={isLargeScreen ? { 
+                perspective: 1200,
+                rotateX: featuresRotateX 
+              } : undefined}
               className="grid sm:grid-cols-2 lg:grid-cols-3 gap-8 xl:gap-10 3xl:gap-12 4xl:gap-16"
             >
               {features.map((f, index) => (
                 <motion.div 
                   key={f.title} 
-                  variants={itemVariants}
+                  ref={(el) => (featureRefs.current[index] = el)}
+                  variants={isLargeScreen ? card3DVariants : itemVariants}
+                  initial="hidden"
+                  whileInView="visible"
+                  viewport={{ once: true, margin: "-50px" }}
                   custom={index}
-                  className="card-elevated rounded-2xl p-8 xl:p-10 3xl:p-12 text-left backdrop-blur-sm bg-card/80 border border-border/50"
+                  whileHover={isLargeScreen ? { 
+                    y: -12,
+                    scale: 1.02,
+                    rotateY: 2,
+                    transition: { type: "spring", stiffness: 300, damping: 20 }
+                  } : { y: -8 }}
+                  className="card-elevated rounded-2xl p-8 xl:p-10 3xl:p-12 text-left backdrop-blur-sm bg-card/80 border border-border/50 transform-gpu"
+                  style={{ transformStyle: isLargeScreen ? "preserve-3d" : undefined }}
                 >
-                  <div className="w-14 h-14 xl:w-16 xl:h-16 3xl:w-20 3xl:h-20 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center mb-6">
+                  <motion.div 
+                    className="w-14 h-14 xl:w-16 xl:h-16 3xl:w-20 3xl:h-20 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center mb-6"
+                    whileHover={isLargeScreen ? { rotate: 5, scale: 1.1 } : undefined}
+                    transition={{ type: "spring", stiffness: 400 }}
+                  >
                     <f.icon className="w-7 h-7 xl:w-8 xl:h-8 3xl:w-10 3xl:h-10 text-primary" />
-                  </div>
+                  </motion.div>
                   <h3 className="font-semibold text-foreground mb-2 text-lg xl:text-xl 3xl:text-2xl leading-tight">{f.title}</h3>
                   <p className="text-base 3xl:text-lg text-muted-foreground leading-relaxed">{f.description}</p>
                 </motion.div>
@@ -462,9 +616,9 @@ export default function Index() {
         )}
       </section>
 
-      {/* How It Works Section - No parallax on mobile */}
-      <section ref={stepsRef} id="como-funciona" className="relative py-20 sm:py-32 overflow-hidden">
-        {/* Background - Static on mobile, parallax on desktop */}
+      {/* How It Works Section - No parallax on mobile, enhanced multi-layer on large screens */}
+      <section ref={stepsRef} id="como-funciona" className="relative py-20 sm:py-32 3xl:py-40 overflow-hidden">
+        {/* Background - Static on mobile, multi-layer parallax on desktop */}
         {isMobile ? (
           <div className="absolute inset-0 bg-muted/30" />
         ) : (
@@ -473,18 +627,56 @@ export default function Index() {
               style={{ y: stepsBackgroundY }}
               className="absolute inset-0 bg-muted/30"
             />
+            {/* Layer 1 - Primary decorations */}
             <motion.div
               style={{ y: stepsDecor1Y }}
-              className="absolute top-20 right-10 w-40 h-40 bg-primary/10 rounded-full blur-3xl"
+              className="absolute top-20 right-10 w-40 3xl:w-64 h-40 3xl:h-64 bg-primary/10 rounded-full blur-3xl"
             />
             <motion.div
               style={{ y: stepsDecor2Y }}
-              className="absolute bottom-20 left-10 w-60 h-60 bg-accent/10 rounded-full blur-3xl"
+              className="absolute bottom-20 left-10 w-60 3xl:w-80 h-60 3xl:h-80 bg-accent/10 rounded-full blur-3xl"
             />
             <motion.div
               style={{ y: stepsDecor3Y }}
-              className="absolute top-1/2 right-1/4 w-32 h-32 bg-primary/5 rounded-full blur-2xl hidden lg:block"
+              className="absolute top-1/2 right-1/4 w-32 3xl:w-48 h-32 3xl:h-48 bg-primary/5 rounded-full blur-2xl hidden lg:block"
             />
+            
+            {/* Large screen additional parallax layers */}
+            {isLargeScreen && (
+              <>
+                {/* Layer 2 - Slower moving geometric shapes */}
+                <motion.div
+                  style={{ y: stepsDecor4Y }}
+                  className="absolute top-1/3 left-1/4 w-24 h-24 bg-primary/8 rounded-2xl blur-xl pointer-events-none"
+                />
+                <motion.div
+                  style={{ y: stepsDecor5Y }}
+                  className="absolute bottom-1/3 right-1/5 w-36 h-36 bg-accent/8 rounded-full blur-2xl pointer-events-none"
+                />
+                {/* Layer 3 - Subtle floating geometric accents */}
+                <motion.div
+                  style={{ 
+                    y: useTransform(smoothStepsProgress, [0, 1], [0, -160]),
+                    rotate: useTransform(smoothStepsProgress, [0, 1], [0, 20])
+                  }}
+                  className="absolute top-1/4 right-16 w-12 h-12 border-2 border-primary/15 rounded-lg pointer-events-none"
+                />
+                <motion.div
+                  style={{ 
+                    y: useTransform(smoothStepsProgress, [0, 1], [20, -120]),
+                    rotate: useTransform(smoothStepsProgress, [0, 1], [15, -5])
+                  }}
+                  className="absolute bottom-1/4 left-24 w-10 h-10 border border-accent/20 rounded-full pointer-events-none"
+                />
+                <motion.div
+                  style={{ 
+                    y: useTransform(smoothStepsProgress, [0, 1], [40, -200]),
+                    scale: useTransform(smoothStepsProgress, [0, 0.5, 1], [0.8, 1.1, 0.9])
+                  }}
+                  className="absolute top-2/3 left-1/3 w-8 h-8 bg-primary/12 rounded-full blur-sm pointer-events-none"
+                />
+              </>
+            )}
           </>
         )}
 
@@ -544,43 +736,77 @@ export default function Index() {
                 </p>
               </motion.div>
 
-              <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-8 xl:gap-10">
+              {/* Steps cards with progressive reveal and 3D perspective on large screens */}
+              <motion.div 
+                style={isLargeScreen ? { 
+                  perspective: stepsPerspective,
+                  rotateY: stepsRotateY 
+                } : undefined}
+                className="grid sm:grid-cols-2 lg:grid-cols-4 gap-8 xl:gap-10 3xl:gap-12"
+              >
                 {steps.map((step, i) => (
                   <motion.div
                     key={step.number}
-                    initial={{ opacity: 0, y: 30 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    viewport={{ once: true }}
-                    transition={{ delay: i * 0.15, type: "spring", stiffness: 120 }}
-                    whileHover={{ y: -8 }}
-                    className="relative"
+                    ref={(el) => (stepRefs.current[i] = el)}
+                    variants={isLargeScreen ? progressiveRevealVariants : undefined}
+                    initial={isLargeScreen ? "hidden" : { opacity: 0, y: 30 }}
+                    whileInView={isLargeScreen ? "visible" : { opacity: 1, y: 0 }}
+                    viewport={{ once: true, margin: "-30px" }}
+                    custom={i}
+                    transition={!isLargeScreen ? { delay: i * 0.15, type: "spring", stiffness: 120 } : undefined}
+                    whileHover={isLargeScreen ? { 
+                      y: -16, 
+                      scale: 1.03,
+                      rotateX: -3,
+                      rotateY: 3,
+                      transition: { type: "spring", stiffness: 300, damping: 20 }
+                    } : { y: -8 }}
+                    className="relative transform-gpu"
+                    style={{ transformStyle: isLargeScreen ? "preserve-3d" : undefined }}
                   >
-                    {/* Connector Line - Desktop only */}
+                    {/* Connector Line - Desktop only with enhanced animation */}
                     {i < steps.length - 1 && (
                       <motion.div 
-                        initial={{ scaleX: 0 }}
-                        whileInView={{ scaleX: 1 }}
+                        initial={{ scaleX: 0, opacity: 0 }}
+                        whileInView={{ scaleX: 1, opacity: 1 }}
                         viewport={{ once: true }}
-                        transition={{ delay: i * 0.15 + 0.3, duration: 0.5 }}
-                        className="hidden lg:block absolute top-12 left-[60%] w-full h-0.5 bg-gradient-to-r from-primary/50 to-primary/10 origin-left" 
+                        transition={{ 
+                          delay: i * 0.15 + 0.3, 
+                          duration: isLargeScreen ? 0.8 : 0.5,
+                          ease: "easeOut"
+                        }}
+                        className="hidden lg:block absolute top-12 3xl:top-14 left-[60%] w-full h-0.5 3xl:h-1 bg-gradient-to-r from-primary/50 to-primary/10 origin-left" 
                       />
                     )}
                     
-                    <div className="bg-card/80 backdrop-blur-sm rounded-2xl p-8 xl:p-10 shadow-lg border border-border/50 h-full relative z-10 hover:border-primary/30 hover:shadow-xl transition-all duration-300">
+                    <motion.div 
+                      className="bg-card/80 backdrop-blur-sm rounded-2xl p-8 xl:p-10 3xl:p-12 shadow-lg border border-border/50 h-full relative z-10 hover:border-primary/30 hover:shadow-xl transition-all duration-300"
+                      whileHover={isLargeScreen ? { 
+                        boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
+                        borderColor: "rgba(var(--primary), 0.4)"
+                      } : undefined}
+                    >
                       <div className="flex items-center gap-4 mb-6">
-                        <div className="w-16 h-16 xl:w-18 xl:h-18 rounded-2xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center text-primary-foreground shadow-md relative overflow-hidden">
-                          <step.icon className="w-7 h-7 xl:w-8 xl:h-8 relative z-10" />
-                        </div>
-                        <span className="text-5xl xl:text-6xl font-bold text-primary/20">
+                        <motion.div 
+                          className="w-16 h-16 xl:w-18 xl:h-18 3xl:w-20 3xl:h-20 rounded-2xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center text-primary-foreground shadow-md relative overflow-hidden"
+                          whileHover={isLargeScreen ? { rotate: 5, scale: 1.1 } : undefined}
+                          transition={{ type: "spring", stiffness: 400 }}
+                        >
+                          <step.icon className="w-7 h-7 xl:w-8 xl:h-8 3xl:w-9 3xl:h-9 relative z-10" />
+                        </motion.div>
+                        <motion.span 
+                          className="text-5xl xl:text-6xl 3xl:text-7xl font-bold text-primary/20"
+                          whileHover={isLargeScreen ? { scale: 1.1, color: "rgba(var(--primary), 0.35)" } : undefined}
+                        >
                           {step.number}
-                        </span>
+                        </motion.span>
                       </div>
-                      <h3 className="font-semibold text-foreground mb-3 text-xl xl:text-2xl leading-tight">{step.title}</h3>
-                      <p className="text-base text-muted-foreground leading-relaxed">{step.description}</p>
-                    </div>
+                      <h3 className="font-semibold text-foreground mb-3 text-xl xl:text-2xl 3xl:text-3xl leading-tight">{step.title}</h3>
+                      <p className="text-base 3xl:text-lg text-muted-foreground leading-relaxed">{step.description}</p>
+                    </motion.div>
                   </motion.div>
                 ))}
-              </div>
+              </motion.div>
 
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
