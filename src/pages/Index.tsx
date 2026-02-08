@@ -266,9 +266,9 @@ export default function Index() {
         ) : (
           <motion.main 
             style={{ opacity: heroOpacity, scale: heroScale }}
-            className="container mx-auto px-4 py-12 lg:py-16 relative z-10"
+            className="container mx-auto px-6 lg:px-12 xl:px-20 py-16 lg:py-20 relative z-10"
           >
-            <div className="grid lg:grid-cols-2 gap-8 lg:gap-12 items-center">
+            <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 xl:gap-24 items-center max-w-7xl mx-auto">
               {/* Text Content with Parallax */}
               <motion.div 
                 style={{ y: heroTextY }}
@@ -287,13 +287,13 @@ export default function Index() {
                   </motion.div>
                   <motion.h1 
                     variants={itemVariants}
-                    className="text-4xl lg:text-5xl xl:text-6xl font-bold text-foreground mb-6 leading-tight"
+                    className="text-4xl lg:text-5xl xl:text-7xl font-bold text-foreground mb-8 leading-tight"
                   >
                     Nutrição inteligente para seus <span className="text-primary bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">objetivos</span>
                   </motion.h1>
                   <motion.p 
                     variants={itemVariants}
-                    className="text-lg text-muted-foreground max-w-xl mx-auto lg:mx-0 mb-8"
+                    className="text-lg xl:text-xl text-muted-foreground max-w-2xl mx-auto lg:mx-0 mb-10"
                   >
                     Crie planos alimentares personalizados, substitua alimentos e entenda o impacto de cada escolha na sua saúde.
                   </motion.p>
@@ -347,7 +347,7 @@ export default function Index() {
                   <img 
                     src={heroImage} 
                     alt="NutriPlan - Planejamento alimentar inteligente" 
-                    className="w-full h-auto max-w-md lg:max-w-xl xl:max-w-2xl mx-auto drop-shadow-2xl relative z-10"
+                    className="w-full h-auto max-w-lg lg:max-w-xl xl:max-w-3xl mx-auto drop-shadow-2xl relative z-10"
                   />
                 </motion.div>
               </motion.div>
@@ -379,7 +379,7 @@ export default function Index() {
       </section>
 
       {/* Features Grid - No parallax on mobile */}
-      <section ref={featuresRef} className="relative py-12 sm:py-24 overflow-hidden bg-muted/30">
+      <section ref={featuresRef} className="relative py-20 sm:py-32 overflow-hidden bg-muted/30">
         {/* Background decoration with parallax - desktop only */}
         {!isMobile && (
           <motion.div
@@ -420,18 +420,18 @@ export default function Index() {
         ) : (
           <motion.div
             style={{ opacity: featuresOpacity }}
-            className="container mx-auto px-4 relative z-10"
+            className="container mx-auto px-6 lg:px-12 xl:px-20 relative z-10"
           >
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
-              className="text-center mb-12"
+              className="text-center mb-16"
             >
-              <h2 className="text-3xl lg:text-4xl font-bold text-foreground mb-4">
+              <h2 className="text-3xl lg:text-4xl xl:text-5xl font-bold text-foreground mb-6">
                 Recursos inteligentes
               </h2>
-              <p className="text-muted-foreground max-w-2xl mx-auto text-base">
+              <p className="text-muted-foreground max-w-3xl mx-auto text-lg xl:text-xl">
                 Ferramentas poderosas para transformar sua alimentação
               </p>
             </motion.div>
@@ -441,7 +441,7 @@ export default function Index() {
               initial="hidden"
               whileInView="visible"
               viewport={{ once: true, margin: "-100px" }}
-              className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 max-w-5xl mx-auto"
+              className="grid sm:grid-cols-2 lg:grid-cols-3 gap-8 xl:gap-10 max-w-7xl mx-auto"
             >
               {features.map((f, index) => (
                 <motion.div 
@@ -453,13 +453,13 @@ export default function Index() {
                     scale: 1.03,
                     transition: { type: "spring", stiffness: 400 }
                   }}
-                  className="card-elevated rounded-2xl p-6 text-left cursor-pointer backdrop-blur-sm bg-card/80 border border-border/50 hover:border-primary/30 transition-colors"
+                  className="card-elevated rounded-2xl p-8 xl:p-10 text-left cursor-pointer backdrop-blur-sm bg-card/80 border border-border/50 hover:border-primary/30 transition-colors"
                 >
-                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center mb-4">
-                    <f.icon className="w-6 h-6 text-primary" />
+                  <div className="w-14 h-14 xl:w-16 xl:h-16 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center mb-6">
+                    <f.icon className="w-7 h-7 xl:w-8 xl:h-8 text-primary" />
                   </div>
-                  <h3 className="font-semibold text-foreground mb-1 text-base leading-tight">{f.title}</h3>
-                  <p className="text-sm text-muted-foreground leading-snug">{f.description}</p>
+                  <h3 className="font-semibold text-foreground mb-2 text-lg xl:text-xl leading-tight">{f.title}</h3>
+                  <p className="text-base text-muted-foreground leading-relaxed">{f.description}</p>
                 </motion.div>
               ))}
             </motion.div>
@@ -468,7 +468,7 @@ export default function Index() {
       </section>
 
       {/* How It Works Section - No parallax on mobile */}
-      <section ref={stepsRef} id="como-funciona" className="relative py-12 sm:py-24 overflow-hidden">
+      <section ref={stepsRef} id="como-funciona" className="relative py-20 sm:py-32 overflow-hidden">
         {/* Background - Static on mobile, parallax on desktop */}
         {isMobile ? (
           <div className="absolute inset-0 bg-muted/30" />
@@ -493,7 +493,7 @@ export default function Index() {
           </>
         )}
 
-        <div className="container mx-auto px-4 relative z-10">
+        <div className="container mx-auto px-6 lg:px-12 xl:px-20 relative z-10">
           {isMobile ? (
             <>
               <div className="text-center mb-8">
@@ -539,17 +539,17 @@ export default function Index() {
                 initial={{ opacity: 0, y: 20 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
-                className="text-center mb-12"
+                className="text-center mb-16"
               >
-                <h2 className="text-3xl lg:text-4xl font-bold text-foreground mb-4">
+                <h2 className="text-3xl lg:text-4xl xl:text-5xl font-bold text-foreground mb-6">
                   Como funciona
                 </h2>
-                <p className="text-muted-foreground max-w-2xl mx-auto text-base">
+                <p className="text-muted-foreground max-w-3xl mx-auto text-lg xl:text-xl">
                   Em 4 passos simples, você terá um plano alimentar personalizado.
                 </p>
               </motion.div>
 
-              <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-8 max-w-6xl mx-auto">
+              <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-8 xl:gap-10 max-w-7xl mx-auto">
                 {steps.map((step, i) => (
                   <motion.div
                     key={step.number}
@@ -571,17 +571,17 @@ export default function Index() {
                       />
                     )}
                     
-                    <div className="bg-card/80 backdrop-blur-sm rounded-2xl p-6 shadow-lg border border-border/50 h-full relative z-10 hover:border-primary/30 hover:shadow-xl transition-all duration-300">
-                      <div className="flex items-center gap-4 mb-4">
-                        <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center text-primary-foreground shadow-md relative overflow-hidden">
-                          <step.icon className="w-6 h-6 relative z-10" />
+                    <div className="bg-card/80 backdrop-blur-sm rounded-2xl p-8 xl:p-10 shadow-lg border border-border/50 h-full relative z-10 hover:border-primary/30 hover:shadow-xl transition-all duration-300">
+                      <div className="flex items-center gap-4 mb-6">
+                        <div className="w-16 h-16 xl:w-18 xl:h-18 rounded-2xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center text-primary-foreground shadow-md relative overflow-hidden">
+                          <step.icon className="w-7 h-7 xl:w-8 xl:h-8 relative z-10" />
                         </div>
-                        <span className="text-4xl font-bold text-primary/20">
+                        <span className="text-5xl xl:text-6xl font-bold text-primary/20">
                           {step.number}
                         </span>
                       </div>
-                      <h3 className="font-semibold text-foreground mb-2 text-lg leading-tight">{step.title}</h3>
-                      <p className="text-sm text-muted-foreground leading-snug">{step.description}</p>
+                      <h3 className="font-semibold text-foreground mb-3 text-xl xl:text-2xl leading-tight">{step.title}</h3>
+                      <p className="text-base text-muted-foreground leading-relaxed">{step.description}</p>
                     </div>
                   </motion.div>
                 ))}
@@ -592,12 +592,12 @@ export default function Index() {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ delay: 0.4 }}
-                className="text-center mt-12"
+                className="text-center mt-16"
               >
                 <Link to="/signup">
-                  <Button variant="hero" size="lg" className="group text-base">
+                  <Button variant="hero" size="lg" className="group text-lg px-8 py-6">
                     Criar minha conta grátis 
-                    <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
+                    <ArrowRight className="w-6 h-6 ml-2 group-hover:translate-x-1 transition-transform" />
                   </Button>
                 </Link>
               </motion.div>
