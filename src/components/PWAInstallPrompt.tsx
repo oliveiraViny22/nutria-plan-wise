@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Download, X, Smartphone, WifiOff } from 'lucide-react';
+import { Download, X, Smartphone, WifiOff, Wifi } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { usePWA } from '@/hooks/usePWA';
+import { useNetworkStatus } from '@/hooks/useNetworkStatus';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export function PWAInstallPrompt() {
@@ -100,18 +101,53 @@ export function PWAInstallPrompt() {
 }
 
 export function OfflineIndicator() {
-  const { isOnline } = usePWA();
+  const { isOnline, isSlowConnection } = useNetworkStatus();
+  const [showReconnected, setShowReconnected] = useState(false);
+  const [wasOffline, setWasOffline] = useState(false);
 
-  if (isOnline) return null;
+  // Track if we were offline to show "reconnected" message
+  useEffect(() => {
+    if (!isOnline) {
+      setWasOffline(true);
+    } else if (wasOffline && isOnline) {
+      setShowReconnected(true);
+      const timer = setTimeout(() => {
+        setShowReconnected(false);
+        setWasOffline(false);
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [isOnline, wasOffline]);
+
+  const showBanner = !isOnline || showReconnected;
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: -20 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="fixed top-0 left-0 right-0 z-[100] bg-warning text-warning-foreground py-2 px-4 text-center text-sm font-medium flex items-center justify-center gap-2"
-    >
-      <WifiOff className="h-4 w-4" />
-      <span>Você está offline. Algumas funcionalidades podem estar limitadas.</span>
-    </motion.div>
+    <AnimatePresence>
+      {showBanner && (
+        <motion.div
+          initial={{ y: -100, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          exit={{ y: -100, opacity: 0 }}
+          transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+          className={`fixed top-0 left-0 right-0 z-[100] flex items-center justify-center gap-2 py-2 px-4 text-sm font-medium ${
+            isOnline 
+              ? 'bg-green-500/90 text-white' 
+              : 'bg-amber-500/90 text-white'
+          }`}
+        >
+          {isOnline ? (
+            <>
+              <Wifi className="w-4 h-4" />
+              <span>Conexão restabelecida</span>
+            </>
+          ) : (
+            <>
+              <WifiOff className="w-4 h-4" />
+              <span>Você está offline. Algumas funções podem estar limitadas.</span>
+            </>
+          )}
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }
