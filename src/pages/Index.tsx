@@ -4,12 +4,6 @@ import { ArrowRight, Leaf, Target, RefreshCw, MessageCircle, UserPlus, Clipboard
 import { Button } from '@/components/ui/button';
 import { Logo } from '@/components/Logo';
 import { ThemeToggle } from '@/components/ThemeToggle';
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
 import heroImage from '@/assets/hero-nutrition.png';
 import { useRef } from 'react';
 
@@ -105,28 +99,6 @@ export default function Index() {
     },
   ];
 
-  const faqs = [
-    {
-      question: 'O NutriPlan é gratuito?',
-      answer: 'Sim! Oferecemos um plano gratuito que permite criar planos alimentares personalizados. Para recursos avançados como substituições ilimitadas e assistente IA, temos planos pagos acessíveis.'
-    },
-    {
-      question: 'Preciso de acompanhamento de nutricionista?',
-      answer: 'O NutriPlan é uma ferramenta de planejamento alimentar e não substitui o acompanhamento profissional. Para condições de saúde específicas, recomendamos sempre consultar um nutricionista.'
-    },
-    {
-      question: 'Como funciona a substituição de alimentos?',
-      answer: 'Você pode trocar qualquer alimento do seu plano por opções equivalentes nutricionalmente. O sistema mostra o impacto da troca nos seus macros em tempo real.'
-    },
-    {
-      question: 'Posso usar em dispositivos móveis?',
-      answer: 'Sim! O NutriPlan é totalmente responsivo e pode ser instalado como um app no seu celular para acesso rápido e offline.'
-    },
-    {
-      question: 'Como a IA personaliza meu plano?',
-      answer: 'Nossa IA considera seu peso, altura, idade, nível de atividade, objetivo (emagrecer, manter ou ganhar massa) e preferências alimentares para criar um plano único para você.'
-    },
-  ];
 
   return (
     <div className="min-h-screen overflow-x-hidden">
@@ -358,75 +330,6 @@ export default function Index() {
         </div>
       </section>
 
-      {/* FAQ Section */}
-      <section className="py-16 sm:py-20">
-        <div className="container mx-auto px-4">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            className="text-center mb-12"
-          >
-            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-foreground mb-4">
-              Perguntas frequentes
-            </h2>
-            <p className="text-muted-foreground max-w-2xl mx-auto text-sm sm:text-base">
-              Tire suas dúvidas sobre o NutriPlan e como ele pode ajudar você.
-            </p>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ delay: 0.2 }}
-            className="max-w-3xl mx-auto"
-          >
-            <Accordion type="single" collapsible className="space-y-4">
-              {faqs.map((faq, i) => (
-                <AccordionItem 
-                  key={i} 
-                  value={`item-${i}`}
-                  className="bg-card border rounded-xl px-6 shadow-sm"
-                >
-                  <AccordionTrigger className="text-left font-medium text-sm sm:text-base py-5 hover:no-underline">
-                    {faq.question}
-                  </AccordionTrigger>
-                  <AccordionContent className="text-muted-foreground text-sm pb-5">
-                    {faq.answer}
-                  </AccordionContent>
-                </AccordionItem>
-              ))}
-            </Accordion>
-          </motion.div>
-        </div>
-      </section>
-
-      {/* CTA Section */}
-      <section className="bg-gradient-to-r from-primary to-primary/80 py-16 sm:py-20">
-        <div className="container mx-auto px-4 text-center">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-          >
-            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-primary-foreground mb-4">
-              Pronto para transformar sua alimentação?
-            </h2>
-            <p className="text-primary-foreground/80 max-w-2xl mx-auto mb-8 text-sm sm:text-base">
-              Junte-se a milhares de pessoas que já estão alcançando seus objetivos com o NutriPlan.
-            </p>
-            <Link to="/signup">
-              <Button 
-                size="lg" 
-                className="bg-background text-primary hover:bg-background/90 font-semibold shadow-lg"
-              >
-                Começar agora — é grátis <ArrowRight className="w-5 h-5 ml-2" />
-              </Button>
-            </Link>
-          </motion.div>
-        </div>
-      </section>
 
       {/* Footer */}
       <footer className="container mx-auto px-4 py-8 mt-8 border-t border-border">
