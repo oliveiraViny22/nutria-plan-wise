@@ -263,16 +263,16 @@ export default function Index() {
               <motion.div 
                 className="absolute inset-0 flex items-center justify-center pointer-events-none"
                 animate={{ 
-                  scale: [1, 1.1, 1],
-                  opacity: [0.5, 0.7, 0.5]
+                  scale: [1, 1.3, 1],
+                  opacity: [0.4, 0.8, 0.4]
                 }}
                 transition={{ 
-                  duration: 6,
+                  duration: 3,
                   repeat: Infinity,
                   ease: "easeInOut"
                 }}
               >
-                <div className="w-3/4 h-3/4 bg-primary/25 rounded-full blur-3xl" />
+                <div className="w-4/5 h-4/5 bg-primary/40 rounded-full blur-3xl" />
               </motion.div>
               <motion.div
                 variants={scaleIn}
