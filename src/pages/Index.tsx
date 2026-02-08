@@ -200,27 +200,6 @@ export default function Index() {
           className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-gradient-radial from-primary/10 to-transparent rounded-full blur-3xl" 
         />
 
-        {/* Floating decorative elements - Enhanced rotation */}
-        <motion.div
-          style={{ y: floatingIcon1Y, rotate: floatingIcon1Rotate }}
-          className="absolute top-40 right-[20%] hidden lg:block"
-        >
-          <div className="w-8 h-8 rounded-full bg-accent/20 backdrop-blur-sm flex items-center justify-center shadow-lg">
-            <Sparkles className="w-4 h-4 text-accent" />
-          </div>
-        </motion.div>
-        <motion.div
-          style={{ y: floatingIcon2Y, rotate: floatingIcon2Rotate }}
-          className="absolute bottom-40 left-[15%] hidden lg:block"
-        >
-          <div className="w-6 h-6 rounded-full bg-primary/20 backdrop-blur-sm shadow-md" />
-        </motion.div>
-        <motion.div
-          style={{ y: useTransform(smoothProgress, [0, 1], [0, -120]) }}
-          className="absolute top-[30%] left-[8%] hidden xl:block"
-        >
-          <div className="w-4 h-4 rounded-full bg-accent/30 backdrop-blur-sm" />
-        </motion.div>
         
         <motion.main 
           style={{ opacity: heroOpacity, scale: heroScale }}
