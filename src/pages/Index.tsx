@@ -266,9 +266,9 @@ export default function Index() {
         ) : (
           <motion.main 
             style={{ opacity: heroOpacity, scale: heroScale }}
-            className="container mx-auto px-6 lg:px-12 xl:px-20 py-16 lg:py-20 relative z-10"
+            className="w-full max-w-7xl mx-auto px-6 lg:px-12 xl:px-16 py-16 lg:py-20 relative z-10"
           >
-            <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 xl:gap-24 items-center max-w-7xl mx-auto">
+            <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 xl:gap-24 items-center">
               {/* Text Content with Parallax */}
               <motion.div 
                 style={{ y: heroTextY }}
