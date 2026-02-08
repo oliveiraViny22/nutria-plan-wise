@@ -855,16 +855,16 @@ export default function Index() {
       </section>
 
       {/* Footer */}
-      <footer className="container mx-auto px-4 py-8 border-t border-border">
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-          <p className="text-sm text-muted-foreground">
+      <footer className="container mx-auto px-4 py-4 border-t border-border">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-2">
+          <p className="text-xs text-muted-foreground">
             © 2026 NutriPlan. Todos os direitos reservados.
           </p>
-          <div className="flex items-center gap-4">
-            <Link to="/terms" className="text-sm text-muted-foreground hover:text-primary transition-colors">
+          <div className="flex items-center gap-3">
+            <Link to="/terms" className="text-xs text-muted-foreground hover:text-primary transition-colors">
               Termos de Uso
             </Link>
-            <Link to="/privacy" className="text-sm text-muted-foreground hover:text-primary transition-colors">
+            <Link to="/privacy" className="text-xs text-muted-foreground hover:text-primary transition-colors">
               Política de Privacidade
             </Link>
           </div>
