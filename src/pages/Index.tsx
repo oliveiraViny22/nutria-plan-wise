@@ -266,9 +266,9 @@ export default function Index() {
         ) : (
           <motion.main 
             style={{ opacity: heroOpacity, scale: heroScale }}
-            className="container max-w-7xl mx-auto px-6 py-16 lg:py-20 relative z-10"
+            className="container max-w-7xl 3xl:max-w-[1600px] 4xl:max-w-[1920px] mx-auto px-6 py-16 lg:py-20 relative z-10"
           >
-            <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 xl:gap-24 items-center">
+            <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 xl:gap-24 3xl:gap-32">
               {/* Text Content with Parallax */}
               <motion.div 
                 style={{ y: heroTextY }}
@@ -420,18 +420,18 @@ export default function Index() {
         ) : (
           <motion.div
             style={{ opacity: featuresOpacity }}
-            className="container max-w-7xl mx-auto px-6 relative z-10"
+            className="container max-w-7xl 3xl:max-w-[1600px] 4xl:max-w-[1920px] mx-auto px-6 relative z-10"
           >
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
-              className="text-center mb-16"
+              className="text-center mb-16 3xl:mb-20"
             >
-              <h2 className="text-3xl lg:text-4xl xl:text-5xl font-bold text-foreground mb-6">
+              <h2 className="text-3xl lg:text-4xl xl:text-5xl 3xl:text-6xl font-bold text-foreground mb-6">
                 Recursos inteligentes
               </h2>
-              <p className="text-muted-foreground max-w-3xl mx-auto text-lg xl:text-xl">
+              <p className="text-muted-foreground max-w-3xl 3xl:max-w-4xl mx-auto text-lg xl:text-xl 3xl:text-2xl">
                 Ferramentas poderosas para transformar sua alimentação
               </p>
             </motion.div>
@@ -441,20 +441,20 @@ export default function Index() {
               initial="hidden"
               whileInView="visible"
               viewport={{ once: true, margin: "-100px" }}
-              className="grid sm:grid-cols-2 lg:grid-cols-3 gap-8 xl:gap-10"
+              className="grid sm:grid-cols-2 lg:grid-cols-3 gap-8 xl:gap-10 3xl:gap-12 4xl:gap-16"
             >
               {features.map((f, index) => (
                 <motion.div 
                   key={f.title} 
                   variants={itemVariants}
                   custom={index}
-                  className="card-elevated rounded-2xl p-8 xl:p-10 text-left backdrop-blur-sm bg-card/80 border border-border/50"
+                  className="card-elevated rounded-2xl p-8 xl:p-10 3xl:p-12 text-left backdrop-blur-sm bg-card/80 border border-border/50"
                 >
-                  <div className="w-14 h-14 xl:w-16 xl:h-16 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center mb-6">
-                    <f.icon className="w-7 h-7 xl:w-8 xl:h-8 text-primary" />
+                  <div className="w-14 h-14 xl:w-16 xl:h-16 3xl:w-20 3xl:h-20 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center mb-6">
+                    <f.icon className="w-7 h-7 xl:w-8 xl:h-8 3xl:w-10 3xl:h-10 text-primary" />
                   </div>
-                  <h3 className="font-semibold text-foreground mb-2 text-lg xl:text-xl leading-tight">{f.title}</h3>
-                  <p className="text-base text-muted-foreground leading-relaxed">{f.description}</p>
+                  <h3 className="font-semibold text-foreground mb-2 text-lg xl:text-xl 3xl:text-2xl leading-tight">{f.title}</h3>
+                  <p className="text-base 3xl:text-lg text-muted-foreground leading-relaxed">{f.description}</p>
                 </motion.div>
               ))}
             </motion.div>
@@ -488,7 +488,7 @@ export default function Index() {
           </>
         )}
 
-        <div className="container max-w-7xl mx-auto px-6 relative z-10">
+        <div className="container max-w-7xl 3xl:max-w-[1600px] 4xl:max-w-[1920px] mx-auto px-6 relative z-10">
           {isMobile ? (
             <>
               <div className="text-center mb-8">
