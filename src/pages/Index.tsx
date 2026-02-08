@@ -75,33 +75,44 @@ export default function Index() {
     offset: ["start end", "end start"],
   });
 
-  // Smooth spring physics for scroll values
-  const smoothProgress = useSpring(scrollYProgress, { stiffness: 100, damping: 30 });
+  // Smooth spring physics for scroll values - more responsive
+  const smoothProgress = useSpring(scrollYProgress, { stiffness: 50, damping: 20, mass: 0.5 });
+  const smoothHeroProgress = useSpring(heroScrollProgress, { stiffness: 80, damping: 25 });
   
-  // Hero parallax transforms
-  const heroY = useTransform(heroScrollProgress, [0, 1], [0, 200]);
-  const heroOpacity = useTransform(heroScrollProgress, [0, 0.6], [1, 0]);
-  const heroScale = useTransform(heroScrollProgress, [0, 0.5], [1, 0.95]);
-  const heroImageY = useTransform(heroScrollProgress, [0, 1], [0, 80]);
-  const heroTextY = useTransform(heroScrollProgress, [0, 1], [0, 50]);
+  // Hero parallax transforms - enhanced depth
+  const heroY = useTransform(smoothHeroProgress, [0, 1], [0, 300]);
+  const heroOpacity = useTransform(heroScrollProgress, [0, 0.5], [1, 0]);
+  const heroScale = useTransform(smoothHeroProgress, [0, 0.6], [1, 0.9]);
+  const heroImageY = useTransform(smoothHeroProgress, [0, 1], [0, 120]);
+  const heroImageRotate = useTransform(smoothHeroProgress, [0, 1], [0, 5]);
+  const heroTextY = useTransform(smoothHeroProgress, [0, 1], [0, 80]);
   
-  // Background orbs parallax (different speeds for depth)
-  const orb1Y = useTransform(heroScrollProgress, [0, 1], [0, 250]);
-  const orb2Y = useTransform(heroScrollProgress, [0, 1], [0, 180]);
-  const orb3Y = useTransform(heroScrollProgress, [0, 1], [0, 300]);
-  const orb1Scale = useTransform(heroScrollProgress, [0, 0.5], [1, 1.2]);
-  const orb2Scale = useTransform(heroScrollProgress, [0, 0.5], [1, 0.8]);
+  // Background orbs parallax - more dramatic depth layers
+  const orb1Y = useTransform(smoothHeroProgress, [0, 1], [0, 350]);
+  const orb1X = useTransform(smoothHeroProgress, [0, 1], [0, -50]);
+  const orb2Y = useTransform(smoothHeroProgress, [0, 1], [0, 220]);
+  const orb2X = useTransform(smoothHeroProgress, [0, 1], [0, 30]);
+  const orb3Y = useTransform(smoothHeroProgress, [0, 1], [0, 450]);
+  const orb1Scale = useTransform(smoothHeroProgress, [0, 0.5], [1, 1.4]);
+  const orb2Scale = useTransform(smoothHeroProgress, [0, 0.5], [1, 0.6]);
+  const orb3Opacity = useTransform(heroScrollProgress, [0, 0.7], [0.3, 0]);
 
-  // Features section parallax
-  const featuresY = useTransform(featuresScrollProgress, [0, 1], [100, -50]);
-  const featuresOpacity = useTransform(featuresScrollProgress, [0, 0.3, 0.7, 1], [0, 1, 1, 0.8]);
+  // Features section parallax - smoother entrance
+  const smoothFeaturesProgress = useSpring(featuresScrollProgress, { stiffness: 60, damping: 20 });
+  const featuresY = useTransform(smoothFeaturesProgress, [0, 0.5, 1], [150, 0, -80]);
+  const featuresOpacity = useTransform(featuresScrollProgress, [0, 0.2, 0.8, 1], [0, 1, 1, 0.7]);
+  const featuresScale = useTransform(smoothFeaturesProgress, [0, 0.3, 0.7, 1], [0.95, 1, 1, 0.98]);
 
-  // Steps section parallax
-  const stepsBackgroundY = useTransform(stepsScrollProgress, [0, 1], [50, -50]);
+  // Steps section parallax - enhanced
+  const smoothStepsProgress = useSpring(stepsScrollProgress, { stiffness: 60, damping: 20 });
+  const stepsBackgroundY = useTransform(smoothStepsProgress, [0, 1], [80, -80]);
+  const stepsBackgroundScale = useTransform(smoothStepsProgress, [0, 0.5, 1], [1.05, 1, 1.02]);
 
-  // Floating icons parallax
-  const floatingIcon1Y = useTransform(smoothProgress, [0, 1], [0, -100]);
-  const floatingIcon2Y = useTransform(smoothProgress, [0, 1], [0, -150]);
+  // Floating icons parallax - more dynamic movement
+  const floatingIcon1Y = useTransform(smoothProgress, [0, 1], [0, -180]);
+  const floatingIcon1Rotate = useTransform(smoothProgress, [0, 1], [0, 15]);
+  const floatingIcon2Y = useTransform(smoothProgress, [0, 1], [0, -220]);
+  const floatingIcon2Rotate = useTransform(smoothProgress, [0, 1], [0, -10]);
 
   const features = [
     { icon: Target, title: 'Metas Personalizadas', description: 'Calcule suas necessidades calóricas e de macros automaticamente' },
@@ -175,34 +186,40 @@ export default function Index() {
         {/* Animated Background Gradient */}
         <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-primary/10 to-accent/5 dark:from-primary/10 dark:via-primary/5 dark:to-background" />
         
-        {/* Parallax Background Orbs */}
+        {/* Parallax Background Orbs - Enhanced with X movement */}
         <motion.div 
-          style={{ y: orb1Y, scale: orb1Scale }}
+          style={{ y: orb1Y, x: orb1X, scale: orb1Scale }}
           className="absolute top-20 left-10 w-72 h-72 bg-primary/20 rounded-full blur-3xl opacity-60" 
         />
         <motion.div 
-          style={{ y: orb2Y, scale: orb2Scale }}
+          style={{ y: orb2Y, x: orb2X, scale: orb2Scale }}
           className="absolute bottom-10 right-10 w-96 h-96 bg-accent/30 rounded-full blur-3xl opacity-40" 
         />
         <motion.div 
-          style={{ y: orb3Y }}
-          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-gradient-radial from-primary/10 to-transparent rounded-full blur-3xl opacity-30" 
+          style={{ y: orb3Y, opacity: orb3Opacity }}
+          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-gradient-radial from-primary/10 to-transparent rounded-full blur-3xl" 
         />
 
-        {/* Floating decorative elements */}
+        {/* Floating decorative elements - Enhanced rotation */}
         <motion.div
-          style={{ y: floatingIcon1Y }}
+          style={{ y: floatingIcon1Y, rotate: floatingIcon1Rotate }}
           className="absolute top-40 right-[20%] hidden lg:block"
         >
-          <div className="w-8 h-8 rounded-full bg-accent/20 backdrop-blur-sm flex items-center justify-center">
+          <div className="w-8 h-8 rounded-full bg-accent/20 backdrop-blur-sm flex items-center justify-center shadow-lg">
             <Sparkles className="w-4 h-4 text-accent" />
           </div>
         </motion.div>
         <motion.div
-          style={{ y: floatingIcon2Y }}
+          style={{ y: floatingIcon2Y, rotate: floatingIcon2Rotate }}
           className="absolute bottom-40 left-[15%] hidden lg:block"
         >
-          <div className="w-6 h-6 rounded-full bg-primary/20 backdrop-blur-sm" />
+          <div className="w-6 h-6 rounded-full bg-primary/20 backdrop-blur-sm shadow-md" />
+        </motion.div>
+        <motion.div
+          style={{ y: useTransform(smoothProgress, [0, 1], [0, -120]) }}
+          className="absolute top-[30%] left-[8%] hidden xl:block"
+        >
+          <div className="w-4 h-4 rounded-full bg-accent/30 backdrop-blur-sm" />
         </motion.div>
         
         <motion.main 
@@ -258,9 +275,9 @@ export default function Index() {
               </motion.div>
             </motion.div>
             
-            {/* Hero Image with Parallax */}
+            {/* Hero Image with Parallax - Enhanced with rotation */}
             <motion.div
-              style={{ y: heroImageY }}
+              style={{ y: heroImageY, rotate: heroImageRotate }}
               className="relative order-first lg:order-last"
             >
               <motion.div
@@ -268,7 +285,7 @@ export default function Index() {
                 initial="hidden"
                 animate="visible"
                 className="relative"
-                whileHover={{ scale: 1.02 }}
+                whileHover={{ scale: 1.02, rotate: -1 }}
                 transition={{ type: "spring", stiffness: 300 }}
               >
                 <img 
@@ -334,11 +351,11 @@ export default function Index() {
         </motion.div>
       </section>
 
-      {/* Features Grid with Parallax */}
+      {/* Features Grid with Enhanced Parallax */}
       <section ref={featuresRef} className="relative py-16 sm:py-24 overflow-hidden">
-        {/* Background decoration */}
+        {/* Background decoration with parallax */}
         <motion.div
-          style={{ y: featuresY }}
+          style={{ y: featuresY, scale: featuresScale }}
           className="absolute inset-0 pointer-events-none"
         >
           <div className="absolute top-0 left-1/4 w-64 h-64 bg-primary/5 rounded-full blur-3xl" />
@@ -397,22 +414,26 @@ export default function Index() {
         </motion.div>
       </section>
 
-      {/* How It Works Section with Parallax */}
+      {/* How It Works Section with Enhanced Parallax */}
       <section ref={stepsRef} id="como-funciona" className="relative py-16 sm:py-24 overflow-hidden">
-        {/* Parallax Background */}
+        {/* Parallax Background - Enhanced */}
         <motion.div
-          style={{ y: stepsBackgroundY }}
+          style={{ y: stepsBackgroundY, scale: stepsBackgroundScale }}
           className="absolute inset-0 bg-muted/30"
         />
         
-        {/* Decorative elements */}
+        {/* Decorative elements with enhanced parallax */}
         <motion.div
-          style={{ y: useTransform(stepsScrollProgress, [0, 1], [0, -80]) }}
+          style={{ y: useTransform(smoothStepsProgress, [0, 1], [0, -120]), scale: useTransform(smoothStepsProgress, [0, 1], [1, 1.3]) }}
           className="absolute top-20 right-10 w-40 h-40 bg-primary/10 rounded-full blur-3xl"
         />
         <motion.div
-          style={{ y: useTransform(stepsScrollProgress, [0, 1], [0, -120]) }}
+          style={{ y: useTransform(smoothStepsProgress, [0, 1], [0, -180]), scale: useTransform(smoothStepsProgress, [0, 1], [1, 0.8]) }}
           className="absolute bottom-20 left-10 w-60 h-60 bg-accent/10 rounded-full blur-3xl"
+        />
+        <motion.div
+          style={{ y: useTransform(smoothStepsProgress, [0, 1], [50, -100]) }}
+          className="absolute top-1/2 right-1/4 w-32 h-32 bg-primary/5 rounded-full blur-2xl hidden lg:block"
         />
 
         <div className="container mx-auto px-4 relative z-10">
