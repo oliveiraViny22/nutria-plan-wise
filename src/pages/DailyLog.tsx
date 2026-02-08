@@ -24,6 +24,7 @@ import { StatusBadge, SuccessCheckmark, ConfettiBurst } from '@/components/ui-ki
 import { Logo } from '@/components/Logo';
 import { MobileNav } from '@/components/MobileNav';
 import { ThemeToggle } from '@/components/ThemeToggle';
+import { SyncStatusBadge } from '@/components/SyncStatusIndicator';
 import {
   Dialog,
   DialogContent,
@@ -50,6 +51,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useAccountPermissions } from '@/hooks/useAccountPermissions';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useLinkedStudent } from '@/hooks/useLinkedStudent';
+import { useOfflineSync } from '@/hooks/useOfflineSync';
 import { toast } from '@/hooks/use-toast';
 import { MEAL_NAMES, MealType } from '@/lib/types';
 
@@ -106,6 +108,7 @@ export default function DailyLog() {
   const permissions = useAccountPermissions();
   const { isProfessional, loading: roleLoading } = useUserRole();
   const { isLinkedStudent, loading: linkedStudentLoading } = useLinkedStudent();
+  const { confirmMeal: offlineConfirmMeal, pendingCount, isSyncing } = useOfflineSync();
   
   // Redirect free users to dashboard (linked students can access daily logging)
   useEffect(() => {
@@ -308,33 +311,37 @@ export default function DailyLog() {
   }, [user, dateKey]);
 
   const handleConfirmMeal = async () => {
-    if (!confirmingMeal || !selectedOption) return;
+    if (!confirmingMeal || !selectedOption || !user) return;
     
     setConfirming(true);
     try {
-      const { data, error } = await supabase.functions.invoke('confirm-meal', {
-        body: {
-          mealId: confirmingMeal.id,
-          optionId: selectedOption,
-          status: 'CONFIRMADA',
-          logDate: dateKey,
-        },
-      });
-
-      if (error) throw error;
+      // Use offline-first confirmation
+      const result = await offlineConfirmMeal(
+        user.id,
+        confirmingMeal.id,
+        selectedOption,
+        'confirmed',
+        dateKey
+      );
 
       // Show success animation
       setShowSuccessAnim(true);
       setTimeout(() => setShowSuccessAnim(false), 1500);
 
       toast({
-        title: 'Refeição confirmada!',
-        description: 'Seu consumo foi registrado com sucesso.',
+        title: result.isOffline ? 'Salvo offline!' : 'Refeição confirmada!',
+        description: result.isOffline 
+          ? 'Será sincronizado quando reconectar.' 
+          : 'Seu consumo foi registrado com sucesso.',
       });
 
       setConfirmingMeal(null);
       setSelectedOption('');
-      await fetchDailyData();
+      
+      // Only refetch if online sync succeeded
+      if (!result.isOffline) {
+        await fetchDailyData();
+      }
     } catch (error: any) {
       console.error('Error confirming meal:', error);
       toast({
@@ -348,32 +355,35 @@ export default function DailyLog() {
   };
 
   const handleExceptionConfirm = async () => {
-    if (!exceptionMeal) return;
+    if (!exceptionMeal || !user) return;
     
     setConfirming(true);
     try {
-      const { data, error } = await supabase.functions.invoke('confirm-meal', {
-        body: {
-          mealId: exceptionMeal.id,
-          optionId: null,
-          status: exceptionStatus,
-          logDate: dateKey,
-          notes: exceptionNotes || undefined,
-        },
-      });
-
-      if (error) throw error;
+      // Map exception status to v2 format
+      const v2Status = exceptionStatus === 'PULADA' ? 'skipped' : 'out_of_plan';
+      
+      // Use offline-first confirmation
+      const result = await offlineConfirmMeal(
+        user.id,
+        exceptionMeal.id,
+        null,
+        v2Status,
+        dateKey
+      );
 
       const statusLabel = exceptionStatus === 'PULADA' ? 'Refeição pulada' : 'Refeição fora do plano';
       toast({
         title: statusLabel,
-        description: 'O registro foi salvo.',
+        description: result.isOffline ? 'Salvo offline.' : 'O registro foi salvo.',
       });
 
       setExceptionMeal(null);
       setExceptionStatus('PULADA');
       setExceptionNotes('');
-      await fetchDailyData();
+      
+      if (!result.isOffline) {
+        await fetchDailyData();
+      }
     } catch (error: any) {
       console.error('Error registering exception:', error);
       toast({
@@ -468,7 +478,10 @@ export default function DailyLog() {
             <Logo size="sm" />
           </div>
           <h1 className="text-sm sm:text-lg font-semibold">Registro Diário</h1>
-          <ThemeToggle />
+          <div className="flex items-center gap-1">
+            <SyncStatusBadge />
+            <ThemeToggle />
+          </div>
         </div>
       </header>
 
