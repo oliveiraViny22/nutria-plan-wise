@@ -275,7 +275,7 @@ export default function Index() {
               </motion.div>
             </motion.div>
             
-            {/* Hero Image with Parallax - Enhanced with rotation */}
+            {/* Hero Image with Parallax - Clean design */}
             <motion.div
               style={{ y: heroImageY, rotate: heroImageRotate }}
               className="relative order-first lg:order-last"
@@ -285,46 +285,14 @@ export default function Index() {
                 initial="hidden"
                 animate="visible"
                 className="relative"
-                whileHover={{ scale: 1.02, rotate: -1 }}
+                whileHover={{ scale: 1.02 }}
                 transition={{ type: "spring", stiffness: 300 }}
               >
                 <img 
                   src={heroImage} 
                   alt="NutriPlan - Planejamento alimentar inteligente" 
-                  className="w-full h-auto max-w-xs sm:max-w-sm lg:max-w-lg mx-auto drop-shadow-2xl"
+                  className="w-full h-auto max-w-sm sm:max-w-md lg:max-w-xl xl:max-w-2xl mx-auto drop-shadow-2xl"
                 />
-                {/* Floating elements - positioned relative to image */}
-                <motion.div
-                  style={{ y: floatingIcon1Y }}
-                  animate={{ 
-                    rotate: [0, 5, 0, -5, 0],
-                    scale: [1, 1.05, 1],
-                  }}
-                  transition={{ 
-                    duration: 6, 
-                    repeat: Infinity,
-                    ease: "easeInOut"
-                  }}
-                  className="absolute top-4 right-0 sm:top-8 sm:-right-2 lg:top-12 lg:right-4 w-12 h-12 sm:w-16 sm:h-16 bg-gradient-to-br from-accent to-accent/60 rounded-2xl shadow-lg flex items-center justify-center backdrop-blur-sm border border-white/20"
-                >
-                  <Target className="w-6 h-6 sm:w-8 sm:h-8 text-accent-foreground" />
-                </motion.div>
-                <motion.div
-                  style={{ y: floatingIcon2Y }}
-                  animate={{ 
-                    rotate: [0, -5, 0, 5, 0],
-                    scale: [1, 1.05, 1],
-                  }}
-                  transition={{ 
-                    duration: 7, 
-                    repeat: Infinity,
-                    ease: "easeInOut",
-                    delay: 1
-                  }}
-                  className="absolute bottom-8 left-0 sm:bottom-12 sm:-left-2 lg:bottom-16 lg:left-4 w-10 h-10 sm:w-14 sm:h-14 bg-gradient-to-br from-primary to-primary/60 rounded-xl shadow-lg flex items-center justify-center backdrop-blur-sm border border-white/20"
-                >
-                  <Leaf className="w-5 h-5 sm:w-7 sm:h-7 text-primary-foreground" />
-                </motion.div>
               </motion.div>
             </motion.div>
           </div>
