@@ -5,9 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Logo } from '@/components/Logo';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { HeroImage } from '@/components/OptimizedImage';
-
-// Hero image from Supabase storage
-const heroImage = 'https://tgprvcodlwyfxjbxirgh.supabase.co/storage/v1/object/public/lovable-uploads/lovable_1770559442602_6bff4026.png';
+import heroImage from '@/assets/hero-nutrition.png';
 import { useRef, useEffect, useState } from 'react';
 
 // Hook to detect mobile devices
