@@ -1,46 +1,60 @@
 import { Link } from 'react-router-dom';
 import { motion, useScroll, useTransform, useSpring } from 'framer-motion';
-import { ArrowRight, Leaf, Target, RefreshCw, MessageCircle, UserPlus, ClipboardList, Utensils, TrendingUp, ChevronDown, Sparkles, Trophy, BarChart3, Flame } from 'lucide-react';
+import { ArrowRight, Leaf, RefreshCw, MessageCircle, UserPlus, ClipboardList, Utensils, TrendingUp, ChevronDown, Trophy, BarChart3, Flame, Target } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Logo } from '@/components/Logo';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import heroImage from '@/assets/hero-nutrition.png';
-import { useRef } from 'react';
+import { useRef, useEffect, useState } from 'react';
 
-// Animation variants for staggered children
+// Hook to detect mobile devices
+const useIsMobile = () => {
+  const [isMobile, setIsMobile] = useState(false);
+  
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+  
+  return isMobile;
+};
+
+// Animation variants for staggered children - optimized for mobile
 const containerVariants = {
   hidden: { opacity: 0 },
   visible: {
     opacity: 1,
     transition: {
-      staggerChildren: 0.15,
-      delayChildren: 0.1,
+      staggerChildren: 0.1,
+      delayChildren: 0.05,
     },
   },
 };
 
 const itemVariants = {
-  hidden: { opacity: 0, y: 30 },
+  hidden: { opacity: 0, y: 20 },
   visible: {
     opacity: 1,
     y: 0,
     transition: {
       type: "spring" as const,
-      stiffness: 100,
-      damping: 12,
+      stiffness: 120,
+      damping: 14,
     },
   },
 };
 
 const scaleIn = {
-  hidden: { opacity: 0, scale: 0.8 },
+  hidden: { opacity: 0, scale: 0.9 },
   visible: {
     opacity: 1,
     scale: 1,
     transition: {
       type: "spring" as const,
-      stiffness: 100,
-      damping: 15,
+      stiffness: 120,
+      damping: 16,
     },
   },
 };
@@ -50,6 +64,7 @@ export default function Index() {
   const heroRef = useRef<HTMLElement>(null);
   const featuresRef = useRef<HTMLElement>(null);
   const stepsRef = useRef<HTMLElement>(null);
+  const isMobile = useIsMobile();
   
   // Main scroll progress for the entire page
   const { scrollYProgress } = useScroll({
@@ -75,44 +90,34 @@ export default function Index() {
     offset: ["start end", "end start"],
   });
 
-  // Smooth spring physics for scroll values - more responsive
-  const smoothProgress = useSpring(scrollYProgress, { stiffness: 50, damping: 20, mass: 0.5 });
+  // Smooth spring physics - lighter on mobile
+  const springConfig = isMobile 
+    ? { stiffness: 100, damping: 30, mass: 0.3 }
+    : { stiffness: 50, damping: 20, mass: 0.5 };
+  
+  const smoothProgress = useSpring(scrollYProgress, springConfig);
   const smoothHeroProgress = useSpring(heroScrollProgress, { stiffness: 80, damping: 25 });
   
-  // Hero parallax transforms - enhanced depth
-  const heroY = useTransform(smoothHeroProgress, [0, 1], [0, 300]);
+  // Hero parallax transforms - reduced on mobile for performance
   const heroOpacity = useTransform(heroScrollProgress, [0, 0.5], [1, 0]);
-  const heroScale = useTransform(smoothHeroProgress, [0, 0.6], [1, 0.9]);
-  const heroImageY = useTransform(smoothHeroProgress, [0, 1], [0, 120]);
-  const heroImageRotate = useTransform(smoothHeroProgress, [0, 1], [0, 5]);
-  const heroTextY = useTransform(smoothHeroProgress, [0, 1], [0, 80]);
+  const heroScale = useTransform(smoothHeroProgress, [0, 0.6], [1, isMobile ? 0.95 : 0.9]);
+  const heroImageY = useTransform(smoothHeroProgress, [0, 1], [0, isMobile ? 40 : 120]);
+  const heroImageRotate = useTransform(smoothHeroProgress, [0, 1], [0, isMobile ? 2 : 5]);
+  const heroTextY = useTransform(smoothHeroProgress, [0, 1], [0, isMobile ? 30 : 80]);
   
-  // Background orbs parallax - more dramatic depth layers
-  const orb1Y = useTransform(smoothHeroProgress, [0, 1], [0, 350]);
-  const orb1X = useTransform(smoothHeroProgress, [0, 1], [0, -50]);
-  const orb2Y = useTransform(smoothHeroProgress, [0, 1], [0, 220]);
-  const orb2X = useTransform(smoothHeroProgress, [0, 1], [0, 30]);
-  const orb3Y = useTransform(smoothHeroProgress, [0, 1], [0, 450]);
-  const orb1Scale = useTransform(smoothHeroProgress, [0, 0.5], [1, 1.4]);
-  const orb2Scale = useTransform(smoothHeroProgress, [0, 0.5], [1, 0.6]);
-  const orb3Opacity = useTransform(heroScrollProgress, [0, 0.7], [0.3, 0]);
+  // Background orbs parallax - minimal on mobile
+  const orb1Y = useTransform(smoothHeroProgress, [0, 1], [0, isMobile ? 100 : 350]);
+  const orb2Y = useTransform(smoothHeroProgress, [0, 1], [0, isMobile ? 60 : 220]);
+  const orb3Opacity = useTransform(heroScrollProgress, [0, 0.7], [isMobile ? 0.15 : 0.3, 0]);
 
   // Features section parallax - smoother entrance
   const smoothFeaturesProgress = useSpring(featuresScrollProgress, { stiffness: 60, damping: 20 });
-  const featuresY = useTransform(smoothFeaturesProgress, [0, 0.5, 1], [150, 0, -80]);
+  const featuresY = useTransform(smoothFeaturesProgress, [0, 0.5, 1], [isMobile ? 50 : 150, 0, isMobile ? -30 : -80]);
   const featuresOpacity = useTransform(featuresScrollProgress, [0, 0.2, 0.8, 1], [0, 1, 1, 0.7]);
-  const featuresScale = useTransform(smoothFeaturesProgress, [0, 0.3, 0.7, 1], [0.95, 1, 1, 0.98]);
 
   // Steps section parallax - enhanced
   const smoothStepsProgress = useSpring(stepsScrollProgress, { stiffness: 60, damping: 20 });
-  const stepsBackgroundY = useTransform(smoothStepsProgress, [0, 1], [80, -80]);
-  const stepsBackgroundScale = useTransform(smoothStepsProgress, [0, 0.5, 1], [1.05, 1, 1.02]);
-
-  // Floating icons parallax - more dynamic movement
-  const floatingIcon1Y = useTransform(smoothProgress, [0, 1], [0, -180]);
-  const floatingIcon1Rotate = useTransform(smoothProgress, [0, 1], [0, 15]);
-  const floatingIcon2Y = useTransform(smoothProgress, [0, 1], [0, -220]);
-  const floatingIcon2Rotate = useTransform(smoothProgress, [0, 1], [0, -10]);
+  const stepsBackgroundY = useTransform(smoothStepsProgress, [0, 1], [isMobile ? 30 : 80, isMobile ? -30 : -80]);
 
   const features = [
     { icon: Target, title: 'Metas Personalizadas', description: 'Calcule suas necessidades calóricas e de macros automaticamente' },
@@ -181,34 +186,36 @@ export default function Index() {
       {/* Spacer for fixed header */}
       <div className="h-14 sm:h-16" />
 
-      {/* Hero Section with Enhanced Parallax */}
-      <section ref={heroRef} className="relative overflow-hidden min-h-[90vh] flex items-center">
+      {/* Hero Section with Mobile-Optimized Parallax */}
+      <section ref={heroRef} className="relative overflow-hidden min-h-[85vh] sm:min-h-[90vh] flex items-center py-4 sm:py-0">
         {/* Animated Background Gradient */}
         <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-primary/10 to-accent/5 dark:from-primary/10 dark:via-primary/5 dark:to-background" />
         
-        {/* Parallax Background Orbs - Enhanced with X movement */}
+        {/* Parallax Background Orbs - Simplified for mobile */}
         <motion.div 
-          style={{ y: orb1Y, x: orb1X, scale: orb1Scale }}
-          className="absolute top-20 left-10 w-72 h-72 bg-primary/20 rounded-full blur-3xl opacity-60" 
+          style={isMobile ? {} : { y: orb1Y }}
+          className="absolute top-10 sm:top-20 left-4 sm:left-10 w-32 sm:w-72 h-32 sm:h-72 bg-primary/20 rounded-full blur-3xl opacity-40 sm:opacity-60" 
         />
         <motion.div 
-          style={{ y: orb2Y, x: orb2X, scale: orb2Scale }}
-          className="absolute bottom-10 right-10 w-96 h-96 bg-accent/30 rounded-full blur-3xl opacity-40" 
+          style={isMobile ? {} : { y: orb2Y }}
+          className="absolute bottom-10 right-4 sm:right-10 w-40 sm:w-96 h-40 sm:h-96 bg-accent/30 rounded-full blur-3xl opacity-30 sm:opacity-40" 
         />
-        <motion.div 
-          style={{ y: orb3Y, opacity: orb3Opacity }}
-          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-gradient-radial from-primary/10 to-transparent rounded-full blur-3xl" 
-        />
+        {!isMobile && (
+          <motion.div 
+            style={{ opacity: orb3Opacity }}
+            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-gradient-radial from-primary/10 to-transparent rounded-full blur-3xl" 
+          />
+        )}
 
         
         <motion.main 
-          style={{ opacity: heroOpacity, scale: heroScale }}
-          className="container mx-auto px-4 py-8 sm:py-12 lg:py-16 relative z-10"
+          style={isMobile ? {} : { opacity: heroOpacity, scale: heroScale }}
+          className="container mx-auto px-4 py-6 sm:py-12 lg:py-16 relative z-10"
         >
-          <div className="grid lg:grid-cols-2 gap-8 lg:gap-12 items-center">
+          <div className="grid lg:grid-cols-2 gap-6 sm:gap-8 lg:gap-12 items-center">
             {/* Text Content with Parallax */}
             <motion.div 
-              style={{ y: heroTextY }}
+              style={isMobile ? {} : { y: heroTextY }}
               className="text-center lg:text-left"
             >
               <motion.div 
@@ -254,50 +261,53 @@ export default function Index() {
               </motion.div>
             </motion.div>
             
-            {/* Hero Image with Parallax - Clean design with glow */}
+            {/* Hero Image with Mobile-Optimized Parallax */}
             <motion.div
-              style={{ y: heroImageY, rotate: heroImageRotate }}
+              style={isMobile ? {} : { y: heroImageY, rotate: heroImageRotate }}
               className="relative order-first lg:order-last"
             >
-              {/* Animated glow effect behind image */}
+              {/* Animated glow effect behind image - reduced on mobile */}
               <motion.div 
                 className="absolute inset-0 flex items-center justify-center pointer-events-none"
-                animate={{ 
+                animate={isMobile ? { 
+                  scale: [1, 1.1, 1],
+                  opacity: [0.3, 0.5, 0.3]
+                } : { 
                   scale: [1, 1.3, 1],
                   opacity: [0.4, 0.8, 0.4]
                 }}
                 transition={{ 
-                  duration: 3,
+                  duration: isMobile ? 4 : 3,
                   repeat: Infinity,
                   ease: "easeInOut"
                 }}
               >
-                <div className="w-4/5 h-4/5 bg-primary/40 rounded-full blur-3xl" />
+                <div className="w-3/4 sm:w-4/5 h-3/4 sm:h-4/5 bg-primary/30 sm:bg-primary/40 rounded-full blur-2xl sm:blur-3xl" />
               </motion.div>
               <motion.div
                 variants={scaleIn}
                 initial="hidden"
                 animate="visible"
                 className="relative"
-                whileHover={{ scale: 1.02 }}
+                whileHover={isMobile ? {} : { scale: 1.02 }}
                 transition={{ type: "spring", stiffness: 300 }}
               >
                 <img 
                   src={heroImage} 
                   alt="NutriPlan - Planejamento alimentar inteligente" 
-                  className="w-full h-auto max-w-sm sm:max-w-md lg:max-w-xl xl:max-w-2xl mx-auto drop-shadow-2xl relative z-10"
+                  className="w-full h-auto max-w-[280px] sm:max-w-md lg:max-w-xl xl:max-w-2xl mx-auto drop-shadow-xl sm:drop-shadow-2xl relative z-10"
                 />
               </motion.div>
             </motion.div>
           </div>
         </motion.main>
 
-        {/* Scroll indicator */}
+        {/* Scroll indicator - hidden on mobile for cleaner look */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 1.5 }}
-          className="absolute bottom-8 left-1/2 -translate-x-1/2"
+          className="absolute bottom-4 sm:bottom-8 left-1/2 -translate-x-1/2 hidden sm:block"
         >
           <motion.div
             animate={{ y: [0, 10, 0] }}
@@ -313,31 +323,33 @@ export default function Index() {
         </motion.div>
       </section>
 
-      {/* Features Grid with Enhanced Parallax */}
-      <section ref={featuresRef} className="relative py-16 sm:py-24 overflow-hidden">
-        {/* Background decoration with parallax */}
-        <motion.div
-          style={{ y: featuresY, scale: featuresScale }}
-          className="absolute inset-0 pointer-events-none"
-        >
-          <div className="absolute top-0 left-1/4 w-64 h-64 bg-primary/5 rounded-full blur-3xl" />
-          <div className="absolute bottom-0 right-1/4 w-80 h-80 bg-accent/5 rounded-full blur-3xl" />
-        </motion.div>
+      {/* Features Grid with Mobile-Optimized Parallax */}
+      <section ref={featuresRef} className="relative py-12 sm:py-24 overflow-hidden">
+        {/* Background decoration with parallax - hidden on mobile */}
+        {!isMobile && (
+          <motion.div
+            style={{ y: featuresY }}
+            className="absolute inset-0 pointer-events-none"
+          >
+            <div className="absolute top-0 left-1/4 w-64 h-64 bg-primary/5 rounded-full blur-3xl" />
+            <div className="absolute bottom-0 right-1/4 w-80 h-80 bg-accent/5 rounded-full blur-3xl" />
+          </motion.div>
+        )}
 
         <motion.div
-          style={{ opacity: featuresOpacity }}
+          style={isMobile ? {} : { opacity: featuresOpacity }}
           className="container mx-auto px-4 relative z-10"
         >
           <motion.div
-            initial={{ opacity: 0, y: 30 }}
+            initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            className="text-center mb-12"
+            className="text-center mb-8 sm:mb-12"
           >
-            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-foreground mb-4">
+            <h2 className="text-xl sm:text-3xl lg:text-4xl font-bold text-foreground mb-3 sm:mb-4">
               Recursos inteligentes
             </h2>
-            <p className="text-muted-foreground max-w-2xl mx-auto text-sm sm:text-base">
+            <p className="text-muted-foreground max-w-2xl mx-auto text-xs sm:text-base px-2">
               Ferramentas poderosas para transformar sua alimentação
             </p>
           </motion.div>
@@ -346,82 +358,86 @@ export default function Index() {
             variants={containerVariants}
             initial="hidden"
             whileInView="visible"
-            viewport={{ once: true, margin: "-100px" }}
-            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 max-w-5xl mx-auto"
+            viewport={{ once: true, margin: isMobile ? "-50px" : "-100px" }}
+            className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6 max-w-5xl mx-auto"
           >
             {features.map((f, index) => (
               <motion.div 
                 key={f.title} 
                 variants={itemVariants}
                 custom={index}
-                whileHover={{ 
+                whileHover={isMobile ? {} : { 
                   y: -12, 
                   scale: 1.03,
                   transition: { type: "spring", stiffness: 400 }
                 }}
-                className="card-elevated rounded-2xl p-4 sm:p-6 text-left cursor-pointer backdrop-blur-sm bg-card/80 border border-border/50 hover:border-primary/30 transition-colors"
+                whileTap={isMobile ? { scale: 0.98 } : {}}
+                className="card-elevated rounded-xl sm:rounded-2xl p-3 sm:p-6 text-left cursor-pointer backdrop-blur-sm bg-card/80 border border-border/50 hover:border-primary/30 transition-colors"
               >
-                <motion.div 
-                  whileHover={{ rotate: [0, -10, 10, 0], scale: 1.1 }}
-                  transition={{ duration: 0.5 }}
-                  className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center mb-3 sm:mb-4"
+                <div 
+                  className="w-8 h-8 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center mb-2 sm:mb-4"
                 >
-                  <f.icon className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
-                </motion.div>
-                <h3 className="font-semibold text-foreground mb-1 sm:mb-2 text-sm sm:text-base">{f.title}</h3>
-                <p className="text-xs sm:text-sm text-muted-foreground">{f.description}</p>
+                  <f.icon className="w-4 h-4 sm:w-6 sm:h-6 text-primary" />
+                </div>
+                <h3 className="font-semibold text-foreground mb-1 text-xs sm:text-base leading-tight">{f.title}</h3>
+                <p className="text-[10px] sm:text-sm text-muted-foreground leading-snug line-clamp-3 sm:line-clamp-none">{f.description}</p>
               </motion.div>
             ))}
           </motion.div>
         </motion.div>
       </section>
 
-      {/* How It Works Section with Enhanced Parallax */}
-      <section ref={stepsRef} id="como-funciona" className="relative py-16 sm:py-24 overflow-hidden">
-        {/* Parallax Background - Enhanced */}
+      {/* How It Works Section - Mobile Optimized */}
+      <section ref={stepsRef} id="como-funciona" className="relative py-12 sm:py-24 overflow-hidden">
+        {/* Parallax Background - Simplified on mobile */}
         <motion.div
-          style={{ y: stepsBackgroundY, scale: stepsBackgroundScale }}
+          style={isMobile ? {} : { y: stepsBackgroundY }}
           className="absolute inset-0 bg-muted/30"
         />
         
-        {/* Decorative elements with enhanced parallax */}
-        <motion.div
-          style={{ y: useTransform(smoothStepsProgress, [0, 1], [0, -120]), scale: useTransform(smoothStepsProgress, [0, 1], [1, 1.3]) }}
-          className="absolute top-20 right-10 w-40 h-40 bg-primary/10 rounded-full blur-3xl"
-        />
-        <motion.div
-          style={{ y: useTransform(smoothStepsProgress, [0, 1], [0, -180]), scale: useTransform(smoothStepsProgress, [0, 1], [1, 0.8]) }}
-          className="absolute bottom-20 left-10 w-60 h-60 bg-accent/10 rounded-full blur-3xl"
-        />
-        <motion.div
-          style={{ y: useTransform(smoothStepsProgress, [0, 1], [50, -100]) }}
-          className="absolute top-1/2 right-1/4 w-32 h-32 bg-primary/5 rounded-full blur-2xl hidden lg:block"
-        />
+        {/* Decorative elements - Hidden on mobile */}
+        {!isMobile && (
+          <>
+            <motion.div
+              style={{ y: useTransform(smoothStepsProgress, [0, 1], [0, -120]) }}
+              className="absolute top-20 right-10 w-40 h-40 bg-primary/10 rounded-full blur-3xl"
+            />
+            <motion.div
+              style={{ y: useTransform(smoothStepsProgress, [0, 1], [0, -180]) }}
+              className="absolute bottom-20 left-10 w-60 h-60 bg-accent/10 rounded-full blur-3xl"
+            />
+            <motion.div
+              style={{ y: useTransform(smoothStepsProgress, [0, 1], [50, -100]) }}
+              className="absolute top-1/2 right-1/4 w-32 h-32 bg-primary/5 rounded-full blur-2xl hidden lg:block"
+            />
+          </>
+        )}
 
         <div className="container mx-auto px-4 relative z-10">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            className="text-center mb-12"
+            className="text-center mb-8 sm:mb-12"
           >
-            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-foreground mb-4">
+            <h2 className="text-xl sm:text-3xl lg:text-4xl font-bold text-foreground mb-3 sm:mb-4">
               Como funciona
             </h2>
-            <p className="text-muted-foreground max-w-2xl mx-auto text-sm sm:text-base">
-              Em 4 passos simples, você terá um plano alimentar personalizado e pronto para seguir.
+            <p className="text-muted-foreground max-w-2xl mx-auto text-xs sm:text-base px-2">
+              Em 4 passos simples, você terá um plano alimentar personalizado.
             </p>
           </motion.div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8 max-w-6xl mx-auto">
+          <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-8 max-w-6xl mx-auto">
             {steps.map((step, i) => (
               <motion.div
                 key={step.number}
-                initial={{ opacity: 0, y: 50 }}
+                initial={{ opacity: 0, y: 30 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
-                transition={{ delay: i * 0.15, type: "spring", stiffness: 100 }}
-                whileHover={{ y: -8 }}
+                transition={{ delay: isMobile ? i * 0.08 : i * 0.15, type: "spring", stiffness: 120 }}
+                whileHover={isMobile ? {} : { y: -8 }}
+                whileTap={isMobile ? { scale: 0.98 } : {}}
                 className="relative"
               >
                 {/* Connector Line - Hidden on mobile and last item */}
@@ -435,33 +451,19 @@ export default function Index() {
                   />
                 )}
                 
-                <div className="bg-card/80 backdrop-blur-sm rounded-2xl p-6 shadow-lg border border-border/50 h-full relative z-10 hover:border-primary/30 hover:shadow-xl transition-all duration-300">
-                  <div className="flex items-center gap-4 mb-4">
-                    <motion.div 
-                      whileHover={{ rotate: 360, scale: 1.1 }}
-                      whileTap={{ scale: 0.95 }}
-                      transition={{ duration: 0.6, type: "spring" }}
-                      className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center text-primary-foreground shadow-md relative overflow-hidden group"
+                <div className="bg-card/80 backdrop-blur-sm rounded-xl sm:rounded-2xl p-3 sm:p-6 shadow-lg border border-border/50 h-full relative z-10 hover:border-primary/30 hover:shadow-xl transition-all duration-300">
+                  <div className="flex items-center gap-2 sm:gap-4 mb-2 sm:mb-4">
+                    <div 
+                      className="w-10 h-10 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center text-primary-foreground shadow-md relative overflow-hidden"
                     >
-                      <motion.div
-                        className="absolute inset-0 bg-white/20"
-                        initial={{ x: "-100%", opacity: 0 }}
-                        whileHover={{ x: "100%", opacity: 1 }}
-                        transition={{ duration: 0.5 }}
-                      />
-                      <step.icon className="w-6 h-6 relative z-10" />
-                    </motion.div>
-                    <motion.span 
-                      initial={{ opacity: 0.2 }}
-                      whileInView={{ opacity: 0.2 }}
-                      whileHover={{ opacity: 0.4, scale: 1.05 }}
-                      className="text-4xl font-bold text-primary"
-                    >
+                      <step.icon className="w-5 h-5 sm:w-6 sm:h-6 relative z-10" />
+                    </div>
+                    <span className="text-2xl sm:text-4xl font-bold text-primary/20">
                       {step.number}
-                    </motion.span>
+                    </span>
                   </div>
-                  <h3 className="font-semibold text-foreground mb-2 text-lg">{step.title}</h3>
-                  <p className="text-sm text-muted-foreground">{step.description}</p>
+                  <h3 className="font-semibold text-foreground mb-1 sm:mb-2 text-xs sm:text-lg leading-tight">{step.title}</h3>
+                  <p className="text-[10px] sm:text-sm text-muted-foreground leading-snug line-clamp-3 sm:line-clamp-none">{step.description}</p>
                 </div>
               </motion.div>
             ))}
@@ -471,13 +473,13 @@ export default function Index() {
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            transition={{ delay: 0.6 }}
-            className="text-center mt-12"
+            transition={{ delay: 0.4 }}
+            className="text-center mt-8 sm:mt-12"
           >
             <Link to="/signup">
-              <Button variant="hero" size="lg" className="group">
+              <Button variant="hero" size="lg" className="group text-sm sm:text-base">
                 Criar minha conta grátis 
-                <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
+                <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 ml-2 group-hover:translate-x-1 transition-transform" />
               </Button>
             </Link>
           </motion.div>
