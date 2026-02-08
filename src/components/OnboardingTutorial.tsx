@@ -1,92 +1,9 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, ChevronLeft, ChevronRight, Sparkles, Target, Utensils, RefreshCw, MessageCircle, BarChart3, CheckCircle2 } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight, CheckCircle2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-
-interface TutorialStep {
-  id: string;
-  icon: React.ElementType;
-  title: string;
-  description: string;
-  features?: string[];
-  highlight?: 'free' | 'paid';
-}
-
-const tutorialSteps: TutorialStep[] = [
-  {
-    id: 'welcome',
-    icon: Sparkles,
-    title: 'Bem-vindo ao NutriPlan! 🎉',
-    description: 'Seu assistente de nutrição inteligente que vai te ajudar a alcançar seus objetivos de saúde. Vamos conhecer as funcionalidades?',
-  },
-  {
-    id: 'goals',
-    icon: Target,
-    title: 'Metas Personalizadas',
-    description: 'Com base no seu perfil (peso, altura, idade, objetivo), calculamos automaticamente suas necessidades calóricas e de macronutrientes usando a fórmula Mifflin-St Jeor.',
-    features: [
-      'Cálculo automático de calorias diárias',
-      'Distribuição ideal de proteínas, carboidratos e gorduras',
-      'Ajuste por nível de atividade física',
-    ],
-    highlight: 'free',
-  },
-  {
-    id: 'meal-plan',
-    icon: Utensils,
-    title: 'Plano Alimentar com IA',
-    description: 'Nossa inteligência artificial cria um plano alimentar completo e personalizado, respeitando suas preferências e restrições alimentares.',
-    features: [
-      'Refeições balanceadas para o dia todo',
-      'Opções variadas para cada refeição',
-      'Quantidades calculadas em gramas',
-    ],
-    highlight: 'free',
-  },
-  {
-    id: 'substitution',
-    icon: RefreshCw,
-    title: 'Substituição Inteligente',
-    description: 'Não gostou de algum alimento? Troque por outro equivalente e veja o impacto nutricional em tempo real. Mantenha os macros equilibrados!',
-    features: [
-      'Sugestões de substituições equivalentes',
-      'Visualização do impacto nos macros',
-      'Manutenção do equilíbrio nutricional',
-    ],
-    highlight: 'paid',
-  },
-  {
-    id: 'chat',
-    icon: MessageCircle,
-    title: 'Chat com IA Nutricional',
-    description: 'Tire suas dúvidas sobre nutrição com nosso assistente inteligente. Ele conhece seu plano e pode dar orientações personalizadas.',
-    features: [
-      'Respostas baseadas no seu perfil',
-      'Dicas de alimentação saudável',
-      'Esclarecimento de dúvidas nutricionais',
-    ],
-    highlight: 'paid',
-  },
-  {
-    id: 'tracking',
-    icon: BarChart3,
-    title: 'Acompanhe seu Progresso',
-    description: 'Confirme suas refeições diariamente e acompanhe sua aderência ao plano. Visualize estatísticas e evolução ao longo do tempo.',
-    features: [
-      'Confirmação de refeições consumidas',
-      'Gráficos de aderência ao plano',
-      'Histórico de consumo',
-    ],
-    highlight: 'free',
-  },
-  {
-    id: 'done',
-    icon: CheckCircle2,
-    title: 'Pronto para começar!',
-    description: 'Você já conhece as principais funcionalidades. Agora é só completar seu perfil no onboarding e seu primeiro plano alimentar será gerado automaticamente!',
-  },
-];
+import { tutorialSteps, type TutorialStep } from '@/components/tutorial';
 
 interface OnboardingTutorialProps {
   onComplete: () => void;

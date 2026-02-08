@@ -42,7 +42,7 @@ export default function Dashboard() {
   const { isProfessional, isAdmin } = useUserRole();
   const { isLinkedStudent } = useLinkedStudent();
   const permissions = useAccountPermissions();
-  const { showTutorial, markTutorialComplete, closeTutorial, openTutorial } = useTutorial();
+  const { showTutorial, markTutorialComplete, closeTutorial, openTutorial, resetAllTutorials } = useTutorial();
   const {
     refresh: refreshSubscription,
     currentPlan: subscriptionPlan,
@@ -421,7 +421,10 @@ export default function Dashboard() {
               onPlanSaved={fetchCurrentPlan}
             />
 
-            <DashboardFooter onOpenTutorial={openTutorial} />
+            <DashboardFooter 
+              onOpenTutorial={openTutorial} 
+              onResetTutorials={resetAllTutorials}
+            />
           </main>
         )}
 

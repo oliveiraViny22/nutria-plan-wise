@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback } from 'react';
 
 const TUTORIAL_STORAGE_KEY = 'nutriplan_tutorial_completed';
 const TUTORIAL_SIGNUP_KEY = 'nutriplan_show_tutorial_after_signup';
+const TOOLTIP_STORAGE_PREFIX = 'nutriplan_tooltip_seen_';
+const WIZARD_STORAGE_PREFIX = 'nutriplan_wizard_completed_';
 
 export function useTutorial() {
   const [showTutorial, setShowTutorial] = useState(false);
@@ -43,6 +45,21 @@ export function useTutorial() {
     setHasCompletedTutorial(false);
   }, []);
 
+  // Reset all tutorials, tooltips and wizards
+  const resetAllTutorials = useCallback(() => {
+    // Reset main tutorial
+    localStorage.removeItem(TUTORIAL_STORAGE_KEY);
+    setHasCompletedTutorial(false);
+    
+    // Reset all tooltips
+    const tooltipKeys = Object.keys(localStorage).filter(k => k.startsWith(TOOLTIP_STORAGE_PREFIX));
+    tooltipKeys.forEach(k => localStorage.removeItem(k));
+    
+    // Reset all wizards
+    const wizardKeys = Object.keys(localStorage).filter(k => k.startsWith(WIZARD_STORAGE_PREFIX));
+    wizardKeys.forEach(k => localStorage.removeItem(k));
+  }, []);
+
   return {
     showTutorial,
     hasCompletedTutorial,
@@ -51,5 +68,6 @@ export function useTutorial() {
     openTutorial,
     closeTutorial,
     resetTutorial,
+    resetAllTutorials,
   };
 }
