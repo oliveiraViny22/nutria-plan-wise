@@ -266,7 +266,7 @@ export default function Index() {
         ) : (
           <motion.main 
             style={{ opacity: heroOpacity, scale: heroScale }}
-            className="w-full max-w-7xl mx-auto px-6 lg:px-12 xl:px-16 py-16 lg:py-20 relative z-10"
+            className="container max-w-7xl mx-auto px-6 py-16 lg:py-20 relative z-10"
           >
             <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 xl:gap-24 items-center">
               {/* Text Content with Parallax */}
@@ -420,7 +420,7 @@ export default function Index() {
         ) : (
           <motion.div
             style={{ opacity: featuresOpacity }}
-            className="w-full max-w-7xl mx-auto px-6 lg:px-12 xl:px-16 relative z-10"
+            className="container max-w-7xl mx-auto px-6 relative z-10"
           >
             <motion.div
               initial={{ opacity: 0, y: 20 }}
@@ -488,7 +488,7 @@ export default function Index() {
           </>
         )}
 
-        <div className="w-full max-w-7xl mx-auto px-6 lg:px-12 xl:px-16 relative z-10">
+        <div className="container max-w-7xl mx-auto px-6 relative z-10">
           {isMobile ? (
             <>
               <div className="text-center mb-8">
