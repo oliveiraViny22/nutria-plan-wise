@@ -28,6 +28,7 @@ import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
 import { MobileNav } from '@/components/MobileNav';
 import { ThemeToggle } from '@/components/ThemeToggle';
+import { UpgradePrompt } from '@/components/UpgradePrompt';
 import { useSubscription } from '@/hooks/useSubscription';
 import { useToast } from '@/hooks/use-toast';
 import { useUserRole } from '@/hooks/useUserRole';
@@ -279,46 +280,7 @@ export default function Subscription() {
 
         {/* Free Plan Upgrade CTA */}
         {isFreePlan && !isLinkedStudent && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-          >
-            <Card className="border-primary/30 overflow-hidden">
-              <div className="h-1.5 bg-gradient-to-r from-primary via-primary/70 to-primary/40" />
-              <CardContent className="pt-8 pb-8 text-center space-y-5">
-                <div className="mx-auto w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center">
-                  <Crown className="h-8 w-8 text-primary" />
-                </div>
-                <div className="space-y-2 max-w-md mx-auto">
-                  <h3 className="text-xl font-bold">Desbloqueie todo o potencial</h3>
-                  <p className="text-sm text-muted-foreground leading-relaxed">
-                    Com o plano Pessoal, você tem acesso a dietas ilimitadas, chat com IA, registro diário, 
-                    acompanhamento de progresso e muito mais.
-                  </p>
-                </div>
-                <div className="grid grid-cols-2 gap-3 max-w-sm mx-auto text-left">
-                  {[
-                    'Dietas ilimitadas',
-                    'Chat com IA',
-                    'Registro diário',
-                    'Acompanhamento',
-                    'Substituições livres',
-                    'Ajustes automáticos',
-                  ].map((feature) => (
-                    <div key={feature} className="flex items-center gap-2 text-sm">
-                      <Check className="h-4 w-4 text-primary flex-shrink-0" />
-                      <span>{feature}</span>
-                    </div>
-                  ))}
-                </div>
-                <Button size="lg" className="mt-2" onClick={() => navigate('/pricing')}>
-                  <Zap className="h-4 w-4 mr-2" />
-                  Ver Planos e Preços
-                </Button>
-              </CardContent>
-            </Card>
-          </motion.div>
+          <UpgradePrompt source="subscription_page" variant="card" />
         )}
 
         {/* Usage Stats & Plan Features - Side by Side (paid users only) */}
