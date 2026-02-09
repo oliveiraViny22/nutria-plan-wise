@@ -14,6 +14,7 @@ import {
   Calculator,
   RefreshCw,
   HelpCircle,
+  Lock as LockIcon,
 } from 'lucide-react';
 import {
   Dialog,
@@ -197,32 +198,82 @@ export function ObjectiveChangeWizard({
               exit={{ opacity: 0, y: -10 }}
               className="space-y-4"
             >
-              <Alert variant="destructive">
-                <Clock className="h-4 w-4" />
-                <AlertTitle>Alteração bloqueada</AlertTitle>
-                <AlertDescription>
-                  {eligibility.reason}
-                  {remainingDays !== null && remainingDays > 0 && (
-                    <span className="block mt-2 font-medium">
-                      Faltam {remainingDays} dias para liberar.
-                    </span>
+              {eligibility.reason?.includes('gratuito') ? (
+                <>
+                  <Alert className="border-primary/30 bg-primary/5">
+                    <LockIcon className="h-4 w-4 text-primary" />
+                    <AlertTitle>Recurso Premium</AlertTitle>
+                    <AlertDescription>
+                      A alteração de objetivo está disponível apenas para usuários com plano pago.
+                      Faça upgrade para desbloquear esse e outros recursos.
+                    </AlertDescription>
+                  </Alert>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      className="flex-1"
+                      onClick={() => onOpenChange(false)}
+                    >
+                      Voltar
+                    </Button>
+                    <Button
+                      className="flex-1"
+                      onClick={() => {
+                        onOpenChange(false);
+                        window.location.href = '/pricing';
+                      }}
+                    >
+                      Ver planos
+                    </Button>
+                  </div>
+                </>
+              ) : eligibility.reason?.includes('profissional') || eligibility.reason?.includes('Alunos') ? (
+                <>
+                  <Alert className="border-accent/30 bg-accent/5">
+                    <Info className="h-4 w-4 text-accent-foreground" />
+                    <AlertTitle>Solicite ao profissional</AlertTitle>
+                    <AlertDescription>
+                      Como aluno vinculado, a alteração de objetivo deve ser solicitada ao seu nutricionista.
+                    </AlertDescription>
+                  </Alert>
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => onOpenChange(false)}
+                  >
+                    Entendi
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Alert variant="destructive">
+                    <Clock className="h-4 w-4" />
+                    <AlertTitle>Alteração bloqueada</AlertTitle>
+                    <AlertDescription>
+                      {eligibility.reason}
+                      {remainingDays !== null && remainingDays > 0 && (
+                        <span className="block mt-2 font-medium">
+                          Faltam {remainingDays} dias para liberar.
+                        </span>
+                      )}
+                    </AlertDescription>
+                  </Alert>
+
+                  {eligibility.change_count > 0 && (
+                    <p className="text-sm text-muted-foreground">
+                      Você já alterou seu objetivo {eligibility.change_count} vez(es).
+                    </p>
                   )}
-                </AlertDescription>
-              </Alert>
 
-              {eligibility.change_count > 0 && (
-                <p className="text-sm text-muted-foreground">
-                  Você já alterou seu objetivo {eligibility.change_count} vez(es).
-                </p>
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => onOpenChange(false)}
+                  >
+                    Entendi
+                  </Button>
+                </>
               )}
-
-              <Button
-                variant="outline"
-                className="w-full"
-                onClick={() => onOpenChange(false)}
-              >
-                Entendi
-              </Button>
             </motion.div>
           )}
 
