@@ -808,6 +808,70 @@ export function useAdminOperations() {
     setSettings(prev => prev.filter(s => s.id !== deletedSetting.id));
   }, []);
 
+  const createUser = useCallback(async (
+    email: string, password: string, name: string, planId?: string
+  ): Promise<{ userId: string; email: string; name: string } | null> => {
+    setLoading(true);
+    try {
+      const data = await invokeAdmin('create_user', { email, password, name, planId });
+      toast({ title: 'Usuário criado', description: `${name} (${email})` });
+      return data;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erro ao criar usuário';
+      toast({ title: 'Erro', description: message, variant: 'destructive' });
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  }, [invokeAdmin, toast]);
+
+  const changeUserPassword = useCallback(async (
+    targetUserId: string, newPassword: string
+  ): Promise<boolean> => {
+    setSavingKeys(prev => new Set(prev).add(`pwd_${targetUserId}`));
+    try {
+      await invokeAdmin('change_user_password', { targetUserId, newPassword });
+      toast({ title: 'Senha alterada com sucesso' });
+      setSavedKeys(prev => new Set(prev).add(`pwd_${targetUserId}`));
+      setTimeout(() => {
+        setSavedKeys(prev => { const next = new Set(prev); next.delete(`pwd_${targetUserId}`); return next; });
+      }, 2000);
+      return true;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erro ao alterar senha';
+      toast({ title: 'Erro', description: message, variant: 'destructive' });
+      return false;
+    } finally {
+      setSavingKeys(prev => { const next = new Set(prev); next.delete(`pwd_${targetUserId}`); return next; });
+    }
+  }, [invokeAdmin, toast]);
+
+  const changeUserPlan = useCallback(async (
+    targetUserId: string, planId: string
+  ): Promise<boolean> => {
+    setSavingKeys(prev => new Set(prev).add(`plan_${targetUserId}`));
+    try {
+      const data = await invokeAdmin('change_user_plan', { targetUserId, planId });
+      toast({ title: 'Plano alterado', description: `Novo plano: ${data.newPlan}` });
+      // Update local state
+      setUsers(prev => prev.map(u => {
+        if (u.user_id !== targetUserId) return u;
+        return { ...u, plan_name: data.newPlan, subscription_status: 'active' };
+      }));
+      setSavedKeys(prev => new Set(prev).add(`plan_${targetUserId}`));
+      setTimeout(() => {
+        setSavedKeys(prev => { const next = new Set(prev); next.delete(`plan_${targetUserId}`); return next; });
+      }, 2000);
+      return true;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erro ao alterar plano';
+      toast({ title: 'Erro', description: message, variant: 'destructive' });
+      return false;
+    } finally {
+      setSavingKeys(prev => { const next = new Set(prev); next.delete(`plan_${targetUserId}`); return next; });
+    }
+  }, [invokeAdmin, toast]);
+
   return {
     loading,
     settingsLoading,
@@ -850,5 +914,8 @@ export function useAdminOperations() {
     updateFood,
     deleteFood,
     normalizeFoodNames,
+    createUser,
+    changeUserPassword,
+    changeUserPlan,
   };
 }

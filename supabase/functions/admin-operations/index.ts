@@ -236,6 +236,20 @@ serve(async (req) => {
         result = await updateUserUsage(supabaseAdmin, userId, params.targetUserId as string, params.updates as Record<string, unknown>, req.headers);
         break;
 
+      case 'create_user':
+        if (!validate.isEmail(params.email) || !validate.isNonEmptyString(params.password) || !validate.isNonEmptyString(params.name)) {
+          throw new Error("Email, senha e nome são obrigatórios");
+        }
+        result = await createUser(supabaseAdmin, userId, params.email as string, params.password as string, params.name as string, params.planId as string | undefined, req.headers);
+        break;
+
+      case 'change_user_plan':
+        if (!validate.isUUID(params.targetUserId) || !validate.isUUID(params.planId)) {
+          throw new Error("IDs de usuário e plano inválidos");
+        }
+        result = await changeUserPlan(supabaseAdmin, userId, params.targetUserId as string, params.planId as string, req.headers);
+        break;
+
       default:
         throw new Error(`Ação desconhecida: ${action}`);
     }
@@ -1645,4 +1659,143 @@ async function updateUserUsage(
 
   logStep('User usage updated', { targetUserId });
   return { usage: result };
+}
+
+// deno-lint-ignore no-explicit-any
+async function createUser(
+  supabase: any,
+  adminId: string,
+  email: string,
+  password: string,
+  name: string,
+  planId: string | undefined,
+  headers: Headers
+) {
+  const normalizedEmail = email.toLowerCase().trim();
+
+  if (password.length < 8) {
+    throw new Error('A senha deve ter pelo menos 8 caracteres');
+  }
+
+  logStep('Creating user', { email: normalizedEmail, name });
+
+  // Check if email already exists
+  const { data: existingProfile } = await supabase
+    .from('profiles')
+    .select('user_id')
+    .eq('email', normalizedEmail)
+    .single();
+
+  if (existingProfile) {
+    throw new Error('Este email já está cadastrado no sistema.');
+  }
+
+  // Create auth user
+  const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+    email: normalizedEmail,
+    password,
+    email_confirm: true,
+    user_metadata: { name, created_by_admin: adminId },
+  });
+
+  if (authError || !authData.user) {
+    throw new Error(`Erro ao criar usuário: ${authError?.message || 'Falha desconhecida'}`);
+  }
+
+  const newUserId = authData.user.id;
+
+  // Wait for trigger to create profile
+  await new Promise(resolve => setTimeout(resolve, 500));
+
+  // Update profile with name/email
+  await supabase
+    .from('profiles')
+    .update({ name, email: normalizedEmail })
+    .eq('user_id', newUserId);
+
+  // If a plan was specified, update the subscription
+  if (planId) {
+    await supabase
+      .from('subscriptions')
+      .update({ plan_id: planId, status: 'active' })
+      .eq('user_id', newUserId);
+  }
+
+  // Audit log
+  await supabase.from('admin_audit_log').insert({
+    user_id: adminId,
+    action: 'create_user',
+    entity_type: 'user',
+    entity_id: newUserId,
+    new_value: { email: normalizedEmail, name, planId },
+    user_agent: headers.get('user-agent'),
+  });
+
+  logStep('User created successfully', { newUserId });
+  return { success: true, userId: newUserId, email: normalizedEmail, name };
+}
+
+// deno-lint-ignore no-explicit-any
+async function changeUserPlan(
+  supabase: any,
+  adminId: string,
+  targetUserId: string,
+  planId: string,
+  headers: Headers
+) {
+  logStep('Changing user plan', { targetUserId, planId });
+
+  // Verify plan exists
+  const { data: plan, error: planError } = await supabase
+    .from('plans')
+    .select('id, name, type')
+    .eq('id', planId)
+    .single();
+
+  if (planError || !plan) {
+    throw new Error('Plano não encontrado');
+  }
+
+  // Get current subscription
+  const { data: currentSub } = await supabase
+    .from('subscriptions')
+    .select('id, plan_id, plans(name)')
+    .eq('user_id', targetUserId)
+    .single();
+
+  const oldPlanName = (currentSub?.plans as { name: string } | null)?.name || 'Nenhum';
+
+  if (currentSub) {
+    // Update existing subscription
+    const { error } = await supabase
+      .from('subscriptions')
+      .update({ plan_id: planId, status: 'active', updated_at: new Date().toISOString() })
+      .eq('user_id', targetUserId);
+
+    if (error) throw new Error(`Erro ao atualizar plano: ${error.message}`);
+  } else {
+    // Create subscription
+    const { error } = await supabase
+      .from('subscriptions')
+      .insert({ user_id: targetUserId, plan_id: planId, status: 'active' });
+
+    if (error) throw new Error(`Erro ao criar assinatura: ${error.message}`);
+  }
+
+  // Reset usage when changing plans
+  await supabase.rpc('reset_monthly_usage', { _user_id: targetUserId });
+
+  // Audit log
+  await supabase.from('admin_audit_log').insert({
+    user_id: adminId,
+    action: 'change_user_plan',
+    entity_type: 'subscription',
+    entity_id: targetUserId,
+    old_value: { plan: oldPlanName },
+    new_value: { plan: plan.name, planId },
+    user_agent: headers.get('user-agent'),
+  });
+
+  logStep('User plan changed', { targetUserId, newPlan: plan.name });
+  return { success: true, newPlan: plan.name };
 }

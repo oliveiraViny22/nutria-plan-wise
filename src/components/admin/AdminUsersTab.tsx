@@ -4,7 +4,7 @@
  * Manages user accounts, roles, and quotas
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   Users, 
   Search, 
@@ -16,6 +16,9 @@ import {
   Loader2,
   Save,
   X,
+  UserPlus,
+  KeyRound,
+  CreditCard,
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -26,8 +29,9 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { UserProfile, DeleteUserPreview, UserUsage } from '@/hooks/useAdminOperations';
+import { UserProfile, DeleteUserPreview, UserUsage, Plan } from '@/hooks/useAdminOperations';
 
 interface AdminUsersTabProps {
   users: UserProfile[];
@@ -41,6 +45,11 @@ interface AdminUsersTabProps {
   deleteUser: (userId: string) => Promise<boolean>;
   getUserUsage: (userId: string) => Promise<UserUsage | null>;
   updateUserUsage: (userId: string, data: Partial<UserUsage>) => Promise<boolean>;
+  createUser: (email: string, password: string, name: string, planId?: string) => Promise<{ userId: string; email: string; name: string } | null>;
+  changeUserPassword: (targetUserId: string, newPassword: string) => Promise<boolean>;
+  changeUserPlan: (targetUserId: string, planId: string) => Promise<boolean>;
+  plans: Plan[];
+  fetchPlans: () => Promise<Plan[]>;
 }
 
 export function AdminUsersTab({
@@ -55,6 +64,11 @@ export function AdminUsersTab({
   deleteUser,
   getUserUsage,
   updateUserUsage,
+  createUser,
+  changeUserPassword,
+  changeUserPlan,
+  plans,
+  fetchPlans,
 }: AdminUsersTabProps) {
   const { toast } = useToast();
   const [userSearch, setUserSearch] = useState('');
@@ -68,6 +82,24 @@ export function AdminUsersTab({
   const [userUsage, setUserUsage] = useState<UserUsage | null>(null);
   const [editedQuotas, setEditedQuotas] = useState<Partial<UserUsage>>({});
   const [loadingUserUsage, setLoadingUserUsage] = useState(false);
+
+  // New dialogs state
+  const [showCreateUser, setShowCreateUser] = useState(false);
+  const [newUser, setNewUser] = useState({ email: '', password: '', name: '', planId: '' });
+  const [creatingUser, setCreatingUser] = useState(false);
+
+  const [passwordUser, setPasswordUser] = useState<UserProfile | null>(null);
+  const [newPassword, setNewPassword] = useState('');
+
+  const [planUser, setPlanUser] = useState<UserProfile | null>(null);
+  const [selectedPlanId, setSelectedPlanId] = useState('');
+
+  // Fetch plans when plan dialog opens
+  useEffect(() => {
+    if (planUser || showCreateUser) {
+      if (plans.length === 0) fetchPlans();
+    }
+  }, [planUser, showCreateUser, plans.length, fetchPlans]);
 
   return (
     <>
@@ -104,6 +136,10 @@ export function AdminUsersTab({
             }}>
               <Search className="h-4 w-4 mr-1" />
               Buscar
+            </Button>
+            <Button onClick={() => setShowCreateUser(true)} variant="default">
+              <UserPlus className="h-4 w-4 mr-1" />
+              Criar Usuário
             </Button>
           </div>
 
@@ -194,6 +230,28 @@ export function AdminUsersTab({
                             title="Editar cotas"
                           >
                             <BarChart3 className="h-4 w-4" />
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            onClick={() => {
+                              setPasswordUser(user);
+                              setNewPassword('');
+                            }}
+                            title="Alterar senha"
+                          >
+                            <KeyRound className="h-4 w-4" />
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            onClick={() => {
+                              setPlanUser(user);
+                              setSelectedPlanId('');
+                            }}
+                            title="Alterar plano"
+                          >
+                            <CreditCard className="h-4 w-4" />
                           </Button>
                           <Button 
                             variant="ghost" 
@@ -531,6 +589,194 @@ export function AdminUsersTab({
               </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Create User Dialog */}
+      <Dialog open={showCreateUser} onOpenChange={(open) => {
+        if (!open) {
+          setShowCreateUser(false);
+          setNewUser({ email: '', password: '', name: '', planId: '' });
+        }
+      }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <UserPlus className="h-5 w-5" />
+              Criar Novo Usuário
+            </DialogTitle>
+            <DialogDescription>
+              Crie uma conta com email e senha. O email será confirmado automaticamente.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Nome</Label>
+              <Input
+                value={newUser.name}
+                onChange={(e) => setNewUser(prev => ({ ...prev, name: e.target.value }))}
+                placeholder="Nome do usuário"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Email</Label>
+              <Input
+                type="email"
+                value={newUser.email}
+                onChange={(e) => setNewUser(prev => ({ ...prev, email: e.target.value }))}
+                placeholder="email@exemplo.com"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Senha</Label>
+              <Input
+                type="text"
+                value={newUser.password}
+                onChange={(e) => setNewUser(prev => ({ ...prev, password: e.target.value }))}
+                placeholder="Mínimo 8 caracteres"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Plano (opcional)</Label>
+              <Select value={newUser.planId} onValueChange={(v) => setNewUser(prev => ({ ...prev, planId: v }))}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Plano gratuito (padrão)" />
+                </SelectTrigger>
+                <SelectContent>
+                  {plans.map((plan) => (
+                    <SelectItem key={plan.id} value={plan.id}>
+                      {plan.name} ({plan.type})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex justify-end gap-2 pt-4">
+              <Button variant="outline" onClick={() => setShowCreateUser(false)}>
+                Cancelar
+              </Button>
+              <Button
+                onClick={async () => {
+                  setCreatingUser(true);
+                  try {
+                    const result = await createUser(
+                      newUser.email, newUser.password, newUser.name,
+                      newUser.planId || undefined
+                    );
+                    if (result) {
+                      setShowCreateUser(false);
+                      setNewUser({ email: '', password: '', name: '', planId: '' });
+                      fetchUsers(50, userPage * 50, userSearch);
+                    }
+                  } finally {
+                    setCreatingUser(false);
+                  }
+                }}
+                disabled={creatingUser || !newUser.email || !newUser.password || !newUser.name || newUser.password.length < 8}
+              >
+                {creatingUser ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <UserPlus className="h-4 w-4 mr-1" />}
+                Criar
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Change Password Dialog */}
+      <Dialog open={!!passwordUser} onOpenChange={(open) => !open && setPasswordUser(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <KeyRound className="h-5 w-5" />
+              Alterar Senha
+            </DialogTitle>
+            <DialogDescription>
+              {passwordUser?.name || passwordUser?.email}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Nova Senha</Label>
+              <Input
+                type="text"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="Mínimo 8 caracteres"
+              />
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={() => setPasswordUser(null)}>
+                Cancelar
+              </Button>
+              <Button
+                onClick={async () => {
+                  if (!passwordUser) return;
+                  const ok = await changeUserPassword(passwordUser.user_id, newPassword);
+                  if (ok) setPasswordUser(null);
+                }}
+                disabled={savingKeys.has(`pwd_${passwordUser?.user_id}`) || newPassword.length < 8}
+              >
+                {savingKeys.has(`pwd_${passwordUser?.user_id}`) ? (
+                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                ) : (
+                  <Save className="h-4 w-4 mr-1" />
+                )}
+                Salvar
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Change Plan Dialog */}
+      <Dialog open={!!planUser} onOpenChange={(open) => !open && setPlanUser(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CreditCard className="h-5 w-5" />
+              Alterar Plano
+            </DialogTitle>
+            <DialogDescription>
+              {planUser?.name || planUser?.email} — Plano atual: <Badge variant="secondary">{planUser?.plan_name || 'Gratuito'}</Badge>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Novo Plano</Label>
+              <Select value={selectedPlanId} onValueChange={setSelectedPlanId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecionar plano" />
+                </SelectTrigger>
+                <SelectContent>
+                  {plans.map((plan) => (
+                    <SelectItem key={plan.id} value={plan.id}>
+                      {plan.name} ({plan.type})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={() => setPlanUser(null)}>
+                Cancelar
+              </Button>
+              <Button
+                onClick={async () => {
+                  if (!planUser || !selectedPlanId) return;
+                  const ok = await changeUserPlan(planUser.user_id, selectedPlanId);
+                  if (ok) setPlanUser(null);
+                }}
+                disabled={savingKeys.has(`plan_${planUser?.user_id}`) || !selectedPlanId}
+              >
+                {savingKeys.has(`plan_${planUser?.user_id}`) ? (
+                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                ) : (
+                  <Save className="h-4 w-4 mr-1" />
+                )}
+                Salvar
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </>

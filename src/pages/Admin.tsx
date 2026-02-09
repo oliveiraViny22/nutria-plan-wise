@@ -156,6 +156,9 @@ export default function Admin() {
     updateFood,
     deleteFood,
     normalizeFoodNames,
+    createUser,
+    changeUserPassword,
+    changeUserPlan,
   } = useAdminOperations();
   
   // Real-time settings updates
@@ -508,6 +511,11 @@ export default function Admin() {
                     deleteUser={deleteUser}
                     getUserUsage={getUserUsage}
                     updateUserUsage={updateUserUsage}
+                    createUser={createUser}
+                    changeUserPassword={changeUserPassword}
+                    changeUserPlan={changeUserPlan}
+                    plans={plans}
+                    fetchPlans={fetchPlans}
                   />
                 </TabsContent>
 
