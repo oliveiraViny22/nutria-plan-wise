@@ -161,8 +161,15 @@ export function useObjectiveChangeRequests() {
           });
 
         if (applyError) {
-          console.error('Error applying objective change:', applyError);
-          // Still mark as success since the approval was recorded
+          console.error('Error applying objective change, rolling back approval:', applyError);
+          // Rollback: revert status to pending since the change failed
+          await supabase
+            .from('objective_change_requests')
+            .update({ status: 'pending', professional_response: null })
+            .eq('id', requestId);
+          
+          toast.error('Erro ao aplicar alteração de objetivo. A solicitação voltou para pendente.');
+          return false;
         }
       }
 

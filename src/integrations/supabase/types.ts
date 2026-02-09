@@ -1396,6 +1396,10 @@ export type Database = {
         Args: { _new_goal: string; _user_id: string }
         Returns: Json
       }
+      calculate_nutritional_targets: {
+        Args: { _goal: string; _user_id: string }
+        Returns: Json
+      }
       can_use_feature: {
         Args: { _feature: string; _user_id: string }
         Returns: boolean
