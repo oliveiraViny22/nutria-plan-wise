@@ -31,14 +31,15 @@ export interface Subscription {
   user_id: string;
   plan_id: string;
   status: 'trial' | 'active' | 'past_due' | 'canceled' | 'expired';
-  billing_cycle: 'monthly';
-  provider?: string;
-  provider_subscription_id?: string;
-  provider_customer_id?: string;
+  billing_cycle?: 'monthly';
+  stripe_subscription_id?: string;
+  stripe_customer_id?: string;
   stripe_price_id?: string;
   current_period_start?: string;
   current_period_end?: string;
   cancel_at_period_end?: boolean;
+  grace_period_end?: string;
+  last_reconciled?: string;
   created_at: string;
   updated_at: string;
 }

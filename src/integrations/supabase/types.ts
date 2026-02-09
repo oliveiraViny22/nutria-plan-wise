@@ -1150,7 +1150,9 @@ export type Database = {
           created_at: string
           current_period_end: string | null
           current_period_start: string | null
+          grace_period_end: string | null
           id: string
+          last_reconciled: string | null
           plan_id: string
           status: Database["public"]["Enums"]["subscription_status"]
           stripe_customer_id: string | null
@@ -1163,7 +1165,9 @@ export type Database = {
           created_at?: string
           current_period_end?: string | null
           current_period_start?: string | null
+          grace_period_end?: string | null
           id?: string
+          last_reconciled?: string | null
           plan_id: string
           status?: Database["public"]["Enums"]["subscription_status"]
           stripe_customer_id?: string | null
@@ -1176,7 +1180,9 @@ export type Database = {
           created_at?: string
           current_period_end?: string | null
           current_period_start?: string | null
+          grace_period_end?: string | null
           id?: string
+          last_reconciled?: string | null
           plan_id?: string
           status?: Database["public"]["Enums"]["subscription_status"]
           stripe_customer_id?: string | null
@@ -1522,6 +1528,7 @@ export type Database = {
         Returns: boolean
       }
       remove_accents: { Args: { input_text: string }; Returns: string }
+      reset_monthly_usage: { Args: { _user_id: string }; Returns: undefined }
     }
     Enums: {
       app_role: "admin" | "user" | "professional"
