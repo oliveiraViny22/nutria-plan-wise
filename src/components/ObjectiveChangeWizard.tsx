@@ -37,7 +37,7 @@ interface ObjectiveChangeWizardProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   currentGoal: string | null;
-  onSuccess?: (generateNewPlan: boolean) => void;
+  onSuccess?: (action: 'generate' | 'rebalance' | 'none') => void;
 }
 
 type WizardStep = 'check' | 'info' | 'select' | 'impact' | 'confirm';
@@ -66,13 +66,13 @@ export function ObjectiveChangeWizard({
   const { loading, eligibility, checkEligibility, applyObjectiveChange, getRemainingDays } = useObjectiveChange();
   const [selectedGoal, setSelectedGoal] = useState<string>('');
   const [step, setStep] = useState<WizardStep>('check');
-  const [generateNewPlan, setGenerateNewPlan] = useState<boolean | null>(null);
+  const [postAction, setPostAction] = useState<'generate' | 'rebalance' | 'none' | null>(null);
 
   useEffect(() => {
     if (open) {
       setStep('check');
       setSelectedGoal('');
-      setGenerateNewPlan(null);
+      setPostAction(null);
       checkEligibility();
     }
   }, [open, checkEligibility]);
@@ -91,7 +91,7 @@ export function ObjectiveChangeWizard({
     const result = await applyObjectiveChange(selectedGoal);
     if (result?.success) {
       onOpenChange(false);
-      onSuccess?.(generateNewPlan === true);
+      onSuccess?.(postAction || 'none');
     }
   };
 
@@ -413,27 +413,40 @@ export function ObjectiveChangeWizard({
                 
                 <div className="space-y-2">
                   <Card 
-                    className={`cursor-pointer transition-all ${generateNewPlan === true ? 'ring-2 ring-primary' : 'hover:bg-accent'}`}
-                    onClick={() => setGenerateNewPlan(true)}
+                    className={`cursor-pointer transition-all ${postAction === 'generate' ? 'ring-2 ring-primary' : 'hover:bg-accent'}`}
+                    onClick={() => setPostAction('generate')}
                   >
                     <CardContent className="p-3 flex items-center gap-3">
                       <RefreshCw className="h-5 w-5 text-primary" />
                       <div>
                         <p className="font-medium text-sm">Gerar novo plano</p>
-                        <p className="text-xs text-muted-foreground">Criar um plano alimentar adequado ao novo objetivo</p>
+                        <p className="text-xs text-muted-foreground">Criar um plano alimentar do zero para o novo objetivo</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card 
+                    className={`cursor-pointer transition-all ${postAction === 'rebalance' ? 'ring-2 ring-primary' : 'hover:bg-accent'}`}
+                    onClick={() => setPostAction('rebalance')}
+                  >
+                    <CardContent className="p-3 flex items-center gap-3">
+                      <Calculator className="h-5 w-5 text-primary" />
+                      <div>
+                        <p className="font-medium text-sm">Otimizar plano atual</p>
+                        <p className="text-xs text-muted-foreground">Ajustar as quantidades dos alimentos para as novas metas</p>
                       </div>
                     </CardContent>
                   </Card>
                   
                   <Card 
-                    className={`cursor-pointer transition-all ${generateNewPlan === false ? 'ring-2 ring-primary' : 'hover:bg-accent'}`}
-                    onClick={() => setGenerateNewPlan(false)}
+                    className={`cursor-pointer transition-all ${postAction === 'none' ? 'ring-2 ring-primary' : 'hover:bg-accent'}`}
+                    onClick={() => setPostAction('none')}
                   >
                     <CardContent className="p-3 flex items-center gap-3">
                       <Clock className="h-5 w-5 text-muted-foreground" />
                       <div>
                         <p className="font-medium text-sm">Decidir depois</p>
-                        <p className="text-xs text-muted-foreground">Apenas alterar objetivo, sem gerar plano agora</p>
+                        <p className="text-xs text-muted-foreground">Apenas alterar objetivo, sem ajustar plano agora</p>
                       </div>
                     </CardContent>
                   </Card>
@@ -447,7 +460,7 @@ export function ObjectiveChangeWizard({
                 </Button>
                 <Button
                   className="flex-1"
-                  disabled={generateNewPlan === null}
+                  disabled={postAction === null}
                   onClick={goNext}
                 >
                   Continuar
@@ -480,7 +493,8 @@ export function ObjectiveChangeWizard({
                       </strong>
                     </li>
                     <li>Recalcular suas metas nutricionais</li>
-                    {generateNewPlan && <li>Iniciar geração de um novo plano alimentar</li>}
+                    {postAction === 'generate' && <li>Iniciar geração de um novo plano alimentar</li>}
+                    {postAction === 'rebalance' && <li>Otimizar as quantidades do plano atual para as novas metas</li>}
                   </ul>
                 </AlertDescription>
               </Alert>
