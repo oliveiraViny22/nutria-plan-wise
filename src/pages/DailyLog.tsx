@@ -109,33 +109,7 @@ export default function DailyLog() {
   const { isProfessional, loading: roleLoading } = useUserRole();
   const { isLinkedStudent, loading: linkedStudentLoading } = useLinkedStudent();
   const { confirmMeal: offlineConfirmMeal, pendingCount, isSyncing } = useOfflineSync();
-  
-  // Redirect free users to dashboard (linked students can access daily logging)
-  useEffect(() => {
-    if (
-      !permissions.loading &&
-      !roleLoading &&
-      !linkedStudentLoading &&
-      permissions.plan_name === 'gratuito' &&
-      !isProfessional &&
-      !isLinkedStudent
-    ) {
-      toast({
-        title: 'Funcionalidade Premium',
-        description: 'O registro de consumo está disponível para planos pagos e alunos vinculados.',
-        variant: 'destructive',
-      });
-      navigate('/dashboard');
-    }
-  }, [
-    permissions.loading,
-    permissions.plan_name,
-    roleLoading,
-    linkedStudentLoading,
-    isProfessional,
-    isLinkedStudent,
-    navigate,
-  ]);
+
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [loading, setLoading] = useState(true);
   const [meals, setMeals] = useState<MealWithOptions[]>([]);
@@ -155,6 +129,10 @@ export default function DailyLog() {
   // Success animation state
   const [showSuccessAnim, setShowSuccessAnim] = useState(false);
   
+  const isPaidUser = permissions.plan_name.toLowerCase() !== 'gratuito';
+  const accessLoading = permissions.loading || roleLoading || linkedStudentLoading;
+  const hasAccess = isPaidUser || isProfessional || isLinkedStudent;
+
   const isPastDate = isBefore(startOfDay(selectedDate), startOfDay(new Date()));
   const isReadOnly = isPastDate; // Past dates are read-only
   const dateKey = format(selectedDate, 'yyyy-MM-dd');
@@ -309,6 +287,55 @@ export default function DailyLog() {
   useEffect(() => {
     fetchDailyData();
   }, [user, dateKey]);
+
+  // Block screen for free users (render-time, no flash)
+  if (!accessLoading && !hasAccess) {
+    return (
+      <div className="min-h-screen bg-background overflow-x-hidden theme-patient">
+        <header className="sticky top-0 z-50 glass border-b">
+          <div className="container mx-auto px-3 sm:px-4 py-2 sm:py-3 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <MobileNav />
+              <Button variant="ghost" size="icon" className="hidden md:flex w-9 h-9 sm:w-10 sm:h-10" onClick={() => navigate('/dashboard')}>
+                <ArrowLeft className="h-4 w-4 sm:h-5 sm:w-5" />
+              </Button>
+              <Logo size="sm" />
+            </div>
+            <h1 className="text-base sm:text-lg font-semibold">Registro Diário</h1>
+            <ThemeToggle />
+          </div>
+        </header>
+        <main className="container mx-auto px-3 sm:px-4 py-8 sm:py-12">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="max-w-md mx-auto text-center"
+          >
+            <Card className="backdrop-blur-md bg-card/80 border-border/40 shadow-lg">
+              <CardContent className="py-8 sm:py-12 px-6">
+                <div className="w-16 h-16 mx-auto mb-6 rounded-full bg-primary/10 flex items-center justify-center">
+                  <UtensilsCrossed className="h-8 w-8 text-primary" />
+                </div>
+                <h2 className="text-xl sm:text-2xl font-bold mb-3">Recurso Premium</h2>
+                <p className="text-muted-foreground mb-6">
+                  O registro de consumo está disponível para planos pagos e alunos vinculados.
+                </p>
+                <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                  <Button onClick={() => navigate('/pricing')} className="gap-2">
+                    <UtensilsCrossed className="h-4 w-4" />
+                    Ver Planos
+                  </Button>
+                  <Button variant="outline" onClick={() => navigate('/dashboard')}>
+                    Voltar ao Dashboard
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        </main>
+      </div>
+    );
+  }
 
   const handleConfirmMeal = async () => {
     if (!confirmingMeal || !selectedOption || !user) return;
