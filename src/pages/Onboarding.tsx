@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, ArrowRight, Check, Loader2, Heart, Ban, User, Target, Utensils } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, Loader2, Heart, Ban, User, Target, Utensils, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -14,6 +14,16 @@ import { OnboardingTutorial } from '@/components/OnboardingTutorial';
 import { useTutorial } from '@/hooks/useTutorial';
 import { FoodSearchSelect } from '@/components/FoodSearchSelect';
 import { ACTIVITY_LEVELS, GOALS, FOOD_PREFERENCES, FOOD_RESTRICTIONS } from '@/lib/types';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 // Passos compactados: 3 etapas essenciais
 const steps = [
@@ -36,6 +46,8 @@ export default function Onboarding() {
   const { user, refreshProfile } = useAuth();
   const navigate = useNavigate();
   const { showTutorial, markTutorialComplete, closeTutorial } = useTutorial();
+  const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
 
   // Form data consolidado
   const [formData, setFormData] = useState({
@@ -161,6 +173,33 @@ export default function Onboarding() {
     }));
   };
 
+  const handleCancelOnboarding = async () => {
+    setCancelling(true);
+    try {
+      // Refresh session to ensure valid token
+      const { data: sessionData } = await supabase.auth.refreshSession();
+      const token = sessionData?.session?.access_token;
+      if (!token) throw new Error('Sessão expirada');
+
+      const { data, error } = await supabase.functions.invoke('delete-account', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (error) throw error;
+
+      // Sign out locally after account deletion
+      await supabase.auth.signOut();
+      toast.success('Cadastro cancelado. Seus dados foram removidos.');
+      navigate('/login');
+    } catch (err: any) {
+      console.error('Cancel onboarding error:', err);
+      toast.error('Erro ao cancelar cadastro. Tente novamente.');
+    } finally {
+      setCancelling(false);
+      setShowCancelDialog(false);
+    }
+  };
+
   const toggleRestriction = (rest: string) => {
     setFormData((prev) => ({
       ...prev,
@@ -195,7 +234,18 @@ export default function Onboarding() {
         {/* Header compacto */}
         <header className="p-4 flex items-center justify-between">
           <Logo />
-          <ThemeToggle />
+          <div className="flex items-center gap-2">
+            <ThemeToggle />
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowCancelDialog(true)}
+              className="text-muted-foreground hover:text-destructive text-xs gap-1"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+              Cancelar
+            </Button>
+          </div>
         </header>
 
         {/* Progress simplificado */}
@@ -556,6 +606,34 @@ export default function Onboarding() {
           </div>
         </footer>
       </div>
+
+      <AlertDialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cancelar cadastro?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Sua conta e todos os dados serão permanentemente excluídos. Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={cancelling}>Voltar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleCancelOnboarding}
+              disabled={cancelling}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {cancelling ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Excluindo...
+                </>
+              ) : (
+                'Sim, excluir minha conta'
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
