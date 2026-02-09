@@ -89,7 +89,8 @@ export function ObjectiveChangeWizard({
   const handleConfirm = async () => {
     if (!selectedGoal) return;
     
-    const result = await applyObjectiveChange(selectedGoal);
+    const keepPlanActive = postAction === 'rebalance';
+    const result = await applyObjectiveChange(selectedGoal, keepPlanActive);
     if (result?.success) {
       onOpenChange(false);
       onSuccess?.(postAction || 'none');
