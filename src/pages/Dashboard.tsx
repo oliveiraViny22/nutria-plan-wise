@@ -112,6 +112,31 @@ export default function Dashboard() {
     }
   }, [searchParams, setSearchParams, refreshSubscription]);
 
+  // Handle objective change actions (generate / rebalance)
+  useEffect(() => {
+    const objectiveAction = searchParams.get('objective_action');
+    if (!objectiveAction || loading) return;
+
+    // Clean the param immediately to avoid re-triggering
+    setSearchParams({});
+
+    if (objectiveAction === 'generate') {
+      toast.info('Objetivo atualizado! Gerando novo plano alimentar...');
+      // Small delay to let profile refresh propagate
+      setTimeout(() => generateMealPlanV5(), 500);
+    } else if (objectiveAction === 'rebalance') {
+      if (currentDietPlan?.id && currentDietPlan.status === 'active') {
+        toast.info('Objetivo atualizado! Otimizando plano atual...');
+        // The AIRebalancer is rendered in DashboardActions/DashboardStats
+        // We scroll to it and let user click, since it requires UI interaction
+        toast.info('Use o botão "Otimizar" abaixo para ajustar seu plano às novas metas.', { duration: 6000 });
+      } else {
+        toast.info('Nenhum plano ativo encontrado. Gerando novo plano...');
+        setTimeout(() => generateMealPlanV5(), 500);
+      }
+    }
+  }, [searchParams, loading, currentDietPlan]);
+
   useEffect(() => {
     if (profile?.user_id) fetchCurrentPlan();
   }, [profile?.user_id]);

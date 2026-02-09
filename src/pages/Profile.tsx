@@ -547,9 +547,9 @@ export default function Profile() {
           onSuccess={async (action) => {
             await refreshProfile();
             if (action === 'generate') {
-              navigate('/meal-plan?action=generate');
+              navigate('/dashboard?objective_action=generate');
             } else if (action === 'rebalance') {
-              navigate('/meal-plan?action=rebalance');
+              navigate('/dashboard?objective_action=rebalance');
             }
           }}
         />
