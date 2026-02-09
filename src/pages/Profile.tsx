@@ -544,7 +544,14 @@ export default function Profile() {
           open={showObjectiveWizard}
           onOpenChange={setShowObjectiveWizard}
           currentGoal={formData.goal || 'maintain'}
-          onSuccess={refreshProfile}
+          onSuccess={async (action) => {
+            await refreshProfile();
+            if (action === 'generate') {
+              navigate('/meal-plan?action=generate');
+            } else if (action === 'rebalance') {
+              navigate('/meal-plan?action=rebalance');
+            }
+          }}
         />
       )}
 
