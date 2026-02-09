@@ -1,16 +1,20 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Send, Loader2, AlertTriangle, Bot, User, Lock } from 'lucide-react';
+import { ArrowLeft, Send, Loader2, AlertTriangle, Bot, User, Lock, MessageCircle } from 'lucide-react';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Card, CardContent } from '@/components/ui/card';
 import { MobileNav } from '@/components/MobileNav';
+import { Logo } from '@/components/Logo';
 import { useAuth } from '@/contexts/AuthContext';
+import { useAccountPermissions } from '@/hooks/useAccountPermissions';
+import { useUserRole } from '@/hooks/useUserRole';
+import { useLinkedStudent } from '@/hooks/useLinkedStudent';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { ChatUsageIndicator } from '@/components/ChatUsageIndicator';
-
 interface ChatUsage {
   current: number;
   limit: number;
@@ -26,6 +30,9 @@ interface ChatMessage {
 export default function Chat() {
   const navigate = useNavigate();
   const { user, profile } = useAuth();
+  const permissions = useAccountPermissions();
+  const { isProfessional, loading: roleLoading } = useUserRole();
+  const { isLinkedStudent, loading: linkedStudentLoading } = useLinkedStudent();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -35,6 +42,10 @@ export default function Chat() {
   const [limitReached, setLimitReached] = useState(false);
   const [limitMessage, setLimitMessage] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const isPaidUser = permissions.plan_name.toLowerCase() !== 'gratuito';
+  const accessLoading = permissions.loading || roleLoading || linkedStudentLoading;
+  const hasAccess = isPaidUser || isProfessional || isLinkedStudent;
 
   useEffect(() => {
     fetchInitialUsage();
@@ -213,6 +224,55 @@ export default function Chat() {
       'O que são macronutrientes?',
     ];
   };
+
+  // Block screen for free users
+  if (!accessLoading && !hasAccess) {
+    return (
+      <div className="min-h-screen bg-background overflow-x-hidden theme-patient">
+        <header className="sticky top-0 z-50 glass border-b">
+          <div className="container mx-auto px-3 sm:px-4 py-2 sm:py-3 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <MobileNav />
+              <Button variant="ghost" size="icon" className="hidden md:flex w-9 h-9 sm:w-10 sm:h-10" onClick={() => navigate('/dashboard')}>
+                <ArrowLeft className="h-4 w-4 sm:h-5 sm:w-5" />
+              </Button>
+              <Logo size="sm" />
+            </div>
+            <h1 className="text-base sm:text-lg font-semibold">Assistente Nutricional</h1>
+            <ThemeToggle />
+          </div>
+        </header>
+        <main className="container mx-auto px-3 sm:px-4 py-8 sm:py-12">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="max-w-md mx-auto text-center"
+          >
+            <Card className="backdrop-blur-md bg-card/80 border-border/40 shadow-lg">
+              <CardContent className="py-8 sm:py-12 px-6">
+                <div className="w-16 h-16 mx-auto mb-6 rounded-full bg-primary/10 flex items-center justify-center">
+                  <MessageCircle className="h-8 w-8 text-primary" />
+                </div>
+                <h2 className="text-xl sm:text-2xl font-bold mb-3">Recurso Premium</h2>
+                <p className="text-muted-foreground mb-6">
+                  O assistente nutricional com IA está disponível para planos pagos e alunos vinculados.
+                </p>
+                <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                  <Button onClick={() => navigate('/pricing')} className="gap-2">
+                    <MessageCircle className="h-4 w-4" />
+                    Ver Planos
+                  </Button>
+                  <Button variant="outline" onClick={() => navigate('/dashboard')}>
+                    Voltar ao Dashboard
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background flex flex-col overflow-x-hidden theme-patient">
