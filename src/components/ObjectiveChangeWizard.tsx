@@ -29,14 +29,15 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Progress } from '@/components/ui/progress';
 import { Card, CardContent } from '@/components/ui/card';
 import { useObjectiveChange } from '@/hooks/useObjectiveChange';
-import { GOALS, ACTIVITY_LEVELS } from '@/lib/types';
+import { GOALS } from '@/lib/types';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 
 interface ObjectiveChangeWizardProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   currentGoal: string | null;
-  onSuccess?: () => void;
+  onSuccess?: (generateNewPlan: boolean) => void;
 }
 
 type WizardStep = 'check' | 'info' | 'select' | 'impact' | 'confirm';
@@ -61,7 +62,7 @@ export function ObjectiveChangeWizard({
   currentGoal,
   onSuccess,
 }: ObjectiveChangeWizardProps) {
-  const { profile } = useAuth();
+  const { user, profile } = useAuth();
   const { loading, eligibility, checkEligibility, applyObjectiveChange, getRemainingDays } = useObjectiveChange();
   const [selectedGoal, setSelectedGoal] = useState<string>('');
   const [step, setStep] = useState<WizardStep>('check');
@@ -90,43 +91,48 @@ export function ObjectiveChangeWizard({
     const result = await applyObjectiveChange(selectedGoal);
     if (result?.success) {
       onOpenChange(false);
-      onSuccess?.();
+      onSuccess?.(generateNewPlan === true);
     }
   };
 
   const remainingDays = getRemainingDays();
   const availableGoals = Object.entries(GOALS).filter(([key]) => key !== currentGoal);
 
-  // Calculate new targets based on selected goal
-  const calculateNewTargets = () => {
-    if (!selectedGoal || !profile) return null;
+  // Fetch targets from backend RPC for consistency
+  const [newTargets, setNewTargets] = useState<{ calories: number; protein: number; carbs: number; fat: number } | null>(null);
+  const [loadingTargets, setLoadingTargets] = useState(false);
 
-    const bmr = profile.sex === 'male'
-      ? 10 * (profile.weight || 70) + 6.25 * (profile.height || 170) - 5 * (profile.age || 30) + 5
-      : 10 * (profile.weight || 60) + 6.25 * (profile.height || 160) - 5 * (profile.age || 30) - 161;
-
-    const activityMultiplier = ACTIVITY_LEVELS[profile.activity_level as keyof typeof ACTIVITY_LEVELS]?.multiplier || 1.55;
-    const tdee = bmr * activityMultiplier;
-    
-    const calorieAdjustment = GOALS[selectedGoal as keyof typeof GOALS]?.calorieAdjustment || 0;
-    const calories = Math.round(tdee + calorieAdjustment);
-
-    let proteinRatio = 0.3, carbsRatio = 0.4, fatRatio = 0.3;
-    if (selectedGoal === 'gain_muscle') {
-      proteinRatio = 0.35; carbsRatio = 0.45; fatRatio = 0.2;
-    } else if (selectedGoal === 'lose_weight') {
-      proteinRatio = 0.35; carbsRatio = 0.35; fatRatio = 0.3;
+  useEffect(() => {
+    if (!selectedGoal || !user?.id) {
+      setNewTargets(null);
+      return;
     }
 
-    return {
-      calories,
-      protein: Math.round((calories * proteinRatio) / 4),
-      carbs: Math.round((calories * carbsRatio) / 4),
-      fat: Math.round((calories * fatRatio) / 9),
-    };
-  };
+    let cancelled = false;
+    setLoadingTargets(true);
 
-  const newTargets = calculateNewTargets();
+    supabase
+      .rpc('calculate_nutritional_targets', { _user_id: user.id, _goal: selectedGoal })
+      .then(({ data, error }) => {
+        if (cancelled) return;
+        setLoadingTargets(false);
+        if (error) {
+          console.error('Error calculating targets:', error);
+          return;
+        }
+        const parsed = typeof data === 'string' ? JSON.parse(data) : data;
+        if (parsed && !parsed.error) {
+          setNewTargets({
+            calories: parsed.calories,
+            protein: parsed.protein,
+            carbs: parsed.carbs,
+            fat: parsed.fat,
+          });
+        }
+      });
+
+    return () => { cancelled = true; };
+  }, [selectedGoal, user?.id]);
 
   const goBack = () => {
     const stepOrder: WizardStep[] = ['check', 'info', 'select', 'impact', 'confirm'];
@@ -344,7 +350,18 @@ export function ObjectiveChangeWizard({
           )}
 
           {/* Step: Impact Preview */}
-          {step === 'impact' && newTargets && (
+          {step === 'impact' && (loadingTargets ? (
+            <motion.div
+              key="impact-loading"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="flex flex-col items-center py-8"
+            >
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              <p className="mt-4 text-muted-foreground">Calculando novas metas...</p>
+            </motion.div>
+          ) : newTargets && (
             <motion.div
               key="impact"
               initial={{ opacity: 0, y: 10 }}
@@ -438,7 +455,7 @@ export function ObjectiveChangeWizard({
                 </Button>
               </div>
             </motion.div>
-          )}
+          ))}
 
           {/* Step: Confirm */}
           {step === 'confirm' && (
