@@ -1392,10 +1392,16 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      apply_objective_change: {
-        Args: { _new_goal: string; _user_id: string }
-        Returns: Json
-      }
+      apply_objective_change:
+        | { Args: { _new_goal: string; _user_id: string }; Returns: Json }
+        | {
+            Args: {
+              _keep_plan_active?: boolean
+              _new_goal: string
+              _user_id: string
+            }
+            Returns: Json
+          }
       calculate_nutritional_targets: {
         Args: { _goal: string; _user_id: string }
         Returns: Json

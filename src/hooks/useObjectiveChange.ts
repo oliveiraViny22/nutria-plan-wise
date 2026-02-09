@@ -48,7 +48,7 @@ export function useObjectiveChange() {
     }
   }, [user?.id]);
 
-  const applyObjectiveChange = useCallback(async (newGoal: string): Promise<ObjectiveChangeResult | null> => {
+  const applyObjectiveChange = useCallback(async (newGoal: string, keepPlanActive: boolean = false): Promise<ObjectiveChangeResult | null> => {
     if (!user?.id) return null;
 
     setLoading(true);
@@ -56,7 +56,8 @@ export function useObjectiveChange() {
       const { data, error } = await supabase
         .rpc('apply_objective_change', { 
           _user_id: user.id,
-          _new_goal: newGoal
+          _new_goal: newGoal,
+          _keep_plan_active: keepPlanActive
         });
 
       if (error) throw error;
