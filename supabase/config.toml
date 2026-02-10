@@ -1,4 +1,4 @@
-project_id = "iplgqpnwfgnqaaeqxnrx"
+project_id = "uswtynxqvcgkvfyutndm"
 
 [functions.check-subscription]
 verify_jwt = false
