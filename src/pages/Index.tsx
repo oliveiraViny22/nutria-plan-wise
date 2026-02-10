@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
 import { motion, useScroll, useTransform, useSpring, useInView } from 'framer-motion';
 import { ArrowRight, Leaf, RefreshCw, MessageCircle, UserPlus, ClipboardList, Utensils, TrendingUp, ChevronDown, Trophy, BarChart3, Flame, Target } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -7,6 +7,7 @@ import { ThemeToggle } from '@/components/ThemeToggle';
 import { HeroImage } from '@/components/OptimizedImage';
 import heroImage from '@/assets/hero-nutrition.png';
 import { useRef, useEffect, useState } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
 
 // Hook to detect mobile devices
 const useIsMobile = () => {
@@ -121,12 +122,15 @@ const card3DVariants = {
 };
 
 export default function Index() {
+  const { user, loading: authLoading } = useAuth();
   const containerRef = useRef<HTMLDivElement>(null);
   const heroRef = useRef<HTMLElement>(null);
   const featuresRef = useRef<HTMLElement>(null);
   const stepsRef = useRef<HTMLElement>(null);
   const isMobile = useIsMobile();
   const isLargeScreen = useIsLargeScreen();
+
+
   
   // Feature cards refs for individual scroll tracking
   const featureRefs = useRef<(HTMLDivElement | null)[]>([]);
@@ -259,6 +263,11 @@ export default function Index() {
       description: 'Monitore sua evolução e ajuste seu objetivo conforme atinge suas metas.' 
     },
   ];
+
+  // Redirect authenticated users to dashboard
+  if (!authLoading && user) {
+    return <Navigate to="/dashboard" replace />;
+  }
 
   return (
     <div ref={containerRef} className="min-h-screen overflow-x-hidden w-full max-w-full">
