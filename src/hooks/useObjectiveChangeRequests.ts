@@ -158,6 +158,7 @@ export function useObjectiveChangeRequests() {
           .rpc('apply_objective_change', {
             _user_id: request.student_id,
             _new_goal: request.requested_goal,
+            _keep_plan_active: false,
           });
 
         if (applyError) {

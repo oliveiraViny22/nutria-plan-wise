@@ -120,21 +120,32 @@ export default function Dashboard() {
     // Clean the param immediately to avoid re-triggering
     setSearchParams({});
 
-    if (objectiveAction === 'generate') {
-      toast.info('Objetivo atualizado! Gerando novo plano alimentar...');
-      // Small delay to let profile refresh propagate
-      setTimeout(() => generateMealPlanV5(), 500);
-    } else if (objectiveAction === 'rebalance') {
-      if (currentDietPlan?.id && currentDietPlan.status === 'active') {
-        toast.info('Objetivo atualizado! Otimizando plano atual...');
-        // The AIRebalancer is rendered in DashboardActions/DashboardStats
-        // We scroll to it and let user click, since it requires UI interaction
-        toast.info('Use o botão "Otimizar" abaixo para ajustar seu plano às novas metas.', { duration: 6000 });
-      } else {
-        toast.info('Nenhum plano ativo encontrado. Gerando novo plano...');
-        setTimeout(() => generateMealPlanV5(), 500);
+    // Force profile refresh first to get updated targets (P2: race condition fix)
+    const doAction = async () => {
+      await refreshProfile();
+      
+      if (objectiveAction === 'generate') {
+        toast.info('Objetivo atualizado! Gerando novo plano alimentar...');
+        setTimeout(() => generateMealPlanV5(), 300);
+      } else if (objectiveAction === 'rebalance') {
+        if (currentDietPlan?.id && currentDietPlan.status === 'active') {
+          toast.info('Objetivo atualizado! Otimizando plano atual...', { duration: 5000 });
+          // Auto-scroll to the optimize section
+          setTimeout(() => {
+            const optimizeBtn = document.querySelector('[data-testid="optimize-button"], [aria-label*="Otimizar"]');
+            if (optimizeBtn) {
+              optimizeBtn.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              (optimizeBtn as HTMLElement).classList.add('ring-2', 'ring-primary', 'animate-pulse');
+              setTimeout(() => (optimizeBtn as HTMLElement).classList.remove('ring-2', 'ring-primary', 'animate-pulse'), 3000);
+            }
+          }, 600);
+        } else {
+          toast.info('Nenhum plano ativo encontrado. Gerando novo plano...');
+          setTimeout(() => generateMealPlanV5(), 300);
+        }
       }
-    }
+    };
+    doAction();
   }, [searchParams, loading, currentDietPlan]);
 
   useEffect(() => {

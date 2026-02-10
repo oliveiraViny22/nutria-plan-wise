@@ -1075,6 +1075,8 @@ export type Database = {
           last_evening_meal: string | null
           meals_per_day: number | null
           name: string | null
+          objective_change_count: number
+          objective_locked_until: string | null
           onboarding_completed: boolean | null
           preferences: string[] | null
           preferred_foods: string[] | null
@@ -1103,6 +1105,8 @@ export type Database = {
           last_evening_meal?: string | null
           meals_per_day?: number | null
           name?: string | null
+          objective_change_count?: number
+          objective_locked_until?: string | null
           onboarding_completed?: boolean | null
           preferences?: string[] | null
           preferred_foods?: string[] | null
@@ -1131,6 +1135,8 @@ export type Database = {
           last_evening_meal?: string | null
           meals_per_day?: number | null
           name?: string | null
+          objective_change_count?: number
+          objective_locked_until?: string | null
           onboarding_completed?: boolean | null
           preferences?: string[] | null
           preferred_foods?: string[] | null
@@ -1392,16 +1398,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      apply_objective_change:
-        | { Args: { _new_goal: string; _user_id: string }; Returns: Json }
-        | {
-            Args: {
-              _keep_plan_active?: boolean
-              _new_goal: string
-              _user_id: string
-            }
-            Returns: Json
-          }
+      apply_objective_change: {
+        Args: {
+          _keep_plan_active?: boolean
+          _new_goal: string
+          _user_id: string
+        }
+        Returns: Json
+      }
       calculate_nutritional_targets: {
         Args: { _goal: string; _user_id: string }
         Returns: Json
