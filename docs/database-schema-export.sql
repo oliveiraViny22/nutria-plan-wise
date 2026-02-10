@@ -1,7 +1,8 @@
 -- =============================================
--- NutriaPlan Database Schema Export
--- Generated: 2026-02-08
+-- NutriaPlan Database Schema Export (COMPLETO)
+-- Generated: 2026-02-10
 -- Supabase Project: iplgqpnwfgnqaaeqxnrx
+-- Inclui: Enums, Tabelas, Funções, Triggers, RLS
 -- =============================================
 
 -- =============================================
@@ -44,6 +45,8 @@ CREATE TABLE public.profiles (
     evening_meal_preference TEXT DEFAULT 'no_preference',
     last_evening_meal TEXT DEFAULT 'dinner',
     onboarding_completed BOOLEAN DEFAULT FALSE,
+    objective_change_count INTEGER NOT NULL DEFAULT 0,
+    objective_locked_until TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
 );
@@ -78,6 +81,8 @@ CREATE TABLE public.subscriptions (
     current_period_start TIMESTAMP WITH TIME ZONE,
     current_period_end TIMESTAMP WITH TIME ZONE,
     cancel_at_period_end BOOLEAN DEFAULT FALSE,
+    grace_period_end TIMESTAMP WITH TIME ZONE,
+    last_reconciled TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
 );
@@ -254,7 +259,7 @@ CREATE TABLE public.body_measurements (
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
 );
 
--- Professional Students (link between professionals and students)
+-- Professional Students
 CREATE TABLE public.professional_students (
     id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
     professional_id UUID NOT NULL REFERENCES public.profiles(user_id),
@@ -276,7 +281,7 @@ CREATE TABLE public.objective_change_policies (
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
 );
 
--- Objective Change Requests (students requesting goal changes)
+-- Objective Change Requests
 CREATE TABLE public.objective_change_requests (
     id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
     student_id UUID NOT NULL,
@@ -324,7 +329,7 @@ CREATE TABLE public.meal_role_food_categories (
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
 );
 
--- Meal Anchor Foods
+-- Meal Anchor Foods (1092 âncoras ativas)
 CREATE TABLE public.meal_anchor_foods (
     id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
     meal_type TEXT NOT NULL,
@@ -481,6 +486,32 @@ BEGIN
 END;
 $$;
 
+-- Set canonical name trigger function
+CREATE OR REPLACE FUNCTION public.set_canonical_name()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SET search_path = public
+AS $$
+BEGIN
+  IF NEW.canonical_name IS NULL OR NEW.canonical_name = '' THEN
+    NEW.canonical_name := public.generate_canonical_name(NEW.name);
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+-- Update updated_at column
+CREATE OR REPLACE FUNCTION public.update_updated_at_column()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SET search_path = public
+AS $$
+BEGIN
+    NEW.updated_at = now();
+    RETURN NEW;
+END;
+$$;
+
 -- Check if user has role
 CREATE OR REPLACE FUNCTION public.has_role(_user_id UUID, _role app_role)
 RETURNS BOOLEAN
@@ -622,6 +653,78 @@ BEGIN
 END;
 $$;
 
+-- Get usage info
+CREATE OR REPLACE FUNCTION public.get_usage_info(_user_id UUID, _feature TEXT)
+RETURNS TABLE(current_usage INTEGER, max_limit INTEGER, allowed BOOLEAN)
+LANGUAGE plpgsql
+STABLE SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+    v_plan RECORD;
+    v_usage RECORD;
+    v_current integer;
+    v_max integer;
+BEGIN
+    -- Admins have unlimited access
+    IF public.has_role(_user_id, 'admin'::app_role) THEN
+        SELECT * INTO v_usage FROM public.user_usage WHERE user_id = _user_id;
+        CASE _feature
+            WHEN 'diet' THEN v_current := COALESCE(v_usage.diets_used, 0);
+            WHEN 'substitution' THEN v_current := COALESCE(v_usage.substitutions_used, 0);
+            WHEN 'adjustment' THEN v_current := COALESCE(v_usage.adjustments_used, 0);
+            WHEN 'chat' THEN
+                IF v_usage IS NOT NULL AND v_usage.last_chat_reset < CURRENT_DATE THEN
+                    v_current := 0;
+                ELSE
+                    v_current := COALESCE(v_usage.chat_messages_today, 0);
+                END IF;
+            ELSE v_current := 0;
+        END CASE;
+        RETURN QUERY SELECT v_current, 999999, TRUE;
+        RETURN;
+    END IF;
+
+    SELECT p.* INTO v_plan
+    FROM public.subscriptions s
+    JOIN public.plans p ON p.id = s.plan_id
+    WHERE s.user_id = _user_id
+    AND s.status IN ('active', 'trial')
+    ORDER BY s.created_at DESC
+    LIMIT 1;
+    
+    IF v_plan IS NULL THEN
+        SELECT * INTO v_plan FROM public.plans WHERE type = 'gratuito' AND is_active = true LIMIT 1;
+    END IF;
+    
+    SELECT * INTO v_usage FROM public.user_usage WHERE user_id = _user_id;
+    
+    CASE _feature
+        WHEN 'diet' THEN
+            v_current := COALESCE(v_usage.diets_used, 0);
+            v_max := COALESCE(v_plan.diet_limit, 0);
+        WHEN 'substitution' THEN
+            v_current := COALESCE(v_usage.substitutions_used, 0);
+            v_max := COALESCE(v_plan.substitution_limit, 0);
+        WHEN 'adjustment' THEN
+            v_current := COALESCE(v_usage.adjustments_used, 0);
+            v_max := COALESCE(v_plan.adjustment_limit, 0);
+        WHEN 'chat' THEN
+            IF v_usage IS NOT NULL AND v_usage.last_chat_reset < CURRENT_DATE THEN
+                v_current := 0;
+            ELSE
+                v_current := COALESCE(v_usage.chat_messages_today, 0);
+            END IF;
+            v_max := COALESCE(v_plan.chat_messages_per_day, 0);
+        ELSE
+            v_current := 0;
+            v_max := 0;
+    END CASE;
+    
+    RETURN QUERY SELECT v_current, v_max, (v_current < v_max AND (v_plan.has_chat OR _feature != 'chat'));
+END;
+$$;
+
 -- Increment usage
 CREATE OR REPLACE FUNCTION public.increment_usage(_user_id UUID, _feature TEXT)
 RETURNS BOOLEAN
@@ -658,13 +761,253 @@ BEGIN
 END;
 $$;
 
+-- Reset monthly usage
+CREATE OR REPLACE FUNCTION public.reset_monthly_usage(_user_id UUID)
+RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  UPDATE public.user_usage
+  SET 
+    diets_used = 0,
+    substitutions_used = 0,
+    adjustments_used = 0,
+    chat_messages_today = 0,
+    last_chat_reset = CURRENT_DATE,
+    period_start = CURRENT_DATE,
+    period_end = CURRENT_DATE + INTERVAL '1 month',
+    updated_at = now()
+  WHERE user_id = _user_id;
+END;
+$$;
+
+-- Calculate nutritional targets
+CREATE OR REPLACE FUNCTION public.calculate_nutritional_targets(_user_id UUID, _goal TEXT)
+RETURNS JSON
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  _profile profiles%ROWTYPE;
+  _bmr numeric;
+  _tdee numeric;
+  _calories integer;
+  _protein integer;
+  _carbs integer;
+  _fat integer;
+  _activity_multiplier numeric;
+  _calorie_adjustment integer;
+  _weight numeric;
+  _protein_per_kg numeric;
+  _fat_ratio numeric;
+BEGIN
+  SELECT * INTO _profile FROM profiles WHERE user_id = _user_id;
+  IF NOT FOUND THEN
+    RETURN json_build_object('error', 'Profile not found');
+  END IF;
+
+  _weight := COALESCE(_profile.weight, 70);
+
+  -- BMR (Mifflin-St Jeor)
+  IF _profile.sex = 'male' THEN
+    _bmr := 10 * _weight + 6.25 * COALESCE(_profile.height, 170) - 5 * COALESCE(_profile.age, 30) + 5;
+  ELSE
+    _bmr := 10 * _weight + 6.25 * COALESCE(_profile.height, 160) - 5 * COALESCE(_profile.age, 30) - 161;
+  END IF;
+
+  _activity_multiplier := CASE _profile.activity_level
+    WHEN 'sedentary' THEN 1.2
+    WHEN 'light' THEN 1.375
+    WHEN 'moderate' THEN 1.55
+    WHEN 'active' THEN 1.725
+    WHEN 'very_active' THEN 1.9
+    ELSE 1.55
+  END;
+
+  _tdee := _bmr * _activity_multiplier;
+
+  _calorie_adjustment := CASE _goal
+    WHEN 'lose_weight' THEN -500
+    WHEN 'maintain' THEN 0
+    WHEN 'gain_muscle' THEN 300
+    ELSE 0
+  END;
+
+  _calories := ROUND(_tdee + _calorie_adjustment);
+
+  _protein_per_kg := CASE _goal
+    WHEN 'gain_muscle' THEN 2.0
+    WHEN 'lose_weight' THEN 2.0
+    WHEN 'maintain' THEN 1.4
+    ELSE 1.4
+  END;
+
+  _protein := ROUND(_weight * _protein_per_kg);
+
+  IF _protein > ROUND(_weight * 3.0) THEN
+    _protein := ROUND(_weight * 3.0);
+  END IF;
+
+  _fat_ratio := CASE _goal
+    WHEN 'gain_muscle' THEN 0.20
+    WHEN 'lose_weight' THEN 0.30
+    WHEN 'maintain' THEN 0.25
+    ELSE 0.25
+  END;
+
+  _fat := ROUND((_calories * _fat_ratio) / 9);
+
+  _carbs := ROUND((_calories - (_protein * 4) - (_fat * 9)) / 4);
+
+  IF _carbs < 50 THEN
+    _carbs := 50;
+  END IF;
+
+  RETURN json_build_object(
+    'calories', _calories,
+    'protein', _protein,
+    'carbs', _carbs,
+    'fat', _fat,
+    'bmr', ROUND(_bmr),
+    'tdee', ROUND(_tdee)
+  );
+END;
+$$;
+
+-- Check objective change eligibility
+CREATE OR REPLACE FUNCTION public.check_objective_change_eligibility(_user_id UUID)
+RETURNS TABLE(can_change BOOLEAN, locked_until TIMESTAMP WITH TIME ZONE, next_cooldown_days INTEGER, change_count INTEGER, reason TEXT)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+    v_profile RECORD;
+    v_user_plan RECORD;
+    v_policy RECORD;
+    v_is_student BOOLEAN;
+    v_change_count INTEGER;
+BEGIN
+    SELECT EXISTS (
+        SELECT 1 FROM professional_students 
+        WHERE student_id = _user_id AND status = 'active'
+    ) INTO v_is_student;
+    
+    IF v_is_student THEN
+        RETURN QUERY SELECT FALSE::BOOLEAN, NULL::TIMESTAMP WITH TIME ZONE, NULL::INTEGER, 0::INTEGER, 'Alunos devem solicitar alteração ao profissional'::TEXT;
+        RETURN;
+    END IF;
+    
+    SELECT objective_change_count, objective_locked_until INTO v_profile FROM profiles WHERE user_id = _user_id;
+    v_change_count := COALESCE(v_profile.objective_change_count, 0);
+    
+    SELECT * INTO v_user_plan FROM get_user_plan(_user_id);
+    
+    IF v_user_plan.plan_type = 'gratuito' THEN
+        RETURN QUERY SELECT FALSE::BOOLEAN, NULL::TIMESTAMP WITH TIME ZONE, NULL::INTEGER, v_change_count, 'Plano gratuito não permite alteração de objetivo'::TEXT;
+        RETURN;
+    END IF;
+    
+    IF v_profile.objective_locked_until IS NOT NULL AND v_profile.objective_locked_until > now() THEN
+        SELECT cooldown_days INTO v_policy FROM objective_change_policies
+        WHERE profile_type = v_user_plan.plan_type::TEXT AND change_number = v_change_count + 1
+        ORDER BY change_number LIMIT 1;
+        
+        RETURN QUERY SELECT FALSE::BOOLEAN, v_profile.objective_locked_until, COALESCE(v_policy.cooldown_days, 90)::INTEGER, v_change_count, 'Em período de cooldown'::TEXT;
+        RETURN;
+    END IF;
+    
+    SELECT cooldown_days INTO v_policy FROM objective_change_policies
+    WHERE profile_type = v_user_plan.plan_type::TEXT AND change_number = v_change_count + 1
+    ORDER BY change_number LIMIT 1;
+    
+    IF v_policy IS NULL THEN
+        SELECT cooldown_days INTO v_policy FROM objective_change_policies
+        WHERE profile_type = v_user_plan.plan_type::TEXT ORDER BY change_number DESC LIMIT 1;
+    END IF;
+    
+    RETURN QUERY SELECT TRUE::BOOLEAN, NULL::TIMESTAMP WITH TIME ZONE, COALESCE(v_policy.cooldown_days, 90)::INTEGER, v_change_count, 'Alteração permitida'::TEXT;
+END;
+$$;
+
+-- Apply objective change
+CREATE OR REPLACE FUNCTION public.apply_objective_change(_user_id UUID, _new_goal TEXT, _keep_plan_active BOOLEAN DEFAULT FALSE)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+    v_eligibility RECORD;
+    v_old_plan RECORD;
+    v_policy RECORD;
+    v_user_plan RECORD;
+    v_profile RECORD;
+    v_new_locked_until TIMESTAMP WITH TIME ZONE;
+    v_new_change_count INTEGER;
+    v_targets JSON;
+BEGIN
+    SELECT * INTO v_eligibility FROM check_objective_change_eligibility(_user_id);
+    
+    IF NOT v_eligibility.can_change THEN
+        RETURN jsonb_build_object('success', FALSE, 'error', v_eligibility.reason, 'locked_until', v_eligibility.locked_until);
+    END IF;
+    
+    SELECT objective_change_count, objective_locked_until INTO v_profile FROM profiles WHERE user_id = _user_id;
+    
+    SELECT * INTO v_old_plan FROM diet_plans WHERE user_id = _user_id AND status = 'active' ORDER BY created_at DESC LIMIT 1;
+    
+    SELECT * INTO v_user_plan FROM get_user_plan(_user_id);
+    
+    v_new_change_count := COALESCE(v_profile.objective_change_count, 0) + 1;
+    
+    SELECT cooldown_days INTO v_policy FROM objective_change_policies
+    WHERE profile_type = v_user_plan.plan_type::TEXT AND change_number = v_new_change_count
+    ORDER BY change_number LIMIT 1;
+    
+    IF v_policy IS NULL THEN
+        SELECT cooldown_days INTO v_policy FROM objective_change_policies
+        WHERE profile_type = v_user_plan.plan_type::TEXT ORDER BY change_number DESC LIMIT 1;
+    END IF;
+    
+    v_new_locked_until := now() + (COALESCE(v_policy.cooldown_days, 90) || ' days')::INTERVAL;
+    
+    v_targets := calculate_nutritional_targets(_user_id, _new_goal);
+    
+    IF v_old_plan IS NOT NULL AND NOT _keep_plan_active THEN
+        UPDATE diet_plans SET status = 'inactive', updated_at = now() WHERE id = v_old_plan.id;
+    END IF;
+    
+    UPDATE profiles
+    SET goal = _new_goal,
+        daily_calories = (v_targets->>'calories')::INTEGER,
+        protein_target = (v_targets->>'protein')::INTEGER,
+        carbs_target = (v_targets->>'carbs')::INTEGER,
+        fat_target = (v_targets->>'fat')::INTEGER,
+        objective_change_count = v_new_change_count,
+        objective_locked_until = v_new_locked_until,
+        updated_at = now()
+    WHERE user_id = _user_id;
+    
+    RETURN jsonb_build_object(
+        'success', TRUE,
+        'message', 'Objetivo alterado com sucesso.',
+        'new_goal', _new_goal,
+        'new_change_count', v_new_change_count,
+        'next_locked_until', v_new_locked_until,
+        'cooldown_days', COALESCE(v_policy.cooldown_days, 90),
+        'targets', v_targets,
+        'plan_kept_active', _keep_plan_active
+    );
+END;
+$$;
+
 -- Confirm meal consumption
 CREATE OR REPLACE FUNCTION public.confirm_meal_consumption(
-    _user_id UUID,
-    _meal_id UUID,
-    _option_id UUID,
-    _status TEXT,
-    _log_date DATE DEFAULT CURRENT_DATE
+    _user_id UUID, _meal_id UUID, _option_id UUID, _status TEXT, _log_date DATE DEFAULT CURRENT_DATE
 )
 RETURNS JSON
 LANGUAGE plpgsql
@@ -682,89 +1025,88 @@ DECLARE
   _meal_status_value meal_status;
 BEGIN
   _meal_status_value := _status::meal_status;
-
-  SELECT diet_plan_id INTO _diet_plan_id
-  FROM meals
-  WHERE id = _meal_id;
-
-  IF _diet_plan_id IS NULL THEN
-    RAISE EXCEPTION 'Meal not found';
-  END IF;
+  SELECT diet_plan_id INTO _diet_plan_id FROM meals WHERE id = _meal_id;
+  IF _diet_plan_id IS NULL THEN RAISE EXCEPTION 'Meal not found'; END IF;
 
   INSERT INTO daily_logs (user_id, diet_plan_id, log_date, status)
   VALUES (_user_id, _diet_plan_id, _log_date, 'no_records'::daily_status)
   ON CONFLICT (user_id, log_date) DO NOTHING;
 
-  SELECT id INTO _daily_log_id
-  FROM daily_logs
-  WHERE user_id = _user_id
-    AND log_date = _log_date;
+  SELECT id INTO _daily_log_id FROM daily_logs WHERE user_id = _user_id AND log_date = _log_date;
 
   IF _option_id IS NOT NULL THEN
-    SELECT total_calories, total_protein, total_carbs, total_fat
-    INTO _option_data
-    FROM meal_options
-    WHERE id = _option_id;
+    SELECT total_calories, total_protein, total_carbs, total_fat INTO _option_data FROM meal_options WHERE id = _option_id;
   END IF;
 
-  SELECT id INTO _meal_log_id
-  FROM meal_logs
-  WHERE daily_log_id = _daily_log_id
-    AND meal_id = _meal_id;
+  SELECT id INTO _meal_log_id FROM meal_logs WHERE daily_log_id = _daily_log_id AND meal_id = _meal_id;
 
   IF _meal_log_id IS NULL THEN
-    INSERT INTO meal_logs (
-      daily_log_id, meal_id, status, confirmed_option_id, confirmed_at,
-      calories_consumed, protein_consumed, carbs_consumed, fat_consumed
-    )
-    VALUES (
-      _daily_log_id, _meal_id, _meal_status_value, _option_id,
+    INSERT INTO meal_logs (daily_log_id, meal_id, status, confirmed_option_id, confirmed_at, calories_consumed, protein_consumed, carbs_consumed, fat_consumed)
+    VALUES (_daily_log_id, _meal_id, _meal_status_value, _option_id,
       CASE WHEN _meal_status_value IN ('confirmed', 'late_confirmed') THEN NOW() ELSE NULL END,
-      COALESCE(_option_data.total_calories, 0),
-      COALESCE(_option_data.total_protein, 0),
-      COALESCE(_option_data.total_carbs, 0),
-      COALESCE(_option_data.total_fat, 0)
-    )
+      COALESCE(_option_data.total_calories, 0), COALESCE(_option_data.total_protein, 0),
+      COALESCE(_option_data.total_carbs, 0), COALESCE(_option_data.total_fat, 0))
     RETURNING id INTO _meal_log_id;
   ELSE
-    UPDATE meal_logs
-    SET status = _meal_status_value,
-        confirmed_option_id = _option_id,
-        confirmed_at = CASE WHEN _meal_status_value IN ('confirmed', 'late_confirmed') THEN NOW() ELSE confirmed_at END,
-        calories_consumed = COALESCE(_option_data.total_calories, 0),
-        protein_consumed = COALESCE(_option_data.total_protein, 0),
-        carbs_consumed = COALESCE(_option_data.total_carbs, 0),
-        fat_consumed = COALESCE(_option_data.total_fat, 0)
+    UPDATE meal_logs SET status = _meal_status_value, confirmed_option_id = _option_id,
+      confirmed_at = CASE WHEN _meal_status_value IN ('confirmed', 'late_confirmed') THEN NOW() ELSE confirmed_at END,
+      calories_consumed = COALESCE(_option_data.total_calories, 0), protein_consumed = COALESCE(_option_data.total_protein, 0),
+      carbs_consumed = COALESCE(_option_data.total_carbs, 0), fat_consumed = COALESCE(_option_data.total_fat, 0)
     WHERE id = _meal_log_id;
   END IF;
 
   SELECT COUNT(*) INTO _total_meals FROM meals WHERE diet_plan_id = _diet_plan_id;
   SELECT COUNT(*) INTO _confirmed_meals FROM meal_logs WHERE daily_log_id = _daily_log_id AND status != 'pending';
 
-  IF _confirmed_meals = 0 THEN
-    _new_daily_status := 'no_records'::daily_status;
-  ELSIF _confirmed_meals >= _total_meals THEN
-    _new_daily_status := 'complete'::daily_status;
-  ELSE
-    _new_daily_status := 'partial'::daily_status;
+  IF _confirmed_meals = 0 THEN _new_daily_status := 'no_records'::daily_status;
+  ELSIF _confirmed_meals >= _total_meals THEN _new_daily_status := 'complete'::daily_status;
+  ELSE _new_daily_status := 'partial'::daily_status;
   END IF;
 
-  UPDATE daily_logs
-  SET status = _new_daily_status,
-      total_calories_consumed = (SELECT COALESCE(SUM(calories_consumed), 0) FROM meal_logs WHERE daily_log_id = _daily_log_id AND status IN ('confirmed', 'late_confirmed')),
-      total_protein_consumed = (SELECT COALESCE(SUM(protein_consumed), 0) FROM meal_logs WHERE daily_log_id = _daily_log_id AND status IN ('confirmed', 'late_confirmed')),
-      total_carbs_consumed = (SELECT COALESCE(SUM(carbs_consumed), 0) FROM meal_logs WHERE daily_log_id = _daily_log_id AND status IN ('confirmed', 'late_confirmed')),
-      total_fat_consumed = (SELECT COALESCE(SUM(fat_consumed), 0) FROM meal_logs WHERE daily_log_id = _daily_log_id AND status IN ('confirmed', 'late_confirmed')),
-      updated_at = NOW()
+  UPDATE daily_logs SET status = _new_daily_status,
+    total_calories_consumed = (SELECT COALESCE(SUM(calories_consumed), 0) FROM meal_logs WHERE daily_log_id = _daily_log_id AND status IN ('confirmed', 'late_confirmed')),
+    total_protein_consumed = (SELECT COALESCE(SUM(protein_consumed), 0) FROM meal_logs WHERE daily_log_id = _daily_log_id AND status IN ('confirmed', 'late_confirmed')),
+    total_carbs_consumed = (SELECT COALESCE(SUM(carbs_consumed), 0) FROM meal_logs WHERE daily_log_id = _daily_log_id AND status IN ('confirmed', 'late_confirmed')),
+    total_fat_consumed = (SELECT COALESCE(SUM(fat_consumed), 0) FROM meal_logs WHERE daily_log_id = _daily_log_id AND status IN ('confirmed', 'late_confirmed')),
+    updated_at = NOW()
   WHERE id = _daily_log_id;
 
-  RETURN json_build_object(
-    'success', true,
-    'daily_log_id', _daily_log_id,
-    'meal_log_id', _meal_log_id,
-    'status', _meal_status_value::text,
-    'daily_status', _new_daily_status::text
-  );
+  RETURN json_build_object('success', true, 'daily_log_id', _daily_log_id, 'meal_log_id', _meal_log_id, 'status', _meal_status_value::text, 'daily_status', _new_daily_status::text);
+END;
+$$;
+
+-- Convert grams to unit
+CREATE OR REPLACE FUNCTION public.convert_grams_to_unit(
+    _grams NUMERIC, _unit_weight_grams NUMERIC, _unit_increment NUMERIC, _tolerance_percent NUMERIC DEFAULT 5
+)
+RETURNS TABLE(success BOOLEAN, display_quantity NUMERIC, calculated_grams NUMERIC, error_percent NUMERIC, fallback_to_grams BOOLEAN)
+LANGUAGE plpgsql
+IMMUTABLE
+SET search_path = public
+AS $$
+DECLARE
+    v_raw_units NUMERIC;
+    v_rounded_units NUMERIC;
+    v_final_grams NUMERIC;
+    v_error_percent NUMERIC;
+BEGIN
+    IF _unit_weight_grams IS NULL OR _unit_weight_grams <= 0 THEN
+        RETURN QUERY SELECT FALSE, _grams, _grams, 0::NUMERIC, TRUE;
+        RETURN;
+    END IF;
+    IF _unit_increment IS NULL OR _unit_increment <= 0 THEN _unit_increment := 1; END IF;
+    
+    v_raw_units := _grams / _unit_weight_grams;
+    v_rounded_units := ROUND(v_raw_units / _unit_increment) * _unit_increment;
+    IF v_rounded_units < _unit_increment THEN v_rounded_units := _unit_increment; END IF;
+    v_final_grams := v_rounded_units * _unit_weight_grams;
+    v_error_percent := ABS(v_final_grams - _grams) / NULLIF(_grams, 0) * 100;
+    
+    IF v_error_percent <= _tolerance_percent THEN
+        RETURN QUERY SELECT TRUE, v_rounded_units, v_final_grams, v_error_percent, FALSE;
+    ELSE
+        RETURN QUERY SELECT FALSE, _grams, _grams, v_error_percent, TRUE;
+    END IF;
 END;
 $$;
 
@@ -778,26 +1120,105 @@ AS $$
 DECLARE
   v_value JSONB;
 BEGIN
-  SELECT value INTO v_value
-  FROM system_settings
-  WHERE key = _flag_key
-  AND category = 'feature_flags';
-  
-  IF v_value IS NULL THEN
-    RETURN _default_value;
-  END IF;
-  
-  IF v_value::text = 'true' OR v_value::text = '"true"' THEN
-    RETURN true;
-  ELSIF v_value::text = 'false' OR v_value::text = '"false"' THEN
-    RETURN false;
-  ELSE
-    RETURN _default_value;
+  SELECT value INTO v_value FROM system_settings WHERE key = _flag_key AND category = 'feature_flags';
+  IF v_value IS NULL THEN RETURN _default_value; END IF;
+  IF v_value::text = 'true' OR v_value::text = '"true"' THEN RETURN true;
+  ELSIF v_value::text = 'false' OR v_value::text = '"false"' THEN RETURN false;
+  ELSE RETURN _default_value;
   END IF;
 END;
 $$;
 
--- Handle new user (trigger function)
+-- Get rollout percent
+CREATE OR REPLACE FUNCTION public.get_rollout_percent(_flag_key TEXT, _default_value INTEGER DEFAULT 0)
+RETURNS INTEGER
+LANGUAGE plpgsql
+STABLE SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_value JSONB;
+BEGIN
+  SELECT value INTO v_value FROM system_settings WHERE key = _flag_key AND category = 'feature_flags';
+  IF v_value IS NULL THEN RETURN _default_value; END IF;
+  BEGIN RETURN (v_value::text)::integer;
+  EXCEPTION WHEN OTHERS THEN RETURN _default_value;
+  END;
+END;
+$$;
+
+-- Is user in rollout
+CREATE OR REPLACE FUNCTION public.is_in_rollout(_user_id UUID, _flag_key TEXT)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+STABLE SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_percent integer;
+  v_user_bucket integer;
+BEGIN
+  v_percent := get_rollout_percent(_flag_key, 0);
+  IF v_percent <= 0 THEN RETURN false; END IF;
+  IF v_percent >= 100 THEN RETURN true; END IF;
+  v_user_bucket := abs(('x' || substr(_user_id::text, 1, 8))::bit(32)::integer) % 100;
+  RETURN v_user_bucket < v_percent;
+END;
+$$;
+
+-- Can view supplements
+CREATE OR REPLACE FUNCTION public.can_view_supplements(_user_id UUID)
+RETURNS BOOLEAN
+LANGUAGE sql
+STABLE SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT (
+    has_role(_user_id, 'admin'::app_role)
+    OR has_role(_user_id, 'professional'::app_role)
+    OR EXISTS (
+      SELECT 1 FROM subscriptions s
+      JOIN plans p ON p.id = s.plan_id
+      WHERE s.user_id = _user_id AND s.status IN ('active', 'trial') AND p.type != 'gratuito'
+    )
+  )
+$$;
+
+-- Can view food
+CREATE OR REPLACE FUNCTION public.can_view_food(_user_id UUID, _food_id UUID)
+RETURNS BOOLEAN
+LANGUAGE sql
+STABLE SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM foods f
+    WHERE f.id = _food_id
+    AND (
+      (f.review_status = 'approved' AND f.is_active = true AND (f.type != 'supplement' OR can_view_supplements(_user_id)))
+      OR has_role(_user_id, 'admin'::app_role)
+      OR (f.created_by_type = 'professional' AND f.created_by_id = _user_id AND has_role(_user_id, 'professional'::app_role))
+    )
+  )
+$$;
+
+-- Get visible foods for user
+CREATE OR REPLACE FUNCTION public.get_visible_foods_for_user(_user_id UUID)
+RETURNS SETOF foods
+LANGUAGE sql
+STABLE SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT f.* FROM foods f
+  WHERE (f.review_status = 'approved' AND f.is_active = true)
+    AND (f.type != 'supplement' OR can_view_supplements(_user_id))
+  UNION
+  SELECT f.* FROM foods f
+  WHERE f.created_by_type = 'professional' AND f.created_by_id = _user_id
+    AND f.review_status = 'pending' AND has_role(_user_id, 'professional'::app_role)
+$$;
+
+-- Handle new user (trigger function for auth.users)
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER
 LANGUAGE plpgsql
@@ -807,19 +1228,34 @@ AS $$
 DECLARE
     free_plan_id UUID;
 BEGIN
-    INSERT INTO public.profiles (user_id, email)
-    VALUES (NEW.id, NEW.email);
-    
+    INSERT INTO public.profiles (user_id, email) VALUES (NEW.id, NEW.email);
     SELECT id INTO free_plan_id FROM public.plans WHERE type = 'gratuito' LIMIT 1;
-    
     IF free_plan_id IS NOT NULL THEN
         INSERT INTO public.subscriptions (user_id, plan_id, status, current_period_start, current_period_end)
         VALUES (NEW.id, free_plan_id, 'trial', now(), now() + INTERVAL '30 days');
     END IF;
-    
-    INSERT INTO public.user_usage (user_id)
-    VALUES (NEW.id);
-    
+    INSERT INTO public.user_usage (user_id) VALUES (NEW.id);
+    RETURN NEW;
+END;
+$$;
+
+-- Handle subscription upgrade
+CREATE OR REPLACE FUNCTION public.handle_subscription_upgrade()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+    v_old_plan_type TEXT;
+    v_new_plan_type TEXT;
+BEGIN
+    IF OLD.plan_id = NEW.plan_id THEN RETURN NEW; END IF;
+    SELECT type::TEXT INTO v_old_plan_type FROM plans WHERE id = OLD.plan_id;
+    SELECT type::TEXT INTO v_new_plan_type FROM plans WHERE id = NEW.plan_id;
+    IF v_old_plan_type = 'gratuito' AND v_new_plan_type != 'gratuito' THEN
+        PERFORM reset_monthly_usage(NEW.user_id);
+    END IF;
     RETURN NEW;
 END;
 $$;
@@ -828,31 +1264,16 @@ $$;
 -- TRIGGERS
 -- =============================================
 
--- Auto-create profile, subscription, usage on user signup
 CREATE TRIGGER on_auth_user_created
     AFTER INSERT ON auth.users
     FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
-
--- Auto-generate canonical name for foods
-CREATE OR REPLACE FUNCTION public.set_canonical_name()
-RETURNS TRIGGER
-LANGUAGE plpgsql
-SET search_path = public
-AS $$
-BEGIN
-  IF NEW.canonical_name IS NULL OR NEW.canonical_name = '' THEN
-    NEW.canonical_name := public.generate_canonical_name(NEW.name);
-  END IF;
-  RETURN NEW;
-END;
-$$;
 
 CREATE TRIGGER set_food_canonical_name
     BEFORE INSERT OR UPDATE ON public.foods
     FOR EACH ROW EXECUTE FUNCTION public.set_canonical_name();
 
 -- =============================================
--- RLS POLICIES (resumo - todas as tabelas têm RLS habilitado)
+-- ROW LEVEL SECURITY (RLS)
 -- =============================================
 
 -- Habilitar RLS em todas as tabelas
@@ -886,18 +1307,225 @@ ALTER TABLE public.ai_usage_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.conversion_events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.webhook_events ENABLE ROW LEVEL SECURITY;
 
--- Exemplo de policies (padrão para maioria das tabelas)
--- Users can view/manage own data
--- Service role has full access
--- Admins have extended permissions via has_role() function
+-- =============================================
+-- RLS POLICIES - PROFILES
+-- =============================================
+CREATE POLICY "Users can view own profile" ON public.profiles FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users can insert own profile" ON public.profiles FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Users can update own profile" ON public.profiles FOR UPDATE USING (auth.uid() = user_id);
+CREATE POLICY "Users can delete own profile" ON public.profiles FOR DELETE USING (auth.uid() = user_id AND user_id != '8cdd8f22-a342-4425-9ce8-05bd6c3ce9c5'::uuid);
+CREATE POLICY "Service role full access to profiles" ON public.profiles FOR ALL USING (auth.role() = 'service_role');
 
 -- =============================================
--- SEED DATA - Plans
+-- RLS POLICIES - PLANS
 -- =============================================
+CREATE POLICY "Authenticated users can view active plans" ON public.plans FOR SELECT USING (is_active = true AND auth.uid() IS NOT NULL);
+CREATE POLICY "Service role full access to plans" ON public.plans FOR ALL USING (auth.role() = 'service_role');
 
-INSERT INTO public.plans (name, type, description, diet_limit, substitution_limit, adjustment_limit, chat_messages_per_day, has_chat, meal_options_limit)
-VALUES 
-    ('Gratuito', 'gratuito', 'Plano gratuito com recursos básicos', 1, 0, 0, 0, false, 3),
-    ('Pessoal Pago', 'plano_pessoal_pago', 'Plano pessoal com recursos avançados', 5, 10, 5, 20, true, 5),
-    ('Profissional', 'profissional', 'Plano para nutricionistas', 999, 999, 999, 100, true, 10)
-ON CONFLICT DO NOTHING;
+-- =============================================
+-- RLS POLICIES - SUBSCRIPTIONS
+-- =============================================
+CREATE POLICY "Users can view own subscription" ON public.subscriptions FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users can update own subscription" ON public.subscriptions FOR UPDATE USING (auth.uid() = user_id);
+CREATE POLICY "Users can delete own subscription" ON public.subscriptions FOR DELETE USING (auth.uid() = user_id);
+CREATE POLICY "Service role full access to subscriptions" ON public.subscriptions FOR ALL USING (auth.role() = 'service_role');
+
+-- =============================================
+-- RLS POLICIES - USER ROLES
+-- =============================================
+CREATE POLICY "Users can view own roles" ON public.user_roles FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users can delete own roles" ON public.user_roles FOR DELETE USING (auth.uid() = user_id AND user_id != '8cdd8f22-a342-4425-9ce8-05bd6c3ce9c5'::uuid);
+CREATE POLICY "Service role full access to user_roles" ON public.user_roles FOR ALL USING (auth.role() = 'service_role');
+
+-- =============================================
+-- RLS POLICIES - USER USAGE
+-- =============================================
+CREATE POLICY "Users can view own usage" ON public.user_usage FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users can insert own usage" ON public.user_usage FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Users can update own usage" ON public.user_usage FOR UPDATE USING (auth.uid() = user_id);
+CREATE POLICY "Users can delete own usage" ON public.user_usage FOR DELETE USING (auth.uid() = user_id);
+CREATE POLICY "Service role full access to user_usage" ON public.user_usage FOR ALL USING (auth.role() = 'service_role');
+
+-- =============================================
+-- RLS POLICIES - FOODS
+-- =============================================
+CREATE POLICY "Anyone can view foods" ON public.foods FOR SELECT USING (true);
+CREATE POLICY "Admins can insert foods" ON public.foods FOR INSERT WITH CHECK (has_role(auth.uid(), 'admin'::app_role));
+CREATE POLICY "Admins can update foods" ON public.foods FOR UPDATE USING (has_role(auth.uid(), 'admin'::app_role));
+CREATE POLICY "Admins can delete foods" ON public.foods FOR DELETE USING (has_role(auth.uid(), 'admin'::app_role));
+CREATE POLICY "Service role full access to foods" ON public.foods FOR ALL USING (auth.role() = 'service_role');
+
+-- =============================================
+-- RLS POLICIES - DIET PLANS
+-- =============================================
+CREATE POLICY "Users can view own diet plans" ON public.diet_plans FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users can insert own diet plans" ON public.diet_plans FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Users can update own diet plans" ON public.diet_plans FOR UPDATE USING (auth.uid() = user_id);
+CREATE POLICY "Users can delete own diet plans" ON public.diet_plans FOR DELETE USING (auth.uid() = user_id);
+CREATE POLICY "Service role full access to diet_plans" ON public.diet_plans FOR ALL USING (auth.role() = 'service_role');
+
+-- =============================================
+-- RLS POLICIES - MEALS
+-- =============================================
+CREATE POLICY "Users can view own meals" ON public.meals FOR SELECT USING (EXISTS (SELECT 1 FROM diet_plans dp WHERE dp.id = meals.diet_plan_id AND dp.user_id = auth.uid()));
+CREATE POLICY "Users can manage own meals" ON public.meals FOR ALL USING (EXISTS (SELECT 1 FROM diet_plans dp WHERE dp.id = meals.diet_plan_id AND dp.user_id = auth.uid()));
+CREATE POLICY "Service role full access to meals" ON public.meals FOR ALL USING (auth.role() = 'service_role');
+
+-- =============================================
+-- RLS POLICIES - MEAL OPTIONS
+-- =============================================
+CREATE POLICY "Users can view own meal options" ON public.meal_options FOR SELECT USING (EXISTS (SELECT 1 FROM meals m JOIN diet_plans dp ON dp.id = m.diet_plan_id WHERE m.id = meal_options.meal_id AND dp.user_id = auth.uid()));
+CREATE POLICY "Users can manage own meal options" ON public.meal_options FOR ALL USING (EXISTS (SELECT 1 FROM meals m JOIN diet_plans dp ON dp.id = m.diet_plan_id WHERE m.id = meal_options.meal_id AND dp.user_id = auth.uid()));
+CREATE POLICY "Service role full access to meal_options" ON public.meal_options FOR ALL USING (auth.role() = 'service_role');
+
+-- =============================================
+-- RLS POLICIES - MEAL OPTION FOODS
+-- =============================================
+CREATE POLICY "Users can view own meal option foods" ON public.meal_option_foods FOR SELECT USING (meal_option_id IN (SELECT mo.id FROM meal_options mo JOIN meals m ON m.id = mo.meal_id JOIN diet_plans dp ON dp.id = m.diet_plan_id WHERE dp.user_id = auth.uid()));
+CREATE POLICY "Users can insert own meal option foods" ON public.meal_option_foods FOR INSERT WITH CHECK (meal_option_id IN (SELECT mo.id FROM meal_options mo JOIN meals m ON m.id = mo.meal_id JOIN diet_plans dp ON dp.id = m.diet_plan_id WHERE dp.user_id = auth.uid()));
+CREATE POLICY "Users can update own meal option foods" ON public.meal_option_foods FOR UPDATE USING (meal_option_id IN (SELECT mo.id FROM meal_options mo JOIN meals m ON m.id = mo.meal_id JOIN diet_plans dp ON dp.id = m.diet_plan_id WHERE dp.user_id = auth.uid()));
+CREATE POLICY "Users can delete own meal option foods" ON public.meal_option_foods FOR DELETE USING (meal_option_id IN (SELECT mo.id FROM meal_options mo JOIN meals m ON m.id = mo.meal_id JOIN diet_plans dp ON dp.id = m.diet_plan_id WHERE dp.user_id = auth.uid()));
+CREATE POLICY "Service role full access to meal_option_foods" ON public.meal_option_foods FOR ALL USING (auth.role() = 'service_role');
+
+-- =============================================
+-- RLS POLICIES - DAILY LOGS
+-- =============================================
+CREATE POLICY "Users can view own daily logs" ON public.daily_logs FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users can manage own daily logs" ON public.daily_logs FOR ALL USING (auth.uid() = user_id);
+CREATE POLICY "Service role full access to daily_logs" ON public.daily_logs FOR ALL USING (auth.role() = 'service_role');
+
+-- =============================================
+-- RLS POLICIES - MEAL LOGS
+-- =============================================
+CREATE POLICY "Users can view own meal logs" ON public.meal_logs FOR SELECT USING (EXISTS (SELECT 1 FROM daily_logs dl WHERE dl.id = meal_logs.daily_log_id AND dl.user_id = auth.uid()));
+CREATE POLICY "Users can manage own meal logs" ON public.meal_logs FOR ALL USING (EXISTS (SELECT 1 FROM daily_logs dl WHERE dl.id = meal_logs.daily_log_id AND dl.user_id = auth.uid()));
+CREATE POLICY "Service role full access to meal_logs" ON public.meal_logs FOR ALL USING (auth.role() = 'service_role');
+
+-- =============================================
+-- RLS POLICIES - WEIGHT LOGS
+-- =============================================
+CREATE POLICY "Users can view own weight logs" ON public.weight_logs FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users can insert own weight logs" ON public.weight_logs FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Users can update own weight logs" ON public.weight_logs FOR UPDATE USING (auth.uid() = user_id);
+CREATE POLICY "Users can delete own weight logs" ON public.weight_logs FOR DELETE USING (auth.uid() = user_id);
+CREATE POLICY "Service role full access to weight_logs" ON public.weight_logs FOR ALL USING (auth.role() = 'service_role');
+
+-- =============================================
+-- RLS POLICIES - BODY MEASUREMENTS
+-- =============================================
+CREATE POLICY "Users can view own measurements" ON public.body_measurements FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users can insert own measurements" ON public.body_measurements FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Users can update own measurements" ON public.body_measurements FOR UPDATE USING (auth.uid() = user_id);
+CREATE POLICY "Users can delete own measurements" ON public.body_measurements FOR DELETE USING (auth.uid() = user_id);
+CREATE POLICY "Professionals can view student measurements" ON public.body_measurements FOR SELECT USING (EXISTS (SELECT 1 FROM professional_students ps WHERE ps.student_id = body_measurements.user_id AND ps.professional_id = auth.uid() AND ps.status = 'active'));
+CREATE POLICY "Professionals can insert student measurements" ON public.body_measurements FOR INSERT WITH CHECK (EXISTS (SELECT 1 FROM professional_students ps WHERE ps.student_id = body_measurements.user_id AND ps.professional_id = auth.uid() AND ps.status = 'active') AND recorded_by = auth.uid());
+CREATE POLICY "Professionals can update student measurements" ON public.body_measurements FOR UPDATE USING (EXISTS (SELECT 1 FROM professional_students ps WHERE ps.student_id = body_measurements.user_id AND ps.professional_id = auth.uid() AND ps.status = 'active') AND recorded_by = auth.uid());
+CREATE POLICY "Service role full access to body_measurements" ON public.body_measurements FOR ALL USING (auth.role() = 'service_role');
+
+-- =============================================
+-- RLS POLICIES - PROFESSIONAL STUDENTS
+-- =============================================
+CREATE POLICY "Professionals can view own students" ON public.professional_students FOR SELECT USING (professional_id = auth.uid() AND has_role(auth.uid(), 'professional'::app_role));
+CREATE POLICY "Professionals can add students" ON public.professional_students FOR INSERT WITH CHECK (professional_id = auth.uid() AND has_role(auth.uid(), 'professional'::app_role));
+CREATE POLICY "Professionals can update own students" ON public.professional_students FOR UPDATE USING (professional_id = auth.uid() AND has_role(auth.uid(), 'professional'::app_role));
+CREATE POLICY "Professionals can delete own students" ON public.professional_students FOR DELETE USING (professional_id = auth.uid() AND has_role(auth.uid(), 'professional'::app_role));
+CREATE POLICY "Students can view own professional relationship" ON public.professional_students FOR SELECT USING (student_id = auth.uid());
+CREATE POLICY "Students can view their pending links" ON public.professional_students FOR SELECT USING (auth.uid() = student_id);
+CREATE POLICY "Students can confirm their own link" ON public.professional_students FOR UPDATE USING (auth.uid() = student_id) WITH CHECK (auth.uid() = student_id AND student_confirmed = true);
+CREATE POLICY "Service role full access to professional_students" ON public.professional_students FOR ALL USING (auth.role() = 'service_role');
+
+-- =============================================
+-- RLS POLICIES - OBJECTIVE CHANGE POLICIES
+-- =============================================
+CREATE POLICY "Authenticated users can view objective_change_policies" ON public.objective_change_policies FOR SELECT USING (auth.uid() IS NOT NULL);
+CREATE POLICY "Admins can manage objective_change_policies" ON public.objective_change_policies FOR ALL USING (has_role(auth.uid(), 'admin'::app_role));
+CREATE POLICY "Service role full access to objective_change_policies" ON public.objective_change_policies FOR ALL USING (auth.role() = 'service_role');
+
+-- =============================================
+-- RLS POLICIES - OBJECTIVE CHANGE REQUESTS
+-- =============================================
+CREATE POLICY "Students can create own requests" ON public.objective_change_requests FOR INSERT WITH CHECK (auth.uid() = student_id);
+CREATE POLICY "Students can view own requests" ON public.objective_change_requests FOR SELECT USING (auth.uid() = student_id);
+CREATE POLICY "Professionals can view student requests" ON public.objective_change_requests FOR SELECT USING (auth.uid() = professional_id AND has_role(auth.uid(), 'professional'::app_role));
+CREATE POLICY "Professionals can update student requests" ON public.objective_change_requests FOR UPDATE USING (auth.uid() = professional_id AND has_role(auth.uid(), 'professional'::app_role));
+CREATE POLICY "Service role full access to objective_change_requests" ON public.objective_change_requests FOR ALL USING (auth.role() = 'service_role');
+
+-- =============================================
+-- RLS POLICIES - MEAL TEMPLATES / ROLES / CATEGORIES
+-- =============================================
+CREATE POLICY "Anyone can view meal_templates" ON public.meal_templates FOR SELECT USING (true);
+CREATE POLICY "Admins can manage meal_templates" ON public.meal_templates FOR ALL USING (has_role(auth.uid(), 'admin'::app_role)) WITH CHECK (has_role(auth.uid(), 'admin'::app_role));
+CREATE POLICY "Service role full access to meal_templates" ON public.meal_templates FOR ALL USING (auth.role() = 'service_role');
+
+CREATE POLICY "Anyone can view meal_template_roles" ON public.meal_template_roles FOR SELECT USING (true);
+CREATE POLICY "Admins can manage meal_template_roles" ON public.meal_template_roles FOR ALL USING (has_role(auth.uid(), 'admin'::app_role)) WITH CHECK (has_role(auth.uid(), 'admin'::app_role));
+CREATE POLICY "Service role full access to meal_template_roles" ON public.meal_template_roles FOR ALL USING (auth.role() = 'service_role');
+
+CREATE POLICY "Anyone can view meal_role_food_categories" ON public.meal_role_food_categories FOR SELECT USING (true);
+CREATE POLICY "Admins can manage meal_role_food_categories" ON public.meal_role_food_categories FOR ALL USING (has_role(auth.uid(), 'admin'::app_role)) WITH CHECK (has_role(auth.uid(), 'admin'::app_role));
+CREATE POLICY "Service role full access to meal_role_food_categories" ON public.meal_role_food_categories FOR ALL USING (auth.role() = 'service_role');
+
+-- =============================================
+-- RLS POLICIES - MEAL ANCHOR FOODS
+-- =============================================
+CREATE POLICY "Everyone can read active anchors" ON public.meal_anchor_foods FOR SELECT USING (is_active = true);
+CREATE POLICY "Admins manage anchor foods" ON public.meal_anchor_foods FOR ALL USING (has_role(auth.uid(), 'admin'::app_role));
+
+-- =============================================
+-- RLS POLICIES - MEAL CONTEXTUAL BLOCKS
+-- =============================================
+CREATE POLICY "Everyone can read active contextual blocks" ON public.meal_contextual_blocks FOR SELECT USING (is_active = true);
+CREATE POLICY "Admins can manage contextual blocks" ON public.meal_contextual_blocks FOR ALL USING (has_role(auth.uid(), 'admin'::app_role)) WITH CHECK (has_role(auth.uid(), 'admin'::app_role));
+
+-- =============================================
+-- RLS POLICIES - FOOD BLOCK OVERRIDES
+-- =============================================
+CREATE POLICY "Authenticated users can read overrides" ON public.food_block_overrides FOR SELECT USING (true);
+CREATE POLICY "Admins can manage food block overrides" ON public.food_block_overrides FOR ALL USING (has_role(auth.uid(), 'admin'::app_role)) WITH CHECK (has_role(auth.uid(), 'admin'::app_role));
+
+-- =============================================
+-- RLS POLICIES - FOOD IMPORTS
+-- =============================================
+CREATE POLICY "Admins can view food imports" ON public.food_imports FOR SELECT USING (has_role(auth.uid(), 'admin'::app_role));
+CREATE POLICY "Service role full access to food_imports" ON public.food_imports FOR ALL USING (auth.role() = 'service_role');
+
+-- =============================================
+-- RLS POLICIES - SYSTEM SETTINGS
+-- =============================================
+CREATE POLICY "Admins can view system_settings" ON public.system_settings FOR SELECT USING (has_role(auth.uid(), 'admin'::app_role));
+CREATE POLICY "Admins can insert system_settings" ON public.system_settings FOR INSERT WITH CHECK (has_role(auth.uid(), 'admin'::app_role));
+CREATE POLICY "Admins can update system_settings" ON public.system_settings FOR UPDATE USING (has_role(auth.uid(), 'admin'::app_role)) WITH CHECK (has_role(auth.uid(), 'admin'::app_role));
+CREATE POLICY "Service role full access to system_settings" ON public.system_settings FOR ALL USING (auth.role() = 'service_role');
+
+-- =============================================
+-- RLS POLICIES - ADMIN AUDIT LOG
+-- =============================================
+CREATE POLICY "Admins can view audit logs" ON public.admin_audit_log FOR SELECT USING (has_role(auth.uid(), 'admin'::app_role));
+CREATE POLICY "Service role full access to admin_audit_log" ON public.admin_audit_log FOR ALL USING (auth.role() = 'service_role');
+
+-- =============================================
+-- RLS POLICIES - AI USAGE LOGS
+-- =============================================
+CREATE POLICY "Admins can view ai_usage_logs" ON public.ai_usage_logs FOR SELECT USING (has_role(auth.uid(), 'admin'::app_role));
+CREATE POLICY "Service role full access to ai_usage_logs" ON public.ai_usage_logs FOR ALL USING (auth.role() = 'service_role');
+
+-- =============================================
+-- RLS POLICIES - CONVERSION EVENTS
+-- =============================================
+CREATE POLICY "Users can read own conversion events" ON public.conversion_events FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users can insert own conversion events" ON public.conversion_events FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Admins can read all conversion events" ON public.conversion_events FOR SELECT USING (has_role(auth.uid(), 'admin'::app_role));
+
+-- =============================================
+-- RLS POLICIES - WEBHOOK EVENTS
+-- =============================================
+CREATE POLICY "Service role full access to webhook_events" ON public.webhook_events FOR ALL USING (auth.role() = 'service_role');
+
+-- =============================================
+-- STORAGE BUCKETS
+-- =============================================
+INSERT INTO storage.buckets (id, name, public) VALUES ('adherence-reports', 'adherence-reports', false);
+
+-- =============================================
+-- FIM DO SCHEMA EXPORT
+-- =============================================
