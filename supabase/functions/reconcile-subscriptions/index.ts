@@ -35,8 +35,7 @@ serve(async (req) => {
     const { data: subscriptions, error: subError } = await supabaseAdmin
       .from('subscriptions')
       .select('*, plan:plans(*)')
-      .not('provider_subscription_id', 'is', null)
-      .eq('provider', 'stripe')
+      .not('stripe_subscription_id', 'is', null)
       .or(`last_reconciled.is.null,last_reconciled.lt.${oneHourAgo}`)
       .limit(50);
 
@@ -60,45 +59,44 @@ serve(async (req) => {
         results.processed++;
 
         // Check grace period expiration first
-        if (sub.status === 'grace_period' && sub.grace_period_end) {
+        if (sub.status === 'past_due' && sub.grace_period_end) {
           if (new Date(sub.grace_period_end) < new Date()) {
-            // Grace period expired - suspend
+            // Grace period expired - cancel
             await supabaseAdmin
               .from('subscriptions')
               .update({
-                status: 'suspended',
+                status: 'canceled',
                 last_reconciled: new Date().toISOString(),
               })
               .eq('id', sub.id);
 
             results.graceExpired++;
             results.suspended++;
-            logStep("Grace period expired, suspended", { userId: sub.user_id });
+            logStep("Grace period expired, canceled", { userId: sub.user_id });
             continue;
           }
         }
 
         // Fetch current status from Stripe
-        if (!sub.provider_subscription_id) {
+        if (!sub.stripe_subscription_id) {
           continue;
         }
 
         let stripeSubscription: Stripe.Subscription;
         try {
-          stripeSubscription = await stripe.subscriptions.retrieve(sub.provider_subscription_id);
+          stripeSubscription = await stripe.subscriptions.retrieve(sub.stripe_subscription_id);
         } catch (stripeError) {
-          // Subscription might not exist in Stripe anymore
           logStep("Could not fetch from Stripe", { 
-            subscriptionId: sub.provider_subscription_id,
+            subscriptionId: sub.stripe_subscription_id,
             error: getErrorForLogging(stripeError),
           });
           
-          // Mark as suspended if Stripe subscription doesn't exist
+          // Mark as canceled if Stripe subscription doesn't exist
           if ((stripeError as { statusCode?: number }).statusCode === 404) {
             await supabaseAdmin
               .from('subscriptions')
               .update({
-                status: 'suspended',
+                status: 'canceled',
                 last_reconciled: new Date().toISOString(),
               })
               .eq('id', sub.id);
@@ -114,17 +112,12 @@ serve(async (req) => {
             correctStatus = 'active';
             break;
           case 'past_due':
-            // Keep grace_period if already in grace, else set grace_period
-            if (sub.status === 'grace_period' || sub.status === 'past_due') {
-              correctStatus = sub.status;
-            } else {
-              correctStatus = 'grace_period';
-            }
+            correctStatus = 'past_due';
             break;
           case 'canceled':
           case 'incomplete_expired':
           case 'unpaid':
-            correctStatus = 'suspended';
+            correctStatus = 'canceled';
             break;
           case 'trialing':
             correctStatus = 'trial';
@@ -147,8 +140,8 @@ serve(async (req) => {
             last_reconciled: new Date().toISOString(),
           };
 
-          // Set grace period if entering grace
-          if (correctStatus === 'grace_period' && !sub.grace_period_end) {
+          // Set grace period if entering past_due
+          if (correctStatus === 'past_due' && !sub.grace_period_end) {
             const gracePeriodEnd = new Date();
             gracePeriodEnd.setDate(gracePeriodEnd.getDate() + 7);
             updateData.grace_period_end = gracePeriodEnd.toISOString();
@@ -171,7 +164,7 @@ serve(async (req) => {
             newStatus: correctStatus,
           });
 
-          if (correctStatus === 'suspended') {
+          if (correctStatus === 'canceled') {
             results.suspended++;
           }
         } else {
