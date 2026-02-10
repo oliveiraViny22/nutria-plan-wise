@@ -249,17 +249,139 @@ ON CONFLICT DO NOTHING;
 -- ORDER BY meal_type, role_name, option_number, sort_order;
 
 -- =============================================
--- NOTA SOBRE TEMPLATE ROLES E FOOD CATEGORIES
+-- MEAL TEMPLATE ROLES (50 registros)
 -- =============================================
--- Os template_roles e role_food_categories devem ser exportados junto
--- com seus UUIDs para manter a integridade referencial.
--- Use as queries abaixo para exportar:
+INSERT INTO meal_template_roles (id, template_id, role_name, sort_order, is_required, min_quantity_grams, max_quantity_grams) VALUES
+  -- Café da Manhã Padrão
+  ('428edaa4-90ad-4c40-8f01-4f81ce14333e', 'bb13a1fb-e6f2-45a9-9bc3-1030cb2b50d1', 'carboidrato_base', 1, true, 30, 150),
+  ('96baee73-44c6-485d-ba7c-93a94c4d0e8f', 'bb13a1fb-e6f2-45a9-9bc3-1030cb2b50d1', 'proteina_principal', 2, true, 50, 150),
+  ('a4cc58e4-b82a-4bc2-9027-0245f3801cc0', 'bb13a1fb-e6f2-45a9-9bc3-1030cb2b50d1', 'fruta', 3, false, 80, 150),
+  ('21f85ec2-0933-44bd-910d-2a1cf186f98a', 'bb13a1fb-e6f2-45a9-9bc3-1030cb2b50d1', 'laticinio', 4, false, 100, 250),
+  ('4c006e20-293a-4fcf-b56e-3b28c80f4d13', 'bb13a1fb-e6f2-45a9-9bc3-1030cb2b50d1', 'gordura', 5, false, 5, 20),
+  ('9671581d-1b0e-4314-9294-877fe91479c8', 'bb13a1fb-e6f2-45a9-9bc3-1030cb2b50d1', 'vegetal', 6, false, 30, 80),
+  -- Lanche da Manhã Padrão
+  ('45b0b8bb-737a-44cb-b6a6-5e28d7e1fc1e', 'df041732-6f44-4c92-9008-6c8cc8726fca', 'proteina_principal', 1, true, 30, 150),
+  ('793ea169-79bc-45a4-8dae-dbca7e6bebe4', 'df041732-6f44-4c92-9008-6c8cc8726fca', 'fruta', 2, true, 80, 200),
+  ('6ed72d64-2550-46ee-9470-10b4d8fe0e46', 'df041732-6f44-4c92-9008-6c8cc8726fca', 'gordura', 3, false, 10, 30),
+  ('682b2cd7-5b4f-44ca-931b-1d05ab316715', 'df041732-6f44-4c92-9008-6c8cc8726fca', 'laticinio', 4, false, 80, 200),
+  -- Ceia Padrão (inativa)
+  ('b160c8bf-e7a2-477f-9334-832dd18a60d1', '414fb320-254b-4ca1-9e90-8a2d8d79fc70', 'laticinio', 1, true, 100, 200),
+  ('5800bbff-60ac-40d4-9884-9ef212285a0a', '414fb320-254b-4ca1-9e90-8a2d8d79fc70', 'fruta', 2, false, 50, 100),
+  ('0e8ec18a-707a-4436-b2e3-ebef2d8f5584', '414fb320-254b-4ca1-9e90-8a2d8d79fc70', 'oleaginosa', 3, false, 10, 20),
+  -- Almoço Padrão
+  ('f23ceda0-9fab-49b3-80f9-45c7cd7595d1', '8bcde5fe-089c-4f67-8390-4d4d1151b163', 'proteina_principal', 1, true, 100, 250),
+  ('cdb1cf19-13f3-4fb5-963c-2bb3e7f8b0dd', '8bcde5fe-089c-4f67-8390-4d4d1151b163', 'carboidrato_base', 2, true, 100, 300),
+  ('ac36efb9-6375-410f-8905-a36a4ea75945', '8bcde5fe-089c-4f67-8390-4d4d1151b163', 'leguminosa', 3, false, 60, 150),
+  ('95e415af-5c23-4f9e-a38c-4f0b35495d35', '8bcde5fe-089c-4f67-8390-4d4d1151b163', 'vegetal', 4, true, 80, 200),
+  ('cf7e612c-eb31-4707-8707-79795239176c', '8bcde5fe-089c-4f67-8390-4d4d1151b163', 'gordura', 5, false, 10, 30),
+  -- Almoço Low Carb
+  ('6ddb2897-7405-4b15-b550-63b293f4317f', '994c3279-6137-442b-bfbe-0e80f0292670', 'proteina_principal', 1, true, 150, 250),
+  ('35458e43-12ee-4c7f-9503-54cf6ec0b523', '994c3279-6137-442b-bfbe-0e80f0292670', 'vegetal', 2, true, 150, 300),
+  ('f07971c3-651b-4880-9339-21a725b5572e', '994c3279-6137-442b-bfbe-0e80f0292670', 'gordura', 3, true, 30, 80),
+  ('33e65980-e08a-4c49-acc9-97618ca42486', '994c3279-6137-442b-bfbe-0e80f0292670', 'carboidrato_base', 4, false, 50, 100),
+  -- Almoço Mediterrâneo
+  ('cb9e1422-d638-4448-925a-67b8ca2a191e', '2a26dc3b-2e79-4cd3-b225-db886f6503ca', 'proteina_principal', 1, true, 120, 200),
+  ('78c7868e-e5e2-4f3f-8823-43d63d8dcd0c', '2a26dc3b-2e79-4cd3-b225-db886f6503ca', 'carboidrato_base', 2, true, 100, 200),
+  ('b7ba4d49-4aef-4583-b053-fb71843bfe86', '2a26dc3b-2e79-4cd3-b225-db886f6503ca', 'leguminosa', 3, true, 80, 150),
+  ('dd68458b-b549-4bdc-bef5-4a9d3066fbff', '2a26dc3b-2e79-4cd3-b225-db886f6503ca', 'vegetal', 4, true, 100, 200),
+  ('30fb861f-9ac7-422b-bbd4-4e6155966bb6', '2a26dc3b-2e79-4cd3-b225-db886f6503ca', 'gordura', 5, true, 20, 50),
+  -- Lanche da Tarde Padrão
+  ('6df1e496-359b-4b04-b3ea-73fa0de78c7d', '97ebef6f-79c9-4de1-9571-05c0971de9ed', 'proteina_principal', 1, true, 30, 150),
+  ('02ad0f7d-b353-404e-9160-a8ce40c09fdb', '97ebef6f-79c9-4de1-9571-05c0971de9ed', 'carboidrato_base', 2, false, 30, 100),
+  ('55401163-5e38-41af-bf8f-f78b9ae64773', '97ebef6f-79c9-4de1-9571-05c0971de9ed', 'fruta', 3, true, 80, 200),
+  ('66cf0172-695d-4ae6-b22a-a95eb3d463d3', '97ebef6f-79c9-4de1-9571-05c0971de9ed', 'gordura', 4, false, 10, 30),
+  ('5aa2aa3d-faf5-4f99-8b26-b9f13e263cae', '97ebef6f-79c9-4de1-9571-05c0971de9ed', 'oleaginosa', 5, false, 10, 30),
+  -- Jantar Padrão
+  ('53db831c-c930-48e6-a85f-60f741cbb650', '5d59d9e3-37b1-460a-8491-ae9ab068078d', 'proteina_principal', 1, true, 100, 220),
+  ('6c8abe73-98ce-4b9d-bed7-3ac5446ad3fd', '5d59d9e3-37b1-460a-8491-ae9ab068078d', 'carboidrato_base', 2, false, 80, 200),
+  ('14fe629c-e01c-41e3-a52e-76cb05c2e07e', '5d59d9e3-37b1-460a-8491-ae9ab068078d', 'leguminosa', 3, false, 60, 150),
+  ('e53f5c35-e868-42cd-8f54-89ca083e5df6', '5d59d9e3-37b1-460a-8491-ae9ab068078d', 'vegetal', 4, true, 100, 250),
+  ('e2d955fc-aa96-4177-af6c-3d25c7a9ac6d', '5d59d9e3-37b1-460a-8491-ae9ab068078d', 'gordura', 5, false, 10, 25),
+  -- Jantar Low Carb
+  ('af43873e-0fef-4889-8767-30ac0d0f9368', '9591b5bf-b937-4835-961c-8de999e83beb', 'proteina_principal', 1, true, 150, 250),
+  ('0476cef6-8a85-4446-a8b4-e38214bad303', '9591b5bf-b937-4835-961c-8de999e83beb', 'vegetal', 2, true, 150, 300),
+  ('82767f53-75e2-4018-bf6a-b5959af89860', '9591b5bf-b937-4835-961c-8de999e83beb', 'gordura', 3, true, 30, 80),
+  ('f4964c3b-a931-4a01-a84d-e815742532fc', '9591b5bf-b937-4835-961c-8de999e83beb', 'carboidrato_base', 4, false, 50, 100),
+  -- Jantar Mediterrâneo
+  ('0f992830-c543-4059-aac8-1c6dd24de9b4', '2ae7c196-c438-4d9d-b6cc-c24d67571c92', 'proteina_principal', 1, true, 120, 200),
+  ('35b74df6-22e4-4f0f-85fa-63d97df9cbab', '2ae7c196-c438-4d9d-b6cc-c24d67571c92', 'carboidrato_base', 2, true, 100, 200),
+  ('f1619b35-4af4-4df1-991a-0db61b2f9ff2', '2ae7c196-c438-4d9d-b6cc-c24d67571c92', 'leguminosa', 3, true, 80, 150),
+  ('dc7f3835-8276-4815-bf75-4e8f36aa7cf2', '2ae7c196-c438-4d9d-b6cc-c24d67571c92', 'vegetal', 4, true, 100, 200),
+  ('93d52fe9-f292-4672-b946-cdfb43ab78f1', '2ae7c196-c438-4d9d-b6cc-c24d67571c92', 'gordura', 5, true, 20, 50),
+  -- Ceia Padrão
+  ('12c459e1-9dcb-41c1-b5c0-4d82283d618f', '673b8f25-d4b5-4396-bd3b-6b03821f192b', 'proteina_principal', 1, true, 50, 150),
+  ('c6a6a83e-1027-4325-a715-b82b7113cf12', '673b8f25-d4b5-4396-bd3b-6b03821f192b', 'fruta', 2, false, 80, 150),
+  ('a3fb62a4-8558-4e8f-9509-d87b0191d617', '673b8f25-d4b5-4396-bd3b-6b03821f192b', 'carboidrato_base', 3, false, 30, 100),
+  ('1cda9e1c-c352-40fd-b2c4-db5bc63b84f6', '673b8f25-d4b5-4396-bd3b-6b03821f192b', 'vegetal', 4, false, 50, 200),
+  ('706449ba-ea09-43d5-8137-84301633dd38', '673b8f25-d4b5-4396-bd3b-6b03821f192b', 'laticinio', 5, false, 100, 200),
+  ('ca2923a6-f884-412c-a544-3f5aebac9fcc', '673b8f25-d4b5-4396-bd3b-6b03821f192b', 'oleaginosa', 6, false, 10, 25)
+ON CONFLICT (id) DO UPDATE SET role_name = EXCLUDED.role_name, sort_order = EXCLUDED.sort_order, is_required = EXCLUDED.is_required, min_quantity_grams = EXCLUDED.min_quantity_grams, max_quantity_grams = EXCLUDED.max_quantity_grams;
+
+-- =============================================
+-- MEAL ROLE FOOD CATEGORIES e ANCHOR FOODS
+-- =============================================
+-- Volume muito grande (100+ categories, 1092+ anchors).
+-- Extrair do banco ORIGEM com as queries abaixo:
 --
--- -- Template Roles:
--- SELECT * FROM meal_template_roles ORDER BY template_id, sort_order;
+-- Role Food Categories:
+-- SELECT 'INSERT INTO meal_role_food_categories (id,role_id,category,priority) VALUES ('
+--   || quote_literal(id) || ',' || quote_literal(role_id) || ',' || quote_literal(category) || ',' || priority
+--   || ') ON CONFLICT (id) DO NOTHING;'
+-- FROM meal_role_food_categories ORDER BY role_id, priority;
 --
--- -- Role Food Categories:
--- SELECT * FROM meal_role_food_categories ORDER BY role_id, priority;
+-- Anchor Foods:
+-- SELECT 'INSERT INTO meal_anchor_foods (id,meal_type,food_id,option_number,role_name,default_quantity_grams,sort_order,is_active,dietary_profile,goal_type) VALUES ('
+--   || quote_literal(id) || ',' || quote_literal(meal_type) || ',' || quote_literal(food_id) || ','
+--   || option_number || ',' || quote_literal(role_name) || ',' || default_quantity_grams || ','
+--   || sort_order || ',' || is_active || ',' || COALESCE(quote_literal(dietary_profile),'NULL') || ','
+--   || COALESCE(quote_literal(goal_type),'NULL')
+--   || ') ON CONFLICT (id) DO NOTHING;'
+-- FROM meal_anchor_foods WHERE is_active = true ORDER BY meal_type, option_number, sort_order;
+
+-- =============================================
+-- ADMINISTRADOR (admin@nutriaplan.com)
+-- =============================================
+-- PASSO 1: Criar usuário admin via edge function
+-- POST /functions/v1/create-admin
+-- Body: {"email": "admin@nutriaplan.com", "password": "SUA_SENHA_AQUI"}
+--
+-- PASSO 2: Após criação, obtenha o user_id gerado e execute:
+--
+-- UPDATE profiles SET
+--   name = 'Administrador',
+--   age = 34,
+--   sex = 'male',
+--   height = 174,
+--   weight = 90,
+--   goal = 'gain_muscle',
+--   activity_level = 'moderate',
+--   daily_calories = 3063,
+--   protein_target = 172,
+--   carbs_target = 441,
+--   fat_target = 68,
+--   meals_per_day = 6,
+--   include_supplements = true,
+--   onboarding_completed = true,
+--   avoided_foods = ARRAY['Chicória', 'Tremoço'],
+--   evening_meal_preference = 'no_preference',
+--   snack_preference = 'afternoon_snack'
+-- WHERE user_id = '<ADMIN_USER_ID>';
+--
+-- -- Role admin (create-admin já faz isso automaticamente)
+-- -- INSERT INTO user_roles (user_id, role) VALUES ('<ADMIN_USER_ID>', 'admin') ON CONFLICT DO NOTHING;
+--
+-- -- Subscription: Plano Profissional com status ativo
+-- UPDATE subscriptions SET
+--   plan_id = '77b91b5c-aac4-4c36-a8ae-f36b1f9c557b',
+--   status = 'active',
+--   current_period_start = now(),
+--   current_period_end = now() + INTERVAL '1 year'
+-- WHERE user_id = '<ADMIN_USER_ID>';
+--
+-- -- Usage override
+-- UPDATE user_usage SET
+--   meal_options_override = 3
+-- WHERE user_id = '<ADMIN_USER_ID>';
 
 -- =============================================
 -- FIM DO DATA EXPORT
