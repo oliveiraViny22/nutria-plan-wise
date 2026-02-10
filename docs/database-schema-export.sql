@@ -1,12 +1,22 @@
 -- =============================================
--- NutriaPlan Database Schema Export (COMPLETO)
+-- NutriaPlan Database Schema Export (COMPLETO v2)
 -- Generated: 2026-02-10
 -- Supabase Project: iplgqpnwfgnqaaeqxnrx
--- Inclui: Enums, Tabelas, Funções, Triggers, RLS
+-- Inclui: Enums, Tabelas, Índices, Constraints Únicos,
+--         Funções, Triggers, RLS Policies, Storage
+-- =============================================
+-- ORDEM DE EXECUÇÃO:
+--   1. Enums
+--   2. Tabelas (com FKs)
+--   3. Índices e Constraints Únicos
+--   4. Funções
+--   5. Triggers (public + auth)
+--   6. RLS (ENABLE + Policies)
+--   7. Storage Buckets
 -- =============================================
 
 -- =============================================
--- ENUMS
+-- 1. ENUMS
 -- =============================================
 
 CREATE TYPE public.app_role AS ENUM ('admin', 'user', 'professional');
@@ -16,7 +26,7 @@ CREATE TYPE public.plan_type AS ENUM ('gratuito', 'plano_pessoal_pago', 'profiss
 CREATE TYPE public.subscription_status AS ENUM ('trial', 'active', 'past_due', 'canceled', 'expired');
 
 -- =============================================
--- TABLES
+-- 2. TABELAS (com Foreign Keys)
 -- =============================================
 
 -- Profiles (extends auth.users)
@@ -54,7 +64,7 @@ CREATE TABLE public.profiles (
 -- Plans (subscription tiers)
 CREATE TABLE public.plans (
     id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
-    name TEXT NOT NULL,
+    name TEXT NOT NULL UNIQUE,
     type public.plan_type NOT NULL,
     description TEXT,
     price_monthly NUMERIC,
@@ -184,7 +194,8 @@ CREATE TABLE public.meal_options (
     total_protein NUMERIC DEFAULT 0,
     total_carbs NUMERIC DEFAULT 0,
     total_fat NUMERIC DEFAULT 0,
-    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+    UNIQUE (meal_id, option_number)
 );
 
 -- Meal Option Foods
@@ -229,7 +240,8 @@ CREATE TABLE public.meal_logs (
     carbs_consumed NUMERIC DEFAULT 0,
     fat_consumed NUMERIC DEFAULT 0,
     notes TEXT,
-    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+    UNIQUE (daily_log_id, meal_id)
 );
 
 -- Weight Logs
@@ -239,7 +251,8 @@ CREATE TABLE public.weight_logs (
     weight_kg NUMERIC NOT NULL,
     log_date DATE NOT NULL DEFAULT CURRENT_DATE,
     notes TEXT,
-    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+    UNIQUE (user_id, log_date)
 );
 
 -- Body Measurements
@@ -256,7 +269,8 @@ CREATE TABLE public.body_measurements (
     body_fat_percent NUMERIC,
     recorded_by UUID REFERENCES public.profiles(user_id),
     notes TEXT,
-    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+    UNIQUE (user_id, measurement_date)
 );
 
 -- Professional Students
@@ -268,7 +282,8 @@ CREATE TABLE public.professional_students (
     student_confirmed BOOLEAN DEFAULT FALSE,
     notes TEXT,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
-    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+    UNIQUE (professional_id, student_id)
 );
 
 -- Objective Change Policies
@@ -278,7 +293,8 @@ CREATE TABLE public.objective_change_policies (
     change_number INTEGER NOT NULL,
     cooldown_days INTEGER NOT NULL DEFAULT 30,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
-    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+    UNIQUE (profile_type, change_number)
 );
 
 -- Objective Change Requests
@@ -344,6 +360,10 @@ CREATE TABLE public.meal_anchor_foods (
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
 );
+
+-- Unique constraint: uma âncora por meal_type + option + food + goal
+CREATE UNIQUE INDEX meal_anchor_foods_unique_per_goal 
+ON public.meal_anchor_foods (meal_type, option_number, food_id, goal_type);
 
 -- Meal Contextual Blocks
 CREATE TABLE public.meal_contextual_blocks (
@@ -441,7 +461,7 @@ CREATE TABLE public.conversion_events (
 -- Webhook Events
 CREATE TABLE public.webhook_events (
     id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
-    event_id TEXT NOT NULL,
+    event_id TEXT NOT NULL UNIQUE,
     event_type TEXT NOT NULL,
     payload JSONB,
     processed_at TIMESTAMP WITH TIME ZONE,
@@ -449,7 +469,116 @@ CREATE TABLE public.webhook_events (
 );
 
 -- =============================================
--- FUNCTIONS
+-- 3. ÍNDICES
+-- =============================================
+
+-- profiles
+CREATE INDEX idx_profiles_user_id ON public.profiles (user_id);
+
+-- plans (name UNIQUE já criado inline)
+
+-- subscriptions
+CREATE INDEX idx_subscriptions_user_id ON public.subscriptions (user_id);
+CREATE INDEX idx_subscriptions_status ON public.subscriptions (status) WHERE (status = ANY (ARRAY['active'::subscription_status, 'trial'::subscription_status]));
+
+-- user_roles
+CREATE INDEX idx_user_roles_user_id ON public.user_roles (user_id);
+
+-- user_usage
+CREATE INDEX idx_user_usage_user_id ON public.user_usage (user_id);
+
+-- foods
+CREATE INDEX idx_foods_name ON public.foods (name);
+CREATE INDEX idx_foods_canonical_name ON public.foods (canonical_name);
+CREATE INDEX idx_foods_category ON public.foods (category);
+CREATE INDEX idx_foods_type ON public.foods (type);
+CREATE INDEX idx_foods_is_active ON public.foods (is_active);
+CREATE INDEX idx_foods_origin ON public.foods (origin);
+CREATE INDEX idx_foods_review_status ON public.foods (review_status);
+CREATE INDEX idx_foods_dietary_profile ON public.foods (dietary_profile) WHERE (dietary_profile IS NOT NULL);
+CREATE INDEX idx_foods_supplement_items ON public.foods (is_supplement_item) WHERE (is_supplement_item = true);
+
+-- diet_plans
+CREATE INDEX idx_diet_plans_user_id ON public.diet_plans (user_id);
+CREATE INDEX idx_diet_plans_user_status ON public.diet_plans (user_id, status);
+CREATE UNIQUE INDEX idx_diet_plans_one_active ON public.diet_plans (user_id) WHERE (status = 'active');
+
+-- meals
+CREATE INDEX idx_meals_diet_plan_id ON public.meals (diet_plan_id);
+
+-- meal_options
+CREATE INDEX idx_meal_options_meal_id ON public.meal_options (meal_id);
+
+-- meal_option_foods
+CREATE INDEX idx_meal_option_foods_meal_option_id ON public.meal_option_foods (meal_option_id);
+CREATE INDEX idx_meal_option_foods_food_id ON public.meal_option_foods (food_id);
+
+-- daily_logs
+CREATE INDEX idx_daily_logs_user_date ON public.daily_logs (user_id, log_date);
+CREATE INDEX idx_daily_logs_diet_plan_id ON public.daily_logs (diet_plan_id);
+
+-- meal_logs
+CREATE INDEX idx_meal_logs_daily_log_id ON public.meal_logs (daily_log_id);
+
+-- body_measurements
+CREATE INDEX idx_body_measurements_user_date ON public.body_measurements (user_id, measurement_date DESC);
+
+-- professional_students
+CREATE INDEX idx_professional_students_professional_id ON public.professional_students (professional_id);
+CREATE INDEX idx_professional_students_student_id ON public.professional_students (student_id);
+CREATE INDEX idx_professional_students_status ON public.professional_students (status);
+CREATE INDEX idx_professional_students_student_confirmed ON public.professional_students (student_confirmed);
+
+-- weight_logs
+CREATE INDEX idx_weight_logs_user_date ON public.weight_logs (user_id, log_date DESC);
+
+-- meal_templates
+CREATE INDEX idx_meal_templates_meal_type ON public.meal_templates (meal_type) WHERE (is_active = true);
+
+-- meal_template_roles
+CREATE INDEX idx_meal_template_roles_template ON public.meal_template_roles (template_id);
+
+-- meal_role_food_categories
+CREATE INDEX idx_meal_role_food_categories_role ON public.meal_role_food_categories (role_id);
+
+-- meal_anchor_foods
+CREATE INDEX idx_meal_anchor_foods_meal_type ON public.meal_anchor_foods (meal_type);
+CREATE INDEX idx_meal_anchor_foods_meal_type_option ON public.meal_anchor_foods (meal_type, option_number);
+CREATE INDEX idx_meal_anchor_foods_active ON public.meal_anchor_foods (is_active) WHERE (is_active = true);
+CREATE INDEX idx_meal_anchor_foods_goal_type ON public.meal_anchor_foods (goal_type) WHERE (goal_type IS NOT NULL);
+CREATE INDEX idx_meal_anchor_foods_dietary_profile ON public.meal_anchor_foods (dietary_profile) WHERE (is_active = true);
+
+-- meal_contextual_blocks
+CREATE INDEX idx_meal_contextual_blocks_meal_type ON public.meal_contextual_blocks (meal_type) WHERE (is_active = true);
+CREATE INDEX idx_meal_contextual_blocks_food_id ON public.meal_contextual_blocks (food_id) WHERE (food_id IS NOT NULL);
+
+-- food_block_overrides
+CREATE INDEX idx_food_block_overrides_food_id ON public.food_block_overrides (food_id);
+CREATE INDEX idx_food_block_overrides_unblocked ON public.food_block_overrides (is_unblocked) WHERE (is_unblocked = true);
+
+-- food_imports
+CREATE INDEX idx_food_imports_status ON public.food_imports (status);
+CREATE INDEX idx_food_imports_created_at ON public.food_imports (created_at DESC);
+
+-- admin_audit_log
+CREATE INDEX idx_admin_audit_log_user_id ON public.admin_audit_log (user_id);
+CREATE INDEX idx_admin_audit_log_action ON public.admin_audit_log (action);
+CREATE INDEX idx_admin_audit_log_created_at ON public.admin_audit_log (created_at DESC);
+
+-- ai_usage_logs
+CREATE INDEX idx_ai_usage_logs_user_id ON public.ai_usage_logs (user_id);
+CREATE INDEX idx_ai_usage_logs_function ON public.ai_usage_logs (function_name);
+CREATE INDEX idx_ai_usage_logs_created_at ON public.ai_usage_logs (created_at DESC);
+
+-- conversion_events
+CREATE INDEX idx_conversion_events_user ON public.conversion_events (user_id, created_at DESC);
+CREATE INDEX idx_conversion_events_feature ON public.conversion_events (feature_key, created_at DESC);
+
+-- webhook_events
+CREATE INDEX idx_webhook_events_event_id ON public.webhook_events (event_id);
+
+-- =============================================
+-- 4. FUNÇÕES
 -- =============================================
 
 -- Remove accents from text
@@ -512,7 +641,7 @@ BEGIN
 END;
 $$;
 
--- Check if user has role
+-- Check if user has role (SECURITY DEFINER - evita recursão RLS)
 CREATE OR REPLACE FUNCTION public.has_role(_user_id UUID, _role app_role)
 RETURNS BOOLEAN
 LANGUAGE plpgsql
@@ -666,7 +795,6 @@ DECLARE
     v_current integer;
     v_max integer;
 BEGIN
-    -- Admins have unlimited access
     IF public.has_role(_user_id, 'admin'::app_role) THEN
         SELECT * INTO v_usage FROM public.user_usage WHERE user_id = _user_id;
         CASE _feature
@@ -783,7 +911,7 @@ BEGIN
 END;
 $$;
 
--- Calculate nutritional targets
+-- Calculate nutritional targets (Mifflin-St Jeor)
 CREATE OR REPLACE FUNCTION public.calculate_nutritional_targets(_user_id UUID, _goal TEXT)
 RETURNS JSON
 LANGUAGE plpgsql
@@ -811,7 +939,6 @@ BEGIN
 
   _weight := COALESCE(_profile.weight, 70);
 
-  -- BMR (Mifflin-St Jeor)
   IF _profile.sex = 'male' THEN
     _bmr := 10 * _weight + 6.25 * COALESCE(_profile.height, 170) - 5 * COALESCE(_profile.age, 30) + 5;
   ELSE
@@ -846,7 +973,6 @@ BEGIN
   END;
 
   _protein := ROUND(_weight * _protein_per_kg);
-
   IF _protein > ROUND(_weight * 3.0) THEN
     _protein := ROUND(_weight * 3.0);
   END IF;
@@ -859,12 +985,8 @@ BEGIN
   END;
 
   _fat := ROUND((_calories * _fat_ratio) / 9);
-
   _carbs := ROUND((_calories - (_protein * 4) - (_fat * 9)) / 4);
-
-  IF _carbs < 50 THEN
-    _carbs := 50;
-  END IF;
+  IF _carbs < 50 THEN _carbs := 50; END IF;
 
   RETURN json_build_object(
     'calories', _calories,
@@ -957,9 +1079,7 @@ BEGIN
     END IF;
     
     SELECT objective_change_count, objective_locked_until INTO v_profile FROM profiles WHERE user_id = _user_id;
-    
     SELECT * INTO v_old_plan FROM diet_plans WHERE user_id = _user_id AND status = 'active' ORDER BY created_at DESC LIMIT 1;
-    
     SELECT * INTO v_user_plan FROM get_user_plan(_user_id);
     
     v_new_change_count := COALESCE(v_profile.objective_change_count, 0) + 1;
@@ -974,7 +1094,6 @@ BEGIN
     END IF;
     
     v_new_locked_until := now() + (COALESCE(v_policy.cooldown_days, 90) || ' days')::INTERVAL;
-    
     v_targets := calculate_nutritional_targets(_user_id, _new_goal);
     
     IF v_old_plan IS NOT NULL AND NOT _keep_plan_active THEN
@@ -996,6 +1115,7 @@ BEGIN
         'success', TRUE,
         'message', 'Objetivo alterado com sucesso.',
         'new_goal', _new_goal,
+        'previous_change_count', v_new_change_count - 1,
         'new_change_count', v_new_change_count,
         'next_locked_until', v_new_locked_until,
         'cooldown_days', COALESCE(v_policy.cooldown_days, 90),
@@ -1005,7 +1125,7 @@ BEGIN
 END;
 $$;
 
--- Confirm meal consumption
+-- Confirm meal consumption (atômico: meal_log + daily_log)
 CREATE OR REPLACE FUNCTION public.confirm_meal_consumption(
     _user_id UUID, _meal_id UUID, _option_id UUID, _status TEXT, _log_date DATE DEFAULT CURRENT_DATE
 )
@@ -1218,7 +1338,7 @@ AS $$
     AND f.review_status = 'pending' AND has_role(_user_id, 'professional'::app_role)
 $$;
 
--- Handle new user (trigger function for auth.users)
+-- Handle new user (trigger function para auth.users)
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER
 LANGUAGE plpgsql
@@ -1261,19 +1381,79 @@ END;
 $$;
 
 -- =============================================
--- TRIGGERS
+-- 5. TRIGGERS
 -- =============================================
 
+-- auth.users → cria profile + subscription + usage
 CREATE TRIGGER on_auth_user_created
     AFTER INSERT ON auth.users
     FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
-CREATE TRIGGER set_food_canonical_name
+-- foods → canonical_name automático
+CREATE TRIGGER trigger_set_canonical_name
     BEFORE INSERT OR UPDATE ON public.foods
     FOR EACH ROW EXECUTE FUNCTION public.set_canonical_name();
 
+-- subscriptions → reset usage ao fazer upgrade
+CREATE TRIGGER on_subscription_upgrade
+    AFTER UPDATE ON public.subscriptions
+    FOR EACH ROW EXECUTE FUNCTION public.handle_subscription_upgrade();
+
+-- updated_at automático em todas as tabelas com updated_at
+CREATE TRIGGER update_profiles_updated_at
+    BEFORE UPDATE ON public.profiles
+    FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+
+CREATE TRIGGER update_subscriptions_updated_at
+    BEFORE UPDATE ON public.subscriptions
+    FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+
+CREATE TRIGGER update_user_usage_updated_at
+    BEFORE UPDATE ON public.user_usage
+    FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+
+CREATE TRIGGER update_diet_plans_updated_at
+    BEFORE UPDATE ON public.diet_plans
+    FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+
+CREATE TRIGGER update_daily_logs_updated_at
+    BEFORE UPDATE ON public.daily_logs
+    FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+
+CREATE TRIGGER update_professional_students_updated_at
+    BEFORE UPDATE ON public.professional_students
+    FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+
+CREATE TRIGGER update_objective_change_policies_updated_at
+    BEFORE UPDATE ON public.objective_change_policies
+    FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+
+CREATE TRIGGER update_objective_change_requests_updated_at
+    BEFORE UPDATE ON public.objective_change_requests
+    FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+
+CREATE TRIGGER update_meal_templates_updated_at
+    BEFORE UPDATE ON public.meal_templates
+    FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+
+CREATE TRIGGER update_meal_anchor_foods_updated_at
+    BEFORE UPDATE ON public.meal_anchor_foods
+    FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+
+CREATE TRIGGER update_meal_contextual_blocks_updated_at
+    BEFORE UPDATE ON public.meal_contextual_blocks
+    FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+
+CREATE TRIGGER update_food_block_overrides_updated_at
+    BEFORE UPDATE ON public.food_block_overrides
+    FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+
+CREATE TRIGGER update_system_settings_updated_at
+    BEFORE UPDATE ON public.system_settings
+    FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+
 -- =============================================
--- ROW LEVEL SECURITY (RLS)
+-- 6. ROW LEVEL SECURITY (RLS)
 -- =============================================
 
 -- Habilitar RLS em todas as tabelas
@@ -1522,10 +1702,11 @@ CREATE POLICY "Admins can read all conversion events" ON public.conversion_event
 CREATE POLICY "Service role full access to webhook_events" ON public.webhook_events FOR ALL USING (auth.role() = 'service_role');
 
 -- =============================================
--- STORAGE BUCKETS
+-- 7. STORAGE BUCKETS
 -- =============================================
 INSERT INTO storage.buckets (id, name, public) VALUES ('adherence-reports', 'adherence-reports', false);
 
 -- =============================================
--- FIM DO SCHEMA EXPORT
+-- FIM DO SCHEMA EXPORT COMPLETO
+-- Tabelas: 24 | Funções: 20 | Triggers: 16 | Índices: 60+
 -- =============================================
