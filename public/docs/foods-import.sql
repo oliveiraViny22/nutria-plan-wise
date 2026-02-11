@@ -1,13 +1,37 @@
 -- ============================================================
--- NutriAPlan - Exportação Completa da Tabela foods
--- Gerado em: 2026-02-10
+-- NutriAPlan - Exportação Completa da Tabela foods v2.1
+-- Gerado em: 2026-02-11
 -- Total: 271 registros (249 ativos + 22 inativos)
 -- ============================================================
 -- INSTRUÇÕES DE USO:
--- 1. Crie a tabela foods no banco destino (veja docs/database-schema-export.sql)
--- 2. Execute este arquivo para popular os dados
--- 3. Os UUIDs são preservados para manter referências cruzadas
+-- 1. Execute docs/database-schema-export.sql primeiro
+-- 2. Execute docs/database-data-export.sql (dados semente)
+-- 3. Execute este arquivo para popular os alimentos
+-- 4. Os UUIDs são preservados para manter referências cruzadas
 -- ============================================================
+
+-- ============================================================
+-- PRÉ-REQUISITOS: Validar que o schema foi aplicado
+-- ============================================================
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'foods') THEN
+    RAISE EXCEPTION 'ERRO: Tabela "foods" não encontrada. Execute database-schema-export.sql antes deste arquivo.';
+  END IF;
+  
+  -- Verificar colunas críticas que foram adicionadas em versões posteriores
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'foods' AND column_name = 'processing_level') THEN
+    RAISE EXCEPTION 'ERRO: Coluna "processing_level" não encontrada na tabela foods. Atualize o schema com database-schema-export.sql.';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'foods' AND column_name = 'unit_enabled') THEN
+    RAISE EXCEPTION 'ERRO: Coluna "unit_enabled" não encontrada na tabela foods. Atualize o schema com database-schema-export.sql.';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'foods' AND column_name = 'canonical_name') THEN
+    RAISE EXCEPTION 'ERRO: Coluna "canonical_name" não encontrada na tabela foods. Atualize o schema com database-schema-export.sql.';
+  END IF;
+
+  RAISE NOTICE 'Pré-requisitos validados. Importando % alimentos...', (SELECT 271);
+END $$;
 
 -- Limpar tabela (CUIDADO: removerá dados existentes!)
 -- TRUNCATE TABLE foods CASCADE;
