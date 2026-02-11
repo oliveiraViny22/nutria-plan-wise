@@ -19,18 +19,30 @@
 -- 1. ENUMS
 -- =============================================
 
-CREATE TYPE public.app_role AS ENUM ('admin', 'user', 'professional');
-CREATE TYPE public.daily_status AS ENUM ('no_records', 'partial', 'complete');
-CREATE TYPE public.meal_status AS ENUM ('pending', 'confirmed', 'skipped', 'out_of_plan', 'late_confirmed');
-CREATE TYPE public.plan_type AS ENUM ('gratuito', 'plano_pessoal_pago', 'profissional');
-CREATE TYPE public.subscription_status AS ENUM ('trial', 'active', 'past_due', 'canceled', 'expired');
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'app_role') THEN
+    CREATE TYPE public.app_role AS ENUM ('admin', 'user', 'professional');
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'daily_status') THEN
+    CREATE TYPE public.daily_status AS ENUM ('no_records', 'partial', 'complete');
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'meal_status') THEN
+    CREATE TYPE public.meal_status AS ENUM ('pending', 'confirmed', 'skipped', 'out_of_plan', 'late_confirmed');
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'plan_type') THEN
+    CREATE TYPE public.plan_type AS ENUM ('gratuito', 'plano_pessoal_pago', 'profissional');
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'subscription_status') THEN
+    CREATE TYPE public.subscription_status AS ENUM ('trial', 'active', 'past_due', 'canceled', 'expired');
+  END IF;
+END $$;
 
 -- =============================================
 -- 2. TABELAS (com Foreign Keys)
 -- =============================================
 
 -- Profiles (extends auth.users)
-CREATE TABLE public.profiles (
+CREATE TABLE IF NOT EXISTS public.profiles (
     id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
     user_id UUID NOT NULL UNIQUE,
     email TEXT,
@@ -62,7 +74,7 @@ CREATE TABLE public.profiles (
 );
 
 -- Plans (subscription tiers)
-CREATE TABLE public.plans (
+CREATE TABLE IF NOT EXISTS public.plans (
     id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
     name TEXT NOT NULL UNIQUE,
     type public.plan_type NOT NULL,
@@ -81,7 +93,7 @@ CREATE TABLE public.plans (
 );
 
 -- Subscriptions
-CREATE TABLE public.subscriptions (
+CREATE TABLE IF NOT EXISTS public.subscriptions (
     id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
     user_id UUID NOT NULL REFERENCES public.profiles(user_id),
     plan_id UUID NOT NULL REFERENCES public.plans(id),
@@ -98,7 +110,7 @@ CREATE TABLE public.subscriptions (
 );
 
 -- User Roles
-CREATE TABLE public.user_roles (
+CREATE TABLE IF NOT EXISTS public.user_roles (
     id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
     user_id UUID NOT NULL REFERENCES public.profiles(user_id),
     role public.app_role NOT NULL,
@@ -107,7 +119,7 @@ CREATE TABLE public.user_roles (
 );
 
 -- User Usage (limits tracking)
-CREATE TABLE public.user_usage (
+CREATE TABLE IF NOT EXISTS public.user_usage (
     id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
     user_id UUID NOT NULL UNIQUE REFERENCES public.profiles(user_id),
     diets_used INTEGER NOT NULL DEFAULT 0,
@@ -123,7 +135,7 @@ CREATE TABLE public.user_usage (
 );
 
 -- Foods catalog
-CREATE TABLE public.foods (
+CREATE TABLE IF NOT EXISTS public.foods (
     id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
     name TEXT NOT NULL,
     canonical_name TEXT,
@@ -155,7 +167,7 @@ CREATE TABLE public.foods (
 );
 
 -- Diet Plans
-CREATE TABLE public.diet_plans (
+CREATE TABLE IF NOT EXISTS public.diet_plans (
     id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
     user_id UUID NOT NULL REFERENCES public.profiles(user_id),
     status TEXT NOT NULL DEFAULT 'active',
@@ -171,7 +183,7 @@ CREATE TABLE public.diet_plans (
 );
 
 -- Meals
-CREATE TABLE public.meals (
+CREATE TABLE IF NOT EXISTS public.meals (
     id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
     diet_plan_id UUID NOT NULL REFERENCES public.diet_plans(id) ON DELETE CASCADE,
     name TEXT NOT NULL,
@@ -184,7 +196,7 @@ CREATE TABLE public.meals (
 );
 
 -- Meal Options
-CREATE TABLE public.meal_options (
+CREATE TABLE IF NOT EXISTS public.meal_options (
     id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
     meal_id UUID NOT NULL REFERENCES public.meals(id) ON DELETE CASCADE,
     option_number INTEGER NOT NULL DEFAULT 1,
@@ -198,7 +210,7 @@ CREATE TABLE public.meal_options (
 );
 
 -- Meal Option Foods
-CREATE TABLE public.meal_option_foods (
+CREATE TABLE IF NOT EXISTS public.meal_option_foods (
     id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
     meal_option_id UUID NOT NULL REFERENCES public.meal_options(id) ON DELETE CASCADE,
     food_id UUID NOT NULL REFERENCES public.foods(id),
@@ -211,7 +223,7 @@ CREATE TABLE public.meal_option_foods (
 );
 
 -- Daily Logs
-CREATE TABLE public.daily_logs (
+CREATE TABLE IF NOT EXISTS public.daily_logs (
     id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
     user_id UUID NOT NULL REFERENCES public.profiles(user_id),
     diet_plan_id UUID NOT NULL REFERENCES public.diet_plans(id),
@@ -227,7 +239,7 @@ CREATE TABLE public.daily_logs (
 );
 
 -- Meal Logs
-CREATE TABLE public.meal_logs (
+CREATE TABLE IF NOT EXISTS public.meal_logs (
     id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
     daily_log_id UUID NOT NULL REFERENCES public.daily_logs(id) ON DELETE CASCADE,
     meal_id UUID NOT NULL REFERENCES public.meals(id),
@@ -244,7 +256,7 @@ CREATE TABLE public.meal_logs (
 );
 
 -- Weight Logs
-CREATE TABLE public.weight_logs (
+CREATE TABLE IF NOT EXISTS public.weight_logs (
     id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
     user_id UUID NOT NULL REFERENCES public.profiles(user_id),
     weight_kg NUMERIC NOT NULL,
@@ -255,7 +267,7 @@ CREATE TABLE public.weight_logs (
 );
 
 -- Body Measurements
-CREATE TABLE public.body_measurements (
+CREATE TABLE IF NOT EXISTS public.body_measurements (
     id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
     user_id UUID NOT NULL REFERENCES public.profiles(user_id),
     measurement_date DATE NOT NULL DEFAULT CURRENT_DATE,
@@ -273,7 +285,7 @@ CREATE TABLE public.body_measurements (
 );
 
 -- Professional Students
-CREATE TABLE public.professional_students (
+CREATE TABLE IF NOT EXISTS public.professional_students (
     id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
     professional_id UUID NOT NULL REFERENCES public.profiles(user_id),
     student_id UUID NOT NULL REFERENCES public.profiles(user_id),
@@ -286,7 +298,7 @@ CREATE TABLE public.professional_students (
 );
 
 -- Objective Change Policies
-CREATE TABLE public.objective_change_policies (
+CREATE TABLE IF NOT EXISTS public.objective_change_policies (
     id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
     profile_type TEXT NOT NULL,
     change_number INTEGER NOT NULL,
@@ -297,7 +309,7 @@ CREATE TABLE public.objective_change_policies (
 );
 
 -- Objective Change Requests
-CREATE TABLE public.objective_change_requests (
+CREATE TABLE IF NOT EXISTS public.objective_change_requests (
     id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
     student_id UUID NOT NULL,
     professional_id UUID NOT NULL,
@@ -311,7 +323,7 @@ CREATE TABLE public.objective_change_requests (
 );
 
 -- Meal Templates
-CREATE TABLE public.meal_templates (
+CREATE TABLE IF NOT EXISTS public.meal_templates (
     id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
     name TEXT NOT NULL,
     meal_type TEXT NOT NULL,
@@ -324,7 +336,7 @@ CREATE TABLE public.meal_templates (
 );
 
 -- Meal Template Roles
-CREATE TABLE public.meal_template_roles (
+CREATE TABLE IF NOT EXISTS public.meal_template_roles (
     id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
     template_id UUID NOT NULL REFERENCES public.meal_templates(id) ON DELETE CASCADE,
     role_name TEXT NOT NULL,
@@ -336,7 +348,7 @@ CREATE TABLE public.meal_template_roles (
 );
 
 -- Meal Role Food Categories
-CREATE TABLE public.meal_role_food_categories (
+CREATE TABLE IF NOT EXISTS public.meal_role_food_categories (
     id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
     role_id UUID NOT NULL REFERENCES public.meal_template_roles(id) ON DELETE CASCADE,
     category TEXT NOT NULL,
@@ -345,7 +357,7 @@ CREATE TABLE public.meal_role_food_categories (
 );
 
 -- Meal Anchor Foods (1092 âncoras ativas)
-CREATE TABLE public.meal_anchor_foods (
+CREATE TABLE IF NOT EXISTS public.meal_anchor_foods (
     id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
     meal_type TEXT NOT NULL,
     food_id UUID NOT NULL REFERENCES public.foods(id),
@@ -361,11 +373,11 @@ CREATE TABLE public.meal_anchor_foods (
 );
 
 -- Unique constraint: uma âncora por meal_type + option + food + goal
-CREATE UNIQUE INDEX meal_anchor_foods_unique_per_goal 
+CREATE UNIQUE INDEX IF NOT EXISTS meal_anchor_foods_unique_per_goal 
 ON public.meal_anchor_foods (meal_type, option_number, food_id, goal_type);
 
 -- Meal Contextual Blocks
-CREATE TABLE public.meal_contextual_blocks (
+CREATE TABLE IF NOT EXISTS public.meal_contextual_blocks (
     id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
     meal_type TEXT NOT NULL,
     food_id UUID REFERENCES public.foods(id),
@@ -380,7 +392,7 @@ CREATE TABLE public.meal_contextual_blocks (
 );
 
 -- Food Block Overrides
-CREATE TABLE public.food_block_overrides (
+CREATE TABLE IF NOT EXISTS public.food_block_overrides (
     id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
     food_id UUID NOT NULL UNIQUE REFERENCES public.foods(id),
     is_unblocked BOOLEAN NOT NULL DEFAULT FALSE,
@@ -391,7 +403,7 @@ CREATE TABLE public.food_block_overrides (
 );
 
 -- Food Imports
-CREATE TABLE public.food_imports (
+CREATE TABLE IF NOT EXISTS public.food_imports (
     id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
     filename TEXT NOT NULL,
     imported_by UUID NOT NULL,
@@ -406,7 +418,7 @@ CREATE TABLE public.food_imports (
 );
 
 -- System Settings
-CREATE TABLE public.system_settings (
+CREATE TABLE IF NOT EXISTS public.system_settings (
     id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
     key TEXT NOT NULL UNIQUE,
     value JSONB NOT NULL,
@@ -419,7 +431,7 @@ CREATE TABLE public.system_settings (
 );
 
 -- Admin Audit Log
-CREATE TABLE public.admin_audit_log (
+CREATE TABLE IF NOT EXISTS public.admin_audit_log (
     id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
     user_id UUID NOT NULL,
     action TEXT NOT NULL,
@@ -433,7 +445,7 @@ CREATE TABLE public.admin_audit_log (
 );
 
 -- AI Usage Logs
-CREATE TABLE public.ai_usage_logs (
+CREATE TABLE IF NOT EXISTS public.ai_usage_logs (
     id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
     user_id UUID NOT NULL,
     function_name TEXT NOT NULL,
@@ -448,7 +460,7 @@ CREATE TABLE public.ai_usage_logs (
 );
 
 -- Conversion Events
-CREATE TABLE public.conversion_events (
+CREATE TABLE IF NOT EXISTS public.conversion_events (
     id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
     user_id UUID NOT NULL,
     feature_key TEXT NOT NULL,
@@ -458,7 +470,7 @@ CREATE TABLE public.conversion_events (
 );
 
 -- Webhook Events
-CREATE TABLE public.webhook_events (
+CREATE TABLE IF NOT EXISTS public.webhook_events (
     id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
     event_id TEXT NOT NULL UNIQUE,
     event_type TEXT NOT NULL,
@@ -472,109 +484,109 @@ CREATE TABLE public.webhook_events (
 -- =============================================
 
 -- profiles
-CREATE INDEX idx_profiles_user_id ON public.profiles (user_id);
+CREATE INDEX IF NOT EXISTS idx_profiles_user_id ON public.profiles (user_id);
 
 -- plans (name UNIQUE já criado inline)
 
 -- subscriptions
-CREATE INDEX idx_subscriptions_user_id ON public.subscriptions (user_id);
-CREATE INDEX idx_subscriptions_status ON public.subscriptions (status) WHERE (status = ANY (ARRAY['active'::subscription_status, 'trial'::subscription_status]));
+CREATE INDEX IF NOT EXISTS idx_subscriptions_user_id ON public.subscriptions (user_id);
+CREATE INDEX IF NOT EXISTS idx_subscriptions_status ON public.subscriptions (status) WHERE (status = ANY (ARRAY['active'::subscription_status, 'trial'::subscription_status]));
 
 -- user_roles
-CREATE INDEX idx_user_roles_user_id ON public.user_roles (user_id);
+CREATE INDEX IF NOT EXISTS idx_user_roles_user_id ON public.user_roles (user_id);
 
 -- user_usage
-CREATE INDEX idx_user_usage_user_id ON public.user_usage (user_id);
+CREATE INDEX IF NOT EXISTS idx_user_usage_user_id ON public.user_usage (user_id);
 
 -- foods
-CREATE INDEX idx_foods_name ON public.foods (name);
-CREATE INDEX idx_foods_canonical_name ON public.foods (canonical_name);
-CREATE INDEX idx_foods_category ON public.foods (category);
-CREATE INDEX idx_foods_type ON public.foods (type);
-CREATE INDEX idx_foods_is_active ON public.foods (is_active);
-CREATE INDEX idx_foods_origin ON public.foods (origin);
-CREATE INDEX idx_foods_review_status ON public.foods (review_status);
-CREATE INDEX idx_foods_dietary_profile ON public.foods (dietary_profile) WHERE (dietary_profile IS NOT NULL);
-CREATE INDEX idx_foods_supplement_items ON public.foods (is_supplement_item) WHERE (is_supplement_item = true);
+CREATE INDEX IF NOT EXISTS idx_foods_name ON public.foods (name);
+CREATE INDEX IF NOT EXISTS idx_foods_canonical_name ON public.foods (canonical_name);
+CREATE INDEX IF NOT EXISTS idx_foods_category ON public.foods (category);
+CREATE INDEX IF NOT EXISTS idx_foods_type ON public.foods (type);
+CREATE INDEX IF NOT EXISTS idx_foods_is_active ON public.foods (is_active);
+CREATE INDEX IF NOT EXISTS idx_foods_origin ON public.foods (origin);
+CREATE INDEX IF NOT EXISTS idx_foods_review_status ON public.foods (review_status);
+CREATE INDEX IF NOT EXISTS idx_foods_dietary_profile ON public.foods (dietary_profile) WHERE (dietary_profile IS NOT NULL);
+CREATE INDEX IF NOT EXISTS idx_foods_supplement_items ON public.foods (is_supplement_item) WHERE (is_supplement_item = true);
 
 -- diet_plans
-CREATE INDEX idx_diet_plans_user_id ON public.diet_plans (user_id);
-CREATE INDEX idx_diet_plans_user_status ON public.diet_plans (user_id, status);
-CREATE UNIQUE INDEX idx_diet_plans_one_active ON public.diet_plans (user_id) WHERE (status = 'active');
+CREATE INDEX IF NOT EXISTS idx_diet_plans_user_id ON public.diet_plans (user_id);
+CREATE INDEX IF NOT EXISTS idx_diet_plans_user_status ON public.diet_plans (user_id, status);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_diet_plans_one_active ON public.diet_plans (user_id) WHERE (status = 'active');
 
 -- meals
-CREATE INDEX idx_meals_diet_plan_id ON public.meals (diet_plan_id);
+CREATE INDEX IF NOT EXISTS idx_meals_diet_plan_id ON public.meals (diet_plan_id);
 
 -- meal_options
-CREATE INDEX idx_meal_options_meal_id ON public.meal_options (meal_id);
+CREATE INDEX IF NOT EXISTS idx_meal_options_meal_id ON public.meal_options (meal_id);
 
 -- meal_option_foods
-CREATE INDEX idx_meal_option_foods_meal_option_id ON public.meal_option_foods (meal_option_id);
-CREATE INDEX idx_meal_option_foods_food_id ON public.meal_option_foods (food_id);
+CREATE INDEX IF NOT EXISTS idx_meal_option_foods_meal_option_id ON public.meal_option_foods (meal_option_id);
+CREATE INDEX IF NOT EXISTS idx_meal_option_foods_food_id ON public.meal_option_foods (food_id);
 
 -- daily_logs
-CREATE INDEX idx_daily_logs_user_date ON public.daily_logs (user_id, log_date);
-CREATE INDEX idx_daily_logs_diet_plan_id ON public.daily_logs (diet_plan_id);
+CREATE INDEX IF NOT EXISTS idx_daily_logs_user_date ON public.daily_logs (user_id, log_date);
+CREATE INDEX IF NOT EXISTS idx_daily_logs_diet_plan_id ON public.daily_logs (diet_plan_id);
 
 -- meal_logs
-CREATE INDEX idx_meal_logs_daily_log_id ON public.meal_logs (daily_log_id);
+CREATE INDEX IF NOT EXISTS idx_meal_logs_daily_log_id ON public.meal_logs (daily_log_id);
 
 -- body_measurements
-CREATE INDEX idx_body_measurements_user_date ON public.body_measurements (user_id, measurement_date DESC);
+CREATE INDEX IF NOT EXISTS idx_body_measurements_user_date ON public.body_measurements (user_id, measurement_date DESC);
 
 -- professional_students
-CREATE INDEX idx_professional_students_professional_id ON public.professional_students (professional_id);
-CREATE INDEX idx_professional_students_student_id ON public.professional_students (student_id);
-CREATE INDEX idx_professional_students_status ON public.professional_students (status);
-CREATE INDEX idx_professional_students_student_confirmed ON public.professional_students (student_confirmed);
+CREATE INDEX IF NOT EXISTS idx_professional_students_professional_id ON public.professional_students (professional_id);
+CREATE INDEX IF NOT EXISTS idx_professional_students_student_id ON public.professional_students (student_id);
+CREATE INDEX IF NOT EXISTS idx_professional_students_status ON public.professional_students (status);
+CREATE INDEX IF NOT EXISTS idx_professional_students_student_confirmed ON public.professional_students (student_confirmed);
 
 -- weight_logs
-CREATE INDEX idx_weight_logs_user_date ON public.weight_logs (user_id, log_date DESC);
+CREATE INDEX IF NOT EXISTS idx_weight_logs_user_date ON public.weight_logs (user_id, log_date DESC);
 
 -- meal_templates
-CREATE INDEX idx_meal_templates_meal_type ON public.meal_templates (meal_type) WHERE (is_active = true);
+CREATE INDEX IF NOT EXISTS idx_meal_templates_meal_type ON public.meal_templates (meal_type) WHERE (is_active = true);
 
 -- meal_template_roles
-CREATE INDEX idx_meal_template_roles_template ON public.meal_template_roles (template_id);
+CREATE INDEX IF NOT EXISTS idx_meal_template_roles_template ON public.meal_template_roles (template_id);
 
 -- meal_role_food_categories
-CREATE INDEX idx_meal_role_food_categories_role ON public.meal_role_food_categories (role_id);
+CREATE INDEX IF NOT EXISTS idx_meal_role_food_categories_role ON public.meal_role_food_categories (role_id);
 
 -- meal_anchor_foods
-CREATE INDEX idx_meal_anchor_foods_meal_type ON public.meal_anchor_foods (meal_type);
-CREATE INDEX idx_meal_anchor_foods_meal_type_option ON public.meal_anchor_foods (meal_type, option_number);
-CREATE INDEX idx_meal_anchor_foods_active ON public.meal_anchor_foods (is_active) WHERE (is_active = true);
-CREATE INDEX idx_meal_anchor_foods_goal_type ON public.meal_anchor_foods (goal_type) WHERE (goal_type IS NOT NULL);
-CREATE INDEX idx_meal_anchor_foods_dietary_profile ON public.meal_anchor_foods (dietary_profile) WHERE (is_active = true);
+CREATE INDEX IF NOT EXISTS idx_meal_anchor_foods_meal_type ON public.meal_anchor_foods (meal_type);
+CREATE INDEX IF NOT EXISTS idx_meal_anchor_foods_meal_type_option ON public.meal_anchor_foods (meal_type, option_number);
+CREATE INDEX IF NOT EXISTS idx_meal_anchor_foods_active ON public.meal_anchor_foods (is_active) WHERE (is_active = true);
+CREATE INDEX IF NOT EXISTS idx_meal_anchor_foods_goal_type ON public.meal_anchor_foods (goal_type) WHERE (goal_type IS NOT NULL);
+CREATE INDEX IF NOT EXISTS idx_meal_anchor_foods_dietary_profile ON public.meal_anchor_foods (dietary_profile) WHERE (is_active = true);
 
 -- meal_contextual_blocks
-CREATE INDEX idx_meal_contextual_blocks_meal_type ON public.meal_contextual_blocks (meal_type) WHERE (is_active = true);
-CREATE INDEX idx_meal_contextual_blocks_food_id ON public.meal_contextual_blocks (food_id) WHERE (food_id IS NOT NULL);
+CREATE INDEX IF NOT EXISTS idx_meal_contextual_blocks_meal_type ON public.meal_contextual_blocks (meal_type) WHERE (is_active = true);
+CREATE INDEX IF NOT EXISTS idx_meal_contextual_blocks_food_id ON public.meal_contextual_blocks (food_id) WHERE (food_id IS NOT NULL);
 
 -- food_block_overrides
-CREATE INDEX idx_food_block_overrides_food_id ON public.food_block_overrides (food_id);
-CREATE INDEX idx_food_block_overrides_unblocked ON public.food_block_overrides (is_unblocked) WHERE (is_unblocked = true);
+CREATE INDEX IF NOT EXISTS idx_food_block_overrides_food_id ON public.food_block_overrides (food_id);
+CREATE INDEX IF NOT EXISTS idx_food_block_overrides_unblocked ON public.food_block_overrides (is_unblocked) WHERE (is_unblocked = true);
 
 -- food_imports
-CREATE INDEX idx_food_imports_status ON public.food_imports (status);
-CREATE INDEX idx_food_imports_created_at ON public.food_imports (created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_food_imports_status ON public.food_imports (status);
+CREATE INDEX IF NOT EXISTS idx_food_imports_created_at ON public.food_imports (created_at DESC);
 
 -- admin_audit_log
-CREATE INDEX idx_admin_audit_log_user_id ON public.admin_audit_log (user_id);
-CREATE INDEX idx_admin_audit_log_action ON public.admin_audit_log (action);
-CREATE INDEX idx_admin_audit_log_created_at ON public.admin_audit_log (created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_admin_audit_log_user_id ON public.admin_audit_log (user_id);
+CREATE INDEX IF NOT EXISTS idx_admin_audit_log_action ON public.admin_audit_log (action);
+CREATE INDEX IF NOT EXISTS idx_admin_audit_log_created_at ON public.admin_audit_log (created_at DESC);
 
 -- ai_usage_logs
-CREATE INDEX idx_ai_usage_logs_user_id ON public.ai_usage_logs (user_id);
-CREATE INDEX idx_ai_usage_logs_function ON public.ai_usage_logs (function_name);
-CREATE INDEX idx_ai_usage_logs_created_at ON public.ai_usage_logs (created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_ai_usage_logs_user_id ON public.ai_usage_logs (user_id);
+CREATE INDEX IF NOT EXISTS idx_ai_usage_logs_function ON public.ai_usage_logs (function_name);
+CREATE INDEX IF NOT EXISTS idx_ai_usage_logs_created_at ON public.ai_usage_logs (created_at DESC);
 
 -- conversion_events
-CREATE INDEX idx_conversion_events_user ON public.conversion_events (user_id, created_at DESC);
-CREATE INDEX idx_conversion_events_feature ON public.conversion_events (feature_key, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_conversion_events_user ON public.conversion_events (user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_conversion_events_feature ON public.conversion_events (feature_key, created_at DESC);
 
 -- webhook_events
-CREATE INDEX idx_webhook_events_event_id ON public.webhook_events (event_id);
+CREATE INDEX IF NOT EXISTS idx_webhook_events_event_id ON public.webhook_events (event_id);
 
 -- =============================================
 -- 4. FUNÇÕES
@@ -1384,69 +1396,85 @@ $$;
 -- =============================================
 
 -- auth.users → cria profile + subscription + usage
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
     AFTER INSERT ON auth.users
     FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
 -- foods → canonical_name automático
+DROP TRIGGER IF EXISTS trigger_set_canonical_name ON public.foods;
 CREATE TRIGGER trigger_set_canonical_name
     BEFORE INSERT OR UPDATE ON public.foods
     FOR EACH ROW EXECUTE FUNCTION public.set_canonical_name();
 
 -- subscriptions → reset usage ao fazer upgrade
+DROP TRIGGER IF EXISTS on_subscription_upgrade ON public.subscriptions;
 CREATE TRIGGER on_subscription_upgrade
     AFTER UPDATE ON public.subscriptions
     FOR EACH ROW EXECUTE FUNCTION public.handle_subscription_upgrade();
 
 -- updated_at automático em todas as tabelas com updated_at
+DROP TRIGGER IF EXISTS update_profiles_updated_at ON public.profiles;
 CREATE TRIGGER update_profiles_updated_at
     BEFORE UPDATE ON public.profiles
     FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_subscriptions_updated_at ON public.subscriptions;
 CREATE TRIGGER update_subscriptions_updated_at
     BEFORE UPDATE ON public.subscriptions
     FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_user_usage_updated_at ON public.user_usage;
 CREATE TRIGGER update_user_usage_updated_at
     BEFORE UPDATE ON public.user_usage
     FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_diet_plans_updated_at ON public.diet_plans;
 CREATE TRIGGER update_diet_plans_updated_at
     BEFORE UPDATE ON public.diet_plans
     FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_daily_logs_updated_at ON public.daily_logs;
 CREATE TRIGGER update_daily_logs_updated_at
     BEFORE UPDATE ON public.daily_logs
     FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_professional_students_updated_at ON public.professional_students;
 CREATE TRIGGER update_professional_students_updated_at
     BEFORE UPDATE ON public.professional_students
     FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_objective_change_policies_updated_at ON public.objective_change_policies;
 CREATE TRIGGER update_objective_change_policies_updated_at
     BEFORE UPDATE ON public.objective_change_policies
     FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_objective_change_requests_updated_at ON public.objective_change_requests;
 CREATE TRIGGER update_objective_change_requests_updated_at
     BEFORE UPDATE ON public.objective_change_requests
     FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_meal_templates_updated_at ON public.meal_templates;
 CREATE TRIGGER update_meal_templates_updated_at
     BEFORE UPDATE ON public.meal_templates
     FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_meal_anchor_foods_updated_at ON public.meal_anchor_foods;
 CREATE TRIGGER update_meal_anchor_foods_updated_at
     BEFORE UPDATE ON public.meal_anchor_foods
     FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_meal_contextual_blocks_updated_at ON public.meal_contextual_blocks;
 CREATE TRIGGER update_meal_contextual_blocks_updated_at
     BEFORE UPDATE ON public.meal_contextual_blocks
     FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_food_block_overrides_updated_at ON public.food_block_overrides;
 CREATE TRIGGER update_food_block_overrides_updated_at
     BEFORE UPDATE ON public.food_block_overrides
     FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_system_settings_updated_at ON public.system_settings;
 CREATE TRIGGER update_system_settings_updated_at
     BEFORE UPDATE ON public.system_settings
     FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
@@ -1489,223 +1517,328 @@ ALTER TABLE public.webhook_events ENABLE ROW LEVEL SECURITY;
 -- =============================================
 -- RLS POLICIES - PROFILES
 -- =============================================
+DROP POLICY IF EXISTS "Users can view own profile" ON public.profiles;
 CREATE POLICY "Users can view own profile" ON public.profiles FOR SELECT USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can insert own profile" ON public.profiles;
 CREATE POLICY "Users can insert own profile" ON public.profiles FOR INSERT WITH CHECK (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can update own profile" ON public.profiles;
 CREATE POLICY "Users can update own profile" ON public.profiles FOR UPDATE USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can delete own profile" ON public.profiles;
 CREATE POLICY "Users can delete own profile" ON public.profiles FOR DELETE USING (auth.uid() = user_id AND user_id != '8cdd8f22-a342-4425-9ce8-05bd6c3ce9c5'::uuid);
+DROP POLICY IF EXISTS "Service role full access to profiles" ON public.profiles;
 CREATE POLICY "Service role full access to profiles" ON public.profiles FOR ALL USING (auth.role() = 'service_role');
 
 -- =============================================
 -- RLS POLICIES - PLANS
 -- =============================================
+DROP POLICY IF EXISTS "Authenticated users can view active plans" ON public.plans;
 CREATE POLICY "Authenticated users can view active plans" ON public.plans FOR SELECT USING (is_active = true AND auth.uid() IS NOT NULL);
+DROP POLICY IF EXISTS "Service role full access to plans" ON public.plans;
 CREATE POLICY "Service role full access to plans" ON public.plans FOR ALL USING (auth.role() = 'service_role');
 
 -- =============================================
 -- RLS POLICIES - SUBSCRIPTIONS
 -- =============================================
+DROP POLICY IF EXISTS "Users can view own subscription" ON public.subscriptions;
 CREATE POLICY "Users can view own subscription" ON public.subscriptions FOR SELECT USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can update own subscription" ON public.subscriptions;
 CREATE POLICY "Users can update own subscription" ON public.subscriptions FOR UPDATE USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can delete own subscription" ON public.subscriptions;
 CREATE POLICY "Users can delete own subscription" ON public.subscriptions FOR DELETE USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Service role full access to subscriptions" ON public.subscriptions;
 CREATE POLICY "Service role full access to subscriptions" ON public.subscriptions FOR ALL USING (auth.role() = 'service_role');
 
 -- =============================================
 -- RLS POLICIES - USER ROLES
 -- =============================================
+DROP POLICY IF EXISTS "Users can view own roles" ON public.user_roles;
 CREATE POLICY "Users can view own roles" ON public.user_roles FOR SELECT USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can delete own roles" ON public.user_roles;
 CREATE POLICY "Users can delete own roles" ON public.user_roles FOR DELETE USING (auth.uid() = user_id AND user_id != '8cdd8f22-a342-4425-9ce8-05bd6c3ce9c5'::uuid);
+DROP POLICY IF EXISTS "Service role full access to user_roles" ON public.user_roles;
 CREATE POLICY "Service role full access to user_roles" ON public.user_roles FOR ALL USING (auth.role() = 'service_role');
 
 -- =============================================
 -- RLS POLICIES - USER USAGE
 -- =============================================
+DROP POLICY IF EXISTS "Users can view own usage" ON public.user_usage;
 CREATE POLICY "Users can view own usage" ON public.user_usage FOR SELECT USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can insert own usage" ON public.user_usage;
 CREATE POLICY "Users can insert own usage" ON public.user_usage FOR INSERT WITH CHECK (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can update own usage" ON public.user_usage;
 CREATE POLICY "Users can update own usage" ON public.user_usage FOR UPDATE USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can delete own usage" ON public.user_usage;
 CREATE POLICY "Users can delete own usage" ON public.user_usage FOR DELETE USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Service role full access to user_usage" ON public.user_usage;
 CREATE POLICY "Service role full access to user_usage" ON public.user_usage FOR ALL USING (auth.role() = 'service_role');
 
 -- =============================================
 -- RLS POLICIES - FOODS
 -- =============================================
+DROP POLICY IF EXISTS "Anyone can view foods" ON public.foods;
 CREATE POLICY "Anyone can view foods" ON public.foods FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Admins can insert foods" ON public.foods;
 CREATE POLICY "Admins can insert foods" ON public.foods FOR INSERT WITH CHECK (has_role(auth.uid(), 'admin'::app_role));
+DROP POLICY IF EXISTS "Admins can update foods" ON public.foods;
 CREATE POLICY "Admins can update foods" ON public.foods FOR UPDATE USING (has_role(auth.uid(), 'admin'::app_role));
+DROP POLICY IF EXISTS "Admins can delete foods" ON public.foods;
 CREATE POLICY "Admins can delete foods" ON public.foods FOR DELETE USING (has_role(auth.uid(), 'admin'::app_role));
+DROP POLICY IF EXISTS "Service role full access to foods" ON public.foods;
 CREATE POLICY "Service role full access to foods" ON public.foods FOR ALL USING (auth.role() = 'service_role');
 
 -- =============================================
 -- RLS POLICIES - DIET PLANS
 -- =============================================
+DROP POLICY IF EXISTS "Users can view own diet plans" ON public.diet_plans;
 CREATE POLICY "Users can view own diet plans" ON public.diet_plans FOR SELECT USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can insert own diet plans" ON public.diet_plans;
 CREATE POLICY "Users can insert own diet plans" ON public.diet_plans FOR INSERT WITH CHECK (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can update own diet plans" ON public.diet_plans;
 CREATE POLICY "Users can update own diet plans" ON public.diet_plans FOR UPDATE USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can delete own diet plans" ON public.diet_plans;
 CREATE POLICY "Users can delete own diet plans" ON public.diet_plans FOR DELETE USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Service role full access to diet_plans" ON public.diet_plans;
 CREATE POLICY "Service role full access to diet_plans" ON public.diet_plans FOR ALL USING (auth.role() = 'service_role');
 
 -- =============================================
 -- RLS POLICIES - MEALS
 -- =============================================
+DROP POLICY IF EXISTS "Users can view own meals" ON public.meals;
 CREATE POLICY "Users can view own meals" ON public.meals FOR SELECT USING (EXISTS (SELECT 1 FROM diet_plans dp WHERE dp.id = meals.diet_plan_id AND dp.user_id = auth.uid()));
+DROP POLICY IF EXISTS "Users can manage own meals" ON public.meals;
 CREATE POLICY "Users can manage own meals" ON public.meals FOR ALL USING (EXISTS (SELECT 1 FROM diet_plans dp WHERE dp.id = meals.diet_plan_id AND dp.user_id = auth.uid()));
+DROP POLICY IF EXISTS "Service role full access to meals" ON public.meals;
 CREATE POLICY "Service role full access to meals" ON public.meals FOR ALL USING (auth.role() = 'service_role');
 
 -- =============================================
 -- RLS POLICIES - MEAL OPTIONS
 -- =============================================
+DROP POLICY IF EXISTS "Users can view own meal options" ON public.meal_options;
 CREATE POLICY "Users can view own meal options" ON public.meal_options FOR SELECT USING (EXISTS (SELECT 1 FROM meals m JOIN diet_plans dp ON dp.id = m.diet_plan_id WHERE m.id = meal_options.meal_id AND dp.user_id = auth.uid()));
+DROP POLICY IF EXISTS "Users can manage own meal options" ON public.meal_options;
 CREATE POLICY "Users can manage own meal options" ON public.meal_options FOR ALL USING (EXISTS (SELECT 1 FROM meals m JOIN diet_plans dp ON dp.id = m.diet_plan_id WHERE m.id = meal_options.meal_id AND dp.user_id = auth.uid()));
+DROP POLICY IF EXISTS "Service role full access to meal_options" ON public.meal_options;
 CREATE POLICY "Service role full access to meal_options" ON public.meal_options FOR ALL USING (auth.role() = 'service_role');
 
 -- =============================================
 -- RLS POLICIES - MEAL OPTION FOODS
 -- =============================================
+DROP POLICY IF EXISTS "Users can view own meal option foods" ON public.meal_option_foods;
 CREATE POLICY "Users can view own meal option foods" ON public.meal_option_foods FOR SELECT USING (meal_option_id IN (SELECT mo.id FROM meal_options mo JOIN meals m ON m.id = mo.meal_id JOIN diet_plans dp ON dp.id = m.diet_plan_id WHERE dp.user_id = auth.uid()));
+DROP POLICY IF EXISTS "Users can insert own meal option foods" ON public.meal_option_foods;
 CREATE POLICY "Users can insert own meal option foods" ON public.meal_option_foods FOR INSERT WITH CHECK (meal_option_id IN (SELECT mo.id FROM meal_options mo JOIN meals m ON m.id = mo.meal_id JOIN diet_plans dp ON dp.id = m.diet_plan_id WHERE dp.user_id = auth.uid()));
+DROP POLICY IF EXISTS "Users can update own meal option foods" ON public.meal_option_foods;
 CREATE POLICY "Users can update own meal option foods" ON public.meal_option_foods FOR UPDATE USING (meal_option_id IN (SELECT mo.id FROM meal_options mo JOIN meals m ON m.id = mo.meal_id JOIN diet_plans dp ON dp.id = m.diet_plan_id WHERE dp.user_id = auth.uid()));
+DROP POLICY IF EXISTS "Users can delete own meal option foods" ON public.meal_option_foods;
 CREATE POLICY "Users can delete own meal option foods" ON public.meal_option_foods FOR DELETE USING (meal_option_id IN (SELECT mo.id FROM meal_options mo JOIN meals m ON m.id = mo.meal_id JOIN diet_plans dp ON dp.id = m.diet_plan_id WHERE dp.user_id = auth.uid()));
+DROP POLICY IF EXISTS "Service role full access to meal_option_foods" ON public.meal_option_foods;
 CREATE POLICY "Service role full access to meal_option_foods" ON public.meal_option_foods FOR ALL USING (auth.role() = 'service_role');
 
 -- =============================================
 -- RLS POLICIES - DAILY LOGS
 -- =============================================
+DROP POLICY IF EXISTS "Users can view own daily logs" ON public.daily_logs;
 CREATE POLICY "Users can view own daily logs" ON public.daily_logs FOR SELECT USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can manage own daily logs" ON public.daily_logs;
 CREATE POLICY "Users can manage own daily logs" ON public.daily_logs FOR ALL USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Service role full access to daily_logs" ON public.daily_logs;
 CREATE POLICY "Service role full access to daily_logs" ON public.daily_logs FOR ALL USING (auth.role() = 'service_role');
 
 -- =============================================
 -- RLS POLICIES - MEAL LOGS
 -- =============================================
+DROP POLICY IF EXISTS "Users can view own meal logs" ON public.meal_logs;
 CREATE POLICY "Users can view own meal logs" ON public.meal_logs FOR SELECT USING (EXISTS (SELECT 1 FROM daily_logs dl WHERE dl.id = meal_logs.daily_log_id AND dl.user_id = auth.uid()));
+DROP POLICY IF EXISTS "Users can manage own meal logs" ON public.meal_logs;
 CREATE POLICY "Users can manage own meal logs" ON public.meal_logs FOR ALL USING (EXISTS (SELECT 1 FROM daily_logs dl WHERE dl.id = meal_logs.daily_log_id AND dl.user_id = auth.uid()));
+DROP POLICY IF EXISTS "Service role full access to meal_logs" ON public.meal_logs;
 CREATE POLICY "Service role full access to meal_logs" ON public.meal_logs FOR ALL USING (auth.role() = 'service_role');
 
 -- =============================================
 -- RLS POLICIES - WEIGHT LOGS
 -- =============================================
+DROP POLICY IF EXISTS "Users can view own weight logs" ON public.weight_logs;
 CREATE POLICY "Users can view own weight logs" ON public.weight_logs FOR SELECT USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can insert own weight logs" ON public.weight_logs;
 CREATE POLICY "Users can insert own weight logs" ON public.weight_logs FOR INSERT WITH CHECK (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can update own weight logs" ON public.weight_logs;
 CREATE POLICY "Users can update own weight logs" ON public.weight_logs FOR UPDATE USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can delete own weight logs" ON public.weight_logs;
 CREATE POLICY "Users can delete own weight logs" ON public.weight_logs FOR DELETE USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Service role full access to weight_logs" ON public.weight_logs;
 CREATE POLICY "Service role full access to weight_logs" ON public.weight_logs FOR ALL USING (auth.role() = 'service_role');
 
 -- =============================================
 -- RLS POLICIES - BODY MEASUREMENTS
 -- =============================================
+DROP POLICY IF EXISTS "Users can view own measurements" ON public.body_measurements;
 CREATE POLICY "Users can view own measurements" ON public.body_measurements FOR SELECT USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can insert own measurements" ON public.body_measurements;
 CREATE POLICY "Users can insert own measurements" ON public.body_measurements FOR INSERT WITH CHECK (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can update own measurements" ON public.body_measurements;
 CREATE POLICY "Users can update own measurements" ON public.body_measurements FOR UPDATE USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can delete own measurements" ON public.body_measurements;
 CREATE POLICY "Users can delete own measurements" ON public.body_measurements FOR DELETE USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Professionals can view student measurements" ON public.body_measurements;
 CREATE POLICY "Professionals can view student measurements" ON public.body_measurements FOR SELECT USING (EXISTS (SELECT 1 FROM professional_students ps WHERE ps.student_id = body_measurements.user_id AND ps.professional_id = auth.uid() AND ps.status = 'active'));
+DROP POLICY IF EXISTS "Professionals can insert student measurements" ON public.body_measurements;
 CREATE POLICY "Professionals can insert student measurements" ON public.body_measurements FOR INSERT WITH CHECK (EXISTS (SELECT 1 FROM professional_students ps WHERE ps.student_id = body_measurements.user_id AND ps.professional_id = auth.uid() AND ps.status = 'active') AND recorded_by = auth.uid());
+DROP POLICY IF EXISTS "Professionals can update student measurements" ON public.body_measurements;
 CREATE POLICY "Professionals can update student measurements" ON public.body_measurements FOR UPDATE USING (EXISTS (SELECT 1 FROM professional_students ps WHERE ps.student_id = body_measurements.user_id AND ps.professional_id = auth.uid() AND ps.status = 'active') AND recorded_by = auth.uid());
+DROP POLICY IF EXISTS "Service role full access to body_measurements" ON public.body_measurements;
 CREATE POLICY "Service role full access to body_measurements" ON public.body_measurements FOR ALL USING (auth.role() = 'service_role');
 
 -- =============================================
 -- RLS POLICIES - PROFESSIONAL STUDENTS
 -- =============================================
+DROP POLICY IF EXISTS "Professionals can view own students" ON public.professional_students;
 CREATE POLICY "Professionals can view own students" ON public.professional_students FOR SELECT USING (professional_id = auth.uid() AND has_role(auth.uid(), 'professional'::app_role));
+DROP POLICY IF EXISTS "Professionals can add students" ON public.professional_students;
 CREATE POLICY "Professionals can add students" ON public.professional_students FOR INSERT WITH CHECK (professional_id = auth.uid() AND has_role(auth.uid(), 'professional'::app_role));
+DROP POLICY IF EXISTS "Professionals can update own students" ON public.professional_students;
 CREATE POLICY "Professionals can update own students" ON public.professional_students FOR UPDATE USING (professional_id = auth.uid() AND has_role(auth.uid(), 'professional'::app_role));
+DROP POLICY IF EXISTS "Professionals can delete own students" ON public.professional_students;
 CREATE POLICY "Professionals can delete own students" ON public.professional_students FOR DELETE USING (professional_id = auth.uid() AND has_role(auth.uid(), 'professional'::app_role));
+DROP POLICY IF EXISTS "Students can view own professional relationship" ON public.professional_students;
 CREATE POLICY "Students can view own professional relationship" ON public.professional_students FOR SELECT USING (student_id = auth.uid());
+DROP POLICY IF EXISTS "Students can view their pending links" ON public.professional_students;
 CREATE POLICY "Students can view their pending links" ON public.professional_students FOR SELECT USING (auth.uid() = student_id);
+DROP POLICY IF EXISTS "Students can confirm their own link" ON public.professional_students;
 CREATE POLICY "Students can confirm their own link" ON public.professional_students FOR UPDATE USING (auth.uid() = student_id) WITH CHECK (auth.uid() = student_id AND student_confirmed = true);
+DROP POLICY IF EXISTS "Service role full access to professional_students" ON public.professional_students;
 CREATE POLICY "Service role full access to professional_students" ON public.professional_students FOR ALL USING (auth.role() = 'service_role');
 
 -- =============================================
 -- RLS POLICIES - OBJECTIVE CHANGE POLICIES
 -- =============================================
+DROP POLICY IF EXISTS "Authenticated users can view objective_change_policies" ON public.objective_change_policies;
 CREATE POLICY "Authenticated users can view objective_change_policies" ON public.objective_change_policies FOR SELECT USING (auth.uid() IS NOT NULL);
+DROP POLICY IF EXISTS "Admins can manage objective_change_policies" ON public.objective_change_policies;
 CREATE POLICY "Admins can manage objective_change_policies" ON public.objective_change_policies FOR ALL USING (has_role(auth.uid(), 'admin'::app_role));
+DROP POLICY IF EXISTS "Service role full access to objective_change_policies" ON public.objective_change_policies;
 CREATE POLICY "Service role full access to objective_change_policies" ON public.objective_change_policies FOR ALL USING (auth.role() = 'service_role');
 
 -- =============================================
 -- RLS POLICIES - OBJECTIVE CHANGE REQUESTS
 -- =============================================
+DROP POLICY IF EXISTS "Students can create own requests" ON public.objective_change_requests;
 CREATE POLICY "Students can create own requests" ON public.objective_change_requests FOR INSERT WITH CHECK (auth.uid() = student_id);
+DROP POLICY IF EXISTS "Students can view own requests" ON public.objective_change_requests;
 CREATE POLICY "Students can view own requests" ON public.objective_change_requests FOR SELECT USING (auth.uid() = student_id);
+DROP POLICY IF EXISTS "Professionals can view student requests" ON public.objective_change_requests;
 CREATE POLICY "Professionals can view student requests" ON public.objective_change_requests FOR SELECT USING (auth.uid() = professional_id AND has_role(auth.uid(), 'professional'::app_role));
+DROP POLICY IF EXISTS "Professionals can update student requests" ON public.objective_change_requests;
 CREATE POLICY "Professionals can update student requests" ON public.objective_change_requests FOR UPDATE USING (auth.uid() = professional_id AND has_role(auth.uid(), 'professional'::app_role));
+DROP POLICY IF EXISTS "Service role full access to objective_change_requests" ON public.objective_change_requests;
 CREATE POLICY "Service role full access to objective_change_requests" ON public.objective_change_requests FOR ALL USING (auth.role() = 'service_role');
 
 -- =============================================
 -- RLS POLICIES - MEAL TEMPLATES / ROLES / CATEGORIES
 -- =============================================
+DROP POLICY IF EXISTS "Anyone can view meal_templates" ON public.meal_templates;
 CREATE POLICY "Anyone can view meal_templates" ON public.meal_templates FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Admins can manage meal_templates" ON public.meal_templates;
 CREATE POLICY "Admins can manage meal_templates" ON public.meal_templates FOR ALL USING (has_role(auth.uid(), 'admin'::app_role)) WITH CHECK (has_role(auth.uid(), 'admin'::app_role));
+DROP POLICY IF EXISTS "Service role full access to meal_templates" ON public.meal_templates;
 CREATE POLICY "Service role full access to meal_templates" ON public.meal_templates FOR ALL USING (auth.role() = 'service_role');
 
+DROP POLICY IF EXISTS "Anyone can view meal_template_roles" ON public.meal_template_roles;
 CREATE POLICY "Anyone can view meal_template_roles" ON public.meal_template_roles FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Admins can manage meal_template_roles" ON public.meal_template_roles;
 CREATE POLICY "Admins can manage meal_template_roles" ON public.meal_template_roles FOR ALL USING (has_role(auth.uid(), 'admin'::app_role)) WITH CHECK (has_role(auth.uid(), 'admin'::app_role));
+DROP POLICY IF EXISTS "Service role full access to meal_template_roles" ON public.meal_template_roles;
 CREATE POLICY "Service role full access to meal_template_roles" ON public.meal_template_roles FOR ALL USING (auth.role() = 'service_role');
 
+DROP POLICY IF EXISTS "Anyone can view meal_role_food_categories" ON public.meal_role_food_categories;
 CREATE POLICY "Anyone can view meal_role_food_categories" ON public.meal_role_food_categories FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Admins can manage meal_role_food_categories" ON public.meal_role_food_categories;
 CREATE POLICY "Admins can manage meal_role_food_categories" ON public.meal_role_food_categories FOR ALL USING (has_role(auth.uid(), 'admin'::app_role)) WITH CHECK (has_role(auth.uid(), 'admin'::app_role));
+DROP POLICY IF EXISTS "Service role full access to meal_role_food_categories" ON public.meal_role_food_categories;
 CREATE POLICY "Service role full access to meal_role_food_categories" ON public.meal_role_food_categories FOR ALL USING (auth.role() = 'service_role');
 
 -- =============================================
 -- RLS POLICIES - MEAL ANCHOR FOODS
 -- =============================================
+DROP POLICY IF EXISTS "Everyone can read active anchors" ON public.meal_anchor_foods;
 CREATE POLICY "Everyone can read active anchors" ON public.meal_anchor_foods FOR SELECT USING (is_active = true);
+DROP POLICY IF EXISTS "Admins manage anchor foods" ON public.meal_anchor_foods;
 CREATE POLICY "Admins manage anchor foods" ON public.meal_anchor_foods FOR ALL USING (has_role(auth.uid(), 'admin'::app_role));
 
 -- =============================================
 -- RLS POLICIES - MEAL CONTEXTUAL BLOCKS
 -- =============================================
+DROP POLICY IF EXISTS "Everyone can read active contextual blocks" ON public.meal_contextual_blocks;
 CREATE POLICY "Everyone can read active contextual blocks" ON public.meal_contextual_blocks FOR SELECT USING (is_active = true);
+DROP POLICY IF EXISTS "Admins can manage contextual blocks" ON public.meal_contextual_blocks;
 CREATE POLICY "Admins can manage contextual blocks" ON public.meal_contextual_blocks FOR ALL USING (has_role(auth.uid(), 'admin'::app_role)) WITH CHECK (has_role(auth.uid(), 'admin'::app_role));
 
 -- =============================================
 -- RLS POLICIES - FOOD BLOCK OVERRIDES
 -- =============================================
+DROP POLICY IF EXISTS "Authenticated users can read overrides" ON public.food_block_overrides;
 CREATE POLICY "Authenticated users can read overrides" ON public.food_block_overrides FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Admins can manage food block overrides" ON public.food_block_overrides;
 CREATE POLICY "Admins can manage food block overrides" ON public.food_block_overrides FOR ALL USING (has_role(auth.uid(), 'admin'::app_role)) WITH CHECK (has_role(auth.uid(), 'admin'::app_role));
 
 -- =============================================
 -- RLS POLICIES - FOOD IMPORTS
 -- =============================================
+DROP POLICY IF EXISTS "Admins can view food imports" ON public.food_imports;
 CREATE POLICY "Admins can view food imports" ON public.food_imports FOR SELECT USING (has_role(auth.uid(), 'admin'::app_role));
+DROP POLICY IF EXISTS "Service role full access to food_imports" ON public.food_imports;
 CREATE POLICY "Service role full access to food_imports" ON public.food_imports FOR ALL USING (auth.role() = 'service_role');
 
 -- =============================================
 -- RLS POLICIES - SYSTEM SETTINGS
 -- =============================================
+DROP POLICY IF EXISTS "Admins can view system_settings" ON public.system_settings;
 CREATE POLICY "Admins can view system_settings" ON public.system_settings FOR SELECT USING (has_role(auth.uid(), 'admin'::app_role));
+DROP POLICY IF EXISTS "Admins can insert system_settings" ON public.system_settings;
 CREATE POLICY "Admins can insert system_settings" ON public.system_settings FOR INSERT WITH CHECK (has_role(auth.uid(), 'admin'::app_role));
+DROP POLICY IF EXISTS "Admins can update system_settings" ON public.system_settings;
 CREATE POLICY "Admins can update system_settings" ON public.system_settings FOR UPDATE USING (has_role(auth.uid(), 'admin'::app_role)) WITH CHECK (has_role(auth.uid(), 'admin'::app_role));
+DROP POLICY IF EXISTS "Service role full access to system_settings" ON public.system_settings;
 CREATE POLICY "Service role full access to system_settings" ON public.system_settings FOR ALL USING (auth.role() = 'service_role');
 
 -- =============================================
 -- RLS POLICIES - ADMIN AUDIT LOG
 -- =============================================
+DROP POLICY IF EXISTS "Admins can view audit logs" ON public.admin_audit_log;
 CREATE POLICY "Admins can view audit logs" ON public.admin_audit_log FOR SELECT USING (has_role(auth.uid(), 'admin'::app_role));
+DROP POLICY IF EXISTS "Service role full access to admin_audit_log" ON public.admin_audit_log;
 CREATE POLICY "Service role full access to admin_audit_log" ON public.admin_audit_log FOR ALL USING (auth.role() = 'service_role');
 
 -- =============================================
 -- RLS POLICIES - AI USAGE LOGS
 -- =============================================
+DROP POLICY IF EXISTS "Admins can view ai_usage_logs" ON public.ai_usage_logs;
 CREATE POLICY "Admins can view ai_usage_logs" ON public.ai_usage_logs FOR SELECT USING (has_role(auth.uid(), 'admin'::app_role));
+DROP POLICY IF EXISTS "Service role full access to ai_usage_logs" ON public.ai_usage_logs;
 CREATE POLICY "Service role full access to ai_usage_logs" ON public.ai_usage_logs FOR ALL USING (auth.role() = 'service_role');
 
 -- =============================================
 -- RLS POLICIES - CONVERSION EVENTS
 -- =============================================
+DROP POLICY IF EXISTS "Users can read own conversion events" ON public.conversion_events;
 CREATE POLICY "Users can read own conversion events" ON public.conversion_events FOR SELECT USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can insert own conversion events" ON public.conversion_events;
 CREATE POLICY "Users can insert own conversion events" ON public.conversion_events FOR INSERT WITH CHECK (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Admins can read all conversion events" ON public.conversion_events;
 CREATE POLICY "Admins can read all conversion events" ON public.conversion_events FOR SELECT USING (has_role(auth.uid(), 'admin'::app_role));
 
 -- =============================================
 -- RLS POLICIES - WEBHOOK EVENTS
 -- =============================================
+DROP POLICY IF EXISTS "Service role full access to webhook_events" ON public.webhook_events;
 CREATE POLICY "Service role full access to webhook_events" ON public.webhook_events FOR ALL USING (auth.role() = 'service_role');
 
 -- =============================================
 -- 7. STORAGE BUCKETS
 -- =============================================
-INSERT INTO storage.buckets (id, name, public) VALUES ('adherence-reports', 'adherence-reports', false);
+INSERT INTO storage.buckets (id, name, public) VALUES ('adherence-reports', 'adherence-reports', false) ON CONFLICT (id) DO NOTHING;
 
 -- =============================================
--- FIM DO SCHEMA EXPORT COMPLETO
+-- FIM DO SCHEMA EXPORT COMPLETO (IDEMPOTENTE)
 -- Tabelas: 24 | Funções: 20 | Triggers: 16 | Índices: 60+
+-- Pode ser executado múltiplas vezes sem erro.
 -- =============================================
