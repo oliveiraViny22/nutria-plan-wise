@@ -137,6 +137,10 @@ interface MealOption {
   meal_id: string;
   option_number: number;
   name: string | null;
+  total_calories?: number | null;
+  total_protein?: number | null;
+  total_carbs?: number | null;
+  total_fat?: number | null;
   meal_option_foods: MealOptionFood[];
 }
 
