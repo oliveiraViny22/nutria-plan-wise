@@ -52,7 +52,7 @@ import {
   InlineBadgeList,
 } from '@/components/profile';
 
-const ADMIN_EMAIL = "admin@nutriaplan.com";
+const ADMIN_EMAILS = ["admin@nutriaplan.com", "admin@nutriaplan.com.br"];
 
 export default function Profile() {
   const navigate = useNavigate();
@@ -139,7 +139,7 @@ export default function Profile() {
   }, [profile]);
 
   const handleDeleteAccount = async () => {
-    if (!user || user.email === ADMIN_EMAIL) return;
+    if (!user || ADMIN_EMAILS.includes(user.email || '')) return;
     if (deleteConfirmText !== 'EXCLUIR') {
       toast.error('Digite EXCLUIR para confirmar');
       return;
@@ -265,7 +265,7 @@ export default function Profile() {
   };
 
 
-  const isAdmin = user?.email === ADMIN_EMAIL;
+  const isAdmin = ADMIN_EMAILS.includes(user?.email || '');
 
   const breadcrumbItems = [
     { label: 'Dashboard', to: '/dashboard' },

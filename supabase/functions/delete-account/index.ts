@@ -1,7 +1,7 @@
 // Delete account edge function - v4 (improved error handling)
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.2";
 
-const ADMIN_EMAIL = "admin@nutriaplan.com";
+const ADMIN_EMAILS = ["admin@nutriaplan.com", "admin@nutriaplan.com.br"];
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -52,7 +52,7 @@ Deno.serve(async (req) => {
     }
 
     // Prevent admin deletion
-    if (user.email === ADMIN_EMAIL) {
+    if (ADMIN_EMAILS.includes(user.email || '')) {
       return new Response(
         JSON.stringify({ error: "Acesso negado" }),
         { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
