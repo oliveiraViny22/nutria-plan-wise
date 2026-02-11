@@ -480,6 +480,42 @@ CREATE TABLE IF NOT EXISTS public.webhook_events (
 );
 
 -- =============================================
+-- 2.5 COLUNAS ADICIONAIS (compatibilidade com bases existentes)
+-- =============================================
+-- Se a tabela já existia antes de IF NOT EXISTS, estas colunas podem faltar.
+
+ALTER TABLE public.professional_students ADD COLUMN IF NOT EXISTS student_confirmed BOOLEAN DEFAULT FALSE;
+ALTER TABLE public.foods ADD COLUMN IF NOT EXISTS processing_level TEXT;
+ALTER TABLE public.foods ADD COLUMN IF NOT EXISTS unit_enabled BOOLEAN DEFAULT FALSE;
+ALTER TABLE public.foods ADD COLUMN IF NOT EXISTS unit_name TEXT;
+ALTER TABLE public.foods ADD COLUMN IF NOT EXISTS unit_weight_grams NUMERIC;
+ALTER TABLE public.foods ADD COLUMN IF NOT EXISTS unit_increment NUMERIC DEFAULT 1;
+ALTER TABLE public.foods ADD COLUMN IF NOT EXISTS supplement_portion TEXT;
+ALTER TABLE public.foods ADD COLUMN IF NOT EXISTS supplement_min_portion NUMERIC DEFAULT 0.5;
+ALTER TABLE public.foods ADD COLUMN IF NOT EXISTS supplement_max_portion NUMERIC DEFAULT 2;
+ALTER TABLE public.foods ADD COLUMN IF NOT EXISTS supplement_notes TEXT;
+ALTER TABLE public.foods ADD COLUMN IF NOT EXISTS created_by_id UUID;
+ALTER TABLE public.foods ADD COLUMN IF NOT EXISTS created_by_type TEXT DEFAULT 'system';
+ALTER TABLE public.foods ADD COLUMN IF NOT EXISTS canonical_name TEXT;
+ALTER TABLE public.foods ADD COLUMN IF NOT EXISTS confidence_level TEXT DEFAULT 'high';
+ALTER TABLE public.foods ADD COLUMN IF NOT EXISTS origin TEXT DEFAULT 'manual';
+ALTER TABLE public.foods ADD COLUMN IF NOT EXISTS review_status TEXT DEFAULT 'approved';
+ALTER TABLE public.foods ADD COLUMN IF NOT EXISTS dietary_profile TEXT;
+ALTER TABLE public.foods ADD COLUMN IF NOT EXISTS is_supplement_item BOOLEAN DEFAULT FALSE;
+ALTER TABLE public.foods ADD COLUMN IF NOT EXISTS is_optional BOOLEAN DEFAULT FALSE;
+ALTER TABLE public.meal_option_foods ADD COLUMN IF NOT EXISTS display_quantity NUMERIC;
+ALTER TABLE public.meal_option_foods ADD COLUMN IF NOT EXISTS display_unit TEXT;
+ALTER TABLE public.meal_option_foods ADD COLUMN IF NOT EXISTS calculated_grams NUMERIC;
+ALTER TABLE public.meal_option_foods ADD COLUMN IF NOT EXISTS unit_locked BOOLEAN DEFAULT FALSE;
+ALTER TABLE public.meal_anchor_foods ADD COLUMN IF NOT EXISTS goal_type TEXT;
+ALTER TABLE public.meal_anchor_foods ADD COLUMN IF NOT EXISTS dietary_profile TEXT;
+ALTER TABLE public.body_measurements ADD COLUMN IF NOT EXISTS recorded_by UUID;
+ALTER TABLE public.subscriptions ADD COLUMN IF NOT EXISTS grace_period_end TIMESTAMP WITH TIME ZONE;
+ALTER TABLE public.subscriptions ADD COLUMN IF NOT EXISTS last_reconciled TIMESTAMP WITH TIME ZONE;
+ALTER TABLE public.subscriptions ADD COLUMN IF NOT EXISTS cancel_at_period_end BOOLEAN DEFAULT FALSE;
+ALTER TABLE public.user_usage ADD COLUMN IF NOT EXISTS meal_options_override INTEGER;
+
+-- =============================================
 -- 3. ÍNDICES
 -- =============================================
 
