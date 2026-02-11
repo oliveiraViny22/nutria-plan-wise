@@ -124,6 +124,31 @@ Deno.serve(async (req) => {
         filename = "profissionais_alunos.csv";
         break;
       }
+      case "foods_sql": {
+        const { data: foodsData } = await supabaseAdmin.from("foods").select("*").order("name");
+        const cols = "id,name,calories,protein,carbs,fat,category,serving_size,type,is_active,is_optional,is_supplement_item,dietary_profile,canonical_name,confidence_level,origin,review_status,created_by_type,unit_enabled,unit_name,unit_weight_grams,unit_increment,supplement_portion,supplement_min_portion,supplement_max_portion,supplement_notes";
+        const lines = (foodsData || []).map((f: Record<string, unknown>) => {
+          const q = (v: unknown) => v === null || v === undefined ? "NULL" : `'${String(v).replace(/'/g, "''")}'`;
+          const vals = [
+            q(f.id), q(f.name), f.calories, f.protein, f.carbs, f.fat,
+            q(f.category), q(f.serving_size ?? '100g'), q(f.type ?? 'food'),
+            f.is_active ?? true, f.is_optional ?? false, f.is_supplement_item ?? false,
+            q(f.dietary_profile), q(f.canonical_name), q(f.confidence_level),
+            q(f.origin), q(f.review_status), q(f.created_by_type),
+            f.unit_enabled ?? false, q(f.unit_name), f.unit_weight_grams ?? 'NULL',
+            f.unit_increment ?? 1, q(f.supplement_portion),
+            f.supplement_min_portion ?? 0.5, f.supplement_max_portion ?? 2,
+            q(f.supplement_notes),
+          ].join(",");
+          return `INSERT INTO foods (${cols}) VALUES (${vals});`;
+        });
+        const header = `-- NutriAPlan - Foods SQL Export\n-- Generated: ${new Date().toISOString().split('T')[0]}\n-- Total: ${lines.length} registros\n-- Sem coluna processing_level (removida do schema)\n\n`;
+        csvData = header + lines.join("\n");
+        filename = "foods_import.sql";
+        return new Response(JSON.stringify({ csv: csvData, filename }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
       case "all": {
         // Export all tables into a single JSON with table names as keys
         const tables = [
