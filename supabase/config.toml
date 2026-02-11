@@ -44,3 +44,6 @@ verify_jwt = false
 
 [functions.cleanup-orphan-users]
 verify_jwt = false
+
+[functions.export-data]
+verify_jwt = false
