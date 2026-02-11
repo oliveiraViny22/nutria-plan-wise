@@ -1,7 +1,7 @@
 -- =====================================================
--- NUTRIAPLAN - EXPORTAÇÃO COMPLETA DE DADOS v2
--- Data: 2026-02-10
--- Versão: v2 (banco normalizado)
+-- NUTRIAPLAN - EXPORTAÇÃO COMPLETA DE DADOS v2.1
+-- Data: 2026-02-11
+-- Versão: v2.1 (com validação de pré-requisitos)
 -- =====================================================
 -- ORDEM DE IMPORTAÇÃO:
 -- 1. Esquema (docs/database-schema-export.sql)
@@ -9,6 +9,42 @@
 -- 3. Alimentos (docs/foods-import.sql)
 -- 4. Dados volumétricos (anchor foods + contextual blocks via query de geração)
 -- =====================================================
+
+-- =====================================================
+-- PRÉ-REQUISITOS: Validar que o schema foi aplicado
+-- =====================================================
+DO $$
+BEGIN
+  -- Verificar enums obrigatórios
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'plan_type') THEN
+    RAISE EXCEPTION 'ERRO: Enum "plan_type" não encontrado. Execute database-schema-export.sql antes deste arquivo.';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'subscription_status') THEN
+    RAISE EXCEPTION 'ERRO: Enum "subscription_status" não encontrado. Execute database-schema-export.sql antes deste arquivo.';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'app_role') THEN
+    RAISE EXCEPTION 'ERRO: Enum "app_role" não encontrado. Execute database-schema-export.sql antes deste arquivo.';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'daily_status') THEN
+    RAISE EXCEPTION 'ERRO: Enum "daily_status" não encontrado. Execute database-schema-export.sql antes deste arquivo.';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'meal_status') THEN
+    RAISE EXCEPTION 'ERRO: Enum "meal_status" não encontrado. Execute database-schema-export.sql antes deste arquivo.';
+  END IF;
+
+  -- Verificar tabelas obrigatórias
+  IF NOT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'plans') THEN
+    RAISE EXCEPTION 'ERRO: Tabela "plans" não encontrada. Execute database-schema-export.sql antes deste arquivo.';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'system_settings') THEN
+    RAISE EXCEPTION 'ERRO: Tabela "system_settings" não encontrada. Execute database-schema-export.sql antes deste arquivo.';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'meal_templates') THEN
+    RAISE EXCEPTION 'ERRO: Tabela "meal_templates" não encontrada. Execute database-schema-export.sql antes deste arquivo.';
+  END IF;
+
+  RAISE NOTICE 'Pré-requisitos validados com sucesso. Prosseguindo com importação de dados...';
+END $$;
 
 BEGIN;
 
