@@ -322,14 +322,19 @@ export function AdminDocsTab({
               <li>Em seguida, execute o <strong>SQL de Dados</strong> para inserir as configurações e dados semente</li>
               <li>Para importar alimentos separadamente, baixe o arquivo <code>foods-import.sql</code> abaixo</li>
             </ol>
-            <a 
-              href="/docs/foods-import.sql"
-              download="foods-import.sql"
-              className="inline-flex items-center gap-2 mt-2 px-3 py-1.5 text-xs font-medium border rounded-md hover:bg-muted transition-colors"
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={!!exportingEntity}
+              onClick={() => handleExportCSV('foods_sql')}
             >
-              <Download className="h-3 w-3" />
-              Baixar foods-import.sql
-            </a>
+              {exportingEntity === 'foods_sql' ? (
+                <Loader2 className="h-3 w-3 mr-2 animate-spin" />
+              ) : (
+                <Download className="h-3 w-3 mr-2" />
+              )}
+              Gerar e Baixar foods_import.sql (atualizado)
+            </Button>
           </div>
         </CardContent>
       </Card>

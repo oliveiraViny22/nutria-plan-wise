@@ -135,7 +135,6 @@ CREATE TABLE public.foods (
     serving_size TEXT DEFAULT '100g',
     type TEXT DEFAULT 'food',
     dietary_profile TEXT,
-    processing_level TEXT,
     origin TEXT DEFAULT 'manual',
     confidence_level TEXT DEFAULT 'high',
     review_status TEXT DEFAULT 'approved',
