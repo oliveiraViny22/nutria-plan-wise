@@ -68,7 +68,7 @@ Deno.serve(async (req) => {
     // Helper function to safely delete and log
     async function safeDelete(
       step: string,
-      deleteOperation: () => Promise<{ error: unknown; count?: number | null }>
+      deleteOperation: () => PromiseLike<{ error: unknown; count?: number | null }>
     ): Promise<void> {
       try {
         const { error, count } = await deleteOperation();
