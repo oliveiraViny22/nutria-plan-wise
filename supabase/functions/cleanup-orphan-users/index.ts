@@ -5,7 +5,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const ADMIN_EMAIL = "admin@nutriaplan.com";
+const ADMIN_EMAILS = ["admin@nutriaplan.com", "admin@nutriaplan.com.br"];
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -77,7 +77,7 @@ Deno.serve(async (req) => {
 
     for (const authUser of authUsers) {
       // Skip admin
-      if (authUser.email === ADMIN_EMAIL) {
+      if (ADMIN_EMAILS.includes(authUser.email || '')) {
         skippedUsers.push(`${authUser.email} (admin protected)`);
         continue;
       }
