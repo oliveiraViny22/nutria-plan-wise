@@ -1,9 +1,8 @@
 /**
- * Admin Documentation Tab Component
- * 
- * Provides access to technical and commercial documentation
+ * Admin Documentation & Data Export Tab Component
  */
 
+import { useState } from 'react';
 import { 
   BookOpen, 
   FileText, 
@@ -12,9 +11,20 @@ import {
   Sparkles,
   Download,
   Loader2,
+  Database,
+  Users,
+  ClipboardList,
+  CreditCard,
+  Scale,
+  Activity,
+  Settings,
+  UserCheck,
+  FileDown,
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 interface AdminDocsTabProps {
   downloadingDoc: string | null;
@@ -22,13 +32,128 @@ interface AdminDocsTabProps {
   onDownloadCode: () => void;
 }
 
+const EXPORT_ENTITIES = [
+  { id: 'profiles', label: 'Usuários', icon: Users, description: 'Perfis e dados cadastrais' },
+  { id: 'foods', label: 'Alimentos', icon: Database, description: 'Base completa de alimentos' },
+  { id: 'diet_plans', label: 'Planos Alimentares', icon: ClipboardList, description: 'Dietas geradas' },
+  { id: 'subscriptions', label: 'Assinaturas', icon: CreditCard, description: 'Planos e status' },
+  { id: 'user_usage', label: 'Uso dos Usuários', icon: Activity, description: 'Contadores de uso' },
+  { id: 'audit_logs', label: 'Logs de Auditoria', icon: FileText, description: 'Ações administrativas' },
+  { id: 'ai_usage', label: 'Logs de IA', icon: Sparkles, description: 'Chamadas e custos de IA' },
+  { id: 'weight_logs', label: 'Registros de Peso', icon: Scale, description: 'Histórico de pesagens' },
+  { id: 'plans', label: 'Planos (Config)', icon: Settings, description: 'Configuração dos planos' },
+  { id: 'system_settings', label: 'Configurações', icon: Settings, description: 'Parâmetros do sistema' },
+  { id: 'professional_students', label: 'Profissionais/Alunos', icon: UserCheck, description: 'Vínculos profissionais' },
+];
+
 export function AdminDocsTab({
   downloadingDoc,
   onDownloadDocumentation,
   onDownloadCode,
 }: AdminDocsTabProps) {
+  const { toast } = useToast();
+  const [exportingEntity, setExportingEntity] = useState<string | null>(null);
+
+  const handleExportCSV = async (entity: string) => {
+    setExportingEntity(entity);
+    try {
+      const { data, error } = await supabase.functions.invoke('export-data', {
+        body: { entity },
+      });
+
+      if (error) throw error;
+
+      if (entity === 'all') {
+        const blob = new Blob([JSON.stringify(data.tables, null, 2)], { type: 'application/json' });
+        downloadBlob(blob, data.filename);
+      } else {
+        const blob = new Blob([data.csv], { type: 'text/csv;charset=utf-8;' });
+        downloadBlob(blob, data.filename);
+      }
+
+      toast({ title: 'Exportação concluída', description: `Arquivo ${data.filename} baixado.` });
+    } catch (error) {
+      console.error('Export error:', error);
+      toast({
+        title: 'Erro na exportação',
+        description: error instanceof Error ? error.message : 'Erro desconhecido',
+        variant: 'destructive',
+      });
+    } finally {
+      setExportingEntity(null);
+    }
+  };
+
+  const downloadBlob = (blob: Blob, filename: string) => {
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="space-y-6">
+      {/* Data Export Section */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <FileDown className="h-5 w-5 text-primary" />
+            Exportação de Dados (CSV)
+          </CardTitle>
+          <CardDescription>
+            Exporte os dados do sistema em formato CSV para análise e compartilhamento.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {EXPORT_ENTITIES.map((entity) => {
+              const Icon = entity.icon;
+              const isExporting = exportingEntity === entity.id;
+              return (
+                <Button
+                  key={entity.id}
+                  variant="outline"
+                  className="h-auto py-3 px-4 flex items-start gap-3 justify-start text-left"
+                  disabled={!!exportingEntity}
+                  onClick={() => handleExportCSV(entity.id)}
+                >
+                  {isExporting ? (
+                    <Loader2 className="h-5 w-5 mt-0.5 shrink-0 animate-spin text-primary" />
+                  ) : (
+                    <Icon className="h-5 w-5 mt-0.5 shrink-0 text-muted-foreground" />
+                  )}
+                  <div className="min-w-0">
+                    <div className="font-medium text-sm">{entity.label}</div>
+                    <div className="text-xs text-muted-foreground">{entity.description}</div>
+                  </div>
+                </Button>
+              );
+            })}
+          </div>
+
+          <div className="pt-2 border-t">
+            <Button
+              variant="default"
+              className="w-full"
+              disabled={!!exportingEntity}
+              onClick={() => handleExportCSV('all')}
+            >
+              {exportingEntity === 'all' ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Download className="h-4 w-4 mr-2" />
+              )}
+              Exportar Tudo (JSON)
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Documentation Section */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
