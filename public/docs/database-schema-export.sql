@@ -515,6 +515,44 @@ ALTER TABLE public.subscriptions ADD COLUMN IF NOT EXISTS last_reconciled TIMEST
 ALTER TABLE public.subscriptions ADD COLUMN IF NOT EXISTS cancel_at_period_end BOOLEAN DEFAULT FALSE;
 ALTER TABLE public.user_usage ADD COLUMN IF NOT EXISTS meal_options_override INTEGER;
 
+-- daily_logs (compatibilidade se a tabela existia sem essas colunas)
+ALTER TABLE public.daily_logs ADD COLUMN IF NOT EXISTS log_date DATE;
+ALTER TABLE public.daily_logs ADD COLUMN IF NOT EXISTS diet_plan_id UUID;
+ALTER TABLE public.daily_logs ADD COLUMN IF NOT EXISTS status public.daily_status DEFAULT 'no_records';
+ALTER TABLE public.daily_logs ADD COLUMN IF NOT EXISTS total_calories_consumed NUMERIC DEFAULT 0;
+ALTER TABLE public.daily_logs ADD COLUMN IF NOT EXISTS total_carbs_consumed NUMERIC DEFAULT 0;
+ALTER TABLE public.daily_logs ADD COLUMN IF NOT EXISTS total_fat_consumed NUMERIC DEFAULT 0;
+ALTER TABLE public.daily_logs ADD COLUMN IF NOT EXISTS total_protein_consumed NUMERIC DEFAULT 0;
+
+-- weight_logs (compatibilidade se a tabela existia sem essas colunas)
+ALTER TABLE public.weight_logs ADD COLUMN IF NOT EXISTS log_date DATE DEFAULT CURRENT_DATE;
+ALTER TABLE public.weight_logs ADD COLUMN IF NOT EXISTS weight_kg NUMERIC;
+ALTER TABLE public.weight_logs ADD COLUMN IF NOT EXISTS notes TEXT;
+
+-- meal_logs
+ALTER TABLE public.meal_logs ADD COLUMN IF NOT EXISTS confirmed_option_id UUID;
+ALTER TABLE public.meal_logs ADD COLUMN IF NOT EXISTS confirmed_at TIMESTAMP WITH TIME ZONE;
+ALTER TABLE public.meal_logs ADD COLUMN IF NOT EXISTS calories_consumed NUMERIC DEFAULT 0;
+ALTER TABLE public.meal_logs ADD COLUMN IF NOT EXISTS protein_consumed NUMERIC DEFAULT 0;
+ALTER TABLE public.meal_logs ADD COLUMN IF NOT EXISTS carbs_consumed NUMERIC DEFAULT 0;
+ALTER TABLE public.meal_logs ADD COLUMN IF NOT EXISTS fat_consumed NUMERIC DEFAULT 0;
+ALTER TABLE public.meal_logs ADD COLUMN IF NOT EXISTS notes TEXT;
+
+-- diet_plans
+ALTER TABLE public.diet_plans ADD COLUMN IF NOT EXISTS is_saved BOOLEAN DEFAULT FALSE;
+ALTER TABLE public.diet_plans ADD COLUMN IF NOT EXISTS objective_change_count INTEGER DEFAULT 0;
+ALTER TABLE public.diet_plans ADD COLUMN IF NOT EXISTS objective_locked_until TIMESTAMP WITH TIME ZONE;
+
+-- profiles
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS include_supplements BOOLEAN DEFAULT FALSE;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS objective_change_count INTEGER DEFAULT 0;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS objective_locked_until TIMESTAMP WITH TIME ZONE;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS preferred_foods TEXT[] DEFAULT '{}';
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS avoided_foods TEXT[] DEFAULT '{}';
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS evening_meal_preference TEXT DEFAULT 'no_preference';
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS last_evening_meal TEXT DEFAULT 'dinner';
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS snack_preference TEXT DEFAULT 'afternoon_snack';
+
 -- =============================================
 -- 3. ÍNDICES
 -- =============================================
