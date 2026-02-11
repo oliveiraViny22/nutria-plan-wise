@@ -1,17 +1,19 @@
 -- =============================================
--- NutriaPlan Database Schema Export (COMPLETO v2)
--- Generated: 2026-02-10
+-- NutriaPlan Database Schema Export (COMPLETO v2.1)
+-- Generated: 2026-02-11
 -- Supabase Project: iplgqpnwfgnqaaeqxnrx
--- Inclui: Enums, Tabelas, Índices, Constraints Únicos,
---         Funções, Triggers, RLS Policies, Storage
+-- =============================================
+-- TOTALMENTE IDEMPOTENTE: pode ser executado em banco novo ou existente.
+-- Resolve: 42P13 (return type), ON CONFLICT, IF NOT EXISTS, DROP FUNCTION.
 -- =============================================
 -- ORDEM DE EXECUÇÃO:
 --   1. Enums
 --   2. Tabelas (com FKs)
+--   2.5 Colunas adicionais (compatibilidade)
 --   3. Índices e Constraints Únicos
---   4. Funções
---   5. Triggers (public + auth)
---   6. RLS (ENABLE + Policies)
+--   4. Funções (com DROP FUNCTION preventivo)
+--   5. Triggers (DROP + CREATE)
+--   6. RLS (ENABLE + DROP POLICY IF EXISTS + CREATE)
 --   7. Storage Buckets
 -- =============================================
 
@@ -147,6 +149,7 @@ CREATE TABLE IF NOT EXISTS public.foods (
     serving_size TEXT DEFAULT '100g',
     type TEXT DEFAULT 'food',
     dietary_profile TEXT,
+    processing_level TEXT,
     origin TEXT DEFAULT 'manual',
     confidence_level TEXT DEFAULT 'high',
     review_status TEXT DEFAULT 'approved',
@@ -356,7 +359,7 @@ CREATE TABLE IF NOT EXISTS public.meal_role_food_categories (
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
 );
 
--- Meal Anchor Foods (1092 âncoras ativas)
+-- Meal Anchor Foods
 CREATE TABLE IF NOT EXISTS public.meal_anchor_foods (
     id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
     meal_type TEXT NOT NULL,
@@ -484,7 +487,10 @@ CREATE TABLE IF NOT EXISTS public.webhook_events (
 -- =============================================
 -- Se a tabela já existia antes de IF NOT EXISTS, estas colunas podem faltar.
 
+-- professional_students
 ALTER TABLE public.professional_students ADD COLUMN IF NOT EXISTS student_confirmed BOOLEAN DEFAULT FALSE;
+
+-- foods
 ALTER TABLE public.foods ADD COLUMN IF NOT EXISTS processing_level TEXT;
 ALTER TABLE public.foods ADD COLUMN IF NOT EXISTS unit_enabled BOOLEAN DEFAULT FALSE;
 ALTER TABLE public.foods ADD COLUMN IF NOT EXISTS unit_name TEXT;
@@ -503,19 +509,29 @@ ALTER TABLE public.foods ADD COLUMN IF NOT EXISTS review_status TEXT DEFAULT 'ap
 ALTER TABLE public.foods ADD COLUMN IF NOT EXISTS dietary_profile TEXT;
 ALTER TABLE public.foods ADD COLUMN IF NOT EXISTS is_supplement_item BOOLEAN DEFAULT FALSE;
 ALTER TABLE public.foods ADD COLUMN IF NOT EXISTS is_optional BOOLEAN DEFAULT FALSE;
+
+-- meal_option_foods
 ALTER TABLE public.meal_option_foods ADD COLUMN IF NOT EXISTS display_quantity NUMERIC;
 ALTER TABLE public.meal_option_foods ADD COLUMN IF NOT EXISTS display_unit TEXT;
 ALTER TABLE public.meal_option_foods ADD COLUMN IF NOT EXISTS calculated_grams NUMERIC;
 ALTER TABLE public.meal_option_foods ADD COLUMN IF NOT EXISTS unit_locked BOOLEAN DEFAULT FALSE;
+
+-- meal_anchor_foods
 ALTER TABLE public.meal_anchor_foods ADD COLUMN IF NOT EXISTS goal_type TEXT;
 ALTER TABLE public.meal_anchor_foods ADD COLUMN IF NOT EXISTS dietary_profile TEXT;
+
+-- body_measurements
 ALTER TABLE public.body_measurements ADD COLUMN IF NOT EXISTS recorded_by UUID;
+
+-- subscriptions
 ALTER TABLE public.subscriptions ADD COLUMN IF NOT EXISTS grace_period_end TIMESTAMP WITH TIME ZONE;
 ALTER TABLE public.subscriptions ADD COLUMN IF NOT EXISTS last_reconciled TIMESTAMP WITH TIME ZONE;
 ALTER TABLE public.subscriptions ADD COLUMN IF NOT EXISTS cancel_at_period_end BOOLEAN DEFAULT FALSE;
+
+-- user_usage
 ALTER TABLE public.user_usage ADD COLUMN IF NOT EXISTS meal_options_override INTEGER;
 
--- daily_logs (compatibilidade se a tabela existia sem essas colunas)
+-- daily_logs
 ALTER TABLE public.daily_logs ADD COLUMN IF NOT EXISTS log_date DATE;
 ALTER TABLE public.daily_logs ADD COLUMN IF NOT EXISTS diet_plan_id UUID;
 ALTER TABLE public.daily_logs ADD COLUMN IF NOT EXISTS status public.daily_status DEFAULT 'no_records';
@@ -524,7 +540,7 @@ ALTER TABLE public.daily_logs ADD COLUMN IF NOT EXISTS total_carbs_consumed NUME
 ALTER TABLE public.daily_logs ADD COLUMN IF NOT EXISTS total_fat_consumed NUMERIC DEFAULT 0;
 ALTER TABLE public.daily_logs ADD COLUMN IF NOT EXISTS total_protein_consumed NUMERIC DEFAULT 0;
 
--- weight_logs (compatibilidade se a tabela existia sem essas colunas)
+-- weight_logs
 ALTER TABLE public.weight_logs ADD COLUMN IF NOT EXISTS log_date DATE DEFAULT CURRENT_DATE;
 ALTER TABLE public.weight_logs ADD COLUMN IF NOT EXISTS weight_kg NUMERIC;
 ALTER TABLE public.weight_logs ADD COLUMN IF NOT EXISTS notes TEXT;
@@ -559,8 +575,6 @@ ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS snack_preference TEXT DEFAU
 
 -- profiles
 CREATE INDEX IF NOT EXISTS idx_profiles_user_id ON public.profiles (user_id);
-
--- plans (name UNIQUE já criado inline)
 
 -- subscriptions
 CREATE INDEX IF NOT EXISTS idx_subscriptions_user_id ON public.subscriptions (user_id);
@@ -665,8 +679,13 @@ CREATE INDEX IF NOT EXISTS idx_webhook_events_event_id ON public.webhook_events 
 -- =============================================
 -- 4. FUNÇÕES
 -- =============================================
+-- IMPORTANTE: Usamos DROP FUNCTION IF EXISTS antes de cada CREATE OR REPLACE
+-- para evitar ERROR 42P13 ("cannot change return type of existing function")
+-- quando a assinatura da função mudou entre versões.
+-- =============================================
 
 -- Remove accents from text
+DROP FUNCTION IF EXISTS public.remove_accents(text);
 CREATE OR REPLACE FUNCTION public.remove_accents(input_text TEXT)
 RETURNS TEXT
 LANGUAGE sql
@@ -681,6 +700,7 @@ AS $$
 $$;
 
 -- Generate canonical name for foods
+DROP FUNCTION IF EXISTS public.generate_canonical_name(text);
 CREATE OR REPLACE FUNCTION public.generate_canonical_name(food_name TEXT)
 RETURNS TEXT
 LANGUAGE plpgsql
@@ -701,6 +721,7 @@ END;
 $$;
 
 -- Set canonical name trigger function
+DROP FUNCTION IF EXISTS public.set_canonical_name() CASCADE;
 CREATE OR REPLACE FUNCTION public.set_canonical_name()
 RETURNS TRIGGER
 LANGUAGE plpgsql
@@ -715,6 +736,7 @@ END;
 $$;
 
 -- Update updated_at column
+DROP FUNCTION IF EXISTS public.update_updated_at_column() CASCADE;
 CREATE OR REPLACE FUNCTION public.update_updated_at_column()
 RETURNS TRIGGER
 LANGUAGE plpgsql
@@ -727,6 +749,7 @@ END;
 $$;
 
 -- Check if user has role (SECURITY DEFINER - evita recursão RLS)
+DROP FUNCTION IF EXISTS public.has_role(uuid, app_role);
 CREATE OR REPLACE FUNCTION public.has_role(_user_id UUID, _role app_role)
 RETURNS BOOLEAN
 LANGUAGE plpgsql
@@ -742,6 +765,7 @@ END;
 $$;
 
 -- Get user plan
+DROP FUNCTION IF EXISTS public.get_user_plan(uuid);
 CREATE OR REPLACE FUNCTION public.get_user_plan(_user_id UUID)
 RETURNS TABLE(
     plan_id UUID,
@@ -801,6 +825,7 @@ END;
 $$;
 
 -- Check if user can use feature
+DROP FUNCTION IF EXISTS public.can_use_feature(uuid, text);
 CREATE OR REPLACE FUNCTION public.can_use_feature(_user_id UUID, _feature TEXT)
 RETURNS BOOLEAN
 LANGUAGE plpgsql
@@ -868,6 +893,7 @@ END;
 $$;
 
 -- Get usage info
+DROP FUNCTION IF EXISTS public.get_usage_info(uuid, text);
 CREATE OR REPLACE FUNCTION public.get_usage_info(_user_id UUID, _feature TEXT)
 RETURNS TABLE(current_usage INTEGER, max_limit INTEGER, allowed BOOLEAN)
 LANGUAGE plpgsql
@@ -939,6 +965,7 @@ END;
 $$;
 
 -- Increment usage
+DROP FUNCTION IF EXISTS public.increment_usage(uuid, text);
 CREATE OR REPLACE FUNCTION public.increment_usage(_user_id UUID, _feature TEXT)
 RETURNS BOOLEAN
 LANGUAGE plpgsql
@@ -975,6 +1002,7 @@ END;
 $$;
 
 -- Reset monthly usage
+DROP FUNCTION IF EXISTS public.reset_monthly_usage(uuid);
 CREATE OR REPLACE FUNCTION public.reset_monthly_usage(_user_id UUID)
 RETURNS VOID
 LANGUAGE plpgsql
@@ -997,6 +1025,7 @@ END;
 $$;
 
 -- Calculate nutritional targets (Mifflin-St Jeor)
+DROP FUNCTION IF EXISTS public.calculate_nutritional_targets(uuid, text);
 CREATE OR REPLACE FUNCTION public.calculate_nutritional_targets(_user_id UUID, _goal TEXT)
 RETURNS JSON
 LANGUAGE plpgsql
@@ -1085,6 +1114,7 @@ END;
 $$;
 
 -- Check objective change eligibility
+DROP FUNCTION IF EXISTS public.check_objective_change_eligibility(uuid);
 CREATE OR REPLACE FUNCTION public.check_objective_change_eligibility(_user_id UUID)
 RETURNS TABLE(can_change BOOLEAN, locked_until TIMESTAMP WITH TIME ZONE, next_cooldown_days INTEGER, change_count INTEGER, reason TEXT)
 LANGUAGE plpgsql
@@ -1141,6 +1171,7 @@ END;
 $$;
 
 -- Apply objective change
+DROP FUNCTION IF EXISTS public.apply_objective_change(uuid, text, boolean);
 CREATE OR REPLACE FUNCTION public.apply_objective_change(_user_id UUID, _new_goal TEXT, _keep_plan_active BOOLEAN DEFAULT FALSE)
 RETURNS JSONB
 LANGUAGE plpgsql
@@ -1211,6 +1242,8 @@ END;
 $$;
 
 -- Confirm meal consumption (atômico: meal_log + daily_log)
+-- DROP com assinatura exata para evitar ERROR 42P13
+DROP FUNCTION IF EXISTS public.confirm_meal_consumption(uuid, uuid, uuid, text, date);
 CREATE OR REPLACE FUNCTION public.confirm_meal_consumption(
     _user_id UUID, _meal_id UUID, _option_id UUID, _status TEXT, _log_date DATE DEFAULT CURRENT_DATE
 )
@@ -1223,52 +1256,73 @@ DECLARE
   _diet_plan_id UUID;
   _daily_log_id UUID;
   _meal_log_id UUID;
-  _option_data RECORD;
+  _option_calories NUMERIC;
+  _option_protein NUMERIC;
+  _option_carbs NUMERIC;
+  _option_fat NUMERIC;
   _total_meals INT;
   _confirmed_meals INT;
-  _new_daily_status daily_status;
-  _meal_status_value meal_status;
+  _daily_status daily_status;
 BEGIN
-  _meal_status_value := _status::meal_status;
-  SELECT diet_plan_id INTO _diet_plan_id FROM meals WHERE id = _meal_id;
-  IF _diet_plan_id IS NULL THEN RAISE EXCEPTION 'Meal not found'; END IF;
+  -- Get active diet plan
+  SELECT id INTO _diet_plan_id
+  FROM diet_plans
+  WHERE user_id = _user_id AND status = 'active'
+  ORDER BY created_at DESC
+  LIMIT 1;
 
-  INSERT INTO daily_logs (user_id, diet_plan_id, log_date, status)
-  VALUES (_user_id, _diet_plan_id, _log_date, 'no_records'::daily_status)
-  ON CONFLICT (user_id, log_date) DO NOTHING;
-
-  SELECT id INTO _daily_log_id FROM daily_logs WHERE user_id = _user_id AND log_date = _log_date;
-
-  IF _option_id IS NOT NULL THEN
-    SELECT total_calories, total_protein, total_carbs, total_fat INTO _option_data FROM meal_options WHERE id = _option_id;
+  IF _diet_plan_id IS NULL THEN
+    RAISE EXCEPTION 'Nenhum plano alimentar ativo encontrado';
   END IF;
 
-  SELECT id INTO _meal_log_id FROM meal_logs WHERE daily_log_id = _daily_log_id AND meal_id = _meal_id;
-
-  IF _meal_log_id IS NULL THEN
-    INSERT INTO meal_logs (daily_log_id, meal_id, status, confirmed_option_id, confirmed_at, calories_consumed, protein_consumed, carbs_consumed, fat_consumed)
-    VALUES (_daily_log_id, _meal_id, _meal_status_value, _option_id,
-      CASE WHEN _meal_status_value IN ('confirmed', 'late_confirmed') THEN NOW() ELSE NULL END,
-      COALESCE(_option_data.total_calories, 0), COALESCE(_option_data.total_protein, 0),
-      COALESCE(_option_data.total_carbs, 0), COALESCE(_option_data.total_fat, 0))
-    RETURNING id INTO _meal_log_id;
-  ELSE
-    UPDATE meal_logs SET status = _meal_status_value, confirmed_option_id = _option_id,
-      confirmed_at = CASE WHEN _meal_status_value IN ('confirmed', 'late_confirmed') THEN NOW() ELSE confirmed_at END,
-      calories_consumed = COALESCE(_option_data.total_calories, 0), protein_consumed = COALESCE(_option_data.total_protein, 0),
-      carbs_consumed = COALESCE(_option_data.total_carbs, 0), fat_consumed = COALESCE(_option_data.total_fat, 0)
-    WHERE id = _meal_log_id;
+  -- Verify meal belongs to this plan
+  IF NOT EXISTS (SELECT 1 FROM meals WHERE id = _meal_id AND diet_plan_id = _diet_plan_id) THEN
+    RAISE EXCEPTION 'Refeição não pertence ao plano ativo';
   END IF;
 
-  SELECT COUNT(*) INTO _total_meals FROM meals WHERE diet_plan_id = _diet_plan_id;
-  SELECT COUNT(*) INTO _confirmed_meals FROM meal_logs WHERE daily_log_id = _daily_log_id AND status != 'pending';
+  -- Get or create daily log
+  SELECT id INTO _daily_log_id
+  FROM daily_logs
+  WHERE user_id = _user_id AND diet_plan_id = _diet_plan_id AND log_date = _log_date;
 
-  IF _confirmed_meals = 0 THEN _new_daily_status := 'no_records'::daily_status;
-  ELSIF _confirmed_meals >= _total_meals THEN _new_daily_status := 'complete'::daily_status;
-  ELSE _new_daily_status := 'partial'::daily_status;
+  IF _daily_log_id IS NULL THEN
+    INSERT INTO daily_logs (user_id, diet_plan_id, log_date, status)
+    VALUES (_user_id, _diet_plan_id, _log_date, 'partial')
+    RETURNING id INTO _daily_log_id;
   END IF;
 
-  UPDATE daily_logs SET status = _new_daily_status,
+  -- Get option nutritional data if confirming
+  IF _status IN ('confirmed', 'late_confirmed') AND _option_id IS NOT NULL THEN
+    SELECT total_calories, total_protein, total_carbs, total_fat
+    INTO _option_calories, _option_protein, _option_carbs, _option_fat
+    FROM meal_options
+    WHERE id = _option_id AND meal_id = _meal_id;
+  END IF;
+
+  -- Upsert meal log
+  INSERT INTO meal_logs (daily_log_id, meal_id, status, confirmed_option_id, confirmed_at,
+    calories_consumed, protein_consumed, carbs_consumed, fat_consumed)
+  VALUES (
+    _daily_log_id, _meal_id, _status::meal_status,
+    CASE WHEN _status IN ('confirmed', 'late_confirmed') THEN _option_id ELSE NULL END,
+    CASE WHEN _status IN ('confirmed', 'late_confirmed') THEN NOW() ELSE NULL END,
+    COALESCE(_option_calories, 0),
+    COALESCE(_option_protein, 0),
+    COALESCE(_option_carbs, 0),
+    COALESCE(_option_fat, 0)
+  )
+  ON CONFLICT (daily_log_id, meal_id) DO UPDATE SET
+    status = EXCLUDED.status,
+    confirmed_option_id = EXCLUDED.confirmed_option_id,
+    confirmed_at = EXCLUDED.confirmed_at,
+    calories_consumed = EXCLUDED.calories_consumed,
+    protein_consumed = EXCLUDED.protein_consumed,
+    carbs_consumed = EXCLUDED.carbs_consumed,
+    fat_consumed = EXCLUDED.fat_consumed
+  RETURNING id INTO _meal_log_id;
+
+  -- Update daily totals
+  UPDATE daily_logs SET
     total_calories_consumed = (SELECT COALESCE(SUM(calories_consumed), 0) FROM meal_logs WHERE daily_log_id = _daily_log_id AND status IN ('confirmed', 'late_confirmed')),
     total_protein_consumed = (SELECT COALESCE(SUM(protein_consumed), 0) FROM meal_logs WHERE daily_log_id = _daily_log_id AND status IN ('confirmed', 'late_confirmed')),
     total_carbs_consumed = (SELECT COALESCE(SUM(carbs_consumed), 0) FROM meal_logs WHERE daily_log_id = _daily_log_id AND status IN ('confirmed', 'late_confirmed')),
@@ -1276,11 +1330,30 @@ BEGIN
     updated_at = NOW()
   WHERE id = _daily_log_id;
 
-  RETURN json_build_object('success', true, 'daily_log_id', _daily_log_id, 'meal_log_id', _meal_log_id, 'status', _meal_status_value::text, 'daily_status', _new_daily_status::text);
+  -- Calculate daily status
+  SELECT COUNT(*) INTO _total_meals FROM meals WHERE diet_plan_id = _diet_plan_id;
+  SELECT COUNT(*) INTO _confirmed_meals FROM meal_logs WHERE daily_log_id = _daily_log_id AND status != 'pending';
+
+  IF _confirmed_meals >= _total_meals THEN
+    _daily_status := 'complete';
+  ELSIF _confirmed_meals > 0 THEN
+    _daily_status := 'partial';
+  ELSE
+    _daily_status := 'no_records';
+  END IF;
+
+  UPDATE daily_logs SET status = _daily_status WHERE id = _daily_log_id;
+
+  RETURN json_build_object(
+    'daily_log_id', _daily_log_id,
+    'meal_log_id', _meal_log_id,
+    'status', _daily_status
+  );
 END;
 $$;
 
 -- Convert grams to unit
+DROP FUNCTION IF EXISTS public.convert_grams_to_unit(numeric, numeric, numeric, numeric);
 CREATE OR REPLACE FUNCTION public.convert_grams_to_unit(
     _grams NUMERIC, _unit_weight_grams NUMERIC, _unit_increment NUMERIC, _tolerance_percent NUMERIC DEFAULT 5
 )
@@ -1316,6 +1389,7 @@ END;
 $$;
 
 -- Get feature flag
+DROP FUNCTION IF EXISTS public.get_feature_flag(text, boolean);
 CREATE OR REPLACE FUNCTION public.get_feature_flag(_flag_key TEXT, _default_value BOOLEAN DEFAULT FALSE)
 RETURNS BOOLEAN
 LANGUAGE plpgsql
@@ -1335,6 +1409,7 @@ END;
 $$;
 
 -- Get rollout percent
+DROP FUNCTION IF EXISTS public.get_rollout_percent(text, integer);
 CREATE OR REPLACE FUNCTION public.get_rollout_percent(_flag_key TEXT, _default_value INTEGER DEFAULT 0)
 RETURNS INTEGER
 LANGUAGE plpgsql
@@ -1353,6 +1428,7 @@ END;
 $$;
 
 -- Is user in rollout
+DROP FUNCTION IF EXISTS public.is_in_rollout(uuid, text);
 CREATE OR REPLACE FUNCTION public.is_in_rollout(_user_id UUID, _flag_key TEXT)
 RETURNS BOOLEAN
 LANGUAGE plpgsql
@@ -1372,6 +1448,7 @@ END;
 $$;
 
 -- Can view supplements
+DROP FUNCTION IF EXISTS public.can_view_supplements(uuid);
 CREATE OR REPLACE FUNCTION public.can_view_supplements(_user_id UUID)
 RETURNS BOOLEAN
 LANGUAGE sql
@@ -1390,6 +1467,7 @@ AS $$
 $$;
 
 -- Can view food
+DROP FUNCTION IF EXISTS public.can_view_food(uuid, uuid);
 CREATE OR REPLACE FUNCTION public.can_view_food(_user_id UUID, _food_id UUID)
 RETURNS BOOLEAN
 LANGUAGE sql
@@ -1408,6 +1486,7 @@ AS $$
 $$;
 
 -- Get visible foods for user
+DROP FUNCTION IF EXISTS public.get_visible_foods_for_user(uuid);
 CREATE OR REPLACE FUNCTION public.get_visible_foods_for_user(_user_id UUID)
 RETURNS SETOF foods
 LANGUAGE sql
@@ -1424,6 +1503,7 @@ AS $$
 $$;
 
 -- Handle new user (trigger function para auth.users)
+DROP FUNCTION IF EXISTS public.handle_new_user() CASCADE;
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER
 LANGUAGE plpgsql
@@ -1445,6 +1525,7 @@ END;
 $$;
 
 -- Handle subscription upgrade
+DROP FUNCTION IF EXISTS public.handle_subscription_upgrade() CASCADE;
 CREATE OR REPLACE FUNCTION public.handle_subscription_upgrade()
 RETURNS TRIGGER
 LANGUAGE plpgsql
@@ -1912,7 +1993,10 @@ CREATE POLICY "Service role full access to webhook_events" ON public.webhook_eve
 INSERT INTO storage.buckets (id, name, public) VALUES ('adherence-reports', 'adherence-reports', false) ON CONFLICT (id) DO NOTHING;
 
 -- =============================================
--- FIM DO SCHEMA EXPORT COMPLETO (IDEMPOTENTE)
+-- FIM DO SCHEMA EXPORT COMPLETO v2.1 (IDEMPOTENTE)
+-- =============================================
 -- Tabelas: 24 | Funções: 20 | Triggers: 16 | Índices: 60+
+-- Todas as funções usam DROP FUNCTION IF EXISTS antes de CREATE
+-- para evitar ERROR 42P13 em bancos existentes.
 -- Pode ser executado múltiplas vezes sem erro.
 -- =============================================
