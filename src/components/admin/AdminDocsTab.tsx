@@ -20,7 +20,11 @@ import {
   Settings,
   UserCheck,
   FileDown,
+  Copy,
+  Check,
+  TableProperties,
 } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
@@ -53,6 +57,9 @@ export function AdminDocsTab({
 }: AdminDocsTabProps) {
   const { toast } = useToast();
   const [exportingEntity, setExportingEntity] = useState<string | null>(null);
+  const [schemaSql, setSchemaSql] = useState<string | null>(null);
+  const [schemaLoading, setSchemaLoading] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   const handleExportCSV = async (entity: string) => {
     setExportingEntity(entity);
@@ -93,6 +100,37 @@ export function AdminDocsTab({
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
+  };
+
+  const handleLoadSchema = async () => {
+    setSchemaLoading(true);
+    try {
+      const res = await fetch('/docs/database-schema-export.sql');
+      if (!res.ok) throw new Error('Arquivo não encontrado');
+      const text = await res.text();
+      setSchemaSql(text);
+    } catch {
+      // Try loading from the docs folder via import
+      try {
+        const { data, error } = await supabase.functions.invoke('export-data', {
+          body: { entity: 'system_settings' },
+        });
+        // Fallback: show a message
+        setSchemaSql('-- Erro ao carregar o schema. Verifique o arquivo docs/database-schema-export.sql');
+      } catch {
+        setSchemaSql('-- Erro ao carregar o schema SQL');
+      }
+    } finally {
+      setSchemaLoading(false);
+    }
+  };
+
+  const handleCopySchema = async () => {
+    if (!schemaSql) return;
+    await navigator.clipboard.writeText(schemaSql);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+    toast({ title: 'Copiado!', description: 'SQL do schema copiado para a área de transferência.' });
   };
 
   return (
@@ -153,7 +191,61 @@ export function AdminDocsTab({
         </CardContent>
       </Card>
 
-      {/* Documentation Section */}
+      {/* SQL Schema Section */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <TableProperties className="h-5 w-5 text-primary" />
+            SQL do Schema (Migração de Tabelas)
+          </CardTitle>
+          <CardDescription>
+            Carregue o SQL completo das tabelas do sistema para copiar e migrar para outro ambiente.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {!schemaSql ? (
+            <Button
+              onClick={handleLoadSchema}
+              disabled={schemaLoading}
+              variant="outline"
+              className="w-full"
+            >
+              {schemaLoading ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Database className="h-4 w-4 mr-2" />
+              )}
+              Carregar SQL das Tabelas
+            </Button>
+          ) : (
+            <>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">
+                  {schemaSql.split('\n').length} linhas
+                </span>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={handleCopySchema}
+                >
+                  {copied ? (
+                    <Check className="h-4 w-4 mr-2" />
+                  ) : (
+                    <Copy className="h-4 w-4 mr-2" />
+                  )}
+                  {copied ? 'Copiado!' : 'Copiar SQL'}
+                </Button>
+              </div>
+              <Textarea
+                value={schemaSql}
+                readOnly
+                className="font-mono text-xs min-h-[400px] max-h-[600px] resize-y"
+              />
+            </>
+          )}
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
