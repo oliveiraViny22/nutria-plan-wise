@@ -58,8 +58,10 @@ export function AdminDocsTab({
   const { toast } = useToast();
   const [exportingEntity, setExportingEntity] = useState<string | null>(null);
   const [schemaSql, setSchemaSql] = useState<string | null>(null);
+  const [dataSql, setDataSql] = useState<string | null>(null);
   const [schemaLoading, setSchemaLoading] = useState(false);
-  const [copied, setCopied] = useState(false);
+  const [dataLoading, setDataLoading] = useState(false);
+  const [copied, setCopied] = useState<string | null>(null);
 
   const handleExportCSV = async (entity: string) => {
     setExportingEntity(entity);
@@ -125,12 +127,25 @@ export function AdminDocsTab({
     }
   };
 
-  const handleCopySchema = async () => {
-    if (!schemaSql) return;
-    await navigator.clipboard.writeText(schemaSql);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-    toast({ title: 'Copiado!', description: 'SQL do schema copiado para a área de transferência.' });
+  const handleCopyText = async (text: string, label: string) => {
+    await navigator.clipboard.writeText(text);
+    setCopied(label);
+    setTimeout(() => setCopied(null), 2000);
+    toast({ title: 'Copiado!', description: `SQL de ${label} copiado para a área de transferência.` });
+  };
+
+  const handleLoadData = async () => {
+    setDataLoading(true);
+    try {
+      const res = await fetch('/docs/database-data-export.sql');
+      if (!res.ok) throw new Error('Arquivo não encontrado');
+      const text = await res.text();
+      setDataSql(text);
+    } catch {
+      setDataSql('-- Erro ao carregar o SQL de dados. Verifique o arquivo docs/database-data-export.sql');
+    } finally {
+      setDataLoading(false);
+    }
   };
 
   return (
@@ -226,14 +241,14 @@ export function AdminDocsTab({
                 <Button
                   size="sm"
                   variant="secondary"
-                  onClick={handleCopySchema}
+                  onClick={() => handleCopyText(schemaSql, 'schema')}
                 >
-                  {copied ? (
+                  {copied === 'schema' ? (
                     <Check className="h-4 w-4 mr-2" />
                   ) : (
                     <Copy className="h-4 w-4 mr-2" />
                   )}
-                  {copied ? 'Copiado!' : 'Copiar SQL'}
+                  {copied === 'schema' ? 'Copiado!' : 'Copiar SQL'}
                 </Button>
               </div>
               <Textarea
@@ -243,6 +258,79 @@ export function AdminDocsTab({
               />
             </>
           )}
+        </CardContent>
+      </Card>
+
+      {/* SQL Data Export/Import Section */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Database className="h-5 w-5 text-primary" />
+            SQL de Dados (Exportação / Importação)
+          </CardTitle>
+          <CardDescription>
+            SQL com os dados semente do sistema (configurações, planos, alimentos). 
+            Use para importar dados em outro ambiente executando o SQL no editor SQL.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {!dataSql ? (
+            <Button
+              onClick={handleLoadData}
+              disabled={dataLoading}
+              variant="outline"
+              className="w-full"
+            >
+              {dataLoading ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Database className="h-4 w-4 mr-2" />
+              )}
+              Carregar SQL de Dados
+            </Button>
+          ) : (
+            <>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">
+                  {dataSql.split('\n').length} linhas
+                </span>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => handleCopyText(dataSql, 'dados')}
+                >
+                  {copied === 'dados' ? (
+                    <Check className="h-4 w-4 mr-2" />
+                  ) : (
+                    <Copy className="h-4 w-4 mr-2" />
+                  )}
+                  {copied === 'dados' ? 'Copiado!' : 'Copiar SQL'}
+                </Button>
+              </div>
+              <Textarea
+                value={dataSql}
+                readOnly
+                className="font-mono text-xs min-h-[400px] max-h-[600px] resize-y"
+              />
+            </>
+          )}
+          
+          <div className="rounded-md border p-4 bg-muted/30 space-y-2">
+            <h4 className="text-sm font-medium">Como migrar os dados:</h4>
+            <ol className="text-xs text-muted-foreground space-y-1 list-decimal list-inside">
+              <li>Execute primeiro o <strong>SQL do Schema</strong> (seção acima) para criar as tabelas</li>
+              <li>Em seguida, execute o <strong>SQL de Dados</strong> para inserir as configurações e dados semente</li>
+              <li>Para importar alimentos separadamente, baixe o arquivo <code>foods-import.sql</code> abaixo</li>
+            </ol>
+            <a 
+              href="/docs/foods-import.sql"
+              download="foods-import.sql"
+              className="inline-flex items-center gap-2 mt-2 px-3 py-1.5 text-xs font-medium border rounded-md hover:bg-muted transition-colors"
+            >
+              <Download className="h-3 w-3" />
+              Baixar foods-import.sql
+            </a>
+          </div>
         </CardContent>
       </Card>
 
